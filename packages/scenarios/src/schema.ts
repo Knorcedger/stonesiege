@@ -47,8 +47,9 @@ export interface ScenarioPlayer {
 
 export type Condition =
   | { kind: 'always' }
-  | { kind: 'timerSeconds'; seconds: number } // since trigger armed
-  | { kind: 'entitiesInArea'; player?: number; defIds?: string[]; area: Rect; atLeast: number }
+  | { kind: 'timerSeconds'; seconds: number } // since this trigger was (last) armed — for unarmed triggers, since armTrigger
+  /** Count entities in a rect. Provide atLeast and/or atMost (at least one required). */
+  | { kind: 'entitiesInArea'; player?: number; defIds?: string[]; area: Rect; atLeast?: number; atMost?: number }
   | { kind: 'refDestroyed'; ref: string }
   | { kind: 'refsDestroyed'; refs: string[]; all: boolean }
   | { kind: 'playerDefeated'; player: number }
@@ -62,7 +63,9 @@ export type Condition =
 
 export type TriggerEffect =
   | { kind: 'message'; text: string; speaker?: string; portrait?: string } // dialogue banner
-  | { kind: 'objectiveAdd'; id: string; text: string }
+  | { kind: 'objectiveAdd'; id: string; text: string } // idempotent: no-op if id already added
+  // Objective state latches: the first complete/fail wins; later complete/fail effects on a
+  // resolved id — or on an id that was never added — are no-ops.
   | { kind: 'objectiveComplete'; id: string }
   | { kind: 'objectiveFail'; id: string }
   | { kind: 'victory' }
@@ -74,6 +77,9 @@ export type TriggerEffect =
   | { kind: 'aiProfile'; player: number; profile: AiProfile }
   | { kind: 'aiAttackNow'; player: number; targetArea?: Rect }
   | { kind: 'panCamera'; x: number; y: number }
+  // Arming a trigger that has already fired and is not loop is a no-op (a fire-once trigger
+  // can never fire twice) — this makes converging arm patterns safe. Arming an armed,
+  // not-yet-fired trigger is also a no-op (it does not reset the timer).
   | { kind: 'armTrigger'; triggerId: string }
   | { kind: 'playSting'; sting: 'horn' | 'victory' | 'defeat' | 'alert' };
 
@@ -81,7 +87,10 @@ export interface TriggerDef {
   id: string;
   /** Armed triggers evaluate every tick; unarmed wait for armTrigger. Default true. */
   armed?: boolean;
-  /** Re-arm after firing (periodic). Default false = fire once. */
+  /**
+   * Re-arm after firing (periodic). Default false = fire once — and armTrigger on a
+   * fired non-loop trigger is a no-op, so it can never fire twice.
+   */
   loop?: boolean;
   conditions: Condition[]; // AND
   effects: TriggerEffect[];

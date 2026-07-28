@@ -14,27 +14,46 @@ The asset generator (`tools/assetgen`) emits Pixi spritesheet atlases into
 
 ## Frame naming (renderer resolves names mechanically — follow exactly)
 - Terrain: `terr/<terrainId>/<variant>` (2–4 variants each, e.g. `terr/grass/0`)
+  - Baked edge transitions: `terr/<hi>_<lo>/<edge>`, `edge` ∈ {`nw`, `ne`, `sw`, `se`}
+    (higher-priority terrain's fringe composited over the lower neighbor; packed into
+    `terrain.png` — recipe in ART_BIBLE §3.2).
 - Units: `unit/<defId>/<anim>/<dir>/<frame>`
   - anims: `idle`, `walk`, `attack`, `gather` (villager), `carry` (villager), `die`, `decay`
   - dir: 0..7, **0 = facing south (toward camera), clockwise** (1 = SW, 2 = W, 3 = NW, 4 = N…).
-    The generator bakes all 8 (mirroring E from W side at build time).
+    The generator authors ONLY dirs 0–4 (S, SW, W, NW, N); the renderer derives 5=NE, 6=E,
+    7=SE by mirroring dirs 3, 2, 1 with `scale.x = -1`. This keeps the whole units atlas
+    within a single 2048×2048 texture (GPU budget: ≤256 MB total for all textures incl.
+    per-player color copies).
   - frames: `walk` 6–8, `attack` 4–6 (impact on a marked frame), `idle` 1–2, `die` 4–6.
+    Each attack anim's impact frame index is written to `meta.bannerfall.impactFrame`
+    in the atlas JSON.
 - Buildings: `bld/<defId>/<state>` — states: `done`, `construct0..2` (scaffold stages), `rubble`.
   Where a building looks different per age (TC, houses), suffix: `bld/<defId>/<age>/done`.
+  Exception: the farm has no construct/rubble states — see ART_BIBLE §4.4 (the renderer
+  draws `obj/farm/0` with a progress dropout during construction).
 - Objects: `obj/tree/<variant>`, `obj/stump`, `obj/gold/<variant>`, `obj/stone/<variant>`,
   `obj/berries`, `obj/farm/<stage>`, `obj/sheep/...`, `obj/deer/...` (animals follow unit anim
-  naming under `obj/` if animated).
-- Icons (HUD command card, 40×40): `icon/<defId>`, `icon/tech/<techId>`, `icon/res/<resource>`.
+  naming under `obj/` if animated). Animals may use reduced frame counts: `idle` 1–2,
+  `walk` 4, `attack` 4, `die` 3, `decay` 2 — the unit ranges above bind `unit/*` only.
+  Ownable animals (captured sheep) carry the player-color mask and emit
+  `obj/<defId>@p<idx>/...` variants exactly like units.
+- Icons (HUD command card, 40×40): `icon/<defId>`, `icon/tech/<techId>`, `icon/res/<resource>`,
+  `icon/cmd/<verb>` (command verbs: `attackMove`, `stop`, `garrison`, `ungarrison`, `delete`,
+  `reseedFarm`, `pack`, `unpack`, `heal`, `convert`, `rally`). Every icon also gets a
+  grayscale companion `icon/<...>/gray` (disabled-button state; luma-mapped, no mask colors).
 - UI chrome under `ui/*` (panel slices, buttons, health bar, selection ring sized per footprint).
 
 ## Player colors
 8 player colors (index 0..7): blue, red, green, yellow, cyan, purple, gray, orange.
-Unit/building sprites are authored with a **magenta-family mask palette** (pure #FF00FF,
-#CC00CC, #990099) that the generator swaps per player color at build time, emitting
-`unit/<defId>@p<color>/...` variants — OR the atlas emits grayscale-mask companion frames and
-the renderer tints. **The generator picks ONE strategy and documents it in the atlas JSON
-`meta.bannerfall.playerColorStrategy` field ('baked' | 'tint')**; renderer must support the
-declared one. Baked is preferred for quality (shading preserved).
+Unit/building/ownable-object sprites are authored with a **magenta-family mask palette**
+(pure #FF00FF, #CC00CC, #990099 — light/mid/dark). Strategy is **'runtime-swap'** (declared
+in atlas JSON `meta.bannerfall.playerColorStrategy`): the atlas ships ONE base copy with the
+magenta mask left in; at match load the RENDERER builds per-player-color textures by exact
+palette substitution on an offscreen canvas (magenta ramp → that color's 3-tone ramp from
+ART_BIBLE), only for the ≤4 colors actually in the match. Shading quality is identical to
+baking, without the 8× atlas blowup. The mask ramp and the 8 player ramps are also listed in
+`meta.bannerfall.maskPalette` / `meta.bannerfall.playerRamps` so the renderer never hardcodes
+hexes. (Baked `@p<idx>` frame naming remains reserved for a future strategy switch.)
 
 ## Style (see ART_BIBLE.md for the full bible)
 Original stylized pixel art evoking late-90s isometric RTS: warm earthy palette, strong

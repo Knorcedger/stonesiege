@@ -7,9 +7,16 @@ and code are original. Mechanics are faithful to the AoE2 experience.
 Target session length: ~20 minutes (fast rush win) to ~2 hours (evenly matched imperial slugfest).
 Platforms: iOS + Android (Capacitor), plus browser for development/testing.
 
+Long sessions must survive mobile OS lifecycle: when the app is backgrounded, the match is
+automatically snapshotted (the deterministic sim makes this cheap — persist the RNG seed +
+command log, or a direct state dump) and resumed on relaunch, so a phone call at minute 90
+never loses a game. All v1 modes are single-player, so the game is always pausable: explicit
+pause button, plus auto-pause on backgrounding. (Manual save/load UI stays on the roadmap —
+see Out of scope.)
+
 ## Modes
 - **Practice**: random-map skirmish vs 1–3 bot opponents. Difficulties: Easy / Standard / Hard.
-  Victory by conquest (destroy enemies or force resign).
+  Victory by conquest — elimination rules are defined in Victory / Defeat below.
 - **Campaign**: scripted scenarios with objectives, briefings, and triggers.
   First campaign: **William Wallace — The Rising of Scotland** (6 scenarios; doubles as the
   tutorial arc, teaching economy → military → sieges progressively).
@@ -18,12 +25,20 @@ Platforms: iOS + Android (Capacitor), plus browser for development/testing.
 - Four stockpiled resources: **Food, Wood, Gold, Stone**.
 - **Villagers** gather and construct. Gathering requires drop-off buildings
   (Town Center for all; Mill = food, Lumber Camp = wood, Mining Camp = gold/stone).
-- Food sources: berry bushes (forage), sheep/deer (herd/hunt), **farms** (renewable, built on
-  a 2×2 plot near a Mill/TC, hold a finite amount of food, re-seedable).
+- Food sources: berry bushes (forage), sheep/deer (herd/hunt), **farms** (renewable, a 3×3
+  plot **placeable anywhere** — there is no proximity rule; efficient play clusters farms
+  around a Mill/TC because of drop-off walk distance. Farms hold a finite amount of food and
+  are re-seedable at full wood cost; the Mill provides a **reseed queue / auto-reseed toggle**
+  that deducts wood as each farm expires, so late-game players never babysit 20 farms by hand).
 - Trees are map objects; chopping a tree eventually depletes it and clears the tile.
 - Gold/stone mines are finite deposits. Depletion drives map control and aggression.
-- Villagers carry a small amount (≈10) and walk to drop-off: **placement of camps matters**.
-- Market (Castle Age): buy/sell resources at moving prices (no trade carts in v1).
+- Villagers carry a small amount (≈10; hunters carry more) and walk to drop-off: **placement
+  of camps matters**.
+- Market (Castle Age, matching `packages/data`): buy/sell resources at moving prices. The
+  exchange rate is a **single global value shared by all players** in the match, and each
+  trade shifts it. Every transaction pays a **~30% fee** (buying costs more than selling
+  returns), so the Market is a lossy converter, not a free resource bank. No fee-reduction
+  tech and no trade carts in v1.
 
 ## Population
 - Pop cap default 100 in practice (configurable up to 200). Houses +5 pop, Town Center +5,
@@ -31,16 +46,26 @@ Platforms: iOS + Android (Capacitor), plus browser for development/testing.
 
 ## Ages
 Dark → **Feudal** → **Castle** → **Imperial**. Advancing is researched at the Town Center,
-costs escalating food/gold, and requires **two buildings of your current age** (AoE2 rule).
+costs escalating food/gold, and requires **two qualifying buildings of your current age**
+(AoE2 rule — houses, farms, walls, gates, and towers don't count; a Castle alone satisfies
+Imperial).
 Each age unlocks buildings, units, and technologies. Age-up times are substantial (~2 min)
 so timing decisions matter.
 
 ## Buildings (v1 roster)
-Town Center (trains villagers, researches ages, garrisons+arrows), House, Mill, Lumber Camp,
-Mining Camp, Farm, Barracks, Archery Range, Stable, Siege Workshop, Blacksmith, Market,
-Monastery, University, Watch Tower (→ upgrades), Stone Wall, Gate, Castle (trains unique unit,
+Town Center (trains villagers, researches ages, garrisons+arrows; extra TCs unlock in Castle
+Age), House, Mill, Lumber Camp, Mining Camp, Farm, Barracks, Archery Range, Stable, Siege
+Workshop, Blacksmith, Market, Monastery, University, Watch Tower (→ upgrades), Stone Wall,
+Gate, Castle (trains unique unit,
 trebuchets; strong arrows), Wonder (build + stand timer = victory in practice, optional).
 No naval/docks in v1 (roadmap).
+
+**Rally points**: every production building supports a rally — select the building, then tap
+ground / a resource / an enemy to set it (shown as a flag; tap the flag control to clear).
+Newly produced units walk to the rally. A rally on a **resource auto-tasks new villagers to
+gather it** (the classic TC-rally-onto-berries loop); a rally on an **enemy unit or building
+sends new military out on attack-move** toward it. With no rally set, new units step just
+outside the building's footprint and idle there.
 
 ## Units (v1 roster) — line upgrades like AoE2
 - **Villager** (all-purpose worker, can fight badly)
@@ -49,34 +74,58 @@ No naval/docks in v1 (roadmap).
 - Archery Range: **Archer → Crossbowman → Arbalester**, **Skirmisher → Elite Skirmisher**
   (anti-archer, min range)
 - Stable: **Scout → Light Cavalry** (fast, cheap, raids), **Knight → Cavalier → Paladin**
-- Siege Workshop: **Battering Ram** (anti-building, pierce-immune-ish, garrisonable),
-  **Mangonel** (area damage, friendly fire), **Trebuchet** (Castle-built, Imperial; pack/unpack)
+- Siege Workshop: **Battering Ram → Capped Ram → Siege Ram** (anti-building,
+  pierce-immune-ish; garrisoned infantry add speed and building damage),
+  **Mangonel → Onager** (area damage, friendly fire),
+  **Trebuchet** (Castle-built, Imperial; pack/unpack)
 - Monastery: **Monk** (heals; converts enemy units — with cooldown and resist rules)
 - Castle: civ **unique unit**
 - Gaia: sheep (capturable), deer, wolves (hostile)
 
+Deliberate line trims vs the AoE2 reference (decisions, not oversights): 4-tier militia line
+(the two-handed intermediate step is skipped), **2-tier spear line** (no third-tier halberd
+upgrade — Pikeman is the Imperial anti-cavalry answer and is tuned in `packages/data` to hold
+against Paladins), 2-tier scout line, 2-tier skirmisher line matching AoE2's two tiers.
+
 ## Combat (the AoE2 counter system — the heart of the game)
-- Damage = max(1, attack − armor), computed per **armor class**: every unit has melee armor,
-  pierce armor, and class memberships (infantry / archer / cavalry / siege / spearman / building
+- Damage = per-class max(0, attack − armor), summed, minimum 1 per hit — computed over
+  **armor classes**: every unit has melee armor, pierce armor, and class memberships
+  (infantry / archer / cavalry / siege / spearman / building
   / ram / monk / unique). Attacks carry base melee-or-pierce damage plus **bonus damage vs
   classes** (spearmen +vs cavalry, skirmishers +vs archers, mangonels +vs buildings, etc.).
 - Ranged units fire real projectiles with travel time and accuracy; moving targets can be missed.
   Mangonel shots deal area damage including to friendlies.
 - Rate of fire, min range (skirms/mangonels), and unit speed create micro (dodging, kiting).
-- Buildings with attacks: TC/towers/castle fire arrows, more when garrisoned (villagers/archers).
-- Garrison: units can garrison in TC/towers/castle/rams; garrisoned units are safe and heal.
-- Conversion: monks convert single enemy units over a few seconds at range; interrupted by
-  damage to line of sight loss.
-- No formations UI in v1; group moves keep loose spacing. Stances: none in v1 (units auto-engage
-  within LOS; attack-move exists).
+- Buildings with attacks: TC/towers/castle fire arrows on their own; garrisoned
+  villagers/archers add extra arrows (melee garrisons add none; castle volleys by default).
+- Garrison: units can garrison in TC/towers/castle/rams; garrisoned units are safe and slowly
+  heal (in buildings — not inside rams). Capacities are per building/ram (numbers in
+  `packages/data`); **only infantry may enter rams**. If a building is destroyed, everything
+  garrisoned inside **dies with it** (evacuating a falling TC is real tension); if a ram is
+  destroyed, its garrisoned infantry are **ejected alive**.
+- Conversion: monks convert single enemy units at range — a per-interval chance between a
+  minimum and maximum time. Damage does not interrupt it; killing the monk or breaking
+  range/line of sight does. Success drains the monk's faith, which recharges slowly.
+- No formations UI in v1; group moves keep loose spacing. Stances: none in v1 (attack-move
+  exists). In place of stances, default combat behavior is fixed **per category**:
+  - Standard military units auto-engage hostiles within LOS.
+  - **Villagers never auto-engage.** Attacked villagers flee toward the nearest TC/tower and
+    garrison if there's room (otherwise they keep their task); they fight only on an explicit
+    command.
+  - **Monks never auto-convert** — conversion is always an explicit command, so faith is never
+    drained by accident. Idle monks auto-heal the nearest wounded friendly in range.
+  - **Mangonels hold fire** whenever a friendly unit is inside the blast area of the shot they
+    would take; an explicit target/ground command overrides this (friendly fire still applies).
+  - **Rams and trebuchets** never auto-acquire; they attack only explicitly ordered targets
+    (attack-move sends them at the nearest enemy building).
 
 ## Technologies
-- **Blacksmith**: 3 tiers each of infantry/cavalry attack, archer attack, infantry/cavalry armor,
-  archer armor (age-gated as in AoE2).
+- **Blacksmith**: 3 tiers each of melee attack (infantry+cavalry), archer attack/range,
+  infantry armor, cavalry armor, archer armor — five lines, age-gated as in AoE2.
 - **Economy**: lumber/mining efficiency tiers, farm food increases (Horse Collar line),
   Wheelbarrow/Hand Cart (villager speed + carry), Loom (villager toughness).
 - **University**: Ballistics (projectile leading), Masonry/Architecture (building HP),
-  Murder Holes (no tower min range), Chemistry (+1 projectile dmg), Siege Engineers.
+  Murder Holes (no tower/castle min range), Chemistry (+1 projectile dmg), Siege Engineers.
 - **Monastery**: healing/conversion improvements. **Castle**: two unique techs per civ.
 - Unit line upgrades are researched at their production building (like AoE2).
 
@@ -95,14 +144,37 @@ reference, then balanced by playtesting loops.
   visible. LOS per unit/building. No elevation combat modifiers in v1 (roadmap).
 
 ## Mobile UX
-- Pan: one-finger drag on empty terrain; pinch to zoom (3 fixed zoom steps, crisp pixel scaling).
-- Tap unit/building = select; drag from a unit = band-select box; double-tap unit = select all
-  of type on screen. Tap ground/enemy with selection = context command (move / attack / gather /
-  build / garrison) — the "right-click" of AoE2 becomes "tap with intent inferred".
-- Long-press = attack-move / alternate command menu.
-- HUD: top resource + pop bar; bottom-left minimap (tap to jump, shows alerts); bottom command
-  card (train/build/research grid with progress + queue); building placement mode with green/red
-  footprint preview. Control groups via saved-selection chips (mobile answer to ctrl+1).
+- **Camera**: **two-finger drag always pans**, regardless of what is under the fingers — in a
+  late-game 100-pop battle the viewport may contain zero empty terrain, and panning must never
+  depend on finding some. One-finger drag on empty terrain also pans. Pinch to zoom (3 fixed
+  zoom steps, crisp pixel scaling).
+- **Selection**: tap a unit/building = select, applied **instantly on the first tap** (no
+  double-tap wait penalizing the most common action); a second tap on the same unit within the
+  double-tap window *expands* the selection to all of that type on screen. Band-select =
+  **long-press on ground, then drag** the box — it never depends on precisely hitting a tiny
+  sprite (long-press without dragging opens the alternate command menu instead, see below).
+  **Deselect** = tap the ✕ on the current-selection panel, or **two-finger tap** anywhere.
+  Tapping an enemy with nothing selected inspects it (stats panel), never issues a command.
+- **Commands**: tap ground/enemy with a selection = context command (move / attack / gather /
+  build / garrison) — the "right-click" of AoE2 becomes "tap with intent inferred". Intent
+  inference uses a tap-slop radius with snap priority **enemy unit > resource/Gaia > own
+  building > ground**, so fat fingers resolve toward the likeliest target. Every issued
+  command shows a brief **undo toast** (~2 s) that reverts the order — the mis-tap safety net.
+- Long-press (held in place, with a selection) = attack-move / alternate command menu;
+  long-press-then-drag on ground = band-select (above).
+- **Rally points**: with a production building selected, tapping ground/resource/enemy sets
+  its rally flag (see Buildings for behavior).
+- HUD: top resource + pop bar including an **idle-villager button** (badge shows the idle
+  count; tapping cycles through idle villagers, centering the camera with the command card
+  ready — the touch answer to AoE2's `.` hotkey) and an **idle-military** equivalent;
+  bottom-left minimap (tap to jump; shows alerts and idle-military markers); bottom command
+  card (train/build/research grid with progress + queue).
+- **Building placement**: never single-tap-to-place. Placement mode spawns a draggable ghost
+  with green/red footprint preview; explicit **confirm/cancel buttons** commit or abort — a
+  mis-dropped Castle is far too expensive for one-tap placement.
+- **Control groups** via saved-selection chips (mobile answer to ctrl+1): with units selected,
+  **long-press an empty chip to save** the group; long-press an occupied chip to overwrite it;
+  tap a chip to reselect (tap again to center the camera on the group).
 - Desktop testing: mouse + right-click + keyboard camera also supported (dev convenience).
 
 ## Audio
@@ -110,11 +182,17 @@ Procedural/synthesized SFX v1 (villager chop, mining picks, swordplay, arrows, b
 placement, horn stings for age-up and attack warnings, UI clicks). Ambient loop. Music: roadmap.
 
 ## Victory / Defeat
-- Practice: conquest (a player with no Town Center, no villagers, and no production buildings
-  is defeated; bots resign when hopeless). Optional Wonder victory.
+- Practice: conquest. A player is defeated the moment they have **no Town Center, no
+  villagers, and no production buildings** — deliberately including a player whose army is
+  still standing. This is the intended stalemate-breaker: an economy that can never rebuild
+  has already lost. On defeat, the player's remaining units and buildings are destroyed
+  (death/collapse animations, then removed) — they do not convert to Gaia and do not keep
+  fighting. Bots resign when hopeless; a human can resign at any time, with the same cleanup.
+  Optional Wonder victory (build + stand timer).
 - Campaign: per-scenario objectives via the trigger system.
 
 ## Out of scope for v1 (explicit roadmap)
-Naval/water gameplay, elevation bonuses, formations & stances, trade carts, relics,
-regicide, multiplayer (architecture is ready: deterministic lockstep), mid-game saves,
-additional civs and campaigns, music score.
+Naval/water gameplay, elevation bonuses, formations & stances (per-category default behavior
+covers v1 — see Combat), trade carts, relics, regicide, multiplayer (architecture is ready:
+deterministic lockstep), manual save/load UI (automatic suspend/resume snapshots and pause
+ARE in v1 — see the top of this document), additional civs and campaigns, music score.

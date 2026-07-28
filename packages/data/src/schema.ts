@@ -19,8 +19,8 @@ export interface UnitDef {
   id: string;
   name: string;
   age: AgeId; // available from this age (given required tech/upgrades)
-  trainedAt: string[]; // building def ids
-  cost: Cost;
+  trainedAt: string[]; // building def ids (empty for gaia animals)
+  cost: Cost; // empty for gaia animals
   trainTime: number; // seconds
   hp: number;
   /** Base damage first ('melee' OR 'pierce'), then bonus-vs-class entries. */
@@ -42,8 +42,25 @@ export interface UnitDef {
   converts?: boolean;
   gather?: Partial<Record<GatherTask, number>>; // resource/second (villager)
   buildRate?: number; // construction speed factor (villager = 1)
-  carryCapacity?: number;
+  /**
+   * Resource carried before walking to a drop-off: one value for all tasks, or per-task
+   * values (GDD: hunters carry more). Carry techs (Wheelbarrow line) multiply every entry.
+   */
+  carryCapacity?: number | Partial<Record<GatherTask, number>>;
+  /** Built-in resistance to monk conversion, 0..100 (the Faith tech adds on this scale). */
+  conversionResist?: number;
   requiresTech?: string; // e.g. line upgrade tech id
+  // --- gaia animals (additive) ---
+  foodAmount?: number; // food left on the carcass when hunted (sheep/deer)
+  huntable?: boolean; // villagers may gather food from it once dead
+  herdable?: boolean; // walks to a nearby player and changes ownership (sheep)
+  // --- siege (additive) ---
+  /** Trebuchet-style units must unpack before firing and pack before moving. */
+  pack?: {
+    packTime: number; unpackTime: number; // seconds
+    /** Replaces `armor` while packed/moving (AoE2: packed trebs are arrow-vulnerable). */
+    packedArmor?: ClassValue[];
+  };
   icon: string; // atlas frame name
 }
 
@@ -64,6 +81,7 @@ export interface BuildingDef {
   projectileSpeed?: number;
   arrowsBase?: number; // simultaneous projectiles when attacking
   arrowsPerGarrison?: number;
+  arrowsMax?: number; // cap on simultaneous projectiles (arrowsBase + garrison arrows)
   garrisonCapacity?: number;
   dropOffFor?: ResourceType[];
   trains?: string[]; // unit def ids
@@ -76,13 +94,29 @@ export interface BuildingDef {
   requiresTech?: string;
   /** Buildings that must exist before this can be placed (e.g. castle needs castle age only). */
   requiresBuildings?: string[];
+  /** False = never counts toward age-up building requirements (houses/farms/walls/gates/towers). Default true. */
+  countsForAgeUp?: boolean;
+  /** One of these alone meets the next age's building requirement (GDD: a Castle alone satisfies Imperial). */
+  satisfiesAgeUpAlone?: boolean;
+  los?: number; // tiles (additive; fog of war). Sim may default to range when absent.
+  icon: string;
+}
+
+/** Gaia resource objects placed on the map: trees, mines, berry bushes. */
+export interface ResourceDef {
+  id: string;
+  name: string;
+  resourceType: ResourceType;
+  amount: number; // total resource held (e.g. tree = 100 wood)
+  gatherTask: GatherTask; // which villager gather rate applies
+  hp?: number; // only if attackable (trees can be cleared); mines/bushes are indestructible
   icon: string;
 }
 
 export type StatKey =
   | 'hp' | 'attack' | 'armorMelee' | 'armorPierce' | 'range' | 'speed' | 'los'
   | 'rof' | 'accuracy' | 'carryCapacity' | 'buildRate' | 'trainTime'
-  | 'conversionResist' | 'garrisonCapacity' | 'farmFood' | 'popCap';
+  | 'conversionResist' | 'garrisonCapacity' | 'farmFood' | 'popCap' | 'minRange';
 
 export type TechEffect =
   | { kind: 'statAdd'; stat: StatKey; amount: number; targetClasses?: ArmorClass[]; targetIds?: string[] }
@@ -106,7 +140,11 @@ export interface TechDef {
   researchTime: number; // seconds
   effects: TechEffect[];
   requiresTech?: string; // chain (e.g. tier 2 needs tier 1)
-  /** AoE2 age-up rule: number of distinct buildings of the player's CURRENT age required. */
+  /**
+   * AoE2 age-up rule: number of distinct buildings of the player's CURRENT age required.
+   * Buildings with countsForAgeUp: false never qualify; a satisfiesAgeUpAlone building
+   * (Castle, for Imperial) meets the requirement by itself.
+   */
   requiresBuildingsOfCurrentAge?: number;
   unique?: boolean; // unique techs are per-civ (referenced from CivDef)
   icon: string;
@@ -130,4 +168,5 @@ export interface GameData {
   buildings: Record<string, BuildingDef>;
   techs: Record<string, TechDef>;
   civs: Record<string, CivDef>;
+  resources: Record<string, ResourceDef>;
 }
