@@ -42,7 +42,20 @@ export interface TrainQueueItem {
   defId: string;
   ticksLeft: number;
   totalTicks: number;
+  /** Resources deducted when queued — refunded exactly on cancel (additive, sim-internal). */
+  paid?: Partial<Stockpile>;
+  /** True once the item reached the front and reserved population (additive, sim-internal). */
+  started?: boolean;
 }
+
+/**
+ * Recorded intent from attack-move or a rally point set on a resource/enemy (additive).
+ * Wave-1 records it; wave-2 systems (auto-engage, auto-gather) act on it.
+ */
+export type UnitIntent =
+  | { kind: 'attackMove'; x: Fixed; y: Fixed }
+  | { kind: 'attackTarget'; targetId: EntityId }
+  | { kind: 'gather'; targetId: EntityId };
 
 export interface ResearchState {
   techId: string;
@@ -65,6 +78,8 @@ export interface Entity {
   targetId?: EntityId;
   carrying?: { type: ResourceType; amount: number };
   garrisonedIn?: EntityId;
+  /** Wave-2 hook: intent recorded by attack-move / rally-onto-target (additive). */
+  intent?: UnitIntent;
   // buildings
   buildProgress?: number; // 0..1000 (integer); < 1000 = foundation/under construction
   trainQueue?: TrainQueueItem[];

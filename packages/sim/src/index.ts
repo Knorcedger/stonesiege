@@ -1,2 +1,6 @@
 export * from './types';
-// createGame and SimRng are implemented by the engine (game.ts, rng.ts) — exported here once landed.
+export { SimRng } from './rng';
+export { createGame } from './game';
+export { hashState } from './hash';
+export { resolveUnitStats, buildModifierTable, invalidateStats } from './stats';
+export type { PlayerModifierTable, ResolvedUnitStats } from './stats';
