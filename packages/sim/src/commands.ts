@@ -2,6 +2,8 @@
 // move / attackMove / stop / train / cancelTrain / setRally / deleteEntity / resign, and
 // the rest are accepted as validated no-ops (TODO hooks filled by wave 2). Illegal
 // commands are dropped silently — the sim never throws on player/AI input.
+// Also home of defeat handling: resign, the per-tick GDD conquest elimination check
+// (no TC + no villagers + no production buildings = defeated), and victory detection.
 
 import { gameData } from '@bf/data';
 import { AGES, GAIA } from './types';
@@ -11,6 +13,7 @@ import { removeEntity } from './entities';
 import { orderMove } from './path';
 import { resolveUnitStats } from './stats';
 import { refundItem, refundQueue, TRAIN_QUEUE_CAP } from './production';
+import { handleBuild, refundFoundation } from './construction';
 
 type Handler<K extends Command['kind']> =
   (state: SimState, cmd: Extract<Command, { kind: K }>, events: SimEvent[]) => void;
@@ -131,23 +134,60 @@ const handleSetRally: Handler<'setRally'> = (state, cmd) => {
 const handleDeleteEntity: Handler<'deleteEntity'> = (state, cmd, events) => {
   const e = state.entities.get(cmd.entityId);
   if (!e || e.player !== cmd.player) return;
-  if (e.kind === 'building') refundQueue(state, e); // foundation refund rules land in wave 2
+  if (e.kind === 'building') {
+    refundQueue(state, e);
+    refundFoundation(state, e); // unbuilt fraction of a foundation comes back
+  }
   removeEntity(state, cmd.entityId);
   events.push({ kind: 'entityDied', id: e.id, defId: e.defId, player: e.player, x: e.x, y: e.y });
 };
 
 const handleResign: Handler<'resign'> = (state, cmd, events) => {
-  const player = state.players[cmd.player];
-  player.defeated = true;
+  defeatPlayer(state, cmd.player, events);
+  checkVictory(state, events);
+};
+
+/** GDD defeat cleanup: mark defeated and destroy everything they own (no Gaia conversion). */
+function defeatPlayer(state: SimState, playerId: PlayerId, events: SimEvent[]): void {
+  state.players[playerId].defeated = true;
   const doomed: Entity[] = [];
-  for (const e of state.entities.values()) if (e.player === cmd.player) doomed.push(e);
+  for (const e of state.entities.values()) if (e.player === playerId) doomed.push(e);
   for (const e of doomed) {
     removeEntity(state, e.id);
     events.push({ kind: 'entityDied', id: e.id, defId: e.defId, player: e.player, x: e.x, y: e.y });
   }
-  events.push({ kind: 'playerDefeated', player: cmd.player });
-  checkVictory(state, events);
-};
+  events.push({ kind: 'playerDefeated', player: playerId });
+}
+
+/**
+ * GDD elimination rule (conquest games only — campaign defeat comes from triggers):
+ * a player with no Town Center, no villagers, and no production buildings is defeated
+ * on the spot, deliberately including a player whose army is still standing. Runs once
+ * per tick from advance() so every removal path (deleteEntity now, wave-2 combat deaths
+ * later) is covered without each caller remembering to check.
+ */
+export function checkEliminations(state: SimState, events: SimEvent[]): void {
+  if (!state.conquest || state.finished) return;
+  const canRebuild: boolean[] = state.players.map(() => false);
+  for (const e of state.entities.values()) {
+    if (e.player === GAIA || e.hp <= 0) continue;
+    if (e.kind === 'unit') {
+      if (e.defId === 'villager') canRebuild[e.player] = true;
+    } else if (e.kind === 'building') {
+      const def = gameData.buildings[e.defId];
+      if (e.defId === 'townCenter' || (def?.trains !== undefined && def.trains.length > 0)) {
+        canRebuild[e.player] = true;
+      }
+    }
+  }
+  let anyDefeated = false;
+  for (const p of state.players) {
+    if (p.id === GAIA || p.defeated || canRebuild[p.id]) continue;
+    defeatPlayer(state, p.id, events);
+    anyDefeated = true;
+  }
+  if (anyDefeated) checkVictory(state, events);
+}
 
 export function checkVictory(state: SimState, events: SimEvent[]): void {
   if (state.finished) return;
@@ -172,7 +212,7 @@ const handlers: { [K in Command['kind']]: Handler<K> } = {
   attackMove: handleAttackMove,
   attack: todo, // TODO(wave 2): combat targeting
   gather: todo, // TODO(wave 2): gathering
-  build: todo, // TODO(wave 2): construction/foundations
+  build: handleBuild,
   repair: todo, // TODO(wave 2): repair
   train: handleTrain,
   cancelTrain: handleCancelTrain,
@@ -189,8 +229,24 @@ const handlers: { [K in Command['kind']]: Handler<K> } = {
   resign: handleResign,
 };
 
+/**
+ * Command kinds whose effects have NOT landed yet (wave-2 systems): the intake
+ * validates and accepts them, but they are no-ops. The HUD reads this so it never
+ * confirms an order the sim will drop (no false-positive toasts / disabled verbs).
+ * Derived from the handlers map — shrinks automatically as wave-2 handlers land.
+ */
+export const PENDING_COMMAND_KINDS: ReadonlySet<Command['kind']> = new Set(
+  (Object.keys(handlers) as Array<Command['kind']>).filter(
+    (k) => (handlers[k] as unknown) === (todo as unknown),
+  ),
+);
+
 export function applyCommands(state: SimState, commands: Command[], events: SimEvent[]): void {
   for (const cmd of commands) {
+    // A command earlier in this batch may have ended the game (e.g. simultaneous
+    // resigns in lockstep). Once finished, later commands must not mutate the
+    // terminal state — otherwise the declared winner could end up "defeated".
+    if (state.finished) return;
     if (!validPlayer(state, cmd.player)) continue;
     const handler = handlers[cmd.kind] as Handler<typeof cmd.kind>;
     handler(state, cmd as never, events);

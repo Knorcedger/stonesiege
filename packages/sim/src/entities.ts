@@ -44,6 +44,8 @@ export interface SpawnInit {
   ref?: string;
   /** Trained units already reserved pop at train start; pass false for them. */
   countsPop?: boolean;
+  /** Buildings only: 0 spawns a foundation (construction raises it); default 1000 = complete. */
+  buildProgress?: number;
 }
 
 export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
@@ -78,7 +80,7 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
       facing: init.facing ?? 0,
       hp: init.hp ?? def.hp, maxHp: def.hp,
       activity: 'idle',
-      buildProgress: 1000, // wave 1: all placed buildings are complete
+      buildProgress: init.buildProgress ?? 1000, // scenario/mapgen buildings arrive complete
     };
     if (def.trains && def.trains.length > 0) e.trainQueue = [];
   } else {

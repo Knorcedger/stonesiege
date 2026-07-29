@@ -68,3 +68,11 @@ export const FALLBACK_PLAYER_RAMPS: readonly (readonly [string, string, string])
 ];
 
 export const FALLBACK_MASK_PALETTE: readonly [string, string, string] = ['#FF00FF', '#CC00CC', '#990099'];
+
+/**
+ * Gaia "player color": some gaia sprites legitimately carry a mask band (sheep
+ * ownership mark per AoE2 — recolors when captured). Unowned/gaia entities swap
+ * it to this neutral wool-gray ramp so raw magenta never reaches the screen.
+ */
+export const GAIA_NEUTRAL_COLOR = -1;
+export const GAIA_NEUTRAL_RAMP: readonly [string, string, string] = ['#D8D2C6', '#9C9482', '#655F52'];

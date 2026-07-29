@@ -158,7 +158,8 @@ function skeleton(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: number): Sk
   const footY = HUMAN_GY;
   const hipY = footY - legLen;
   const shoulderY = hipY - torsoH + bob + (spec.hunch ? 1 : 0);
-  const headY = shoulderY - 3;
+  // hunched roles carry the head low + forward; everyone else gets a 1px neck gap
+  const headY = shoulderY - (spec.hunch ? 3 : 4);
   return {
     cx: 24,
     footY,
@@ -228,38 +229,52 @@ function paintTorso(r: Raster, s: Skel, spec: HumanSpec): void {
 function paintHead(r: Raster, s: Skel, spec: HumanSpec, dir: Dir): void {
   const hx = s.headX;
   const hy = s.headY;
-  r.fillEllipse(hx, hy, 2, 2, awayView(dir) ? (spec.helmet === 'none' ? P.woodDark : P.skinShadow) : P.skinBase);
-  if (!awayView(dir)) {
+  const away = awayView(dir);
+  // rounded 4–5px head (§6.1): skin circle + top-left skinLight + skinShadow jaw
+  r.fillEllipse(hx, hy, 2, 2, away ? P.skinShadow : P.skinBase);
+  if (!away) {
     r.set(hx - 1, hy - 1, P.skinLight);
-    r.set(hx, hy + 2, P.skinShadow); // chin/neck
+    r.set(hx, hy - 1, P.skinLight);
+    r.set(hx - 1, hy, P.skinLight);
+    r.set(hx + 1, hy + 1, P.skinShadow);
   }
+  // 1px skinShadow neck ties the head to the shoulders (kills the floating-block read)
+  r.set(hx, hy + 2, P.skinShadow);
+  r.set(hx, hy + 3, P.skinShadow);
   switch (spec.helmet) {
     case 'cap': {
       const c = spec.capC ?? M.mid;
       r.fillRect(hx - 2, hy - 2, 5, 2, c);
+      r.fillRect(hx - 1, hy - 3, 3, 1, c); // rounded crown
       r.set(hx - 2, hy - 2, spec.capC ? spec.capC : M.light);
+      r.set(hx - 1, hy - 3, spec.capC ? spec.capC : M.light);
       break;
     }
     case 'helm':
     case 'helmLight': {
       const c = spec.helmet === 'helm' ? P.metalBase : P.metalLight;
       r.fillRect(hx - 2, hy - 2, 5, 2, c);
+      r.fillRect(hx - 1, hy - 3, 3, 1, c); // domed crown
       r.set(hx - 2, hy - 1, c);
       r.set(hx + 2, hy - 1, c);
       if (dir === 0) r.set(hx, hy, P.metalDark); // nasal bar
-      if (spec.glint) r.set(hx - 1, hy - 2, P.highlight);
+      if (spec.glint) r.set(hx - 1, hy - 3, P.highlight);
       break;
     }
     case 'hood': {
       r.fillRect(hx - 2, hy - 2, 5, 3, P.clothDark);
+      r.fillRect(hx - 1, hy - 3, 3, 1, P.clothDark); // rounded hood crown
       r.set(hx - 2, hy - 2, M.mid);
       r.set(hx - 1, hy - 2, M.mid);
-      if (!awayView(dir)) r.fillRect(hx - 1, hy, 3, 2, P.skinShadow); // shaded face
+      r.set(hx - 1, hy - 3, M.mid);
+      r.set(hx, hy - 3, M.mid);
+      if (!away) r.fillRect(hx - 1, hy, 3, 2, P.skinShadow); // shaded face
       break;
     }
     case 'monk': {
       r.fillRect(hx - 2, hy - 2, 5, 3, P.clothDark);
-      if (!awayView(dir)) r.fillRect(hx - 1, hy, 3, 2, P.skinBase);
+      r.fillRect(hx - 1, hy - 3, 3, 1, P.clothDark);
+      if (!away) r.fillRect(hx - 1, hy, 3, 2, P.skinBase);
       break;
     }
     case 'brim': {
@@ -269,30 +284,56 @@ function paintHead(r: Raster, s: Skel, spec: HumanSpec, dir: Dir): void {
       break;
     }
     default:
-      if (!awayView(dir)) r.set(hx, hy - 2, P.woodDark); // hair
-      else r.fillRect(hx - 1, hy - 2, 3, 1, P.woodDark);
+      // bare head: hair cap of woodDark pixels so the skull reads round, not square
+      if (!away) {
+        r.fillRect(hx - 1, hy - 2, 3, 1, P.woodDark);
+        r.set(hx - 2, hy - 1, P.woodDark);
+      } else {
+        r.fillRect(hx - 1, hy - 2, 3, 2, P.woodDark);
+      }
   }
   if (spec.plumeMask) {
-    r.set(hx, hy - 3, M.light);
-    r.set(hx - s.fx, hy - 4, M.mid);
+    r.set(hx, hy - 4, M.light);
+    r.set(hx - s.fx, hy - 5, M.mid);
   }
+}
+
+/** Far-leg shade one ramp step below the leg color (mirrors the §6.1 horse rule). */
+function legShade(c: RGB): RGB {
+  if (c === P.clothDark) return P.woodDark;
+  if (c === P.woodDark) return P.uiWoodDark;
+  if (c === P.metalDark) return P.slateDark;
+  if (c === P.skinBase) return P.skinShadow;
+  return P.woodDark;
 }
 
 function paintLegs(r: Raster, s: Skel, spec: HumanSpec, dir: Dir, anim: HumanAnim, frame: number): void {
   if (spec.robe) return; // monk cone hides legs
   const walkish = anim === 'walk' || anim === 'carry';
+  const h = s.footY - s.hipY + 1;
+  const far = legShade(spec.legsC);
+  // NOTE: an isolated 2px column is fully consumed by the §7.2 outline pass
+  // (both pixels border transparency). Legs therefore always paint a dark
+  // filler between the two columns so each keeps a visible core color, and
+  // the pair never collapses into one outline-black post.
   if (sideView(dir)) {
     const stride = walkish ? WALK_STRIDE[frame] : 0;
-    const near = s.cx + s.lean - 2 + (walkish ? stride : 0);
-    const far = s.cx + s.lean + (walkish ? -stride : 0);
+    const nearX = s.cx + s.lean - 2 + stride;
+    let farX = s.cx + s.lean - stride;
+    if (Math.abs(farX - nearX) < 2) farX = nearX + 2; // never coincide (passing frames)
     const farLift = walkish && Math.abs(stride) === 2 ? 1 : 0;
-    r.fillRect(far, s.hipY, 2, s.footY - s.hipY + 1 - farLift, P.woodDark); // far leg darker
-    r.fillRect(near, s.hipY, 2, s.footY - s.hipY + 1, spec.legsC);
+    const lo = Math.min(nearX, farX);
+    const hi = Math.max(nearX, farX);
+    r.fillRect(lo, s.hipY, hi - lo + 2, h - 1, far); // hull filler (feet row stays split)
+    r.fillRect(farX, s.hipY, 2, h - farLift, far);
+    r.fillRect(nearX, s.hipY, 2, h, spec.legsC);
   } else {
     const liftL = walkish ? [1, 0, 0, 0, 1, 0][frame] : 0;
     const liftR = walkish ? [0, 0, 1, 1, 0, 0][frame] : 0;
-    r.fillRect(s.cx + s.lean - 3, s.hipY, 2, s.footY - s.hipY + 1 - liftL, spec.legsC);
-    r.fillRect(s.cx + s.lean + 1, s.hipY, 2, s.footY - s.hipY + 1 - liftR, spec.legsC);
+    const cx = s.cx + s.lean;
+    r.fillRect(cx - 1, s.hipY, 2, h - 2, far); // dark crotch column between the legs
+    r.fillRect(cx - 3, s.hipY, 2, h - liftL, spec.legsC);
+    r.fillRect(cx + 1, s.hipY, 2, h - liftR, spec.legsC);
   }
 }
 
@@ -395,9 +436,13 @@ function paintWeapon(
       const mid = Math.round((top + bot) / 2);
       const bow = P.woodPale;
       const bulge = side ? fx * 2 : -2;
-      blade(bx, top, bx + bulge, mid - 2, bow);
-      blade(bx + bulge, mid - 2, bx + bulge, mid + 2, bow);
-      blade(bx + bulge, mid + 2, bx, bot, bow);
+      // 2px-thick arc (§6.2): a 1px arc is fully eaten by the outline pass
+      const o = side ? fx : -1; // thickness offset toward the bulge
+      for (const dx of [0, o]) {
+        blade(bx + dx, top, bx + bulge + dx, mid - 2, bow);
+        blade(bx + bulge + dx, mid - 2, bx + bulge + dx, mid + 2, bow);
+        blade(bx + bulge + dx, mid + 2, bx + dx, bot, bow);
+      }
       if (phase === 'back') {
         blade(bx, top, gx - fx * 2, gy, P.highlight);
         blade(bx, bot, gx - fx * 2, gy, P.highlight);
@@ -475,8 +520,13 @@ function paintWeapon(
         blade(cx, gy + 1, cx + fx * 2, s.headY - 5, P.woodBase);
         r.fillRect(cx + fx * 2 - 1, s.headY - 7, 2, 2, P.metalBase);
       } else {
-        blade(cx - fx * 1, gy + 2, cx - fx * 5, s.headY - 3, P.woodBase);
-        r.fillRect(cx - fx * 5 - 1, s.headY - 4, 2, 2, P.metalBase);
+        // rest: shaft slung diagonally over the shoulder, head clear of the
+        // silhouette in EVERY dir (front/back views previously drew it as a
+        // vertical line hidden inside the body — §6.2 signature was invisible)
+        const sxd = side ? -fx : 1; // shoulder side the shaft leans over
+        blade(cx - sxd * 1, gy + 2, cx - sxd * 6, s.headY - 5, P.woodBase);
+        r.fillRect(cx - sxd * 6 - 1, s.headY - 7, 3, 2, P.metalBase);
+        r.set(cx - sxd * 6 - 1, s.headY - 7, P.metalLight);
       }
       break;
     }
@@ -487,18 +537,23 @@ function paintShield(r: Raster, s: Skel, spec: HumanSpec, dir: Dir): void {
   if (!spec.shield || spec.shield === 'none') return;
   const cx = s.cx + s.lean;
   const ty = s.shoulderY + 4;
-  const rr = spec.shield === 'buckler' ? 2 : 3;
+  const round = spec.shield !== 'buckler';
+  const rr = round ? 4 : 2; // round shield is a real mass (§6.2), buckler stays small
   // off-hand side: opposite the weapon for side views, screen-right for front,
   // slung on the back for away views.
-  const sx = awayView(dir) ? cx + 1 : sideView(dir) ? cx - s.fx * 4 : cx + 4;
+  const off = round ? 5 : 4;
+  const sx = awayView(dir) ? cx + 2 : sideView(dir) ? cx - s.fx * off : cx + off;
   const sy = awayView(dir) ? s.shoulderY + 3 : ty;
-  // wood rim, masked face core (keeps unit mask coverage inside the 8–20% band)
+  // wide wood rim, masked face core sized to keep the 8–20% coverage band
   r.fillEllipse(sx, sy, rr, rr, P.woodBase);
-  r.fillEllipse(sx, sy, rr - 1, rr - 1, M.mid);
-  if (rr > 2) {
+  r.fillEllipse(sx, sy, rr - (round ? 2 : 1), rr - (round ? 2 : 1), M.mid);
+  if (round) {
     r.set(sx - 1, sy - 1, M.light);
-    r.set(sx + 1, sy + 1, P.woodDark);
-    r.set(sx + 2, sy + 1, P.woodDark);
+    r.set(sx - 2, sy - 2, P.woodPale); // lit rim
+    r.set(sx - 3, sy - 1, P.woodPale);
+    r.set(sx + 2, sy + 2, P.woodDark);
+    r.set(sx + 3, sy + 1, P.woodDark);
+    r.set(sx + 1, sy + 3, P.woodDark);
   }
   r.set(sx, sy, P.metalDark); // boss
 }
@@ -536,9 +591,10 @@ function drawHumanDowned(spec: HumanSpec, dir: Dir, frame: number): Raster {
     if (spec.robe) paintRobe(r, sk, spec);
     else {
       paintLegs(r, sk, spec, dir, 'idle', 0);
-      // +1 sash row in the recoil frames keeps team color in the 8–20% band
-      // (the extended weapon adds opaque pixels these poses wouldn't otherwise have)
-      paintTorso(r, sk, { ...spec, sashRows: spec.sashRows + 1 });
+      // +1 sash row in the frame-0 recoil keeps team color in the 8–20% band
+      // (the extended weapon adds opaque pixels that pose wouldn't otherwise
+      // have); frame 1 drops the weapon, so the bonus row would overshoot 20%
+      paintTorso(r, sk, { ...spec, sashRows: spec.sashRows + (frame === 0 ? 1 : 0) });
     }
     paintHead(r, sk, spec, dir);
     if (frame === 0) paintWeapon(r, sk, spec, dir, 'idle', 0);
@@ -634,10 +690,13 @@ const CAV_STRIDE = [2, 1, 0, -1, -2, -1, 0, 1]; // 8-frame 4-beat, per-leg phase
 
 export type CavAnim = 'idle' | 'walk' | 'attack' | 'die' | 'decay';
 
-function coatColors(coat: 'bay' | 'dun'): { body: RGB; lit: RGB; dark: RGB } {
+function coatColors(coat: 'bay' | 'dun'): { body: RGB; lit: RGB; dark: RGB; legFar: RGB } {
+  // §6.1: mane/tail = woodDark for both coats, but the FAR LEG pair is only
+  // "one ramp step darker" than the body — dun far legs in woodDark read as
+  // detached black sticks under the pale coat (r3-16 deer/giraffe report)
   return coat === 'bay'
-    ? { body: P.woodBase, lit: P.woodLight, dark: P.woodDark }
-    : { body: P.dirtLight, lit: P.dirtPale, dark: P.woodDark };
+    ? { body: P.woodBase, lit: P.woodLight, dark: P.woodDark, legFar: P.woodDark }
+    : { body: P.dirtLight, lit: P.dirtPale, dark: P.woodDark, legFar: P.dirtBase };
 }
 
 function drawCavDowned(spec: CavSpec, dir: Dir, frame: number): Raster {
@@ -704,88 +763,74 @@ export function drawCavalry(spec: CavSpec, anim: CavAnim, dir: Dir, frame: numbe
   const [fx, fy] = FACE[dir];
   const side = sideView(dir);
   const c = coatColors(spec.coat);
-  const legLen = 9;
-  const ry = side ? 5 : 5;
-  const rx = side ? 10 : 5;
+  // §6.1 numbers: body ellipse ~18×8 (side), four 2×8 leg columns
+  const legLen = 8;
+  const ry = side ? 4 : 5;
+  const rx = side ? 9 : 6;
   const bob = anim === 'walk' ? [0, -1, -1, 0, 0, -1, -1, 0][frame] : anim === 'idle' && frame === 1 ? -1 : 0;
   const lunge = anim === 'attack' ? [-1, -1, 2, 1, 0][frame] : 0;
   const cy = CAV_GY - legLen - ry + bob;
   const bx0 = cx + fx * lunge;
 
-  r.dropShadow(cx, CAV_GY, side ? 13 : 8, 3);
+  r.dropShadow(cx, CAV_GY, side ? 13 : 9, 3);
 
   const inB = (x: number, y: number) => Raster.inEllipse(x, y, bx0, cy, rx, ry);
 
-  // legs — far pair darker, 4-beat cycle
+  // legs — 2×8 columns (+2px overlap into the body), far pair one ramp step
+  // darker, 4-beat cycle. Front/back pairs are ADJACENT (near+far touching):
+  // an isolated 2px column is fully consumed by the §7.2 outline pass, so
+  // gapped columns rendered as coreless black sticks.
   const legXs = side
-    ? [bx0 + fx * (rx - 3), bx0 + fx * (rx - 5), bx0 - fx * (rx - 5), bx0 - fx * (rx - 3)]
-    : [bx0 - 6, bx0 - 3, bx0 + 2, bx0 + 5];
+    ? [bx0 + fx * (rx - 2), bx0 + fx * (rx - 4), bx0 - fx * (rx - 4), bx0 - fx * (rx - 2)]
+    : [bx0 - 6, bx0 - 4, bx0 + 2, bx0 + 4];
   const phases = [0, 4, 2, 6];
   for (let i = 0; i < 4; i++) {
     const stride = anim === 'walk' ? CAV_STRIDE[(frame + phases[i]) % 8] : 0;
     const dx = side ? stride : 0;
     const lift = anim === 'walk' && Math.abs(stride) === 2 ? 1 : 0;
     const far = side ? i === 1 || i === 3 : i === 1 || i === 2;
-    r.fillRect(legXs[i] + dx, cy + ry - 2, 2, legLen + 2 - lift, far ? c.dark : c.body);
+    r.fillRect(legXs[i] + dx, cy + ry - 2, 2, legLen + 2 - lift, far ? c.legFar : c.body);
   }
 
   // body
   r.paintWhere(inB, c.body);
   r.paintWhere((x, y) => inB(x, y) && !inB(x - 2, y - 2), c.lit);
   r.paintWhere((x, y) => inB(x, y) && !inB(x + 2, y + 2) && Raster.ditherOn(x, y, 50), c.dark);
-
-  // neck + head toward facing
-  const lag = anim === 'walk' ? (frame % 4 < 2 ? 0 : 1) : 0;
-  if (side) {
-    const nx = bx0 + fx * (rx - 2);
-    r.fillPoly(
-      [
-        [nx, cy - 1],
-        [nx + fx * 3, cy - 1],
-        [nx + fx * 6, cy - 8],
-        [nx + fx * 3, cy - 8],
-      ],
-      c.body,
-    );
-    r.fillPoly(
-      [
-        [nx + fx * 3, cy - 9],
-        [nx + fx * 8, cy - 7],
-        [nx + fx * 8, cy - 5],
-        [nx + fx * 4, cy - 6],
-      ],
-      c.body,
-    );
-    r.set(nx + fx * 3, cy - 10, c.dark); // ear
-    r.line(nx + fx * 2, cy - 8, nx + fx * 5 - lag * fx, cy - 3, c.dark); // mane
-    // tail streams behind
-    const tx = bx0 - fx * rx;
-    r.line(tx, cy - 1, tx - fx * 4, cy + 3 + lag, c.dark);
-    r.line(tx, cy, tx - fx * 3, cy + 5 + lag, c.dark);
-  } else if (dir === 0) {
-    // facing camera: chest + hanging head
-    r.fillPoly([[cx - 2, cy - 2], [cx + 2, cy - 2], [cx + 2, cy + 4], [cx - 2, cy + 4]], c.body);
-    r.fillEllipse(cx, cy + 5, 2, 3, c.body);
-    r.set(cx - 2, cy - 1, c.dark);
-    r.set(cx + 2, cy - 1, c.dark); // ears
-    r.set(cx - 1, cy + 6, c.dark);
-    r.set(cx + 1, cy + 6, c.dark); // nostrils
-  } else {
-    // away: rump + hanging tail
-    r.line(cx, cy + 1, cx, cy + 6 + lag, c.dark);
-    r.set(cx - 2, cy - ry - 3, c.dark);
-    r.set(cx + 2, cy - ry - 3, c.dark); // ear tips beyond the rider
+  if (!side) {
+    // solid chest (dir 0) / rump (dir 4) mass filling the gap between the
+    // splayed legs (r3-16: the front frame read as a void between sticks);
+    // drawn BEFORE the caparison so the knight's cloth drapes over it
+    const low = dir === 0 ? 5 : 4;
+    r.fillPoly([[cx - 4, cy - 3], [cx + 4, cy - 3], [cx + 3, cy + low], [cx - 3, cy + low]], c.body);
+    for (let y = cy - 3; y <= cy + low - 1; y++) {
+      if (r.alphaAt(cx - 3, y) === 255) r.set(cx - 3, y, c.lit); // lit left flank
+    }
   }
 
-  // caparison / blanket (after legs+body, hem at mid-leg)
+  const lag = anim === 'walk' ? (frame % 4 < 2 ? 0 : 1) : 0;
+
+  // caparison / blanket (after legs+body, hem at mid-leg; §6.1 layer order —
+  // the neck/head block above paints AFTER this so the head clears the cloth)
   if (spec.caparison) {
-    const hem = cy + ry + 2;
-    for (let y = cy + 1; y <= hem; y++) {
-      const hw = y <= cy + ry ? 0 : y - (cy + ry);
-      for (let x = bx0 - rx + 3 + hw; x <= bx0 + rx - 3 - hw; x++) {
-        if (y <= cy + ry && !inB(x, y)) continue;
-        if (side || Math.abs(x - bx0) <= rx) {
+    if (side) {
+      const hem = cy + ry + 3;
+      for (let y = cy + 1; y <= hem; y++) {
+        const hw = y <= cy + ry ? 0 : y - (cy + ry);
+        for (let x = bx0 - rx + 3 + hw; x <= bx0 + rx - 3 - hw; x++) {
+          if (y <= cy + ry && !inB(x, y)) continue;
           r.set(x, y, x < bx0 - 3 ? M.light : x > bx0 + 3 ? M.dark : M.mid);
+        }
+      }
+    } else {
+      // front/away: the cloth drapes the whole chest/rump silhouette.
+      // Rounded shoulder + 2px hem taper keep the drape inside the 20% §9.4
+      // ceiling on the smaller §6.1 horse (walk frames lift legs, shrinking
+      // the opaque denominator).
+      for (let y = cy; y <= cy + ry + 1; y++) {
+        const hw = (y === cy ? 3 : 4) - 2 * Math.max(0, y - (cy + ry));
+        for (let x = bx0 - hw; x <= bx0 + hw; x++) {
+          if (y <= cy + ry - 1 && !inB(x, y)) continue;
+          r.set(x, y, x < bx0 - 1 ? M.light : x > bx0 + 1 ? M.dark : M.mid);
         }
       }
     }
@@ -797,6 +842,59 @@ export function drawCavalry(spec: CavSpec, anim: CavAnim, dir: Dir, frame: numbe
     }
   }
 
+  // neck + head toward facing (over the cloth so the head clears it)
+  if (side) {
+    // §6.1 neck: a 3px-wide band rising ~45° from the shoulder — 5 steps, so
+    // the head sits ON the neck top (the old 6-step neck with the head thrown
+    // 2px further forward read as a giraffe at pinch-zoom, r3-16)
+    const sx = bx0 + fx * (rx - 3);
+    for (let i = 0; i < 5; i++) {
+      r.fillRect(sx + fx * i - (fx < 0 ? 2 : 0), cy - 1 - i, 3, 2, c.body);
+    }
+    // §6.1 head: 4×3 wedge poly (brow high at the neck, muzzle low in front)
+    const hx0 = sx + fx * 5;
+    const hy0 = cy - 7;
+    r.fillPoly(
+      [
+        [hx0 - fx, hy0 - 1],
+        [hx0 + fx * 3, hy0],
+        [hx0 + fx * 4, hy0 + 2],
+        [hx0 - fx, hy0 + 2],
+      ],
+      c.body,
+    );
+    r.set(hx0, hy0 - 2, c.dark); // 1px ear
+    r.set(hx0 + fx * 4, hy0 + 2, spec.coat === 'dun' ? c.lit : c.dark); // muzzle
+    // mane crest polyline along the back of the neck (1px walk lag)
+    r.line(sx + fx, cy - 2, sx + fx * 5, cy - 6 - lag, c.dark);
+    // chest bulge under the neck root ties neck to body
+    r.fillRect(bx0 + fx * (rx - 1) - (fx < 0 ? 1 : 0), cy - 1, 2, 4, c.body);
+    // tail streams behind
+    const tx = bx0 - fx * rx;
+    r.line(tx, cy - 1, tx - fx * 4, cy + 3 + lag, c.dark);
+    r.line(tx, cy, tx - fx * 3, cy + 5 + lag, c.dark);
+  } else if (dir === 0) {
+    // facing camera: hanging head below the chest mass
+    r.fillEllipse(cx, cy + 6, 2, 3, c.body);
+    r.set(cx - 2, cy - 2, c.dark);
+    r.set(cx + 2, cy - 2, c.dark); // ears
+    r.set(cx - 1, cy + 7, c.dark);
+    r.set(cx + 1, cy + 7, c.dark); // nostrils
+    if (spec.caparison) {
+      // chanfron cloth over the brow — the §6.2 "full caparison" front read
+      for (let y = cy + 3; y <= cy + 5; y++) {
+        for (let x = cx - 1; x <= cx + 1; x++) {
+          r.set(x, y, x < cx ? M.light : x > cx ? M.dark : M.mid);
+        }
+      }
+    }
+  } else {
+    // away: hanging tail over the rump mass
+    r.line(cx, cy + 1, cx, cy + 7 + lag, c.dark);
+    r.set(cx - 2, cy - ry - 3, c.dark);
+    r.set(cx + 2, cy - ry - 3, c.dark); // ear tips beyond the rider
+  }
+
   // saddle + rider
   const seatY = cy - ry;
   r.fillRect(bx0 - 2, seatY - 1, 5, 2, P.woodDark); // saddle
@@ -804,46 +902,89 @@ export function drawCavalry(spec: CavSpec, anim: CavAnim, dir: Dir, frame: numbe
   const rTorsoDark: RGB = spec.riderMetal >= 1 ? P.metalDark : P.clothDark;
   // rider near leg along the flank (side views)
   if (side) r.fillRect(bx0 - fx * 1, seatY, 2, 5, rTorsoDark);
+  // torso — shoulders wider than the waist so the rider reads as a figure,
+  // not a featureless column (r3-16); scout line leans forward (§6.2)
+  const lean = spec.caparison ? 0 : fx;
   r.fillPoly(
     [
-      [bx0 - 2, seatY - 8],
-      [bx0 + 3, seatY - 8],
+      [bx0 - 3 + lean, seatY - 11],
+      [bx0 + 4 + lean, seatY - 11],
       [bx0 + 2, seatY - 1],
       [bx0 - 1, seatY - 1],
     ],
     rTorso,
   );
-  if (r.alphaAt(bx0 - 1, seatY - 7) === 255) r.set(bx0 - 1, seatY - 7, spec.riderMetal === 2 ? P.highlight : P.clothLight);
-  const hx = bx0 + fx;
-  const hy = seatY - 10;
-  r.fillEllipse(hx, hy, 2, 2, awayView(dir) ? P.skinShadow : P.skinBase);
-  // helmet
-  const helmC: RGB = spec.riderMetal === 2 ? P.metalLight : spec.riderMetal === 1 ? P.metalBase : P.clothDark;
-  r.fillRect(hx - 2, hy - 2, 5, 2, helmC);
-  if (spec.plumeMask) {
-    r.set(hx, hy - 3, M.light);
-    r.set(hx - fx, hy - 4, M.mid);
+  if (r.alphaAt(bx0 - 2 + lean, seatY - 10) === 255) {
+    r.set(bx0 - 2 + lean, seatY - 10, spec.riderMetal === 2 ? P.highlight : spec.riderMetal === 1 ? P.metalLight : P.clothLight);
   }
-  // lance: couched for the knight line, raised short lance for scouts
+  // belt row splits torso from hips
+  for (let x = bx0 - 1; x <= bx0 + 2; x++) {
+    if (r.alphaAt(x, seatY - 4) === 255) r.set(x, seatY - 4, rTorsoDark);
+  }
+  // arm reaching toward the lance grip (side + front views)
+  if (side) {
+    r.line(bx0 + lean + fx, seatY - 9, bx0 + fx * 4, seatY - 6, rTorso);
+    r.set(bx0 + fx * 4, seatY - 6, P.skinBase); // hand
+  } else if (dir === 0) {
+    r.line(bx0 + 3, seatY - 9, bx0 + 4, seatY - 6, rTorso);
+    r.set(bx0 + 4, seatY - 6, P.skinBase);
+  }
+  // §6.1 layered rider: a DISTINCT head pixel-group over a 1px neck —
+  // bare skin + hair for the scout line, metal helm for the knight line
+  const hx = bx0 + lean + (side ? fx : 0);
+  const hy = seatY - 14;
+  r.set(hx, hy + 2, P.skinShadow); // neck
+  if (spec.riderMetal === 0) {
+    r.fillEllipse(hx, hy, 2, 2, awayView(dir) ? P.skinShadow : P.skinBase);
+    if (!awayView(dir)) {
+      r.set(hx - 1, hy - 1, P.skinLight);
+      r.set(hx, hy - 1, P.skinLight);
+    }
+    r.fillRect(hx - 1, hy - 2, 3, 1, P.woodDark); // hair cap
+  } else {
+    const helmC: RGB = spec.riderMetal === 2 ? P.metalLight : P.metalBase;
+    r.fillEllipse(hx, hy, 2, 2, awayView(dir) ? P.skinShadow : P.skinBase);
+    // one wide flat-domed block (a narrow crown gets eaten to a 1px spike by
+    // the outline pass); face rows stay skin below the brim
+    r.fillRect(hx - 2, hy - 2, 5, 3, helmC);
+    r.set(hx + 2, hy, P.metalDark);
+    if (dir === 0) r.set(hx, hy + 1, P.metalDark); // nasal bar
+    if (spec.riderMetal === 2) r.set(hx - 1, hy - 2, P.highlight); // glint
+  }
+  if (spec.plumeMask) {
+    r.set(hx, hy - 4, M.light);
+    r.set(hx - fx, hy - 5, M.mid);
+  }
+  // lance: straight couched lance for the knight line, short raised lance for
+  // scouts — always a straight 2px shaft (a 1px line reads as an antenna)
   const lanceY = seatY - 5;
   if (anim === 'attack') {
     const ext = [0, 0, 3, 2, 0][frame];
     r.line(bx0 - fx * 4, lanceY + 1, bx0 + fx * (12 + ext), lanceY + fy * 3, P.woodPale);
-    if (frame === 2) r.set(bx0 + fx * (12 + ext), lanceY + fy * 3, P.highlight);
+    r.line(bx0 - fx * 4, lanceY + 2, bx0 + fx * (12 + ext), lanceY + fy * 3 + 1, P.woodDark);
+    if (frame === 2) r.set(bx0 + fx * (13 + ext), lanceY + fy * 3, P.highlight);
   } else if (spec.caparison) {
     if (side) {
-      r.line(bx0 - fx * 3, lanceY + 3, bx0 + fx * 11, lanceY + 1, P.woodPale);
-      r.line(bx0 - fx * 3, lanceY + 4, bx0 + fx * 6, lanceY + 3, P.woodDark);
-      r.set(bx0 + fx * 12, lanceY + 1, P.metalLight);
+      // butt behind the hip, steel tip ahead of the chest, sloping gently
+      // down — held just above the horse's back line so the shaft reads
+      // against the grass instead of sinking into the caparison
+      r.line(bx0 - fx * 6, seatY - 5, bx0 + fx * 13, seatY - 1, P.woodPale);
+      r.line(bx0 - fx * 6, seatY - 4, bx0 + fx * 13, seatY, P.woodDark);
+      r.set(bx0 + fx * 14, seatY - 1, P.metalLight);
+      r.set(bx0 + fx * 14, seatY, P.metalLight);
     } else {
       r.line(bx0 - 4, lanceY + 4, bx0 - 4, lanceY - 2, P.woodPale);
+      r.line(bx0 - 5, lanceY + 4, bx0 - 5, lanceY - 2, P.woodDark);
       r.set(bx0 - 4, lanceY - 3, P.metalLight);
     }
   } else if (side) {
-    r.line(bx0 + fx * 2, lanceY + 2, bx0 + fx * 6, lanceY - 6, P.woodPale);
-    r.set(bx0 + fx * 6, lanceY - 7, P.metalLight);
+    r.line(bx0 + fx * 2, seatY - 2, bx0 + fx * 7, seatY - 11, P.woodPale);
+    r.line(bx0 + fx * 3, seatY - 2, bx0 + fx * 8, seatY - 11, P.woodPale);
+    r.set(bx0 + fx * 8, seatY - 12, P.metalLight);
+    r.set(bx0 + fx * 7, seatY - 12, P.metalLight);
   } else {
     r.line(bx0 + 4, lanceY + 3, bx0 + 4, lanceY - 4, P.woodPale);
+    r.line(bx0 + 5, lanceY + 3, bx0 + 5, lanceY - 4, P.woodDark);
     r.set(bx0 + 4, lanceY - 5, P.metalLight);
   }
   // kite shield on the off side

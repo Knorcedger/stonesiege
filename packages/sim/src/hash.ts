@@ -43,7 +43,7 @@ function mixEntity(h: number, e: Entity): number {
   if (e.amountLeft !== undefined) h = mix(h, e.amountLeft);
   if (e.targetId !== undefined) h = mix(h, e.targetId);
   if (e.intent !== undefined) {
-    h = mix(h, e.intent.kind === 'attackMove' ? 1 : e.intent.kind === 'attackTarget' ? 2 : 3);
+    h = mix(h, e.intent.kind === 'attackMove' ? 1 : e.intent.kind === 'attackTarget' ? 2 : e.intent.kind === 'gather' ? 3 : 4);
     if (e.intent.kind === 'attackMove') { h = mix(h, e.intent.x); h = mix(h, e.intent.y); }
     else h = mix(h, e.intent.targetId);
   }

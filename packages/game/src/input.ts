@@ -16,6 +16,7 @@ import {
   GAIA, fp,
   type Command, type Entity, type EntityId, type GameState, type PlayerId,
 } from '@bf/sim/types';
+import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { worldToTile, type Camera } from './camera';
 import type { WorldLayer } from './world';
 import {
@@ -48,6 +49,55 @@ export interface InputHost {
 }
 
 type DragMode = 'pan' | 'band' | 'ghost' | 'none';
+
+export type TapAction =
+  | { type: 'select'; id: EntityId }
+  | { type: 'command' }
+  | { type: 'inspect'; id: EntityId }
+  | { type: 'none' };
+
+/** What the current commandable selection contains (drives tap semantics). */
+export interface TapSelection {
+  units: number;
+  buildings: number;
+}
+
+/**
+ * Decide what a plain tap does. `picks` is distance-ordered (nearest first).
+ * GDD intent inference:
+ * - With units selected, an enemy anywhere in the tap slop outranks everything
+ *   (taps-with-selection are attacks in melee); an own unit only steals the tap
+ *   as a reselect when it is the NEAREST pick and no enemy is in the slop.
+ * - With a buildings-only selection, GDD "tap a unit/building = select" wins:
+ *   tapping any own unit, or an own building as the nearest pick, reselects
+ *   (so TC -> Barracks is one tap and re-tapping the TC never moves its rally).
+ *   Ground/resource/enemy taps still set the rally point.
+ * - Bare taps (no selection) stay instant-select.
+ */
+export function resolveTapAction(picks: Entity[], sel: TapSelection, human: PlayerId): TapAction {
+  const ownUnit = picks.find((p) => p.player === human && p.kind === 'unit');
+  if (sel.units > 0) {
+    const enemy = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
+    if (!enemy && ownUnit && picks[0]?.id === ownUnit.id) return { type: 'select', id: ownUnit.id };
+    return { type: 'command' };
+  }
+  if (sel.buildings > 0) {
+    if (ownUnit) return { type: 'select', id: ownUnit.id };
+    const nearest = picks[0];
+    if (nearest && nearest.player === human && nearest.kind === 'building') {
+      return { type: 'select', id: nearest.id };
+    }
+    // ground / resource / enemy: context command (rally point)
+    return { type: 'command' };
+  }
+  if (ownUnit) return { type: 'select', id: ownUnit.id };
+  const ownBuilding = picks.find((p) => p.player === human && p.kind === 'building');
+  if (ownBuilding) return { type: 'select', id: ownBuilding.id };
+  // enemy/resource with nothing selected: inspect (stats panel), never a command
+  if (picks.length > 0) return { type: 'inspect', id: picks[0].id };
+  // ground with no selection: nothing (deselect is explicit: ✕ / two-finger tap)
+  return { type: 'none' };
+}
 
 export class InputController {
   private gestures: GestureState = createGestureState();
@@ -100,7 +150,9 @@ export class InputController {
       };
     };
     const down = (ev: PointerEvent) => {
-      el.setPointerCapture?.(ev.pointerId);
+      // capture can throw NotFoundError if the pointer is already gone
+      // (released between event dispatch and handling, or synthetic events)
+      try { el.setPointerCapture?.(ev.pointerId); } catch { /* non-fatal */ }
       this.feed(toEvt(ev, 'down'));
       ev.preventDefault();
     };
@@ -254,28 +306,23 @@ export class InputController {
     }
     const w = this.host.camera.screenToWorld(sx, sy);
     const picks = this.pickAt(w.x, w.y);
-    const ownUnit = picks.find((p) => p.player === this.host.humanPlayer && p.kind === 'unit');
     const sel = this.commandableSelection();
-
-    if (ownUnit) {
-      this.host.setSelection([ownUnit.id]);
-      return;
+    const selCtx: TapSelection = {
+      units: sel.filter((e) => e.kind === 'unit').length,
+      buildings: sel.filter((e) => e.kind === 'building').length,
+    };
+    const action = resolveTapAction(picks, selCtx, this.host.humanPlayer);
+    switch (action.type) {
+      case 'select':
+      case 'inspect':
+        this.host.setSelection([action.id]);
+        break;
+      case 'command':
+        this.contextCommand(w.x, w.y, picks, sel);
+        break;
+      case 'none':
+        break;
     }
-    if (sel.length > 0) {
-      this.contextCommand(w.x, w.y, picks, sel);
-      return;
-    }
-    const ownBuilding = picks.find((p) => p.player === this.host.humanPlayer && p.kind === 'building');
-    if (ownBuilding) {
-      this.host.setSelection([ownBuilding.id]);
-      return;
-    }
-    if (picks.length > 0) {
-      // enemy/resource with nothing selected: inspect (stats panel), never a command
-      this.host.setSelection([picks[0].id]);
-      return;
-    }
-    // ground with no selection: nothing (deselect is explicit: ✕ / two-finger tap)
   }
 
   private handleDoubleTap(sx: number, sy: number): void {
@@ -283,6 +330,18 @@ export class InputController {
     const picks = this.pickAt(w.x, w.y);
     const own = picks.find((p) => p.player === this.host.humanPlayer && p.kind === 'unit');
     if (!own) {
+      // No own unit: double-tap on an own building expands to all of its type
+      // on screen (GDD expand-to-type applies to buildings too).
+      const ownBld = picks.find((p) => p.player === this.host.humanPlayer && p.kind === 'building');
+      if (ownBld) {
+        const view = this.host.camera.getWorldView();
+        const all = this.host.world.buildingsOfTypeInRect(
+          this.host.getState(), ownBld.defId, view.x0, view.y0, view.x1, view.y1, this.host.humanPlayer,
+        );
+        this.host.setSelection(all.length > 0 ? all.map((e) => e.id) : [ownBld.id]);
+        this.host.showToast(`Selected all ${ownBld.defId} on screen (${Math.max(all.length, 1)})`);
+        return;
+      }
       this.handleTap(sx, sy);
       return;
     }
@@ -338,17 +397,35 @@ export class InputController {
       : null;
 
     // Production buildings selected (and no units): tap sets the rally point.
+    // Undo restores each building's previous rally (or re-centers it on the
+    // building itself when none was set — the sim remaps a blocked center tile
+    // to the nearest walkable one, i.e. the default spawn side).
     if (units.length === 0 && buildings.length > 0) {
       const target = enemy ?? gaiaOrRes;
-      for (const b of buildings) {
-        this.host.issue({
-          kind: 'setRally', player: human, buildingId: b.id,
-          x: target ? target.x : fp(worldToTile(wx, wy).x),
-          y: target ? target.y : fp(worldToTile(wx, wy).y),
-          targetId: target?.id,
-        });
-      }
-      this.host.showToast('Rally point set');
+      const prevRallies = buildings.map((b) => ({
+        id: b.id,
+        rally: b.rally ? { ...b.rally } : null,
+        x: b.x,
+        y: b.y,
+      }));
+      const undoRally = (): void => {
+        for (const p of prevRallies) {
+          this.host.issue({
+            kind: 'setRally', player: human, buildingId: p.id,
+            x: p.rally ? p.rally.x : p.x,
+            y: p.rally ? p.rally.y : p.y,
+            targetId: p.rally?.targetId,
+          });
+        }
+      };
+      const rallyCmd = (b: Entity): Command => ({
+        kind: 'setRally', player: human, buildingId: b.id,
+        x: target ? target.x : fp(worldToTile(wx, wy).x),
+        y: target ? target.y : fp(worldToTile(wx, wy).y),
+        targetId: target?.id,
+      });
+      for (const b of buildings.slice(0, -1)) this.host.issue(rallyCmd(b));
+      this.host.issueWithUndo(rallyCmd(buildings[buildings.length - 1]), 'Rally point set', undoRally);
       return;
     }
     if (unitIds.length === 0) return;
@@ -356,30 +433,54 @@ export class InputController {
     const armed = this.host.isAttackMoveArmed();
     this.host.setAttackMoveArmed(false);
 
+    // Wave-2 verbs the sim would silently drop are downgraded to an HONEST move
+    // toward the target — the toast confirms exactly what happened, never a no-op.
+    const can = (k: Command['kind']): boolean => !PENDING_COMMAND_KINDS.has(k);
+    const moveTo = (x: number, y: number, ids: EntityId[], label: string): void => {
+      this.host.issueWithUndo({ kind: 'move', player: human, units: ids, x, y }, label, undoStop);
+    };
+
     if (enemy) {
-      this.host.issueWithUndo({ kind: 'attack', player: human, units: unitIds, targetId: enemy.id }, 'Attack', undoStop);
+      if (can('attack')) {
+        this.host.issueWithUndo({ kind: 'attack', player: human, units: unitIds, targetId: enemy.id }, 'Attack', undoStop);
+      } else {
+        moveTo(enemy.x, enemy.y, unitIds, 'Move (attack lands in wave 2)');
+      }
       return;
     }
     if (gaiaOrRes && villagers.length > 0) {
-      this.host.issueWithUndo(
-        { kind: 'gather', player: human, units: villagers.map((e) => e.id), targetId: gaiaOrRes.id },
-        'Gather', undoStop,
-      );
-      if (military.length > 0) {
-        this.host.issue({ kind: 'move', player: human, units: military.map((e) => e.id), x: gaiaOrRes.x, y: gaiaOrRes.y });
+      if (can('gather')) {
+        this.host.issueWithUndo(
+          { kind: 'gather', player: human, units: villagers.map((e) => e.id), targetId: gaiaOrRes.id },
+          'Gather', undoStop,
+        );
+        if (military.length > 0) {
+          this.host.issue({ kind: 'move', player: human, units: military.map((e) => e.id), x: gaiaOrRes.x, y: gaiaOrRes.y });
+        }
+      } else {
+        moveTo(gaiaOrRes.x, gaiaOrRes.y, unitIds, 'Move (gathering lands in wave 2)');
       }
       return;
     }
     if (gaiaOrRes && military.length > 0 && gaiaOrRes.kind === 'unit') {
       // military ordered onto a gaia animal: hunt it
-      this.host.issueWithUndo({ kind: 'attack', player: human, units: unitIds, targetId: gaiaOrRes.id }, 'Attack', undoStop);
+      if (can('attack')) {
+        this.host.issueWithUndo({ kind: 'attack', player: human, units: unitIds, targetId: gaiaOrRes.id }, 'Attack', undoStop);
+      } else {
+        moveTo(gaiaOrRes.x, gaiaOrRes.y, unitIds, 'Move (hunting lands in wave 2)');
+      }
       return;
     }
     if (ownBld && villagers.length > 0 && ((ownBld.buildProgress ?? 1000) < 1000 || ownBld.hp < ownBld.maxHp)) {
-      this.host.issueWithUndo(
-        { kind: 'repair', player: human, units: villagers.map((e) => e.id), targetId: ownBld.id },
-        (ownBld.buildProgress ?? 1000) < 1000 ? 'Build' : 'Repair', undoStop,
-      );
+      const isFoundation = (ownBld.buildProgress ?? 1000) < 1000;
+      if (can(isFoundation ? 'build' : 'repair')) {
+        this.host.issueWithUndo(
+          { kind: 'repair', player: human, units: villagers.map((e) => e.id), targetId: ownBld.id },
+          isFoundation ? 'Build' : 'Repair', undoStop,
+        );
+      } else {
+        moveTo(ownBld.x, ownBld.y, unitIds, `Move (${isFoundation ? 'construction' : 'repair'} lands in wave 2)`);
+      }
       return;
     }
     const t = worldToTile(wx, wy);

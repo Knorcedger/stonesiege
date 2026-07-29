@@ -7,7 +7,9 @@ import {
   type Command, type Entity, type EntityId, type GameState, type PlayerId,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
+import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { loadAssets, type GameAssets } from './assets';
+import { centroidTile, idleUnits, liveGroupIds, sameIdSet, type IdleCategory } from './selectionTools';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
 import { WorldLayer } from './world';
@@ -96,6 +98,48 @@ export async function runGame(root: HTMLElement): Promise<void> {
   };
   const deselect = (): void => setSelection([]);
 
+  // Idle-unit cycling (GDD: top-bar idle-villager/-military badges = touch `.` hotkey).
+  const idleCursor: Record<IdleCategory, number> = { villager: 0, military: 0 };
+  const getIdleCounts = (): Record<IdleCategory, number> => ({
+    villager: idleUnits(getState(), humanPlayer, 'villager').length,
+    military: idleUnits(getState(), humanPlayer, 'military').length,
+  });
+  const cycleIdle = (cat: IdleCategory): void => {
+    const list = idleUnits(getState(), humanPlayer, cat);
+    if (list.length === 0) return;
+    const e = list[idleCursor[cat] % list.length];
+    idleCursor[cat] = (idleCursor[cat] + 1) % list.length;
+    setSelection([e.id]);
+    camera.centerOnTile(e.x / FP, e.y / FP);
+  };
+
+  // Control groups (GDD: saved-selection chips — long-press saves, tap reselects,
+  // tap again centers the camera on the group).
+  const GROUP_COUNT = 4;
+  const groups: EntityId[][] = Array.from({ length: GROUP_COUNT }, () => []);
+  const getGroupCounts = (): number[] => groups.map((g) => liveGroupIds(getState(), g).length);
+  const saveGroup = (index: number): boolean => {
+    const ids = liveSelection().filter((e) => e.player === humanPlayer).map((e) => e.id);
+    if (ids.length === 0 || index < 0 || index >= GROUP_COUNT) return false;
+    groups[index] = ids;
+    return true;
+  };
+  const selectGroup = (index: number): void => {
+    if (index < 0 || index >= GROUP_COUNT) return;
+    const ids = liveGroupIds(getState(), groups[index]);
+    if (ids.length === 0) return;
+    if (sameIdSet(ids, selection)) {
+      // second tap on the active group: center the camera on it
+      const members = ids
+        .map((id) => getState().entities.get(id))
+        .filter((e): e is Entity => !!e);
+      const c = centroidTile(members, FP);
+      if (c) camera.centerOnTile(c.x, c.y);
+      return;
+    }
+    setSelection(ids);
+  };
+
   // --------------------------------------------------------------- sim loop
   const loop = new SimLoop(game, {
     onTick: (events) => {
@@ -139,9 +183,12 @@ export async function runGame(root: HTMLElement): Promise<void> {
       .moveTo(0, -hh).lineTo(hw, 0).lineTo(0, hh).lineTo(-hw, 0).closePath()
       .fill({ color, alpha: 0.45 })
       .stroke({ width: 2, color, alpha: 1 });
+    // Resolve the local player's color variant (baked @p<idx> or runtime-swapped) —
+    // NEVER the neutral mask frame, whose raw magenta placeholder pixels would show.
+    const colorIdx = getState().players[humanPlayer]?.setup.color;
     const frame =
-      assets.tryResolve(`bld/${placement.defId}/${getState().players[humanPlayer]?.age ?? 'dark'}/done`) ??
-      assets.resolveFrame(`bld/${placement.defId}/done`);
+      assets.tryResolve(`bld/${placement.defId}/${getState().players[humanPlayer]?.age ?? 'dark'}/done`, colorIdx) ??
+      assets.resolveFrame(`bld/${placement.defId}/done`, colorIdx);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
   };
@@ -162,6 +209,11 @@ export async function runGame(root: HTMLElement): Promise<void> {
   };
   const confirmPlacement = (): void => {
     if (!placement) return;
+    if (PENDING_COMMAND_KINDS.has('build')) {
+      // sim would silently drop the build command — never confirm a no-op
+      hud.showUndoToast('Construction arrives in wave 2', null);
+      return;
+    }
     if (!game.canPlace(humanPlayer, placement.defId, placement.tileX, placement.tileY) || !canAfford(placement.defId)) return;
     const villagers = liveSelection().filter((e) => e.defId === 'villager').map((e) => e.id);
     if (villagers.length === 0) {
@@ -207,6 +259,11 @@ export async function runGame(root: HTMLElement): Promise<void> {
     togglePause: () => loop.togglePause(),
     isPaused: () => loop.paused,
     resumeGame: () => loop.resume(),
+    getIdleCounts,
+    cycleIdle,
+    getGroupCounts,
+    saveGroup,
+    selectGroup,
   };
   const hud = new Hud(root, hudHost);
 

@@ -93,11 +93,11 @@ const HUMANS: Record<string, HumanSpec> = {
   },
   longbowman: {
     id: 'longbowman', height: 26, torsoW: 6, tunic: CLOTH, legsC: P.clothDark,
-    helmet: 'hood', weapon: 'longbow', quiver: true, sashRows: 3, metal: 0,
+    helmet: 'hood', weapon: 'longbow', quiver: true, sashRows: 4, metal: 0,
   },
   eliteLongbowman: {
     id: 'eliteLongbowman', height: 26, torsoW: 6, tunic: CLOTH, legsC: P.woodDark,
-    helmet: 'hood', weapon: 'longbow', quiver: true, sashRows: 3, metal: 1,
+    helmet: 'hood', weapon: 'longbow', quiver: true, sashRows: 4, metal: 1,
   },
 };
 

@@ -12,9 +12,13 @@ import { Rectangle, Texture, TextureSource } from 'pixi.js';
 import { gameData } from '@bf/data';
 import { resolveFrameName, bakedColorName } from './frames';
 import {
-  swapPalette, hexToRgb, FALLBACK_PLAYER_RAMPS, FALLBACK_MASK_PALETTE, type Rgb,
+  swapPalette, containsMask, hexToRgb, FALLBACK_PLAYER_RAMPS, FALLBACK_MASK_PALETTE,
+  GAIA_NEUTRAL_COLOR, GAIA_NEUTRAL_RAMP, type Rgb,
 } from './recolor';
 import { makeMockFrame } from './dev/mockAtlas';
+
+/** Dev builds run extra pixel asserts (mask colors must never reach the screen). */
+const DEV_ASSERTS = typeof import.meta !== 'undefined' && !!import.meta.env?.DEV;
 
 export const ATLAS_NAMES = ['terrain', 'units', 'buildings', 'objects', 'ui', 'icons'] as const;
 export type AtlasName = (typeof ATLAS_NAMES)[number];
@@ -129,12 +133,24 @@ export class GameAssets {
       const bctx = base.getContext('2d')!;
       bctx.drawImage(atlas.image, 0, 0);
       const baseData = bctx.getImageData(0, 0, base.width, base.height);
-      for (const color of colors) {
+      // gaia sprites with a mask band (sheep ownership mark) swap to neutral gray
+      for (const color of [...colors, GAIA_NEUTRAL_COLOR]) {
         if (atlas.colorFrames.has(color)) continue;
-        const ramp = ramps[color] ?? ramps[0];
+        const ramp = color === GAIA_NEUTRAL_COLOR
+          ? GAIA_NEUTRAL_RAMP.map(hexToRgb)
+          : ramps[color] ?? ramps[0];
         if (!ramp) continue;
         const copy = new ImageData(new Uint8ClampedArray(baseData.data), baseData.width, baseData.height);
         swapPalette(copy.data, atlas.maskPalette, ramp);
+        // Dev assert (ASSET_CONTRACT): after the swap NO mask pixel may survive —
+        // any hit means raw magenta would render in-game (the sheep-collar bug).
+        if (DEV_ASSERTS && containsMask(copy.data, atlas.maskPalette)) {
+          console.error(
+            `[assets] ${atlas.name}: mask colors survived the ` +
+            `${color === GAIA_NEUTRAL_COLOR ? 'gaia-neutral' : `player ${color}`} palette swap — ` +
+            'raw magenta would reach the screen',
+          );
+        }
         const cnv = document.createElement('canvas');
         cnv.width = base.width;
         cnv.height = base.height;
@@ -183,6 +199,22 @@ export class GameAssets {
       }
       if (!tex && playerColor !== undefined) {
         tex = atlas.colorFrames.get(playerColor)?.get(phys);
+        // Dev assert: a masked runtime-swap atlas serving the PLAIN frame for a
+        // color request means the swap was never prepared for this color — the
+        // frame's mask band would render as raw magenta.
+        if (
+          DEV_ASSERTS && !tex && atlas.maskPalette && atlas.strategy !== 'baked' &&
+          !atlas.colorFrames.has(playerColor) && atlas.frames.has(phys)
+        ) {
+          const warnKey = `swap-missing:${atlas.name}:${playerColor}`;
+          if (!this.warned.has(warnKey)) {
+            this.warned.add(warnKey);
+            console.error(
+              `[assets] ${atlas.name}: no palette-swapped copy for color ${playerColor} ` +
+              `(frame ${phys}) — serving the raw mask frame. Was prepareMatchColors called?`,
+            );
+          }
+        }
       }
       tex ??= atlas.frames.get(phys);
       if (tex) {
@@ -213,6 +245,43 @@ export class GameAssets {
     let i = 0;
     while (i < max && this.tryResolve(`${prefix}/${i}`)) i++;
     return i;
+  }
+
+  private contentTopCache = new Map<string, number>();
+
+  /**
+   * First non-transparent row of a frame, in px from the frame rect's top
+   * (0 when unknown/mock). Atlas frames carry transparent headroom, so HUD
+   * overlays (building health bars) must anchor to pixels, not the rect.
+   * Alpha is identical across color swaps — cached per physical frame name.
+   */
+  contentTopPx(name: string): number {
+    const { name: phys } = resolveFrameName(name);
+    const cached = this.contentTopCache.get(phys);
+    if (cached !== undefined) return cached;
+    let top = 0;
+    const atlasName = atlasNameFor(phys);
+    const atlas = atlasName ? this.atlases.get(atlasName) : undefined;
+    const fd = atlas?.frameData.get(phys);
+    if (atlas && !atlas.missing && atlas.image && fd) {
+      const { x, y, w, h } = fd.frame;
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d')!;
+      ctx.drawImage(atlas.image, x, y, w, h, 0, 0, w, h);
+      const data = ctx.getImageData(0, 0, w, h).data;
+      scan: for (let row = 0; row < h; row++) {
+        for (let col = 0; col < w; col++) {
+          if (data[(row * w + col) * 4 + 3] !== 0) {
+            top = row;
+            break scan;
+          }
+        }
+      }
+    }
+    this.contentTopCache.set(phys, top);
+    return top;
   }
 
   /**

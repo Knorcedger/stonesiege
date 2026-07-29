@@ -19,14 +19,20 @@ export interface ObjectsResult {
 function oakTree(): Raster {
   const r = new Raster(48, 64);
   r.dropShadow(24, 58, 12, 4);
-  r.fillRect(21, 45, 5, 14, PALETTE.woodBase);
-  r.fillRect(21, 45, 1, 14, PALETTE.woodLight);
+  // trunk runs UP INTO the canopy (top at y=36, under the satellite ellipses) so
+  // the crown is seated with no grass gap; visible clear length below is ~14px.
+  r.fillRect(21, 36, 5, 23, PALETTE.woodBase);
+  r.fillRect(21, 36, 1, 23, PALETTE.woodLight);
+  r.set(20, 58, PALETTE.woodBase); // root flares
+  r.set(26, 58, PALETTE.woodBase);
+  // §4.1 canopy: big center r14x10 + two satellites overlapping the trunk top
   const inU = (x: number, y: number) =>
     Raster.inEllipse(x, y, 24, 26, 14, 10) ||
+    Raster.inEllipse(x, y, 24, 17, 9, 7) || // crown knob — mass taller than wide
     Raster.inEllipse(x, y, 14, 32, 9, 7) ||
     Raster.inEllipse(x, y, 34, 30, 9, 7);
   r.paintWhere(inU, PALETTE.leafBase);
-  r.paintWhere((x, y) => inU(x, y) && !inU(x - 3, y - 3), PALETTE.leafLight);
+  r.paintWhere((x, y) => inU(x, y) && !inU(x - 2, y - 2), PALETTE.leafLight);
   r.paintWhere((x, y) => inU(x, y) && !inU(x + 2, y + 2), PALETTE.leafDark);
   r.ditherWhere(
     0, 0, 47, 47,
@@ -37,7 +43,7 @@ function oakTree(): Raster {
   const rng = new Rng('obj/tree/0');
   for (let i = 0, n = rng.int(6, 10); i < n; i++) {
     const x = rng.int(12, 38);
-    const y = rng.int(18, 38);
+    const y = rng.int(14, 38);
     if (inU(x, y)) r.set(x, y, PALETTE.leafShadow);
   }
   r.outlinePass();

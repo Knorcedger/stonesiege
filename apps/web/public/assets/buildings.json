@@ -3,7 +3,7 @@
   "bld/archeryRange/construct0": {
    "frame": {
     "x": 1610,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 122
    },
@@ -27,7 +27,7 @@
   "bld/archeryRange/construct1": {
    "frame": {
     "x": 1224,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 124
    },
@@ -51,7 +51,7 @@
   "bld/archeryRange/construct2": {
    "frame": {
     "x": 1159,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 134
    },
@@ -75,7 +75,7 @@
   "bld/archeryRange/done": {
    "frame": {
     "x": 1352,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 134
    },
@@ -99,7 +99,7 @@
   "bld/archeryRange/rubble": {
    "frame": {
     "x": 1417,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 123
    },
@@ -123,7 +123,7 @@
   "bld/barracks/construct0": {
    "frame": {
     "x": 1803,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 122
    },
@@ -147,7 +147,7 @@
   "bld/barracks/construct1": {
    "frame": {
     "x": 1738,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 131
    },
@@ -171,7 +171,7 @@
   "bld/barracks/construct2": {
    "frame": {
     "x": 1800,
-    "y": 837,
+    "y": 821,
     "w": 192,
     "h": 146
    },
@@ -195,7 +195,7 @@
   "bld/barracks/done": {
    "frame": {
     "x": 1,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 146
    },
@@ -219,7 +219,7 @@
   "bld/barracks/rubble": {
    "frame": {
     "x": 387,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 126
    },
@@ -243,7 +243,7 @@
   "bld/blacksmith/construct0": {
    "frame": {
     "x": 1,
-    "y": 1275,
+    "y": 1259,
     "w": 192,
     "h": 122
    },
@@ -267,7 +267,7 @@
   "bld/blacksmith/construct1": {
    "frame": {
     "x": 1,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 131
    },
@@ -291,7 +291,7 @@
   "bld/blacksmith/construct2": {
    "frame": {
     "x": 194,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 146
    },
@@ -315,7 +315,7 @@
   "bld/blacksmith/done": {
    "frame": {
     "x": 387,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 146
    },
@@ -339,7 +339,7 @@
   "bld/blacksmith/rubble": {
    "frame": {
     "x": 580,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 126
    },
@@ -363,7 +363,7 @@
   "bld/castle/construct0": {
    "frame": {
     "x": 515,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 154
    },
@@ -386,8 +386,8 @@
   },
   "bld/castle/construct1": {
    "frame": {
-    "x": 1,
-    "y": 479,
+    "x": 515,
+    "y": 272,
     "w": 256,
     "h": 186
    },
@@ -458,8 +458,8 @@
   },
   "bld/castle/rubble": {
    "frame": {
-    "x": 1350,
-    "y": 479,
+    "x": 1029,
+    "y": 465,
     "w": 256,
     "h": 171
    },
@@ -483,7 +483,7 @@
   "bld/gate/construct0": {
    "frame": {
     "x": 456,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -507,7 +507,7 @@
   "bld/gate/construct1": {
    "frame": {
     "x": 326,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 63
    },
@@ -531,7 +531,7 @@
   "bld/gate/construct2": {
    "frame": {
     "x": 1873,
-    "y": 1398,
+    "y": 1382,
     "w": 64,
     "h": 76
    },
@@ -555,7 +555,7 @@
   "bld/gate/done": {
    "frame": {
     "x": 1938,
-    "y": 1398,
+    "y": 1382,
     "w": 64,
     "h": 76
    },
@@ -579,7 +579,7 @@
   "bld/gate/rubble": {
    "frame": {
     "x": 391,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 60
    },
@@ -603,7 +603,7 @@
   "bld/guardTower/construct0": {
    "frame": {
     "x": 521,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -627,7 +627,7 @@
   "bld/guardTower/construct1": {
    "frame": {
     "x": 1743,
-    "y": 1398,
+    "y": 1382,
     "w": 64,
     "h": 82
    },
@@ -651,7 +651,7 @@
   "bld/guardTower/construct2": {
    "frame": {
     "x": 710,
-    "y": 1275,
+    "y": 1259,
     "w": 64,
     "h": 110
    },
@@ -675,7 +675,7 @@
   "bld/guardTower/done": {
    "frame": {
     "x": 775,
-    "y": 1275,
+    "y": 1259,
     "w": 64,
     "h": 110
    },
@@ -699,7 +699,7 @@
   "bld/guardTower/rubble": {
    "frame": {
     "x": 66,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 71
    },
@@ -723,7 +723,7 @@
   "bld/house/castle/done": {
    "frame": {
     "x": 840,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 110
    },
@@ -747,7 +747,7 @@
   "bld/house/construct0": {
    "frame": {
     "x": 1033,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 90
    },
@@ -771,7 +771,7 @@
   "bld/house/construct1": {
    "frame": {
     "x": 388,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 97
    },
@@ -795,7 +795,7 @@
   "bld/house/construct2": {
    "frame": {
     "x": 969,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 110
    },
@@ -819,7 +819,7 @@
   "bld/house/dark/done": {
    "frame": {
     "x": 1098,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 110
    },
@@ -843,7 +843,7 @@
   "bld/house/feudal/done": {
    "frame": {
     "x": 1227,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 110
    },
@@ -867,7 +867,7 @@
   "bld/house/imperial/done": {
    "frame": {
     "x": 1356,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 110
    },
@@ -891,7 +891,7 @@
   "bld/house/rubble": {
    "frame": {
     "x": 646,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 93
    },
@@ -915,7 +915,7 @@
   "bld/keep/construct0": {
    "frame": {
     "x": 586,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -939,7 +939,7 @@
   "bld/keep/construct1": {
    "frame": {
     "x": 1678,
-    "y": 1398,
+    "y": 1382,
     "w": 64,
     "h": 87
    },
@@ -963,7 +963,7 @@
   "bld/keep/construct2": {
    "frame": {
     "x": 580,
-    "y": 1275,
+    "y": 1259,
     "w": 64,
     "h": 118
    },
@@ -987,7 +987,7 @@
   "bld/keep/done": {
    "frame": {
     "x": 645,
-    "y": 1275,
+    "y": 1259,
     "w": 64,
     "h": 118
    },
@@ -1011,7 +1011,7 @@
   "bld/keep/rubble": {
    "frame": {
     "x": 1,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 73
    },
@@ -1035,7 +1035,7 @@
   "bld/lumberCamp/construct0": {
    "frame": {
     "x": 1162,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 90
    },
@@ -1059,7 +1059,7 @@
   "bld/lumberCamp/construct1": {
    "frame": {
     "x": 904,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 91
    },
@@ -1083,7 +1083,7 @@
   "bld/lumberCamp/construct2": {
    "frame": {
     "x": 1,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 100
    },
@@ -1107,7 +1107,7 @@
   "bld/lumberCamp/done": {
    "frame": {
     "x": 130,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 100
    },
@@ -1131,7 +1131,7 @@
   "bld/lumberCamp/rubble": {
    "frame": {
     "x": 1291,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 90
    },
@@ -1155,7 +1155,7 @@
   "bld/market/construct0": {
    "frame": {
     "x": 772,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 154
    },
@@ -1178,8 +1178,8 @@
   },
   "bld/market/construct1": {
    "frame": {
-    "x": 1158,
-    "y": 666,
+    "x": 901,
+    "y": 650,
     "w": 256,
     "h": 162
    },
@@ -1202,8 +1202,8 @@
   },
   "bld/market/construct2": {
    "frame": {
-    "x": 836,
-    "y": 479,
+    "x": 515,
+    "y": 465,
     "w": 256,
     "h": 176
    },
@@ -1226,8 +1226,8 @@
   },
   "bld/market/done": {
    "frame": {
-    "x": 1093,
-    "y": 479,
+    "x": 772,
+    "y": 465,
     "w": 256,
     "h": 176
    },
@@ -1251,7 +1251,7 @@
   "bld/market/rubble": {
    "frame": {
     "x": 1672,
-    "y": 666,
+    "y": 650,
     "w": 256,
     "h": 158
    },
@@ -1275,7 +1275,7 @@
   "bld/mill/construct0": {
    "frame": {
     "x": 1420,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 90
    },
@@ -1299,7 +1299,7 @@
   "bld/mill/construct1": {
    "frame": {
     "x": 1743,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 105
    },
@@ -1323,7 +1323,7 @@
   "bld/mill/construct2": {
    "frame": {
     "x": 773,
-    "y": 1143,
+    "y": 1127,
     "w": 128,
     "h": 126
    },
@@ -1347,7 +1347,7 @@
   "bld/mill/done": {
    "frame": {
     "x": 902,
-    "y": 1143,
+    "y": 1127,
     "w": 128,
     "h": 126
    },
@@ -1371,7 +1371,7 @@
   "bld/mill/rubble": {
    "frame": {
     "x": 259,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 98
    },
@@ -1395,7 +1395,7 @@
   "bld/miningCamp/construct0": {
    "frame": {
     "x": 1549,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 90
    },
@@ -1419,7 +1419,7 @@
   "bld/miningCamp/construct1": {
    "frame": {
     "x": 517,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 94
    },
@@ -1443,7 +1443,7 @@
   "bld/miningCamp/construct2": {
    "frame": {
     "x": 1485,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 106
    },
@@ -1467,7 +1467,7 @@
   "bld/miningCamp/done": {
    "frame": {
     "x": 1614,
-    "y": 1275,
+    "y": 1259,
     "w": 128,
     "h": 106
    },
@@ -1491,7 +1491,7 @@
   "bld/miningCamp/rubble": {
    "frame": {
     "x": 775,
-    "y": 1398,
+    "y": 1382,
     "w": 128,
     "h": 92
    },
@@ -1515,7 +1515,7 @@
   "bld/monastery/construct0": {
    "frame": {
     "x": 194,
-    "y": 1275,
+    "y": 1259,
     "w": 192,
     "h": 122
    },
@@ -1539,7 +1539,7 @@
   "bld/monastery/construct1": {
    "frame": {
     "x": 580,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 142
    },
@@ -1562,8 +1562,8 @@
   },
   "bld/monastery/construct2": {
    "frame": {
-    "x": 772,
-    "y": 666,
+    "x": 258,
+    "y": 650,
     "w": 192,
     "h": 166
    },
@@ -1586,8 +1586,8 @@
   },
   "bld/monastery/done": {
    "frame": {
-    "x": 965,
-    "y": 666,
+    "x": 451,
+    "y": 650,
     "w": 192,
     "h": 166
    },
@@ -1611,7 +1611,7 @@
   "bld/monastery/rubble": {
    "frame": {
     "x": 1545,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 132
    },
@@ -1635,7 +1635,7 @@
   "bld/siegeWorkshop/construct0": {
    "frame": {
     "x": 1029,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 154
    },
@@ -1659,7 +1659,7 @@
   "bld/siegeWorkshop/construct1": {
    "frame": {
     "x": 1,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 158
    },
@@ -1682,8 +1682,8 @@
   },
   "bld/siegeWorkshop/construct2": {
    "frame": {
-    "x": 1607,
-    "y": 479,
+    "x": 1286,
+    "y": 465,
     "w": 256,
     "h": 170
    },
@@ -1706,8 +1706,8 @@
   },
   "bld/siegeWorkshop/done": {
    "frame": {
-    "x": 1,
-    "y": 666,
+    "x": 1543,
+    "y": 465,
     "w": 256,
     "h": 170
    },
@@ -1731,7 +1731,7 @@
   "bld/siegeWorkshop/rubble": {
    "frame": {
     "x": 258,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 156
    },
@@ -1755,7 +1755,7 @@
   "bld/stable/construct0": {
    "frame": {
     "x": 387,
-    "y": 1275,
+    "y": 1259,
     "w": 192,
     "h": 122
    },
@@ -1779,7 +1779,7 @@
   "bld/stable/construct1": {
    "frame": {
     "x": 194,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 129
    },
@@ -1803,7 +1803,7 @@
   "bld/stable/construct2": {
    "frame": {
     "x": 773,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 142
    },
@@ -1827,7 +1827,7 @@
   "bld/stable/done": {
    "frame": {
     "x": 966,
-    "y": 996,
+    "y": 980,
     "w": 192,
     "h": 142
    },
@@ -1851,7 +1851,7 @@
   "bld/stable/rubble": {
    "frame": {
     "x": 1031,
-    "y": 1143,
+    "y": 1127,
     "w": 192,
     "h": 125
    },
@@ -1875,7 +1875,7 @@
   "bld/stoneWall/construct0": {
    "frame": {
     "x": 651,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -1899,7 +1899,7 @@
   "bld/stoneWall/construct1": {
    "frame": {
     "x": 716,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -1923,7 +1923,7 @@
   "bld/stoneWall/construct2": {
    "frame": {
     "x": 196,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 66
    },
@@ -1947,7 +1947,7 @@
   "bld/stoneWall/done": {
    "frame": {
     "x": 261,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 66
    },
@@ -1971,7 +1971,7 @@
   "bld/stoneWall/rubble": {
    "frame": {
     "x": 781,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -1994,10 +1994,10 @@
   },
   "bld/townCenter/castle/done": {
    "frame": {
-    "x": 1,
+    "x": 1093,
     "y": 272,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "rotated": false,
    "trimmed": false,
@@ -2005,21 +2005,21 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "sourceSize": {
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6893
+    "y": 0.6522
    }
   },
   "bld/townCenter/construct0": {
    "frame": {
     "x": 1286,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 154
    },
@@ -2042,10 +2042,10 @@
   },
   "bld/townCenter/construct1": {
    "frame": {
-    "x": 579,
-    "y": 479,
+    "x": 644,
+    "y": 650,
     "w": 256,
-    "h": 178
+    "h": 166
    },
    "rotated": false,
    "trimmed": false,
@@ -2053,23 +2053,23 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 178
+    "h": 166
    },
    "sourceSize": {
     "w": 256,
-    "h": 178
+    "h": 166
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6404
+    "y": 0.6145
    }
   },
   "bld/townCenter/construct2": {
    "frame": {
-    "x": 258,
+    "x": 1350,
     "y": 272,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "rotated": false,
    "trimmed": false,
@@ -2077,23 +2077,23 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "sourceSize": {
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6893
+    "y": 0.6522
    }
   },
   "bld/townCenter/dark/done": {
    "frame": {
-    "x": 515,
+    "x": 1607,
     "y": 272,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "rotated": false,
    "trimmed": false,
@@ -2101,23 +2101,23 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "sourceSize": {
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6893
+    "y": 0.6522
    }
   },
   "bld/townCenter/feudal/done": {
    "frame": {
-    "x": 772,
-    "y": 272,
+    "x": 1,
+    "y": 465,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "rotated": false,
    "trimmed": false,
@@ -2125,23 +2125,23 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "sourceSize": {
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6893
+    "y": 0.6522
    }
   },
   "bld/townCenter/imperial/done": {
    "frame": {
-    "x": 1029,
-    "y": 272,
+    "x": 258,
+    "y": 465,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "rotated": false,
    "trimmed": false,
@@ -2149,23 +2149,23 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "sourceSize": {
     "w": 256,
-    "h": 206
+    "h": 184
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6893
+    "y": 0.6522
    }
   },
   "bld/townCenter/rubble": {
    "frame": {
-    "x": 515,
-    "y": 666,
+    "x": 1415,
+    "y": 650,
     "w": 256,
-    "h": 167
+    "h": 160
    },
    "rotated": false,
    "trimmed": false,
@@ -2173,21 +2173,21 @@
     "x": 0,
     "y": 0,
     "w": 256,
-    "h": 167
+    "h": 160
    },
    "sourceSize": {
     "w": 256,
-    "h": 167
+    "h": 160
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.6168
+    "y": 0.6
    }
   },
   "bld/university/construct0": {
    "frame": {
     "x": 1543,
-    "y": 837,
+    "y": 821,
     "w": 256,
     "h": 154
    },
@@ -2210,8 +2210,8 @@
   },
   "bld/university/construct1": {
    "frame": {
-    "x": 258,
-    "y": 666,
+    "x": 1,
+    "y": 650,
     "w": 256,
     "h": 170
    },
@@ -2234,7 +2234,7 @@
   },
   "bld/university/construct2": {
    "frame": {
-    "x": 1286,
+    "x": 1,
     "y": 272,
     "w": 256,
     "h": 192
@@ -2258,7 +2258,7 @@
   },
   "bld/university/done": {
    "frame": {
-    "x": 1543,
+    "x": 258,
     "y": 272,
     "w": 256,
     "h": 192
@@ -2282,8 +2282,8 @@
   },
   "bld/university/rubble": {
    "frame": {
-    "x": 1415,
-    "y": 666,
+    "x": 1158,
+    "y": 650,
     "w": 256,
     "h": 162
    },
@@ -2307,7 +2307,7 @@
   "bld/watchTower/construct0": {
    "frame": {
     "x": 846,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 58
    },
@@ -2331,7 +2331,7 @@
   "bld/watchTower/construct1": {
    "frame": {
     "x": 1808,
-    "y": 1398,
+    "y": 1382,
     "w": 64,
     "h": 78
    },
@@ -2355,7 +2355,7 @@
   "bld/watchTower/construct2": {
    "frame": {
     "x": 1872,
-    "y": 1275,
+    "y": 1259,
     "w": 64,
     "h": 102
    },
@@ -2379,7 +2379,7 @@
   "bld/watchTower/done": {
    "frame": {
     "x": 1937,
-    "y": 1275,
+    "y": 1259,
     "w": 64,
     "h": 102
    },
@@ -2403,7 +2403,7 @@
   "bld/watchTower/rubble": {
    "frame": {
     "x": 131,
-    "y": 1499,
+    "y": 1483,
     "w": 64,
     "h": 68
    },
@@ -2426,8 +2426,8 @@
   },
   "bld/wonder/construct0": {
    "frame": {
-    "x": 258,
-    "y": 479,
+    "x": 772,
+    "y": 272,
     "w": 320,
     "h": 186
    },
@@ -2552,7 +2552,7 @@
   "format": "RGBA8888",
   "size": {
    "w": 2048,
-   "h": 1573
+   "h": 1557
   },
   "scale": 1,
   "bannerfall": {

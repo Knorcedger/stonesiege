@@ -47,8 +47,12 @@ export class Minimap {
     this.bakeTerrain(state);
 
     this.canvas.addEventListener('pointerdown', (ev) => {
+      // CSS may downscale the canvas on narrow screens (media query) — map
+      // pointer coords back into the fixed internal SIZE space before inverting.
       const rect = this.canvas.getBoundingClientRect();
-      const t = this.pixelToTile(ev.clientX - rect.left, ev.clientY - rect.top);
+      const sx = rect.width > 0 ? SIZE / rect.width : 1;
+      const sy = rect.height > 0 ? SIZE / rect.height : 1;
+      const t = this.pixelToTile((ev.clientX - rect.left) * sx, (ev.clientY - rect.top) * sy);
       if (t) this.onJump(t.x, t.y);
       ev.stopPropagation();
     });

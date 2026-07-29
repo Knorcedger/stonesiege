@@ -2,7 +2,8 @@
 // deterministic: players in spaced quadrants; each start gets TC + 3 villagers + scout,
 // 4 sheep, a berry patch, main + secondary gold, stone (+ small secondary), nearby deer
 // and two distant wolves. Forest blobs with clearings avoid start zones, extra neutral
-// golds sit near the middle, and a carve pass guarantees every TC can reach every other.
+// golds sit near the middle, and a carve pass guarantees every TC AND every resource
+// cluster (players' + mid golds) can be reached — forests never wall anything off.
 
 import { gameData } from '@bf/data';
 import type { GameMap, TerrainId } from './types';
@@ -70,12 +71,18 @@ function clusterTiles(state: SimState, cx: number, cy: number, count: number): A
 
 /**
  * Find a cluster center in ring [minR, maxR] around (ax, ay) with room for `count`
- * tiles. Widens the ring if the terrain is crowded, so starts are always complete.
+ * tiles. Widens the ring if the terrain is crowded, and falls back to a deterministic
+ * outward spiral from the anchor if random sampling never lands — a start is never
+ * silently missing a resource cluster on a pathological seed.
  */
 function placeCluster(
   state: SimState, rng: SimRng, ax: number, ay: number,
   minR: number, maxR: number, count: number, defId: string,
 ): Array<{ x: number; y: number }> {
+  const spawnAll = (tiles: Array<{ x: number; y: number }>): Array<{ x: number; y: number }> => {
+    for (const t of tiles) spawnEntity(state, { defId, player: 0, tileX: t.x, tileY: t.y });
+    return tiles;
+  };
   for (let widen = 0; widen < 5; widen++) {
     const lo = minR, hi = maxR + widen * 3;
     for (let attempt = 0; attempt < 60; attempt++) {
@@ -86,11 +93,23 @@ function placeCluster(
       if (cx < 2 || cy < 2 || cx >= state.map.width - 2 || cy >= state.map.height - 2) continue;
       const tiles = clusterTiles(state, cx, cy, count);
       if (!tiles) continue;
-      for (const t of tiles) spawnEntity(state, { defId, player: 0, tileX: t.x, tileY: t.y });
-      return tiles;
+      return spawnAll(tiles);
     }
   }
-  return [];
+  // Deterministic spiral fallback (no rng draws): first ring-ordered center with room.
+  const spiralMax = Math.max(state.map.width, state.map.height);
+  for (let r = Math.min(minR, spiralMax); r <= spiralMax; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        const cx = ax + dx, cy = ay + dy;
+        if (cx < 2 || cy < 2 || cx >= state.map.width - 2 || cy >= state.map.height - 2) continue;
+        const tiles = clusterTiles(state, cx, cy, count);
+        if (tiles) return spawnAll(tiles);
+      }
+    }
+  }
+  return []; // only possible when the whole map has no open ground for the cluster
 }
 
 /** Non-blocking gaia units (sheep/deer/wolves) scattered in a ring. */
@@ -213,19 +232,73 @@ function carveCorridor(state: SimState, x0: number, y0: number, x1: number, y1: 
   }
 }
 
-/** Guarantee every TC can reach every other (clears tree corridors as needed). */
+/** Nearest reached walkable tile to (x, y) — the shortest corridor target. */
+function nearestReachedTile(
+  state: SimState, reach: Uint8Array, x: number, y: number,
+): { x: number; y: number } | null {
+  const { width } = state.map;
+  let best = -1, bestD = Infinity;
+  for (let i = 0; i < reach.length; i++) {
+    if (!reach[i]) continue;
+    const dx = (i % width) - x, dy = ((i / width) | 0) - y;
+    const d = dx * dx + dy * dy;
+    if (d < bestD) { bestD = d; best = i; }
+  }
+  return best < 0 ? null : { x: best % width, y: (best / width) | 0 };
+}
+
+/**
+ * Guarantee every gate (TC access tiles + resource-cluster harvest tiles) can reach
+ * gates[0], clearing tree corridors as needed. Each unreached gate carves toward the
+ * nearest already-reached tile, so successive passes converge even when a straight
+ * line to gates[0] would cross unremovable blockers (mines, TCs).
+ */
 function ensureReachability(state: SimState, gates: Array<{ x: number; y: number }>): void {
-  for (let pass = 0; pass < 4; pass++) {
+  for (let pass = 0; pass < 8; pass++) {
     const reach = floodReach(state, gates[0].x, gates[0].y);
     let allReached = true;
     for (let i = 1; i < gates.length; i++) {
       if (!reach[tileIndex(state.map, gates[i].x, gates[i].y)]) {
         allReached = false;
-        carveCorridor(state, gates[i].x, gates[i].y, gates[0].x, gates[0].y);
+        const target = nearestReachedTile(state, reach, gates[i].x, gates[i].y) ?? gates[0];
+        carveCorridor(state, gates[i].x, gates[i].y, target.x, target.y);
       }
     }
     if (allReached) return;
   }
+}
+
+/**
+ * A walkable tile adjacent to some tile of the cluster (the harvest access point).
+ * If forest growth sealed the cluster completely, fells one adjacent tree to open one.
+ */
+function clusterGate(
+  state: SimState, tiles: Array<{ x: number; y: number }>,
+): { x: number; y: number } | null {
+  for (const t of tiles) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        if (isTileWalkable(state, t.x + dx, t.y + dy)) return { x: t.x + dx, y: t.y + dy };
+      }
+    }
+  }
+  for (const t of tiles) {
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = t.x + dx, y = t.y + dy;
+        if (!inBounds(state.map, x, y)) continue;
+        for (const e of state.entities.values()) {
+          if (e.kind === 'resource' && e.defId === 'tree' && e.tileX === x && e.tileY === y) {
+            removeEntity(state, e.id);
+            return { x, y };
+          }
+        }
+      }
+    }
+  }
+  return null; // cluster ringed entirely by other resources/buildings (not seen in practice)
 }
 
 /** Generate the practice map into a freshly initialized SimState (players already set up). */
@@ -238,6 +311,10 @@ export function generatePracticeMap(state: SimState, rng: SimRng): void {
   const anchors = playerAnchors(rng.fork(102), width, height, playerCount);
 
   // player starts BEFORE forests so start layouts never fight the treeline
+  const resourceClusters: Array<Array<{ x: number; y: number }>> = [];
+  const addCluster = (tiles: Array<{ x: number; y: number }>): void => {
+    if (tiles.length > 0) resourceClusters.push(tiles);
+  };
   const tcDefSize = gameData.buildings.townCenter.size;
   for (let p = 1; p <= playerCount; p++) {
     const a = anchors[p - 1];
@@ -257,18 +334,18 @@ export function generatePracticeMap(state: SimState, rng: SimRng): void {
     const scoutSpot = findFreeAdjacentTile(state, tcX + tcDefSize, tcY, 1) ?? { x: tcX + tcDefSize + 1, y: tcY };
     spawnEntity(state, { defId: 'scout', player: p, tileX: scoutSpot.x, tileY: scoutSpot.y });
 
-    placeCluster(state, rp, a.x, a.y, 6, 9, 5 + rp.nextInt(2), 'berryBush'); // 5–6 berries
-    placeCluster(state, rp, a.x, a.y, 9, 13, 6 + rp.nextInt(2), 'goldMine'); // 6–7 main gold
-    placeCluster(state, rp, a.x, a.y, 14, 19, 4, 'goldMine'); // secondary gold
-    placeCluster(state, rp, a.x, a.y, 10, 15, 4 + rp.nextInt(2), 'stoneMine'); // 4–5 stone
-    placeCluster(state, rp, a.x, a.y, 16, 21, 3, 'stoneMine'); // small secondary stone
+    addCluster(placeCluster(state, rp, a.x, a.y, 6, 9, 5 + rp.nextInt(2), 'berryBush')); // 5–6 berries
+    addCluster(placeCluster(state, rp, a.x, a.y, 9, 13, 6 + rp.nextInt(2), 'goldMine')); // 6–7 main gold
+    addCluster(placeCluster(state, rp, a.x, a.y, 14, 19, 4, 'goldMine')); // secondary gold
+    addCluster(placeCluster(state, rp, a.x, a.y, 10, 15, 4 + rp.nextInt(2), 'stoneMine')); // 4–5 stone
+    addCluster(placeCluster(state, rp, a.x, a.y, 16, 21, 3, 'stoneMine')); // small secondary stone
   }
 
   // neutral extra golds near the middle
   const midRng = rng.fork(103);
   const mx = width >> 1, my = height >> 1;
-  placeCluster(state, midRng, mx, my, 2, 10, 4, 'goldMine');
-  placeCluster(state, midRng, mx, my, 4, 14, 4, 'goldMine');
+  addCluster(placeCluster(state, midRng, mx, my, 2, 10, 4, 'goldMine'));
+  addCluster(placeCluster(state, midRng, mx, my, 4, 14, 4, 'goldMine'));
 
   growForests(state, rng.fork(104), anchors);
 
@@ -281,13 +358,19 @@ export function generatePracticeMap(state: SimState, rng: SimRng): void {
     placeAnimals(state, ra, a.x, a.y, 22, 30, 2, 'wolf'); // 2 distant wolves
   }
 
-  // gates: a free tile beside each TC, then guarantee mutual reachability
+  // gates: a free tile beside each TC plus one harvest tile per resource cluster
+  // (players' berries/gold/stone AND the mid golds), then guarantee mutual reachability —
+  // forests must never wall off one player's resources while the opponent's stay open
   const gates: Array<{ x: number; y: number }> = [];
   for (const e of state.entities.values()) {
     if (e.kind === 'building' && e.defId === 'townCenter') {
       const gate = findFreeAdjacentTile(state, e.tileX, e.tileY, tcDefSize, 6);
       if (gate) gates.push(gate);
     }
+  }
+  for (const tiles of resourceClusters) {
+    const gate = clusterGate(state, tiles);
+    if (gate) gates.push(gate);
   }
   if (gates.length > 1) ensureReachability(state, gates);
 }

@@ -11,6 +11,7 @@ import {
 import { gameData } from '@bf/data';
 import type { GameAssets } from './assets';
 import { animForActivity, animFrameIndex, type AnimName } from './frames';
+import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 
 const HIGHLIGHT = 0xf4eedd;
@@ -31,6 +32,8 @@ interface EntityView {
   animStartTick: number;
   lastHpKey: string;
   lastRingKey: string;
+  /** Root-local y of the sprite's first opaque row (trimmed visible top). */
+  spriteTopPx: number;
 }
 
 interface GhostRecord {
@@ -208,6 +211,19 @@ export class WorldLayer {
     return this.unitsInWorldRect(state, x0, y0, x1, y1, player).filter((e) => e.defId === defId);
   }
 
+  /** Own buildings of one type whose center falls in a world-space rect (double-tap expand-to-type). */
+  buildingsOfTypeInRect(state: GameState, defId: string, x0: number, y0: number, x1: number, y1: number, player: PlayerId): Entity[] {
+    const lo = { x: Math.min(x0, x1), y: Math.min(y0, y1) };
+    const hi = { x: Math.max(x0, x1), y: Math.max(y0, y1) };
+    const out: Entity[] = [];
+    for (const e of state.entities.values()) {
+      if (e.kind !== 'building' || e.player !== player || e.defId !== defId || e.activity === 'dying') continue;
+      const p = tileToWorld(e.x / FP, e.y / FP);
+      if (p.x >= lo.x && p.x <= hi.x && p.y >= lo.y && p.y <= hi.y) out.push(e);
+    }
+    return out;
+  }
+
   // ------------------------------------------------------------------ internals
 
   private tileVis(vis: Uint8Array | null, state: GameState, tx: number, ty: number): number {
@@ -223,7 +239,7 @@ export class WorldLayer {
     const hpBar = new Graphics();
     root.addChild(ring, sprite, hpBar);
     this.container.addChild(root);
-    return { root, ring, sprite, hpBar, lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '' };
+    return { root, ring, sprite, hpBar, lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0 };
   }
 
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
@@ -233,18 +249,27 @@ export class WorldLayer {
     const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);
     view.root.zIndex = flat ? pos.y - 4000 : pos.y;
 
-    const colorIdx = e.player === GAIA ? undefined : state.players[e.player]?.setup.color;
+    // Gaia entities use the neutral swap: some (sheep) carry a real mask band that
+    // must never render raw magenta. Atlases without masks serve the plain frame.
+    const colorIdx = e.player === GAIA ? GAIA_NEUTRAL_COLOR : state.players[e.player]?.setup.color;
     const { candidates, alpha: sprAlpha } = this.frameNameFor(state, e, tickFloat, view);
     const key = candidates.join('|');
     if (key !== view.lastFrameKey) {
       let frame = null;
+      let resolvedName = candidates[candidates.length - 1];
       for (let i = 0; i < candidates.length - 1 && !frame; i++) {
         frame = this.assets.tryResolve(candidates[i], colorIdx);
+        if (frame) resolvedName = candidates[i];
       }
-      frame ??= this.assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
+      frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
       view.sprite.scale.x = frame.mirrored ? -1 : 1;
+      // Trimmed visible top (frames carry transparent headroom): overlays like
+      // the health bar must anchor to pixels, not the texture rect.
+      view.spriteTopPx = Math.round(
+        this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height,
+      );
       view.lastFrameKey = key;
     }
     view.sprite.alpha = sprAlpha;
@@ -319,15 +344,19 @@ export class WorldLayer {
     const damaged = e.hp < e.maxHp;
     const show = (selected || damaged) && e.activity !== 'dying' && e.kind !== 'resource';
     const frac = Math.max(0, Math.min(1, e.hp / Math.max(1, e.maxHp)));
-    const key = show ? `${frac.toFixed(2)}:${e.kind}:${e.defId}` : '';
+    // Buildings anchor the bar to the sprite's trimmed visible top (roof/flag
+    // apex) + a small gap — footprint math floated it over open grass because
+    // tall frames carry transparent headroom. Integer px; part of the key so
+    // the bar follows construct-stage frame changes.
+    const isB = e.kind === 'building';
+    const yOff = isB ? buildingHpBarY(view.spriteTopPx) : -34;
+    const key = show ? `${frac.toFixed(2)}:${e.kind}:${e.defId}:${yOff}` : '';
     if (key === view.lastHpKey) return;
     view.lastHpKey = key;
     view.hpBar.clear();
     if (!show) return;
-    const isB = e.kind === 'building';
     const size = isB ? gameData.buildings[e.defId]?.size ?? 1 : 0;
     const w = isB ? size * TILE_W_SAFE - 8 : 26;
-    const yOff = isB ? -(size * HALF_H + 14 + size * 8) : -34;
     const color = frac > 0.5 ? HP_GREEN : frac > 0.25 ? HP_YELLOW : HP_RED;
     view.hpBar.rect(-w / 2 - 1, yOff - 1, w + 2, 6).fill(OUTLINE);
     view.hpBar.rect(-w / 2, yOff, w, 4).fill(HP_BG);
@@ -421,6 +450,15 @@ export class WorldLayer {
 }
 
 const TILE_W_SAFE = HALF_W * 2;
+
+/**
+ * Building health-bar y offset (root-local): the 6px-tall bar sits a ~5px gap
+ * above the sprite's trimmed visible top, at integer pixels. Pure + exported
+ * for unit tests.
+ */
+export function buildingHpBarY(spriteTopPx: number): number {
+  return Math.round(spriteTopPx) - 10;
+}
 
 function resourceFrameName(e: Entity): string {
   const h = (Math.imul(e.id, 2654435761) >>> 0);

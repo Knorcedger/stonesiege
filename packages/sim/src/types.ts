@@ -55,7 +55,8 @@ export interface TrainQueueItem {
 export type UnitIntent =
   | { kind: 'attackMove'; x: Fixed; y: Fixed }
   | { kind: 'attackTarget'; targetId: EntityId }
-  | { kind: 'gather'; targetId: EntityId };
+  | { kind: 'gather'; targetId: EntityId }
+  | { kind: 'build'; targetId: EntityId };
 
 export interface ResearchState {
   techId: string;

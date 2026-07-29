@@ -1,12 +1,22 @@
 // DOM HUD (ARCHITECTURE: HUD is DOM for crisp text + native touch targets).
-// Top resource/pop/age bar, selection info panel, context-sensitive command
-// card (train / build / military verbs) with cost tooltips + queue progress,
+// Top resource/pop/age bar (with idle-villager/idle-military cycle badges),
+// selection info panel, context-sensitive command card (train / build /
+// military verbs) with cost tooltips + queue progress, control-group chips,
 // undo toast (~2 s), pause overlay, placement confirm/cancel.
 // Styling follows ART_BIBLE §8 (dark wood + parchment + gold).
+// Fonts: Jacquard 12 = display/headers only; Pixelify Sans = body text; all
+// NUMERALS use VT323 (.bf-num) — Pixelify's 2/5 glyphs read as S and make
+// HP/resource/pop counts ambiguous at a glance. Current/max counters (pop, HP)
+// go through formatRatio: VT323's S-shaped '5' merges with an unspaced slash.
+// Every tappable control has a ≥44px hit area (mobile-first): visually small
+// buttons get an invisible centered ::after hit-area expansion.
 
-import { AGES, type Entity, type EntityId, type GameState, type PlayerId, type ResourceType } from '@bf/sim/types';
+import { type Entity, type EntityId, type GameState, type PlayerId, type ResourceType } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
+import type { IdleCategory } from '../selectionTools';
+import { buildMenuButtons, trainMenuButtons } from './cardModel';
+import { formatRatio } from './format';
 
 export interface HudHost {
   assets: GameAssets;
@@ -26,6 +36,13 @@ export interface HudHost {
   togglePause(): void;
   isPaused(): boolean;
   resumeGame(): void;
+  /** Idle-unit badges (GDD: touch answer to AoE2's `.` hotkey). */
+  getIdleCounts(): Record<IdleCategory, number>;
+  cycleIdle(cat: IdleCategory): void;
+  /** Control groups (GDD: saved-selection chips). */
+  getGroupCounts(): number[];
+  saveGroup(index: number): boolean;
+  selectGroup(index: number): void;
 }
 
 const RESOURCES: ResourceType[] = ['food', 'wood', 'gold', 'stone'];
@@ -35,20 +52,27 @@ const AGE_LABEL: Record<string, string> = {
 
 const HUD_CSS = `
 .bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Pixelify Sans","VT323",monospace; color:#EFDDB5; user-select:none; -webkit-user-select:none; }
+.bf-num { font-family:"VT323",monospace; } /* numerals: Pixelify's 2/5 read as S — VT323 digits are unambiguous */
 .bf-panel { background:linear-gradient(#3a2a18,#2C1F12); border:1px solid #1A1208; box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 2px #64492B inset; border-radius:4px; }
-.bf-top { position:absolute; top:6px; left:6px; right:6px; height:34px; display:flex; align-items:center; gap:14px; padding:0 10px; pointer-events:auto; }
+.bf-top { position:absolute; top:6px; left:6px; right:6px; height:34px; display:flex; align-items:center; gap:12px; padding:0 10px; pointer-events:auto; }
 .bf-res { display:flex; align-items:center; gap:5px; font-size:16px; }
 .bf-res canvas { width:22px; height:22px; image-rendering:pixelated; }
 .bf-age { margin-left:auto; font-size:16px; color:#E6C04A; letter-spacing:1px; }
-.bf-btn { pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:inherit; font-size:14px; padding:3px 10px; cursor:pointer; }
+.bf-btn { position:relative; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:inherit; font-size:14px; padding:3px 10px; cursor:pointer; }
 .bf-btn:active { transform:translate(1px,1px); }
 .bf-btn:disabled { color:#8a8a8a; border-color:#5a5a5a; cursor:default; }
+/* ≥44px touch targets (mobile-first): invisible centered hit-area expansion keeps visuals small */
+.bf-btn::after, .bf-idle::after { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,44px); height:max(100%,44px); }
+.bf-idle { position:relative; display:flex; align-items:center; gap:3px; background:#46331F; border:1px solid #8A6414; border-radius:3px; padding:1px 5px; cursor:pointer; pointer-events:auto; color:#EFDDB5; font-family:inherit; }
+.bf-idle canvas { width:22px; height:22px; image-rendering:pixelated; }
+.bf-idle:disabled { opacity:0.4; cursor:default; }
+.bf-idlecount { font-family:"VT323",monospace; font-size:18px; line-height:1; color:#E6C04A; min-width:11px; text-align:center; }
 .bf-selpanel { position:absolute; left:6px; bottom:172px; width:172px; padding:8px; pointer-events:auto; display:none; }
 .bf-selpanel.show { display:block; }
 .bf-selrow { display:flex; gap:8px; align-items:center; }
 .bf-selrow canvas { width:40px; height:40px; image-rendering:pixelated; border:1px solid #8A6414; }
 .bf-selname { font-size:15px; flex:1; }
-.bf-selhp { font-size:13px; color:#DABE8D; }
+.bf-selhp { font-size:14px; color:#DABE8D; }
 .bf-x { position:absolute; top:2px; right:2px; width:22px; height:22px; padding:0; line-height:18px; font-size:14px; }
 .bf-card { position:absolute; right:6px; bottom:6px; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-card.show { display:block; }
@@ -56,14 +80,15 @@ const HUD_CSS = `
 .bf-grid { display:grid; grid-template-columns:repeat(5,44px); gap:4px; }
 .bf-cmdbtn { position:relative; width:44px; height:44px; padding:1px; background:#2C1F12; border:1px solid #8A6414; border-radius:3px; cursor:pointer; pointer-events:auto; }
 .bf-cmdbtn canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
-.bf-cmdbtn:disabled { border-color:#5a5a5a; opacity:0.9; }
-.bf-cmdbtn:disabled canvas { filter:grayscale(1) brightness(0.55); }
+/* disabled look via class (NOT the disabled attribute): a tap must still show the reason tip */
+.bf-cmdbtn:disabled, .bf-cmdbtn.disabled { border-color:#5a5a5a; opacity:0.9; }
+.bf-cmdbtn:disabled canvas, .bf-cmdbtn.disabled canvas { filter:grayscale(1) brightness(0.55); }
 .bf-cmdbtn.active { border-color:#E6C04A; box-shadow:0 0 0 1px #E6C04A; }
-.bf-queue { display:flex; gap:4px; margin-top:6px; min-height:36px; } /* fixed height: chips appearing must not reflow the card (misclick = cancel) */
-.bf-qitem { position:relative; width:34px; height:34px; border:1px solid #64492B; background:#2C1F12; }
-.bf-qitem canvas { width:32px; height:32px; image-rendering:pixelated; }
+.bf-queue { display:flex; gap:4px; margin-top:6px; min-height:46px; } /* fixed height: chips appearing must not reflow the card (misclick = cancel) */
+.bf-qitem { position:relative; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px: cancel-a-unit mis-taps are costly */
+.bf-qitem canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
-.bf-tip { position:absolute; right:6px; bottom:190px; max-width:250px; padding:6px 9px; font-size:13px; color:#1A1208; background:#DABE8D; border:1px solid #B99A6B; border-radius:3px; display:none; pointer-events:none; }
+.bf-tip { position:absolute; right:6px; bottom:200px; max-width:250px; padding:6px 9px; font-size:14px; color:#1A1208; background:#DABE8D; border:1px solid #B99A6B; border-radius:3px; display:none; pointer-events:none; }
 .bf-toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); padding:6px 10px; display:none; align-items:center; gap:10px; font-size:14px; pointer-events:auto; }
 .bf-toast.show { display:flex; }
 .bf-pause { position:absolute; inset:0; background:rgba(10,8,5,0.72); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; pointer-events:auto; z-index:40; }
@@ -71,6 +96,31 @@ const HUD_CSS = `
 .bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:42px; color:#E6C04A; margin:0; }
 .bf-place { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:8px 10px; display:none; gap:10px; pointer-events:auto; }
 .bf-place.show { display:flex; }
+/* top-center: the only HUD region that never collides with minimap (168px, bottom-left),
+   command card (bottom-right) or the placement bar (bottom-center) on phone widths */
+.bf-chips { position:absolute; left:50%; top:46px; transform:translateX(-50%); display:flex; gap:6px; pointer-events:auto; }
+.bf-chips.hide { display:none; }
+.bf-chip { position:relative; width:44px; height:44px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
+.bf-chip.empty { background:#3a2a18; color:#B99A6B; border-color:#64492B; box-shadow:none; }
+.bf-chipcount { position:absolute; right:3px; bottom:1px; font-size:14px; color:#64492B; }
+/* ---- narrow widths (portrait phones): compress the top bar. It may wrap to a
+   second row, but every control — the pause button above all — stays on-screen
+   and tappable. Group chips drop below the (possibly two-row) bar. ---- */
+@media (max-width: 720px) {
+  .bf-top { flex-wrap:wrap; height:auto; min-height:34px; gap:2px 7px; padding:3px 8px; }
+  .bf-res { font-size:14px; gap:2px; }
+  .bf-res canvas { width:18px; height:18px; }
+  .bf-poplabel { display:none; } /* numerals carry the meaning on phones */
+  .bf-age { font-size:13px; letter-spacing:0; }
+  .bf-chips { top:84px; }
+}
+/* The 168px minimap and the 246px command card cannot share one <=480px row —
+   shrink the minimap so the card's train/build buttons are never covered, and
+   lift the selection panel clear of the card's tallest layout (~190px). */
+@media (max-width: 480px) {
+  .bf-mini canvas { width:112px !important; height:112px !important; image-rendering:pixelated; }
+  .bf-selpanel { bottom:200px; }
+}
 `;
 
 function costText(cost: Partial<Record<ResourceType, number>>): string {
@@ -80,12 +130,6 @@ function costText(cost: Partial<Record<ResourceType, number>>): string {
     if (v) parts.push(`${v} ${r}`);
   }
   return parts.join(', ') || 'free';
-}
-
-function canAfford(state: GameState, player: PlayerId, cost: Partial<Record<ResourceType, number>>): boolean {
-  const p = state.players[player];
-  if (!p) return false;
-  return RESOURCES.every((r) => (p.stockpile[r] ?? 0) >= (cost[r] ?? 0));
 }
 
 export class Hud {
@@ -114,6 +158,9 @@ export class Hud {
   private placeBar!: HTMLDivElement;
   private placeConfirm!: HTMLButtonElement;
   private placeLabel!: HTMLSpanElement;
+  private idleBtns = new Map<IdleCategory, { btn: HTMLButtonElement; count: HTMLSpanElement }>();
+  private chipStrip!: HTMLDivElement;
+  private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
   private lastCardKey = '';
   private queueProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId; index: number }> = [];
 
@@ -139,8 +186,10 @@ export class Hud {
     this.buildToast();
     this.buildPauseOverlay();
     this.buildPlacementBar();
+    this.buildGroupChips();
 
     this.minimapSlot = document.createElement('div');
+    this.minimapSlot.className = 'bf-mini';
     this.minimapSlot.style.cssText = 'position:absolute;left:6px;bottom:6px;pointer-events:auto;';
     this.el.appendChild(this.minimapSlot);
   }
@@ -159,11 +208,14 @@ export class Hud {
         const span = this.resSpans.get(r);
         if (span) span.textContent = String(Math.floor(p.stockpile[r] ?? 0));
       }
-      this.popSpan.textContent = `${p.pop}/${p.popCap}`;
+      // formatRatio, NOT `${pop}/${popCap}`: an unspaced '/5' merges into '$' in VT323
+      this.popSpan.textContent = formatRatio(p.pop, p.popCap);
       this.ageSpan.textContent = AGE_LABEL[p.age] ?? p.age;
     }
     this.pauseBtn.textContent = this.host.isPaused() ? '▶' : 'II';
     this.pauseOverlay.classList.toggle('show', this.host.isPaused());
+    this.updateIdleButtons();
+    this.updateGroupChips();
     this.updateSelectionPanel();
     this.updateCard(state);
     this.updatePlacementBar();
@@ -188,6 +240,7 @@ export class Hud {
       box.className = 'bf-res';
       box.appendChild(this.host.assets.getIconCanvas(`icon/res/${r}`));
       const span = document.createElement('span');
+      span.className = 'bf-num';
       span.textContent = '0';
       box.appendChild(span);
       this.resSpans.set(r, span);
@@ -195,10 +248,18 @@ export class Hud {
     }
     const pop = document.createElement('div');
     pop.className = 'bf-res';
-    pop.textContent = 'Pop ';
+    const popLabel = document.createElement('span');
+    popLabel.className = 'bf-poplabel';
+    popLabel.textContent = 'Pop ';
+    pop.appendChild(popLabel);
     this.popSpan = document.createElement('span');
+    this.popSpan.className = 'bf-num';
     pop.appendChild(this.popSpan);
     bar.appendChild(pop);
+
+    // Idle-unit cycle badges (GDD: the touch answer to AoE2's `.` hotkey)
+    this.addIdleButton(bar, 'villager', 'icon/villager', 'Idle villagers — tap to cycle');
+    this.addIdleButton(bar, 'military', 'icon/militia', 'Idle military — tap to cycle');
 
     this.ageSpan = document.createElement('span');
     this.ageSpan.className = 'bf-age';
@@ -210,6 +271,30 @@ export class Hud {
     this.pauseBtn.addEventListener('click', () => this.host.togglePause());
     bar.appendChild(this.pauseBtn);
     this.el.appendChild(bar);
+  }
+
+  private addIdleButton(bar: HTMLElement, cat: IdleCategory, icon: string, title: string): void {
+    const btn = document.createElement('button');
+    btn.className = 'bf-idle';
+    btn.title = title;
+    btn.appendChild(this.host.assets.getIconCanvas(icon));
+    const count = document.createElement('span');
+    count.className = 'bf-idlecount';
+    count.textContent = '0';
+    btn.appendChild(count);
+    btn.addEventListener('click', () => this.host.cycleIdle(cat));
+    bar.appendChild(btn);
+    this.idleBtns.set(cat, { btn, count });
+  }
+
+  private updateIdleButtons(): void {
+    const counts = this.host.getIdleCounts();
+    for (const [cat, ui] of this.idleBtns) {
+      const n = counts[cat];
+      const text = String(n);
+      if (ui.count.textContent !== text) ui.count.textContent = text;
+      ui.btn.disabled = n === 0;
+    }
   }
 
   private buildSelectionPanel(): void {
@@ -224,7 +309,7 @@ export class Hud {
     this.selName = document.createElement('div');
     this.selName.className = 'bf-selname';
     this.selHp = document.createElement('div');
-    this.selHp.className = 'bf-selhp';
+    this.selHp.className = 'bf-selhp bf-num';
     col.appendChild(this.selName);
     col.appendChild(this.selHp);
     row.appendChild(col);
@@ -253,7 +338,7 @@ export class Hud {
     this.el.appendChild(this.card);
 
     this.tip = document.createElement('div');
-    this.tip.className = 'bf-tip';
+    this.tip.className = 'bf-tip bf-num'; // cost/time numerals dominate tooltips
     this.el.appendChild(this.tip);
   }
 
@@ -261,6 +346,7 @@ export class Hud {
     this.toast = document.createElement('div');
     this.toast.className = 'bf-panel bf-toast';
     this.toastLabel = document.createElement('span');
+    this.toastLabel.className = 'bf-num'; // toasts carry counts ("Selected all … (12)")
     this.toast.appendChild(this.toastLabel);
     this.toastUndoBtn = document.createElement('button');
     this.toastUndoBtn.className = 'bf-btn';
@@ -292,11 +378,72 @@ export class Hud {
     this.el.appendChild(this.pauseOverlay);
   }
 
+  /**
+   * Control-group chips (GDD Mobile UX): long-press an empty chip to save the
+   * current selection, long-press an occupied chip to overwrite it, tap to
+   * reselect, tap the active group again to center the camera on it.
+   */
+  private buildGroupChips(): void {
+    const LONG_PRESS_MS = 450;
+    this.chipStrip = document.createElement('div');
+    this.chipStrip.className = 'bf-chips';
+    const n = this.host.getGroupCounts().length;
+    for (let i = 0; i < n; i++) {
+      const btn = document.createElement('button');
+      btn.className = 'bf-chip empty';
+      btn.appendChild(document.createTextNode(String(i + 1)));
+      const count = document.createElement('span');
+      count.className = 'bf-chipcount bf-num';
+      btn.appendChild(count);
+      let timer: ReturnType<typeof setTimeout> | null = null;
+      let longFired = false;
+      const cancelTimer = (): void => {
+        if (timer) clearTimeout(timer);
+        timer = null;
+      };
+      btn.addEventListener('pointerdown', () => {
+        longFired = false;
+        cancelTimer();
+        timer = setTimeout(() => {
+          longFired = true;
+          const saved = this.host.saveGroup(i);
+          this.showUndoToast(saved ? `Group ${i + 1} saved` : 'Select units to save a group', null);
+        }, LONG_PRESS_MS);
+      });
+      btn.addEventListener('pointerup', () => {
+        cancelTimer();
+        if (!longFired) this.host.selectGroup(i);
+      });
+      btn.addEventListener('pointerleave', cancelTimer);
+      btn.addEventListener('pointercancel', cancelTimer);
+      this.chipStrip.appendChild(btn);
+      this.chipEls.push({ btn, count });
+    }
+    this.el.appendChild(this.chipStrip);
+  }
+
+  private updateGroupChips(): void {
+    // hide while placing: placement is a deliberate commit/abort moment (GDD) —
+    // no selection-switching affordances competing with confirm/cancel
+    this.chipStrip.classList.toggle('hide', this.host.getPlacement() !== null);
+    const counts = this.host.getGroupCounts();
+    this.chipEls.forEach((chip, i) => {
+      const n = counts[i] ?? 0;
+      chip.btn.classList.toggle('empty', n === 0);
+      const text = n > 0 ? String(n) : '';
+      if (chip.count.textContent !== text) chip.count.textContent = text;
+      chip.btn.title = n > 0
+        ? `Group ${i + 1} (${n}) — tap: select, tap again: center camera, long-press: overwrite`
+        : `Group ${i + 1} — long-press with a selection to save`;
+    });
+  }
+
   private buildPlacementBar(): void {
     this.placeBar = document.createElement('div');
     this.placeBar.className = 'bf-panel bf-place';
     this.placeLabel = document.createElement('span');
-    this.placeLabel.style.cssText = 'font-size:14px;align-self:center;';
+    this.placeLabel.className = 'bf-num'; // "House — 25 wood": the cost numeral must be legible
+    this.placeLabel.style.cssText = 'font-size:16px;align-self:center;';
     this.placeConfirm = document.createElement('button');
     this.placeConfirm.className = 'bf-btn';
     this.placeConfirm.textContent = 'Build here';
@@ -326,7 +473,7 @@ export class Hud {
     this.selName.textContent = sel.length > 1 ? `${name} ×${sel.length}` : name;
     this.selHp.textContent = first.kind === 'resource'
       ? `${first.amountLeft ?? 0} left`
-      : `HP ${Math.max(0, first.hp)} / ${first.maxHp}`;
+      : `HP ${formatRatio(Math.max(0, first.hp), first.maxHp)}`;
     const iconName = def?.icon ?? `icon/${first.defId}`;
     if (this.selIcon.dataset.icon !== iconName) {
       this.selIcon.dataset.icon = iconName;
@@ -374,7 +521,6 @@ export class Hud {
     }
     const player = state.players[this.host.humanPlayer];
     if (!player) return;
-    const ageIdx = AGES.indexOf(player.age);
 
     const buildings = sel.filter((e) => e.kind === 'building');
     const units = sel.filter((e) => e.kind === 'unit');
@@ -385,15 +531,12 @@ export class Hud {
     if (buildings.length === 1 && units.length === 0) {
       const b = buildings[0];
       const def = gameData.buildings[b.defId];
-      const trains = (def?.trains ?? []).filter((uid) => {
-        const u = gameData.units[uid];
-        return u && !u.requiresTech && AGES.indexOf(u.age) <= ageIdx;
-      });
-      if ((b.buildProgress ?? 1000) >= 1000 && trains.length > 0) {
+      const trainBtns = trainMenuButtons(player.stockpile, player.age, b.defId);
+      if ((b.buildProgress ?? 1000) >= 1000 && trainBtns.length > 0) {
         this.cardTitle.textContent = `${def?.name ?? b.defId} — Train`;
-        for (const uid of trains) {
-          const u = gameData.units[uid];
-          this.addButton(u.icon, `${u.name}\n${costText(u.cost)} • ${u.trainTime}s`, canAfford(state, this.host.humanPlayer, u.cost), false, () => this.host.trainUnit(b.id, uid));
+        for (const tb of trainBtns) {
+          const u = gameData.units[tb.id];
+          this.addButton(tb.icon, `${u.name}\n${costText(u.cost)} • ${u.trainTime}s`, tb.enabled, false, () => this.host.trainUnit(b.id, tb.id), tb.reason);
         }
         // queue chips
         (b.trainQueue ?? []).forEach((item, i) => {
@@ -418,11 +561,18 @@ export class Hud {
 
     if (villagers.length > 0) {
       this.cardTitle.textContent = 'Build';
-      const list = Object.values(gameData.buildings).filter(
-        (bd) => !bd.requiresTech && AGES.indexOf(bd.age) <= ageIdx,
-      );
-      for (const bd of list) {
-        this.addButton(bd.icon, `${bd.name}\n${costText(bd.cost)} • ${bd.buildTime}s`, canAfford(state, this.host.humanPlayer, bd.cost), false, () => this.host.startPlacement(bd.id));
+      // cardModel decides enabled/gray: only genuinely unavailable actions
+      // (unaffordable, or a verb the sim would silently drop) render disabled.
+      for (const bb of buildMenuButtons(player.stockpile, player.age)) {
+        const bd = gameData.buildings[bb.id];
+        this.addButton(
+          bb.icon,
+          `${bd.name}\n${costText(bd.cost)} • ${bd.buildTime}s`,
+          bb.enabled,
+          false,
+          () => this.host.startPlacement(bd.id),
+          bb.reason,
+        );
       }
       shown = true;
     }
@@ -439,24 +589,25 @@ export class Hud {
     this.card.classList.toggle('show', shown);
   }
 
-  private addButton(icon: string, tooltip: string, enabled: boolean, active: boolean, onClick: () => void): void {
+  /**
+   * `icon` is the FINAL frame to render — cardModel already picked the colored
+   * icon or its `/gray` companion, so gray can only mean genuinely unavailable.
+   */
+  private addButton(icon: string, tooltip: string, enabled: boolean, active: boolean, onClick: () => void, disabledReason?: string): void {
     const btn = document.createElement('button');
-    btn.className = 'bf-cmdbtn' + (active ? ' active' : '');
-    btn.disabled = !enabled;
-    const iconName = enabled ? icon : this.grayIconName(icon);
-    btn.appendChild(this.host.assets.getIconCanvas(iconName));
+    btn.className = 'bf-cmdbtn' + (active ? ' active' : '') + (enabled ? '' : ' disabled');
+    // class instead of the disabled attribute: disabled buttons still receive the
+    // tap so we can surface WHY they are disabled (cost / wave-2 gating)
+    btn.setAttribute('aria-disabled', String(!enabled));
+    btn.appendChild(this.host.assets.getIconCanvas(icon));
+    const fullTip = enabled ? tooltip : `${tooltip}\n(${disabledReason ?? 'not enough resources'})`;
     btn.addEventListener('click', () => {
       if (enabled) onClick();
-      else this.showTip(tooltip + '\n(not enough resources)');
+      else this.showTip(fullTip);
     });
-    btn.addEventListener('pointerenter', () => this.showTip(tooltip));
+    btn.addEventListener('pointerenter', () => this.showTip(fullTip));
     btn.addEventListener('pointerleave', () => (this.tip.style.display = 'none'));
     this.cardGrid.appendChild(btn);
-  }
-
-  private grayIconName(icon: string): string {
-    // Contract: every icon has a grayscale companion `icon/<...>/gray`.
-    return `${icon}/gray`;
   }
 
   private showTip(text: string): void {

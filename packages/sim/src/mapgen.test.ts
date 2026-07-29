@@ -12,16 +12,14 @@ function gaiaNear(game: Game, defId: string, from: Entity, radius: number): numb
   return n;
 }
 
-/** BFS over game.isWalkable (8-dir, matching sim movement). */
-function reachable(game: Game, from: { x: number; y: number }, to: { x: number; y: number }): boolean {
+/** BFS flood over game.isWalkable (8-dir, matching sim movement) from one tile. */
+function floodFrom(game: Game, from: { x: number; y: number }): Uint8Array {
   const { width, height } = game.state.map;
   const seen = new Uint8Array(width * height);
   const queue = [from.y * width + from.x];
   seen[queue[0]] = 1;
-  const target = to.y * width + to.x;
   while (queue.length > 0) {
     const t = queue.pop()!;
-    if (t === target) return true;
     const tx = t % width, ty = (t / width) | 0;
     for (let dy = -1; dy <= 1; dy++) {
       for (let dx = -1; dx <= 1; dx++) {
@@ -34,7 +32,64 @@ function reachable(game: Game, from: { x: number; y: number }, to: { x: number; 
       }
     }
   }
+  return seen;
+}
+
+/** True if a villager standing on a reached tile could harvest e (adjacent walkable + reached). */
+function hasReachableHarvestTile(game: Game, reach: Uint8Array, e: Entity): boolean {
+  const { width, height } = game.state.map;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      if (dx === 0 && dy === 0) continue;
+      const x = e.tileX + dx, y = e.tileY + dy;
+      if (x < 0 || y < 0 || x >= width || y >= height) continue;
+      if (reach[y * width + x]) return true; // flood only marks walkable tiles
+    }
+  }
   return false;
+}
+
+/** Connected components (8-adjacency) of gaia resources of one defId — the "clusters". */
+function resourceComponents(game: Game, defId: string): Entity[][] {
+  const list: Entity[] = [];
+  for (const e of game.state.entities.values()) {
+    if (e.player === 0 && e.defId === defId) list.push(e);
+  }
+  const byTile = new Map<string, Entity>();
+  for (const e of list) byTile.set(`${e.tileX},${e.tileY}`, e);
+  const seen = new Set<number>();
+  const comps: Entity[][] = [];
+  for (const e of list) {
+    if (seen.has(e.id)) continue;
+    const comp: Entity[] = [];
+    const stack = [e];
+    seen.add(e.id);
+    while (stack.length > 0) {
+      const c = stack.pop()!;
+      comp.push(c);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const n = byTile.get(`${c.tileX + dx},${c.tileY + dy}`);
+          if (n && !seen.has(n.id)) { seen.add(n.id); stack.push(n); }
+        }
+      }
+    }
+    comps.push(comp);
+  }
+  return comps;
+}
+
+const HARVEST_DEFS = ['berryBush', 'goldMine', 'stoneMine'] as const;
+
+/** Fairness invariant: no berry/gold/stone cluster may be fully walled off by forest. */
+function expectNoSealedClusters(game: Game, reach: Uint8Array, label: string): void {
+  for (const defId of HARVEST_DEFS) {
+    for (const comp of resourceComponents(game, defId)) {
+      const open = comp.some((e) => hasReachableHarvestTile(game, reach, e));
+      expect(open, `${label}: sealed ${defId} cluster @${comp[0].tileX},${comp[0].tileY} (${comp.length} tiles)`).toBe(true);
+    }
+  }
 }
 
 function gateOf(game: Game, tc: Entity): { x: number; y: number } {
@@ -88,10 +143,30 @@ describe('practice mapgen fairness', () => {
         }
 
         // mutual reachability
+        const { width } = game.state.map;
         const gates = tcs.map((tc) => gateOf(game, tc));
+        const reach = floodFrom(game, gates[0]);
         for (let i = 1; i < gates.length; i++) {
-          expect(reachable(game, gates[0], gates[i]), `TC0 -> TC${i}`).toBe(true);
+          expect(reach[gates[i].y * width + gates[i].x], `TC0 -> TC${i}`).toBe(1);
         }
+
+        // resource fairness: every player's berry/gold/stone must be harvestable from
+        // TC0's connected region — forests may never wall off one player's economy
+        for (let p = 1; p <= playerCount; p++) {
+          const tc = tcs[p - 1];
+          for (const [defId, radius] of [['berryBush', 24], ['goldMine', 28], ['stoneMine', 30]] as const) {
+            let accessible = 0;
+            for (const e of game.state.entities.values()) {
+              if (e.player !== 0 || e.defId !== defId) continue;
+              if (tileDist(e, tc) > radius) continue;
+              if (hasReachableHarvestTile(game, reach, e)) accessible++;
+            }
+            expect(accessible, `player ${p} reachable ${defId}`).toBeGreaterThanOrEqual(1);
+          }
+        }
+
+        // and no cluster anywhere (incl. mid golds) may be fully sealed by forest
+        expectNoSealedClusters(game, reach, `seed ${seed} ${playerCount}p`);
 
         // forests + wildlife exist
         let trees = 0, wolves = 0, deer = 0;
@@ -112,6 +187,26 @@ describe('practice mapgen fairness', () => {
     for (const e of game.state.entities.values()) {
       if (e.kind !== 'unit') continue;
       expect(game.isWalkable(e.tileX, e.tileY), `${e.defId}#${e.id}`).toBe(true);
+    }
+  });
+
+  it('seed sweep: starts always complete, no cluster ever sealed off (placeCluster never gives up)', () => {
+    // wide net for the old failure modes: silent [] from placeCluster, and forest
+    // blobs walling off one player's resources while the opponent's stay open
+    for (let seed = 500; seed < 540; seed++) {
+      const players = [player(), player({ civ: 'english' }), player({ civ: 'scots' })];
+      const game = createGame(practiceConfig(seed, players));
+      const reach = floodFrom(game, gateOf(game, entitiesOf(game.state.entities, 1, 'townCenter')[0]));
+      for (let p = 1; p <= players.length; p++) {
+        const tcs = entitiesOf(game.state.entities, p, 'townCenter');
+        expect(tcs, `seed ${seed} player ${p} TC`).toHaveLength(1);
+        const tc = tcs[0];
+        // generous radius: widened rings / spiral fallback may push clusters out a bit
+        expect(gaiaNear(game, 'berryBush', tc, 40), `seed ${seed} player ${p} berries`).toBeGreaterThanOrEqual(5);
+        expect(gaiaNear(game, 'goldMine', tc, 40), `seed ${seed} player ${p} gold`).toBeGreaterThanOrEqual(10); // 6 main + 4 secondary
+        expect(gaiaNear(game, 'stoneMine', tc, 40), `seed ${seed} player ${p} stone`).toBeGreaterThanOrEqual(7); // 4 + 3
+      }
+      expectNoSealedClusters(game, reach, `seed ${seed}`);
     }
   });
 });

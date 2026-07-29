@@ -1,7 +1,7 @@
 // Internal (non-public) sim state shared by the system modules. Everything here is part
 // of the deterministic state: integers only, insertion-ordered Maps, no wall clock.
 
-import type { Entity, EntityId, Fixed, GameMap, PlayerState } from './types';
+import type { Entity, EntityId, Fixed, GameMap, PlayerState, Stockpile } from './types';
 import type { SimRng } from './rng';
 import type { SpatialGrid } from './spatial';
 import type { PlayerModifierTable, ResolvedUnitStats } from './stats';
@@ -29,6 +29,13 @@ export interface VisionStamp {
   r: number;
 }
 
+/** An under-construction building: scaled progress accumulator + what was paid (refunds). */
+export interface FoundationSite {
+  acc: number; // scaled builder-tick accumulator (integer)
+  accNeeded: number; // 3 * buildTimeTicks * RATE_SCALE
+  paid: Stockpile;
+}
+
 /** Shared-vision group (a team, or a solo player). Allied players point at the same arrays. */
 export interface VisionGroup {
   counts: Uint16Array; // live LOS stamp counts per tile
@@ -47,6 +54,8 @@ export interface SimState {
   // --- internal ---
   rng: SimRng;
   nextId: number;
+  /** Conquest elimination active (practice games; campaign defeat comes from triggers). */
+  conquest: boolean;
   /** Hard pop ceiling from GameConfig. */
   popCapLimit: number;
   /** 1 = terrain passable (water is not), per tile. */
@@ -63,6 +72,10 @@ export interface SimState {
   visionGroupOf: number[];
   vision: VisionGroup[];
   visionStamps: Map<EntityId, VisionStamp>;
+  /** Under-construction buildings by entity id (progress accumulator + paid cost). */
+  foundations: Map<EntityId, FoundationSite>;
+  /** Builder re-approach attempts (units with a build intent that failed to arrive). */
+  buildRetries: Map<EntityId, number>;
   /** Per-player stat modifier tables (built from civ bonuses; techs extend them in wave 2). */
   modifiers: PlayerModifierTable[];
   /** resolveUnitStats cache, keyed `${player}:${defId}`; cleared when modifiers change. */

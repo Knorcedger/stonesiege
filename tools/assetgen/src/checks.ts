@@ -27,6 +27,15 @@ export const COVERAGE_OVERRIDES: Record<string, [number, number]> = {
   // only; the gate carries two small post banners on a big stone mass.
   monastery: [0.001, 0.08],
   gate: [0.001, 0.08],
+  // §5.3 exact placements are small by construction: TC color = apex banner
+  // flag + door cloth on a 4×4 sprite (0.32% actual); house color = a single
+  // pre-outlined 3×3 gable pennant (0.22–0.50% actual across ages). Neither
+  // can physically reach the 2% default floor (same reasoning as monastery) —
+  // the old full-length trim stripes that padded them into the band were
+  // off-spec and read as painter's tape. Floors sit just under the measured
+  // minimum so a regressed (outline-eaten) pennant fails the build again.
+  townCenter: [0.002, 0.08],
+  house: [0.002, 0.08],
 };
 
 /** §9.1: every opaque pixel on-palette; only translucency is black@88 (+ ui overlays). */

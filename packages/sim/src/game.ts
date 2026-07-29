@@ -1,9 +1,10 @@
 // createGame + the tick pipeline. Both map modes: seeded 'practice-random' generation and
 // pre-resolved ScenarioStart. advance() applies commands, runs production, pathfinding,
-// movement (with local avoidance) and returns the tick's events.
+// movement (with local avoidance), then the conquest elimination check, and returns the
+// tick's events.
 
 import { gameData } from '@bf/data';
-import { GAIA } from './types';
+import { AGES, GAIA } from './types';
 import type {
   Command, Game, GameConfig, GameMap, GameState, PlayerState, ScenarioStart, SimEvent, Stockpile,
 } from './types';
@@ -15,10 +16,11 @@ import { spawnEntity } from './entities';
 import { buildModifierTable } from './stats';
 import { revealAll } from './fog';
 import { generatePracticeMap, makeEmptyMap } from './mapgen';
-import { applyCommands } from './commands';
+import { applyCommands, checkEliminations } from './commands';
 import { tickProduction } from './production';
 import { tickPathfinding } from './path';
 import { tickMovement } from './movement';
+import { buildAgeIndex, rivalUnitOnFootprint, tickConstruction } from './construction';
 import { hashState } from './hash';
 
 /** AoE2 standard starting kit (see docs/AOE2_REFERENCE.md). */
@@ -95,6 +97,7 @@ export function createGame(config: GameConfig): Game {
     finished: false,
     rng,
     nextId: 1,
+    conquest: !scenario, // practice = conquest; campaign defeat comes from triggers (GDD)
     popCapLimit: config.popCap,
     walkTerrain: buildWalkTerrain(map),
     blockers: new Uint16Array(map.width * map.height),
@@ -105,6 +108,8 @@ export function createGame(config: GameConfig): Game {
     visionGroupOf,
     vision,
     visionStamps: new Map(),
+    foundations: new Map(),
+    buildRetries: new Map(),
     modifiers: players.map((p) => buildModifierTable(p.setup.civ, p.age)),
     statsCache: new Map(),
   };
@@ -128,6 +133,8 @@ export function createGame(config: GameConfig): Game {
     tickProduction(state, events);
     tickPathfinding(state);
     tickMovement(state);
+    tickConstruction(state, events); // after movement so same-tick arrivals start building
+    checkEliminations(state, events); // GDD conquest elimination — after all removals this tick
     state.tick++;
     return events;
   };
@@ -140,12 +147,16 @@ export function createGame(config: GameConfig): Game {
       const def = gameData.buildings[defId];
       if (!def) return false;
       if (player <= GAIA || player >= state.players.length) return false;
+      // construction age gate (TC: castle age per GDD, even though the def is 'dark')
+      if (buildAgeIndex(def) > AGES.indexOf(state.players[player].age)) return false;
       for (let dy = 0; dy < def.size; dy++) {
         for (let dx = 0; dx < def.size; dx++) {
           const x = tileX + dx, y = tileY + dy;
           if (!isTileWalkable(state, x, y)) return false;
         }
       }
+      // rival units on the footprint block placement (own + Gaia units are nudged off)
+      if (rivalUnitOnFootprint(state, player, tileX, tileY, def.size)) return false;
       return true;
     },
     isWalkable: (tileX, tileY) => isTileWalkable(state, tileX, tileY),

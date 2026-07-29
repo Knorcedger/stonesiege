@@ -660,8 +660,13 @@ the rest are eyeball checks on the contact-sheet review page.
    silhouette lineup image, generated automatically, judged by eye).
 4. ⚙ **Player-color coverage**: units 8–20% of opaque pixels masked; buildings 2–8%;
    icons 0%. The assert reads this per-defId override table (quiet by design):
-   `monk` 4–10%; masked `obj/*` animals (owned sheep collar) 1–6%. Any future
-   exception must be added here, not special-cased in code.
+   `monk` 4–10%; masked `obj/*` animals (owned sheep collar) 1–6%; siege reads
+   team via banner panels, not cloth mass — rams 1.5–8%, `mangonel`/`onager`
+   3–9%, `trebuchet` 1.5–13%; `monastery` and `gate` 0.1–8% (door banner /
+   post pennants on big quiet masses); `townCenter` 0.2–8% (apex banner flag +
+   door cloth only) and `house` 0.2–8% (the single pre-outlined 3×3 gable
+   pennant) — their §5.3 placements are small by construction on big sprites.
+   Any future exception must be added here, not special-cased in code.
 5. ⚙ **Contrast vs terrain**: composited on four backdrop strips — `grassBase`,
    `dirtBase`, `grassShadow` (forest floor, where hunting/lumbering happens), and
    `dirtPale` (road) — ≥ 40% of a unit's opaque pixels differ from each backdrop by

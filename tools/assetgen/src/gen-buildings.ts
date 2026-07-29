@@ -275,6 +275,106 @@ function drawRoof(r: Raster, s: Struct, RH: number, ramp: RoofRamp, inset = 0.35
   line2(r, R1, R2, ramp.lit);
 }
 
+type RoofTex = 'thatch' | 'shingle' | 'slate';
+
+/**
+ * §7.13 hipped roof over a struct: ridge along the A iso axis; only the two
+ * camera-facing planes carry detail — screen-left trapezoid = light tone,
+ * screen-right hip triangle = base tone with the 2-row 50% eave dither; 1px
+ * light ridge line; 1px dark hip seams; per-material row texture. Returns the
+ * ridge endpoints so callers can seat banners/trim at the apex.
+ */
+function hippedRoof(
+  r: Raster,
+  s: Struct,
+  RH: number,
+  ramp: RoofRamp,
+  tex: RoofTex,
+  ridgeInset = 0.32,
+): { r1: Pt; r2: Pt } {
+  const lp = (p: Pt, q: Pt, f: number): Pt => [p[0] + (q[0] - p[0]) * f, p[1] + (q[1] - p[1]) * f];
+  const e1 = lp(s.Wt, s.Nt, 0.5); // upper-left eave midpoint
+  const e2 = lp(s.St, s.Et, 0.5); // lower-right eave midpoint
+  const m1 = lp(e1, e2, ridgeInset);
+  const m2 = lp(e2, e1, ridgeInset);
+  const r1: Pt = [m1[0], m1[1] - RH]; // high (upper-left) ridge end
+  const r2: Pt = [m2[0], m2[1] - RH];
+  // Far planes only when the roof is shallow enough that the far slope crests
+  // above the ridge on screen (ridge below the N wall-top corner). On steep
+  // roofs the back faces point away from the camera — painting their screen
+  // quads would smear phantom dark slopes above the hip seams.
+  if (r1[1] > s.Nt[1]) {
+    r.fillPoly([s.Wt, s.Nt, r1], ramp.dark);
+    r.fillPoly([s.Nt, s.Et, r2, r1], ramp.dark);
+  }
+  // …then the two camera-facing planes
+  r.fillPoly([s.Wt, s.St, r2, r1], ramp.lit); // screen-left trapezoid
+  r.fillPoly([s.St, s.Et, r2], ramp.base); // screen-right hip end
+  // row texture parallel to the eave on both camera planes
+  const texPlane = (a0: Pt, a1: Pt, b0: Pt, b1: Pt, lit: boolean): void => {
+    const vspan = Math.max(
+      4,
+      Math.round(Math.max(Math.abs(b0[1] - a0[1]), Math.abs(b1[1] - a1[1]))),
+    );
+    // §5.3/§7.13 light-vs-base split: the lit plane keeps its light fill with
+    // SPARSE base-tone rows; the base plane gets denser dark rows. Equal-density
+    // texture on both planes averaged their values together at 1×.
+    const spacing = tex === 'slate' ? (lit ? 6 : 4) : tex === 'shingle' ? (lit ? 4 : 3) : 3;
+    const len = Math.max(8, Math.round(Math.abs(a1[0] - a0[0]) + Math.abs(a1[1] - a0[1])));
+    for (let k = 1; k * spacing < vspan - 1; k++) {
+      const v = (k * spacing) / vspan;
+      for (let i = 0; i <= len; i++) {
+        const u = i / len;
+        const e = lp(a0, a1, u);
+        const g = lp(b0, b1, u);
+        const x = Math.round(e[0] + (g[0] - e[0]) * v);
+        const y = Math.round(e[1] + (g[1] - e[1]) * v);
+        if (r.alphaAt(x, y) !== 255) continue;
+        if (tex === 'thatch') {
+          // combed straw: dashed rows, one ramp step off the plane fill
+          // (sparser dashes on the lit plane so it stays clearly lighter)
+          if ((i + k * 3) % (lit ? 8 : 5) < 2) r.set(x, y, lit ? ramp.base : ramp.dark);
+        } else if (tex === 'shingle') {
+          // §5.1: shingle rows, lighter course every 3rd row
+          const c: RGB = k % 3 === 0 ? (lit ? P.woodPale : ramp.lit) : lit ? ramp.base : ramp.dark;
+          r.set(x, y, c);
+        } else {
+          r.set(x, y, lit ? ramp.base : ramp.dark);
+        }
+      }
+    }
+    // 2-row 50% eave dither (dark tone) on the screen-right plane (§5.3);
+    // thatch also gets a ragged ±1px eave fringe on both planes (§5.1)
+    for (let i = 0; i <= len; i++) {
+      const u = i / len;
+      const e = lp(a0, a1, u);
+      if (!lit) {
+        const g = lp(b0, b1, u);
+        for (const dv of [1, 2]) {
+          const x = Math.round(e[0] + ((g[0] - e[0]) * dv) / vspan);
+          const y = Math.round(e[1] + ((g[1] - e[1]) * dv) / vspan);
+          if (Raster.ditherOn(i, dv, 50) && r.alphaAt(x, y) === 255) r.set(x, y, ramp.dark);
+        }
+      }
+      if (tex === 'thatch') {
+        // §5.1 ragged eave: straw tufts overhang 1px below the eave on
+        // alternating runs, with a dark notch bitten into the eave between
+        if (i % 4 < 2) r.set(Math.round(e[0]), Math.round(e[1]) + 1, lit ? ramp.lit : ramp.base);
+        else if (i % 4 === 2) r.set(Math.round(e[0]), Math.round(e[1]), ramp.dark);
+      }
+    }
+  };
+  texPlane(s.Wt, s.St, r1, r2, true);
+  texPlane(s.St, s.Et, r2, r2, false);
+  // hip seams: 1px dark diagonals from the ridge ends to the eave corners
+  line2(r, r1, s.Wt, ramp.dark);
+  line2(r, r2, s.St, ramp.dark);
+  line2(r, r2, s.Et, ramp.dark);
+  // ridge line in the light tone
+  line2(r, r1, r2, ramp.lit);
+  return { r1, r2 };
+}
+
 /** Cone roof (§7.14): stacked 1px ellipse rows shrinking to an apex. */
 function cone(r: Raster, cx: number, baseY: number, rx: number, h: number, ramp: RoofRamp): void {
   for (let i = 0; i <= h; i++) {
@@ -326,6 +426,27 @@ function pennant(r: Raster, x: number, y: number, h: number): void {
   r.set(x + 2, y - h + 1, M.dark);
 }
 
+/**
+ * §5.3 house player color: a 3×3 masked pennant on a short gable pole. The
+ * flag is authored PRE-OUTLINED (1px `outline` border around the masked core):
+ * an unbordered 3×3 flag poking into open sky lost all but 2 px to the §7.2
+ * outline pass, leaving the house team-unreadable at 1× (r3-08/r3-14).
+ * Light+mid tones dominate the core so the color reads at 1×.
+ */
+function gablePennant(r: Raster, x: number, y: number, h: number): void {
+  r.fillRect(x, y - h, 1, h, P.woodDark);
+  r.fillRect(x + 1, y - h - 1, 5, 5, P.outline);
+  for (let fy = 0; fy < 3; fy++) {
+    for (let fx = 0; fx < 3; fx++) {
+      const c: RGB =
+        fy === 0 ? (fx < 2 ? M.light : M.mid)
+        : fy === 1 ? (fx === 0 ? M.light : M.mid)
+        : fx === 2 ? M.dark : M.mid;
+      r.set(x + 2 + fx, y - h + fy, c);
+    }
+  }
+}
+
 function doorCloth(r: Raster, x: number, y: number, w: number, h: number): void {
   for (let yy = 0; yy < h; yy++) {
     for (let xx = 0; xx < w; xx++) {
@@ -358,109 +479,194 @@ function litWindow(r: Raster, x: number, y: number, glaze = false): void {
 type Recipe = (c: Canvas, age: Age, banner: boolean) => void;
 
 function rTownCenter(c: Canvas, age: Age, banner: boolean): void {
-  const roof = roofFor(age);
+  const idx = ageIdx(age);
+  const stone = idx >= 2;
+  // §5.1 crescendo: Dark = thatch, Feudal = wood shingle, Castle+ = slate
+  const roof: RoofRamp = age === 'dark' ? THATCH : age === 'feudal' ? SHINGLE : SLATE;
+  const tex: RoofTex = age === 'dark' ? 'thatch' : age === 'feudal' ? 'shingle' : 'slate';
   yard(c, `tc:${age}`, P.dirtLight);
-  // raised platform (stone from castle age, log crib before)
-  const plat = struct(c.cx, c.cy, 1.7, 1.7, 6);
+  // raised 6px platform (stone from castle age, log crib before) — §5.3
+  const plat = struct(c.cx, c.cy, 1.75, 1.75, 6);
   drawWalls(c.r, plat, age === 'castle' ? 'stone' : age === 'imperial' ? 'dressed' : 'log', `tc:p:${age}`);
-  // platform top = interior floor
-  quad(c.r, [plat.Nt, plat.Et, plat.St, plat.Wt], P.dirtPale);
-  for (let i = 0; i < 40; i++) {
+  // platform top: packed-earth deck; Imperial upgrades to stonePale flagstones
+  const deckC: RGB = age === 'imperial' ? P.stonePale : P.dirtPale;
+  quad(c.r, [plat.Nt, plat.Et, plat.St, plat.Wt], deckC);
+  for (let i = 0; i < 84; i++) {
     const rng = new Rng(`tc:fl:${age}:${i}`);
-    const fx = c.cx + rng.int(-60, 60);
-    const fy = c.cy - 6 + rng.int(-24, 24);
-    if (c.r.alphaAt(fx, fy) === 255) c.r.set(fx, fy, rng.chance(0.5) ? P.dirtLight : P.parchDark);
+    const fx = c.cx + rng.int(-106, 106);
+    const fy = c.cy - 6 + rng.int(-50, 50);
+    const [pr, pg, pb, pa] = c.r.get(fx, fy);
+    if (pa === 255 && pr === deckC[0] && pg === deckC[1] && pb === deckC[2]) {
+      c.r.set(
+        fx,
+        fy,
+        age === 'imperial'
+          ? rng.chance(0.5) ? P.stoneLight : P.stoneDark
+          : rng.chance(0.5) ? P.dirtLight : P.parchDark,
+      );
+    }
   }
   // front steps at the S corner
   for (let i = 0; i < 3; i++) {
     const y = plat.S[1] - i * 2 - 1;
-    c.r.fillRect(Math.round(plat.S[0]) - 6 + i, y - 1, 12 - 2 * i, 2, ageIdx(age) >= 2 ? P.stoneLight : P.woodPale);
+    c.r.fillRect(
+      Math.round(plat.S[0]) - 6 + i, y - 1, 12 - 2 * i,
+      2,
+      age === 'imperial' ? P.stonePale : stone ? P.stoneLight : P.woodPale,
+    );
   }
-  // open-sided great hall: shaded interior + corner posts + huge hipped roof
-  const hall = struct(c.cx, c.cy - 6, 1.25, 1.25, 17);
-  // shaded interior mass under the roof (posts stand in front of it)
-  const inner = struct(c.cx, c.cy - 8, 1.05, 1.05, 12);
-  quad(c.r, [inner.W, inner.S, inner.St, inner.Wt], P.woodDark);
-  quad(c.r, [inner.S, inner.E, inner.Et, inner.St], P.outline);
-  const postC: RGB = age === 'imperial' ? P.stonePale : ageIdx(age) >= 2 ? P.stoneBase : P.woodBase;
-  const postLit: RGB = ageIdx(age) >= 2 ? P.stoneLight : P.woodLight;
+  // Great hall at the §5.3 H budget: 26px walls + 34px hipped roof over the
+  // 6px platform. Raw px, the same convention every other recipe uses for its
+  // H table row — the old 44/58 superstructure read as an oversized circus
+  // tent over a black void (r3-02/r3-14/r3-15).
+  const hallCy = c.cy - 10;
+  const wallH = 26;
+  const hall = struct(c.cx, hallCy, 1.15, 1.15, wallH);
+  // both camera-facing faces carry the §5.1 age wall grammar (Dark: log
+  // verticals + lashings; Feudal: timber frame; Castle: coursed stone piers;
+  // Imperial: dressed stone) — no more untextured woodBase band
+  drawWalls(c.r, hall, wallFor(age), `tc:hall:${age}`);
+  // open-sided great-hall read: a wide doorway at the S corner showing a lit
+  // dirtPale interior floor strip under interior shadow
+  const ox = Math.round(hall.S[0]);
+  const oy = Math.round(hall.S[1]);
+  c.r.fillRect(ox - 6, oy - 14, 13, 14, P.uiWoodDark);
+  for (let yy = oy - 3; yy <= oy - 1; yy++) {
+    for (let xx = ox - 6; xx <= ox + 6; xx++) c.r.set(xx, yy, P.dirtPale);
+  }
+  c.r.set(ox - 3, oy - 2, P.dirtLight);
+  c.r.set(ox + 2, oy - 3, P.dirtLight);
+  c.r.set(ox + 4, oy - 1, P.parchDark);
+  // corner posts/piers overlap the wall corners up to the eave
+  const postC: RGB = age === 'imperial' ? P.stonePale : stone ? P.stoneBase : P.woodBase;
+  const postLit: RGB = age === 'imperial' ? P.stonePale : stone ? P.stoneLight : P.woodLight;
   for (const p of [hall.W, hall.S, hall.E]) {
-    c.r.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 17, 3, 17, postC);
-    c.r.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - 17, 1, 17, postLit);
+    c.r.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - wallH, 3, wallH, postC);
+    c.r.fillRect(Math.round(p[0]) - 1, Math.round(p[1]) - wallH, 1, wallH, postLit);
+    if (age === 'dark') {
+      // rope lashings at the log joints
+      c.r.set(Math.round(p[0]), Math.round(p[1]) - 18, P.clothDark);
+      c.r.set(Math.round(p[0]) + 1, Math.round(p[1]) - 17, P.clothDark);
+    }
   }
-  // side lean-to annex peeking out on the E side
-  const annex = struct(c.cx + 58, c.cy + 8, 0.5, 0.45, 9);
-  drawWalls(c.r, annex, wallFor(age), `tc:a:${age}`);
-  drawRoof(c.r, annex, 5, roof, 0.1);
-  // the big hipped roof — the defining mass
-  drawRoof(c.r, hall, 24, roof, 0.4);
-  const ridgeY = Math.round((hall.Nt[1] + hall.St[1]) / 2) - 24;
+  // the big hipped roof — the defining mass (§7.13): 34px rise, ridgeInset
+  // 0.18 keeps a long readable light ridge with 1px dark hip seams (the old
+  // 0.3 inset on a 58px rise collapsed to a near-point apex)
+  const ridge = hippedRoof(c.r, hall, 34, roof, tex, 0.18);
+  const apex: Pt = [(ridge.r1[0] + ridge.r2[0]) / 2, (ridge.r1[1] + ridge.r2[1]) / 2];
   if (age === 'imperial') {
-    // gold ridge trim + glazed gable window
-    c.r.fillRect(c.cx - 8, ridgeY + 14, 16, 1, P.goldBase);
-    litWindow(c.r, c.cx - 1, ridgeY + 16, true);
+    // gold ridge trim + goldShine finials at both ridge ends
+    line2(c.r, [ridge.r1[0], ridge.r1[1] + 1], [ridge.r2[0], ridge.r2[1] + 1], P.goldBase);
+    c.r.set(Math.round(ridge.r1[0]), Math.round(ridge.r1[1]) - 1, P.goldShine);
+    c.r.set(Math.round(ridge.r2[0]), Math.round(ridge.r2[1]) - 1, P.goldShine);
+    // glazed gable window in a pale surround on the SE hip plane
+    const gx = Math.round((hall.St[0] + hall.Et[0] + 2 * ridge.r2[0]) / 4);
+    const gy = Math.round((hall.St[1] + hall.Et[1] + 2 * ridge.r2[1]) / 4);
+    c.r.fillRect(gx - 2, gy - 3, 6, 6, P.stonePale);
+    litWindow(c.r, gx, gy - 2, true);
+    // dashed gold trim on the platform cornice (§5.1 parapet trim, no banding)
+    for (const [a, b] of [[plat.Wt, plat.St], [plat.St, plat.Et]] as const) {
+      const steps = Math.round(Math.abs(b[0] - a[0]));
+      for (let i = 0; i < steps; i += 5) {
+        const x = Math.round(a[0] + ((b[0] - a[0]) * i) / steps);
+        const y = Math.round(a[1] + ((b[1] - a[1]) * i) / steps);
+        c.r.set(x, y, P.goldBase);
+        c.r.set(x + 1, y, P.goldBase);
+      }
+    }
   }
-  // door cloth hanging between the front posts
-  doorCloth(c.r, Math.round(hall.S[0]) - 3, Math.round(hall.S[1]) - 15, 7, 9);
+  // side lean-to annex against the hall's SE face, drawn AFTER the main roof
+  // so the intersection resolves cleanly (annex reads in front)
+  const annex = struct(c.cx + 62, c.cy + 8, 0.5, 0.42, 10);
+  drawWalls(c.r, annex, wallFor(age), `tc:a:${age}`);
+  drawRoof(c.r, annex, 6, roof, 0.1);
+  // door cloth hanging in the S doorway (§5.3 player-color placement)
+  doorCloth(c.r, ox - 2, oy - 13, 5, 6);
   if (banner) {
-    // masked eave trim + tall banner rising from the ridge
-    maskBand(c.r, hall.Wt, hall.St, 3, -4);
-    maskBand(c.r, annex.Wt, annex.St, 2, -2);
-    bannerPole(c.r, c.cx, ridgeY + 2, 12, 8, 6);
+    // §5.3: tall banner pole seated at the RIDGE MIDPOINT (the midpoint of
+    // r1–r2 lies on the ridge line) — flag + door cloth are the ONLY
+    // player-color carriers (no trim stripes; see COVERAGE_OVERRIDES)
+    bannerPole(c.r, Math.round(apex[0]), Math.round(apex[1]), 12, 8, 6);
   }
 }
 
 function rHouse(c: Canvas, age: Age, banner: boolean): void {
   const rng = new Rng(`house:${age}`);
-  yard(c, `house:${age}`);
+  // NO dirt apron in done states — dirt footprints belong to construct0 only
+  // (§8.4: the apron corrupted the green placement-preview read).
   if (age === 'dark') {
-    // round wattle hut with a broad conical thatch roof
+    // §5.3: oval wattle hut + conical thatch filling the 2x2 diamond
+    // (12px wall / 14px roof, drum wide enough to own its footprint)
     const hx = c.cx;
-    const hy = c.cy + 8;
-    // drum wall: ellipse base + cylinder band
-    c.r.fillEllipse(hx, hy, 18, 8, P.woodPale);
-    for (let y = hy - 9; y <= hy; y++) c.r.fillRect(hx - 18, y, 37, 1, P.woodPale);
-    c.r.fillEllipse(hx, hy - 9, 18, 8, P.woodPale);
-    // lit left edge + weave dither on the wall only
-    for (let y = hy - 12; y <= hy + 4; y++) {
-      for (let x = hx - 18; x <= hx + 18; x++) {
+    const hy = c.cy + 10; // wall base center
+    const WR = 29; // wall radius
+    // drum wall: bottom bulge + cylinder band + top ellipse
+    c.r.fillEllipse(hx, hy, WR, 11, P.woodPale);
+    c.r.fillRect(hx - WR, hy - 12, WR * 2 + 1, 13, P.woodPale);
+    c.r.fillEllipse(hx, hy - 12, WR, 9, P.woodPale);
+    // screen-right shade + clothDark wattle weave (§5.1); left stays lit
+    for (let y = hy - 20; y <= hy + 11; y++) {
+      for (let x = hx - WR; x <= hx + WR; x++) {
         if (c.r.alphaAt(x, y) !== 255) continue;
-        if (x < hx - 14) c.r.set(x, y, P.clothLight);
-        else if ((x + 2 * y) % 5 === 0) c.r.set(x, y, P.clothDark);
+        if (x > hx + WR - 6) c.r.set(x, y, P.woodLight);
+        else if (x >= hx - WR + 5 && (x + 2 * y) % 5 === 0) c.r.set(x, y, P.clothDark);
       }
     }
-    cone(c.r, hx, hy - 10, 20, 15, THATCH);
-    darkDoor(c.r, hx - 2, hy - 4, 5, 7);
-    doorCloth(c.r, hx - 2, hy - 4, 5, 4);
-  } else {
-    const wall = wallFor(age);
-    const s = struct(c.cx, c.cy, 0.8, 0.7, age === 'imperial' ? 14 : 12);
-    drawWalls(c.r, s, wall, `house:${age}`);
-    if (age === 'castle') {
-      // jettied timber upper floor over the stone ground floor
-      const upper = struct(c.cx, c.cy - 7, 0.85, 0.75, 6);
-      drawWalls(c.r, upper, 'timber', `house:up:${age}`);
+    // conical thatch roof with comb rows, 2-row eave dither + ragged eave
+    const RR = 33;
+    const RH = 14;
+    const by = hy - 13;
+    for (let i = 0; i <= RH; i++) {
+      const rr = Math.max(1, Math.round((RR * (RH - i)) / RH));
+      const y = by - i;
+      for (let x = hx - rr; x <= hx + rr; x++) {
+        const f = (x - (hx - rr)) / (2 * rr);
+        let col: RGB = f < 0.33 ? P.thatchLight : f > 0.72 ? P.thatchDark : P.thatchBase;
+        if (i % 3 === 1 && (x - hx + i * 2) % 5 < 2) col = f < 0.4 ? P.thatchBase : P.thatchDark;
+        if (i <= 1 && Raster.ditherOn(x, y, 50)) col = P.thatchDark;
+        c.r.set(x, y, col);
+      }
     }
-    drawRoof(c.r, s, age === 'feudal' ? 12 : 10, roofFor(age), age === 'imperial' ? 0.15 : 0.05);
-    if (age === 'imperial') {
-      // chimney
-      const chx = Math.round(s.Nt[0]) + 8;
-      c.r.fillRect(chx, s.Nt[1] - 16, 3, 8, P.stoneBase);
-      c.r.fillRect(chx, s.Nt[1] - 16, 1, 8, P.stoneLight);
-      litWindow(c.r, Math.round(s.S[0]) + 4, Math.round(s.S[1]) - 8, true);
+    c.r.set(hx, by - RH, P.thatchLight); // apex
+    for (let x = hx - RR; x <= hx + RR; x++) {
+      if ((x - hx + 40) % 4 < 2 && c.r.alphaAt(x, by + 1) === 255) c.r.set(x, by + 1, P.thatchDark); // ragged eave
     }
-    darkDoor(c.r, Math.round(s.S[0]) - 2, Math.round(s.S[1]) - 6, 4, 6, age !== 'feudal');
-    const wx = Math.round((s.S[0] + s.E[0]) / 2);
-    c.r.fillRect(wx, Math.round((s.S[1] + s.E[1]) / 2) - 8, 2, 3, P.woodDark); // shutter
+    darkDoor(c.r, hx - 2, hy + 2, 5, 8);
+    // undyed hide door flap (§5.1 dark age) — player color lives ONLY in the
+    // gable pennant (§5.3), never in stripes or door cloth on houses
+    c.r.fillRect(hx - 2, hy + 2, 5, 5, P.clothBase);
+    c.r.fillRect(hx + 1, hy + 2, 1, 5, P.clothDark);
+    c.r.set(hx - 2, hy + 2, P.clothLight);
+    if (banner) gablePennant(c.r, hx, by - RH + 1, 6);
+    return;
   }
+  const wall = wallFor(age);
+  const s = struct(c.cx, c.cy, 0.85, 0.72, age === 'imperial' ? 14 : 12);
+  drawWalls(c.r, s, wall, `house:${age}`);
+  if (age === 'castle') {
+    // jettied timber upper floor over the stone ground floor
+    const upper = struct(c.cx, c.cy - 7, 0.9, 0.77, 6);
+    drawWalls(c.r, upper, 'timber', `house:up:${age}`);
+  }
+  drawRoof(c.r, s, age === 'feudal' ? 12 : 10, roofFor(age), age === 'imperial' ? 0.15 : 0.05);
+  if (age === 'imperial') {
+    // chimney — anchored to the back eave line at its x so it never floats
+    const chx = Math.round(s.Nt[0]) + 8;
+    const edgeY =
+      s.Nt[1] + ((s.Et[1] - s.Nt[1]) * (chx - s.Nt[0])) / Math.max(1, s.Et[0] - s.Nt[0]);
+    const chy = Math.round(edgeY) + 5; // base sunk 5px into the roof plane
+    c.r.fillRect(chx, chy - 12, 3, 12, P.stoneBase);
+    c.r.fillRect(chx, chy - 12, 1, 12, P.stoneLight);
+    c.r.fillRect(chx - 1, chy - 13, 5, 1, P.stoneLight);
+    litWindow(c.r, Math.round(s.S[0]) + 4, Math.round(s.S[1]) - 8, true);
+  }
+  darkDoor(c.r, Math.round(s.S[0]) - 2, Math.round(s.S[1]) - 6, 4, 6, age !== 'feudal');
+  const wx = Math.round((s.S[0] + s.E[0]) / 2);
+  c.r.fillRect(wx, Math.round((s.S[1] + s.E[1]) / 2) - 8, 2, 3, P.woodDark); // shutter
   if (banner) {
-    if (age === 'dark') {
-      maskBand(c.r, [c.cx - 15, c.cy - 4], [c.cx + 15, c.cy - 4], 2);
-    } else {
-      const s2 = struct(c.cx, c.cy, 0.8, 0.7, age === 'imperial' ? 14 : 12);
-      maskBand(c.r, s2.Wt, s2.St, 2, -3);
-    }
-    pennant(c.r, c.cx + rng.int(-4, 4), c.ty + 10, 6);
+    // §5.3: the 3×3 gable pennant is the house's ONLY player-color carrier
+    const gy = Math.round((s.Nt[1] + s.St[1]) / 2) - (age === 'feudal' ? 11 : 9);
+    gablePennant(c.r, Math.round((s.Nt[0] + s.St[0]) / 2) + rng.int(-2, 2), gy, 7);
   }
 }
 
@@ -1177,7 +1383,7 @@ function rWonder(c: Canvas, _age: Age, banner: boolean): void {
 
 // registry: elevation px above the footprint + recipe
 const RECIPES: Record<string, { elev: number; recipe: Recipe }> = {
-  townCenter: { elev: 62, recipe: rTownCenter },
+  townCenter: { elev: 40, recipe: rTownCenter },
   house: { elev: 30, recipe: rHouse },
   mill: { elev: 46, recipe: rMill },
   lumberCamp: { elev: 20, recipe: rLumberCamp },
