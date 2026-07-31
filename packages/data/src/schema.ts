@@ -54,6 +54,8 @@ export interface UnitDef {
   foodAmount?: number; // food left on the carcass when hunted (sheep/deer)
   huntable?: boolean; // villagers may gather food from it once dead
   herdable?: boolean; // walks to a nearby player and changes ownership (sheep)
+  /** Food/second the carcass rots away once dead and not fully eaten (AoE2 ~0.25). */
+  decayRate?: number;
   // --- siege (additive) ---
   /** Trebuchet-style units must unpack before firing and pack before moving. */
   pack?: {
