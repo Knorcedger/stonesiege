@@ -13,6 +13,7 @@ import {
 import { gameData } from '@bf/data';
 import type { GameAssets } from './assets';
 import { animForActivity, animFrameIndex, type AnimName } from './frames';
+import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 
@@ -73,6 +74,9 @@ export class WorldLayer {
   private views = new Map<EntityId, EntityView>();
   private ghostViews = new Map<EntityId, Sprite>();
   private ghosts = new Map<EntityId, GhostRecord>();
+  /** Rally flag markers for selected own production buildings (GDD: rally shown as a flag). */
+  private rallyFlags = new Graphics();
+  private lastRallyFlagKey = '';
   private prevPos = new Map<EntityId, { x: number; y: number }>();
   private curPos = new Map<EntityId, { x: number; y: number }>();
   private frameCounts = new Map<string, number>();
@@ -86,6 +90,8 @@ export class WorldLayer {
     private humanPlayer: PlayerId,
   ) {
     this.container.sortableChildren = true;
+    this.rallyFlags.zIndex = 1e9; // markers float above every sprite
+    this.container.addChild(this.rallyFlags);
   }
 
   /** Snapshot positions at each tick boundary (for interpolation). */
@@ -147,6 +153,39 @@ export class WorldLayer {
     }
     this.prunePositions(seen);
     this.updateGhosts(state, vis, seen);
+    this.updateRallyFlags(state);
+  }
+
+  /**
+   * Rally flag markers (GDD Buildings: the rally is "shown as a flag") for
+   * SELECTED own production buildings with an active rally. A rally onto a
+   * target (berries, an enemy) tracks the target's live position.
+   */
+  private updateRallyFlags(state: GameState): void {
+    const spots: Array<{ x: number; y: number }> = [];
+    for (const id of this.selection) {
+      const e = state.entities.get(id);
+      if (!e || e.player !== this.humanPlayer || !hasActiveRally(e)) continue;
+      const target = e.rally!.targetId !== undefined ? state.entities.get(e.rally!.targetId) : undefined;
+      const p = target
+        ? tileToWorld(target.x / FP, target.y / FP)
+        : tileToWorld(e.rally!.x / FP, e.rally!.y / FP);
+      spots.push({ x: Math.round(p.x), y: Math.round(p.y) });
+    }
+    const key = spots.map((s) => `${s.x},${s.y}`).join('|');
+    if (key === this.lastRallyFlagKey) return;
+    this.lastRallyFlagKey = key;
+    this.rallyFlags.clear();
+    for (const s of spots) {
+      // ground marker + pole + gold pennant (same look as the garrison badge flag)
+      this.rallyFlags.ellipse(s.x, s.y, 7, 4).stroke({ width: 1.5, color: OUTLINE });
+      this.rallyFlags.ellipse(s.x, s.y, 7, 4).stroke({ width: 1, color: GATHER_HIGHLIGHT });
+      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 20).stroke({ width: 1.5, color: OUTLINE });
+      this.rallyFlags
+        .poly([s.x, s.y - 20, s.x + 13, s.y - 16, s.x, s.y - 12])
+        .fill(GATHER_HIGHLIGHT)
+        .stroke({ width: 1, color: OUTLINE });
+    }
   }
 
   /** Targets of the currently selected villagers (GDD: gather target highlights). */
@@ -182,7 +221,9 @@ export class WorldLayer {
     for (const e of state.entities.values()) {
       const tv = this.tileVis(vis, state, e.tileX, e.tileY);
       const visible = e.player === this.humanPlayer || (e.kind === 'resource' ? tv >= 1 : tv === 2);
-      if (!visible || e.activity === 'dying') continue;
+      // Garrisoned units sit at their host building's anchor but are not drawn —
+      // they must never steal a tap aimed at the building itself.
+      if (!visible || e.activity === 'dying' || e.garrisonedIn !== undefined) continue;
       let d: number;
       if (e.kind === 'building') {
         const size = gameData.buildings[e.defId]?.size ?? 1;
@@ -207,7 +248,7 @@ export class WorldLayer {
     const hi = { x: Math.max(x0, x1), y: Math.max(y0, y1) };
     const out: Entity[] = [];
     for (const e of state.entities.values()) {
-      if (e.kind !== 'unit' || e.player !== player || e.activity === 'dying') continue;
+      if (e.kind !== 'unit' || e.player !== player || e.activity === 'dying' || e.garrisonedIn !== undefined) continue;
       const p = tileToWorld(e.x / FP, e.y / FP);
       if (p.x >= lo.x && p.x <= hi.x && p.y >= lo.y && p.y <= hi.y) out.push(e);
     }
@@ -319,9 +360,10 @@ export class WorldLayer {
     if (view.carry?.visible) view.carry.position.set(9, Math.min(view.spriteTopPx, -18) - 4);
   }
 
-  /** Garrison flag + occupant-count badge over occupied buildings. */
+  /** Garrison flag + occupant-count badge over occupied hosts — buildings AND
+   *  rams (unit hosts, sim garrison.ts): a loaded ram must show its contents. */
   private updateGarrisonBadge(e: Entity, view: EntityView): void {
-    const count = e.kind === 'building' ? e.garrison?.length ?? 0 : 0;
+    const count = e.garrison?.length ?? 0;
     const key = count > 0 ? String(count) : '';
     if (key !== view.lastBadgeKey) {
       view.lastBadgeKey = key;
@@ -485,9 +527,12 @@ export class WorldLayer {
           this.ghostViews.set(id, spr);
           this.container.addChild(spr);
           const colorIdx = state.players[g.player]?.setup.color;
-          const frame =
-            this.assets.tryResolve(`bld/${g.defId}/${g.age}/done`, colorIdx) ??
-            this.assets.resolveFrame(`bld/${g.defId}/done`, colorIdx);
+          // Farms have no bld/ frames (ART_BIBLE §4.4): remember them as a mature
+          // field (obj/farm/2) instead of the missing bld/farm/done placeholder.
+          const frame = g.defId === 'farm'
+            ? this.assets.resolveFrame('obj/farm/2', colorIdx)
+            : this.assets.tryResolve(`bld/${g.defId}/${g.age}/done`, colorIdx) ??
+              this.assets.resolveFrame(`bld/${g.defId}/done`, colorIdx);
           spr.texture = frame.texture;
           spr.anchor.set(frame.anchorX, frame.anchorY);
           spr.position.set(Math.round(g.wx), Math.round(g.wy));

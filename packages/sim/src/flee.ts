@@ -1,8 +1,10 @@
 // Villager flee (GDD combat rules): villagers never auto-engage. When one takes damage
 // it runs for the nearest own completed defensive building (TC / tower / castle — any
 // building def with garrison room AND its own attack) and garrisons there. With nowhere
-// to go it simply keeps its task. Only the garrison ENTRY required by this rule lives
-// here; the full garrison system (ungarrison, extra arrows, healing) is a later system.
+// to go it simply keeps its task. The interrupted task is remembered: a flee-garrisoned
+// villager is marked `sheltering` (HUD: idle-villager badge) and ungarrison restores its
+// pre-flee intent (garrison.ts — the AoE2 return-to-work bell). Only the garrison ENTRY
+// lives here; the full garrison system (ungarrison, extra arrows, healing) is garrison.ts.
 
 import { gameData } from '@bf/data';
 import { FP, GAIA } from './types';
@@ -45,10 +47,11 @@ export function onUnitDamaged(state: SimState, victim: Entity): void {
   }
   if (!best) return; // no shelter: keep the current task (GDD)
 
+  const savedIntent = victim.intent; // remembered for the return-to-work bell
   victim.intent = undefined; // abandon gather/build task
   state.gather.delete(victim.id);
   state.buildRetries.delete(victim.id);
-  state.fleeing.set(victim.id, { buildingId: best.id, retries: 0 });
+  state.fleeing.set(victim.id, { buildingId: best.id, retries: 0, savedIntent });
   orderMove(state, [victim.id], best.x, best.y);
   victim.activity = 'fleeing';
 }
@@ -86,6 +89,10 @@ export function tickFlee(state: SimState): void {
     const size = gameData.buildings[b.defId]?.size ?? 1;
     if (adjacentToFootprint(e, b.tileX, b.tileY, size)) {
       garrisonUnit(state, e, b);
+      // sheltering (flee-garrisoned, not an explicit order): the HUD surfaces these in
+      // the idle-villager badge, and ungarrison restores the interrupted task
+      e.sheltering = true;
+      if (f.savedIntent) state.shelterIntents.set(id, f.savedIntent);
       state.fleeing.delete(id);
       continue;
     }

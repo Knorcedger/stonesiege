@@ -108,6 +108,7 @@ export function ejectGarrison(state: SimState, host: Entity, size = 1): void {
     const u = state.entities.get(id);
     if (!u) continue;
     u.garrisonedIn = undefined;
+    u.sheltering = undefined;
     u.x = spot.x * FP + FP / 2;
     u.y = spot.y * FP + FP / 2;
     u.tileX = spot.x;
@@ -125,6 +126,7 @@ function clearUnitBookkeeping(state: SimState, id: EntityId): void {
   state.unitsGrid.remove(id);
   state.gather.delete(id);
   state.fleeing.delete(id);
+  state.shelterIntents.delete(id);
   state.animalCd.delete(id);
   state.buildRetries.delete(id);
   state.combat.delete(id);
@@ -153,6 +155,7 @@ function toCorpse(state: SimState, e: Entity): void {
     }
     e.garrisonedIn = undefined;
   }
+  e.sheltering = undefined;
   fogOnDeath(state, e);
   if (e.player !== GAIA) {
     const player = state.players[e.player];
@@ -257,6 +260,12 @@ export function isStandardMilitary(def: UnitDef | undefined): boolean {
 function retaliate(state: SimState, victim: Entity, attackerId: EntityId): void {
   if (victim.player <= GAIA || victim.garrisonedIn !== undefined) return;
   if (state.combat.has(victim.id) || state.fleeing.has(victim.id)) return;
+  if (state.garrisoning.has(victim.id)) return;
+  // AoE2: damage never interrupts an explicit order. A unit on a plain move keeps
+  // walking (retreat/disengage micro stays possible); other non-attack intents also
+  // hold. Attack-movers DO retaliate — engaging under fire is the point of the order.
+  if (victim.intent !== undefined && victim.intent.kind !== 'attackMove') return;
+  if (state.motion.has(victim.id) && victim.intent?.kind !== 'attackMove') return;
   const def = gameData.units[victim.defId];
   if (!isStandardMilitary(def)) return;
   const attacker = state.entities.get(attackerId);

@@ -3,18 +3,28 @@
 // No DOM/Pixi so the behavior is unit-testable.
 
 import { GAIA, type Entity, type EntityId, type GameState, type PlayerId } from '@bf/sim/types';
+import { gameData } from '@bf/data';
 
 export type IdleCategory = 'villager' | 'military';
 
-/** A unit counts as idle when it stands with no activity (GDD: the `.` hotkey set). */
+/**
+ * A unit counts as idle when it stands with no activity (GDD: the `.` hotkey set).
+ * SHELTERING units (villagers auto-garrisoned by the flee reflex) also count: they are
+ * workforce parked in a TC/tower, and without this the badge hides a raid burying the
+ * economy — cycling to one centers the camera on its shelter, whose ungarrison button
+ * is the return-to-work bell. Explicitly garrisoned units are excluded (deliberate).
+ * Herdables/huntables (captured sheep) are food, not workers or soldiers — they
+ * never appear in either idle badge or its camera cycle.
+ */
 export function isIdleOwnUnit(e: Entity, player: PlayerId): boolean {
+  const def = gameData.units[e.defId];
   return (
     e.kind === 'unit' &&
     e.player === player &&
     e.player !== GAIA &&
     e.hp > 0 &&
-    e.activity === 'idle' &&
-    e.garrisonedIn === undefined
+    (e.sheltering === true || (e.activity === 'idle' && e.garrisonedIn === undefined)) &&
+    !(def?.herdable || def?.huntable)
   );
 }
 

@@ -4,10 +4,14 @@
 //   Mining Camp gold/stone) → deposit (resourceDropped) → walk back.
 // Auto-continue: on depletion (resourceDepleted; trees leave a non-blocking stump,
 // mines/bushes/carcasses vanish) the villager retargets a same-task node near the old
-// one, else deposits any partial load and idles. AoE2 etiquette: ONE gatherer per tree
-// (extras queue politely beside it), several per mine/bush. Hunting: live huntables are
+// one, else deposits any partial load and idles. Retargeting spreads across nodes:
+// nodes already claimed to slot capacity by other gatherers' intents are skipped.
+// AoE2 etiquette: ONE gatherer per tree, several per mine/bush — an extra arriving at
+// a full node bumps to the nearest free same-task node (AoE2 lumberjack behavior),
+// queueing politely only when nothing nearby is free. Hunting: live huntables are
 // struck down first (villager attacks), then the carcass is eaten like a food node
-// (rot lives in animals.ts). Farms feed exactly one farmer.
+// (rot lives in animals.ts). Farms feed exactly one farmer; an EXPIRED farm keeps its
+// farmer — they bank any load, then wait at the fallow plot for an auto/manual reseed.
 //
 // All amounts/accumulators are scaled integers; every rate/capacity read goes through
 // resolveUnitStats so civ bonuses and (later) techs apply.
@@ -35,6 +39,8 @@ const RETARGET_RADIUS = 8;
 const STATIC_RETRIES = 8;
 /** Live prey runs around — hunters persist much longer. */
 const PREY_RETRIES = 60;
+/** A gatherer queued at a full node re-scans for a free node every N ticks. */
+const BUMP_STAGGER = 5;
 /** AoE2: max one gatherer per tree. */
 const TREE_SLOTS = 1;
 /** Mines/bushes/carcasses: one gatherer per adjacent tile of the node. */
@@ -136,9 +142,34 @@ function nearestDropoff(state: SimState, e: Entity, type: ResourceType): Entity 
   return best;
 }
 
-/** Auto-continue: nearest same-task target around the depleted node's last tile. */
+/** Concurrent-gatherer cap for a target (1 per tree/farm, several per mine/bush). */
+function slotCapOf(view: TargetView): number {
+  return view.kind === 'farm' ? 1 : view.task === 'wood' ? TREE_SLOTS : NODE_SLOTS;
+}
+
+/**
+ * Gather-intent count per target for `player`'s other workers (excluding `excludeId`).
+ * Counts INTENT (workers en route included), so successive retargets in the same tick
+ * see each other's picks and spread instead of piling onto one node.
+ */
+function countGatherIntents(state: SimState, player: PlayerId, excludeId: EntityId): Map<EntityId, number> {
+  const counts = new Map<EntityId, number>();
+  for (const u of state.entities.values()) {
+    if (u.id === excludeId || u.kind !== 'unit' || u.hp <= 0 || u.player !== player) continue;
+    if (u.intent?.kind !== 'gather') continue;
+    counts.set(u.intent.targetId, (counts.get(u.intent.targetId) ?? 0) + 1);
+  }
+  return counts;
+}
+
+/**
+ * Auto-continue: nearest same-task target around the depleted/full node's last tile.
+ * Nodes already claimed to slot capacity by other gatherers' intents are skipped, so
+ * a displaced group fans out across nodes instead of recreating the pile-up.
+ */
 function findNearbyTarget(state: SimState, villager: Entity, task: GatherTask, cx: number, cy: number): Entity | null {
   if (task === 'farm') return null; // farmers wait at their fallow plot instead
+  const intents = countGatherIntents(state, villager.player, villager.id);
   let best: Entity | null = null;
   let bestD = Infinity;
   for (const t of state.entities.values()) {
@@ -146,10 +177,19 @@ function findNearbyTarget(state: SimState, villager: Entity, task: GatherTask, c
     if (!view || view.task !== task) continue;
     const dx = t.tileX - cx, dy = t.tileY - cy;
     if (Math.max(Math.abs(dx), Math.abs(dy)) > RETARGET_RADIUS) continue;
+    if (view.kind !== 'prey' && (intents.get(t.id) ?? 0) >= slotCapOf(view)) continue;
     const dd = dx * dx + dy * dy;
     if (dd < bestD) { bestD = dd; best = t; }
   }
   return best;
+}
+
+/** Own, completed, currently-fallow farm (amountLeft 0) — its farmer waits beside it. */
+function isFallowOwnFarm(state: SimState, target: Entity | undefined, playerId: PlayerId): target is Entity {
+  if (!target || target.kind !== 'building' || target.player !== playerId || target.hp <= 0) return false;
+  if (gameData.buildings[target.defId]?.providesFood === undefined) return false;
+  if ((target.buildProgress ?? 1000) < 1000) return false;
+  return (target.amountLeft ?? 0) <= 0;
 }
 
 /** Drop the task entirely: clear intent + bookkeeping, stand down (any load is kept). */
@@ -224,6 +264,8 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
     const target = intent?.kind === 'gather' ? state.entities.get(intent.targetId) : undefined;
     if (target && classifyGatherTarget(state, target, e.player)) {
       orderMove(state, [e.id], target.x, target.y);
+    } else if (isFallowOwnFarm(state, target, e.player)) {
+      orderMove(state, [e.id], target.x, target.y); // walk back and wait for the reseed
     } else {
       onTargetLost(state, e, info);
     }
@@ -271,7 +313,31 @@ function stepWorker(
   const intent = e.intent as Extract<NonNullable<Entity['intent']>, { kind: 'gather' }>;
   const target = state.entities.get(intent.targetId);
   const view = classifyGatherTarget(state, target, e.player);
-  if (!target || !view) { onTargetLost(state, e, info); return; }
+  if (!target || !view) {
+    // AoE2 farm lifecycle: an EXPIRED farm keeps its farmer. Bank any load, then wait
+    // beside the fallow plot so an auto/manual reseed resumes them without new orders.
+    if (isFallowOwnFarm(state, target, e.player)) {
+      info.task = 'farm';
+      info.lastX = target.tileX;
+      info.lastY = target.tileY;
+      if (e.carrying && e.carrying.amount > 0) { startDeposit(state, e, info); return; }
+      const size = gameData.buildings[target.defId]?.size ?? 1;
+      if (!adjacentToFootprint(e, target.tileX, target.tileY, size)) {
+        if (!state.motion.has(e.id)) {
+          if (info.retries >= STATIC_RETRIES) { release(state, e); return; }
+          info.retries++;
+          orderMove(state, [e.id], target.x, target.y);
+        }
+        return;
+      }
+      info.retries = 0;
+      state.motion.delete(e.id);
+      e.activity = 'idle';
+      return;
+    }
+    onTargetLost(state, e, info);
+    return;
+  }
 
   info.task = view.task;
   info.lastX = target.tileX;
@@ -293,10 +359,21 @@ function stepWorker(
   if (view.kind === 'prey') { strike(state, e, info, target, events); return; }
 
   // slot etiquette: 1 per tree/farm, several per mine/bush/carcass
-  const slotCap = view.kind === 'farm' ? 1 : view.task === 'wood' ? TREE_SLOTS : NODE_SLOTS;
+  const slotCap = slotCapOf(view);
   const used = slots.get(target.id) ?? 0;
   if (used >= slotCap) {
-    // queue politely beside the node until the slot frees
+    // AoE2 lumberjack etiquette: bump to a nearby free same-task node instead of
+    // idling (staggered scan — the intent-count sweep is O(entities))
+    if ((state.tick + e.id) % BUMP_STAGGER === 0) {
+      const next = findNearbyTarget(state, e, view.task, target.tileX, target.tileY);
+      if (next && next.id !== target.id) {
+        e.intent = { kind: 'gather', targetId: next.id };
+        info.retries = 0;
+        orderMove(state, [e.id], next.x, next.y);
+        return;
+      }
+    }
+    // nothing free nearby: queue politely beside the node until the slot frees
     state.motion.delete(e.id);
     e.activity = 'idle';
     return;

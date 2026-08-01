@@ -96,6 +96,75 @@ describe('movement', () => {
     expect(Math.max(Math.abs(unit.tileX - 10), Math.abs(unit.tileY - 10))).toBeLessThanOrEqual(1);
   });
 
+  it('a move into a sealed forest pocket walks to the closest reachable tile (never a no-op)', () => {
+    const map = grassMap(20, 20);
+    const entities: ScenarioStart['entities'] = [
+      { defId: 'militia', player: 1, tileX: 2, tileY: 10 },
+    ];
+    // tree ring sealing the walkable tile (10,10): walkable but disconnected
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        entities.push({ defId: 'tree', player: 0, tileX: 10 + dx, tileY: 10 + dy });
+      }
+    }
+    const game = createGame(scenarioConfig(6, map, entities, [player()]));
+    const unit = entitiesOf(game.state.entities, 1, 'militia')[0];
+
+    game.advance([{ kind: 'move', player: 1, units: [unit.id], x: fp(10) + FP / 2, y: fp(10) + FP / 2 }]);
+    for (let t = 0; t < 600; t++) game.advance([]);
+
+    // AoE2 behavior: the unit walked up to the pocket instead of standing at (2,10)
+    expect(unit.activity).toBe('idle');
+    expect(game.isWalkable(unit.tileX, unit.tileY)).toBe(true);
+    expect(Math.max(Math.abs(unit.tileX - 10), Math.abs(unit.tileY - 10))).toBeLessThanOrEqual(3);
+  });
+
+  it('an attack-move group to an unreachable goal still advances (order not dropped)', () => {
+    const map = grassMap(20, 20);
+    const entities: ScenarioStart['entities'] = [];
+    for (let i = 0; i < 5; i++) entities.push({ defId: 'militia', player: 1, tileX: 2, tileY: 8 + i });
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        entities.push({ defId: 'tree', player: 0, tileX: 10 + dx, tileY: 10 + dy });
+      }
+    }
+    const game = createGame(scenarioConfig(7, map, entities, [player()]));
+    const ids = entitiesOf(game.state.entities, 1, 'militia').map((e) => e.id);
+    expect(ids).toHaveLength(5);
+
+    game.advance([{ kind: 'attackMove', player: 1, units: ids, x: fp(10) + FP / 2, y: fp(10) + FP / 2 }]);
+    for (let t = 0; t < 800; t++) game.advance([]);
+
+    for (const u of entitiesOf(game.state.entities, 1, 'militia')) {
+      expect(u.activity, `unit ${u.id} never arrived`).toBe('idle');
+      expect(u.intent?.kind, `unit ${u.id} lost its attack-move intent`).toBe('attackMove');
+      const d = Math.max(Math.abs(u.tileX - 10), Math.abs(u.tileY - 10));
+      expect(d, `unit ${u.id} did not advance toward the goal`).toBeLessThanOrEqual(6);
+    }
+  });
+
+  it('a click deep inside a lake (beyond the 8-tile spiral) walks to the shore', () => {
+    const map = grassMap(40, 40);
+    // 20x20 lake: nearest land to its center (20,20) is 10 tiles away, past the old maxR=8
+    for (let y = 10; y < 30; y++) {
+      for (let x = 10; x < 30; x++) map.terrain[y * 40 + x] = 3; // water
+    }
+    const game = createGame(scenarioConfig(8, map, [
+      { defId: 'militia', player: 1, tileX: 2, tileY: 20 },
+    ], [player()]));
+    const unit = entitiesOf(game.state.entities, 1, 'militia')[0];
+
+    game.advance([{ kind: 'move', player: 1, units: [unit.id], x: fp(20) + FP / 2, y: fp(20) + FP / 2 }]);
+    for (let t = 0; t < 800; t++) game.advance([]);
+
+    expect(unit.activity).toBe('idle');
+    expect(game.isWalkable(unit.tileX, unit.tileY)).toBe(true);
+    // reached the shoreline near the click, not stuck at the start column
+    expect(Math.max(Math.abs(unit.tileX - 20), Math.abs(unit.tileY - 20))).toBeLessThanOrEqual(11);
+  });
+
   it('commands from the wrong player are dropped', () => {
     const map = grassMap(20, 20);
     const game = createGame(scenarioConfig(5, map, [

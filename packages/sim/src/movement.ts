@@ -96,7 +96,13 @@ function followPaths(state: SimState): void {
     const movedX = e.x - beforeX, movedY = e.y - beforeY;
     if (movedX !== 0 || movedY !== 0) e.facing = facingFromDelta(movedX, movedY);
 
-    const movedSq = movedX * movedX + movedY * movedY;
+    // Stuck detection on NET movement since last tick (separation included): a unit
+    // whose own step succeeds but is shoved straight back by the crowd each tick made
+    // no progress — measuring only the step let head-on jams livelock forever.
+    const netX = e.x - m.lastX, netY = e.y - m.lastY;
+    m.lastX = e.x;
+    m.lastY = e.y;
+    const movedSq = netX * netX + netY * netY;
     const minMove = Math.max(1, speedFp >> 2);
     if (movedSq < minMove * minMove) {
       m.stuckTicks++;

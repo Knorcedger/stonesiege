@@ -10,12 +10,13 @@ import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { loadAssets, type GameAssets } from './assets';
 import { centroidTile, idleUnits, liveGroupIds, sameIdSet, type IdleCategory } from './selectionTools';
+import { placementGhostFrames } from './frames';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
 import { WorldLayer } from './world';
 import { FxLayer } from './fx';
 import { FogLayer } from './fog';
-import { SimLoop } from './simloop';
+import { SimLoop, TICK_MS } from './simloop';
 import { playHornSting } from './audio';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
@@ -24,21 +25,52 @@ import { Minimap } from './hud/minimap';
 import { Overlays } from './hud/overlays';
 import { deriveMatchSummary, emptyTallies, formatMatchTime, recordDeath } from './hud/summary';
 import { createGame, practiceConfig } from './simBridge';
+import { createBot, type Bot, type BotDifficulty } from '@bf/ai';
+import {
+  clearSnapshot, loadSnapshot, replaySnapshot, saveSnapshot, SNAPSHOT_VERSION,
+  type CommandLog,
+} from './persist';
 
 const PLACE_GREEN = 0x3e8c34;
 const PLACE_RED = 0xb3261e;
+/** Autosave cadence while playing (ticks): 15 s — cheap next to hide/pagehide saves. */
+const AUTOSAVE_TICKS = 300;
 
-export async function runGame(root: HTMLElement): Promise<void> {
+export interface RunGameOptions {
+  /** Restore the persisted match snapshot instead of starting fresh. */
+  resume?: boolean;
+  /** Bot difficulty for a fresh practice match (GDD: Easy / Standard / Hard). */
+  difficulty?: BotDifficulty;
+}
+
+export async function runGame(root: HTMLElement, options: RunGameOptions = {}): Promise<void> {
   const loading = document.createElement('div');
   loading.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#DABE8D;font:18px "Pixelify Sans",monospace;background:#16100a;';
   loading.textContent = 'Mustering the banners…';
   root.appendChild(loading);
 
   const assets = await loadAssets();
-  const config = practiceConfig();
+  const snapshot = options.resume ? loadSnapshot() : null;
+  if (!snapshot) clearSnapshot(); // starting fresh abandons any stale match
+  const difficulty: BotDifficulty = snapshot?.difficulty ?? options.difficulty ?? 'standard';
+  const config = snapshot?.config ?? practiceConfig();
   assets.prepareMatchColors(config.players.map((p) => p.color));
   const game = createGame(config);
   const humanPlayer: PlayerId = (config.players.findIndex((p) => p.isHuman) + 1) as PlayerId;
+
+  // Resume: replay the recorded command log through the fresh engine — the
+  // deterministic sim rebuilds the exact snapshotted state (GDD suspend/resume).
+  const commandLog: CommandLog = snapshot?.log ?? [];
+  const replayedDeaths: Array<Extract<SimEvent, { kind: 'entityDied' }>> = [];
+  if (snapshot) {
+    loading.textContent = 'Restoring match…';
+    await new Promise((r) => requestAnimationFrame(() => r(null))); // let the text paint
+    replaySnapshot(game, snapshot, (events) => {
+      for (const ev of events) {
+        if (ev.kind === 'entityDied') replayedDeaths.push(ev);
+      }
+    });
+  }
 
   const app = new Application();
   await app.init({
@@ -74,11 +106,21 @@ export async function runGame(root: HTMLElement): Promise<void> {
   const bandOverlay = new Graphics();
   app.stage.addChild(bandOverlay);
 
-  // center on the human TC
+  // center on the human TC (resumed matches may have lost it — any own entity then)
+  let centered = false;
   for (const e of game.state.entities.values()) {
     if (e.player === humanPlayer && e.defId === 'townCenter') {
       camera.centerOnTile(e.x / FP, e.y / FP);
+      centered = true;
       break;
+    }
+  }
+  if (!centered) {
+    for (const e of game.state.entities.values()) {
+      if (e.player === humanPlayer && e.hp > 0) {
+        camera.centerOnTile(e.x / FP, e.y / FP);
+        break;
+      }
     }
   }
   world.onTick(game.state); // initial position snapshot
@@ -89,6 +131,7 @@ export async function runGame(root: HTMLElement): Promise<void> {
   let placement: { defId: string; tileX: number; tileY: number } | null = null;
   const tallies = emptyTallies();
   let housed = false;
+  for (const ev of replayedDeaths) recordDeath(tallies, ev, humanPlayer); // summary survives resume
   let wonderOwner: PlayerId | null = null; // whose countdown the banner tracks
   let endShown = false;
 
@@ -155,6 +198,7 @@ export async function runGame(root: HTMLElement): Promise<void> {
   const showEnd = (victory: boolean): void => {
     if (endShown) return;
     endShown = true;
+    clearSnapshot(); // a finished match must never be offered for resume
     deselect();
     overlays.showEndScreen(
       victory,
@@ -232,17 +276,50 @@ export async function runGame(root: HTMLElement): Promise<void> {
   };
 
   // --------------------------------------------------------------- sim loop
+  // Bot opponents (GDD Practice): every non-human player gets a controller that
+  // reads sim state and issues Commands through the same queue a human would.
+  // During a resume their historical commands came from the log; from here on
+  // they play live again.
+  const bots: Bot[] = config.players
+    .map((p, i) => ({ setup: p, id: (i + 1) as PlayerId }))
+    .filter(({ setup }) => !setup.isHuman)
+    .map(({ id }) => createBot(game, id, difficulty));
+
   const loop = new SimLoop(game, {
     onTick: (events) => {
       const st = getState();
+      for (const bot of bots) {
+        for (const cmd of bot.tick()) loop.issue(cmd);
+      }
       world.onTick(st);
       world.onSimEvents(events, st.tick);
       fx.onSimEvents(st, events, st.tick);
       handleSimEvents(events);
       fog.update(st.players[humanPlayer]?.visibility ?? new Uint8Array(0));
     },
+    // match-snapshot command log: every applied batch (human AND bots) is
+    // recorded so a resume replays the identical game
+    onAdvance: (tick, commands) => {
+      commandLog.push([tick, commands]);
+    },
   });
   loop.attachAutoPause();
+
+  // ------------------------------------------------------------- persistence
+  // GDD: backgrounding auto-snapshots the match; periodic saves cover OS kills
+  // and dev-server reloads. Cleared the moment the match ends.
+  let lastSavedTick = game.state.tick;
+  const saveMatch = (): void => {
+    const st = getState();
+    if (endShown || st.finished) return;
+    saveSnapshot({ version: SNAPSHOT_VERSION, config, difficulty, tick: st.tick, log: commandLog });
+    lastSavedTick = st.tick;
+  };
+  const onVisibility = (): void => {
+    if (document.hidden) saveMatch();
+  };
+  document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('pagehide', saveMatch);
 
   const issue = (cmd: Command): void => loop.issue(cmd);
   const issueWithUndo = (cmd: Command, label: string, undo: (() => void) | null): void => {
@@ -279,10 +356,14 @@ export async function runGame(root: HTMLElement): Promise<void> {
       .stroke({ width: 2, color, alpha: 1 });
     // Resolve the local player's color variant (baked @p<idx> or runtime-swapped) —
     // NEVER the neutral mask frame, whose raw magenta placeholder pixels would show.
+    // placementGhostFrames handles the farm exception (obj/farm/2, no bld/ frames).
     const colorIdx = getState().players[humanPlayer]?.setup.color;
-    const frame =
-      assets.tryResolve(`bld/${placement.defId}/${getState().players[humanPlayer]?.age ?? 'dark'}/done`, colorIdx) ??
-      assets.resolveFrame(`bld/${placement.defId}/done`, colorIdx);
+    const candidates = placementGhostFrames(placement.defId, getState().players[humanPlayer]?.age ?? 'dark');
+    let frame = null;
+    for (let i = 0; i < candidates.length - 1 && !frame; i++) {
+      frame = assets.tryResolve(candidates[i], colorIdx);
+    }
+    frame ??= assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
   };
@@ -315,16 +396,29 @@ export async function runGame(root: HTMLElement): Promise<void> {
       return;
     }
     const def = gameData.buildings[placement.defId];
-    issue({ kind: 'build', player: humanPlayer, units: villagers, defId: placement.defId, tileX: placement.tileX, tileY: placement.tileY });
+    const { defId, tileX, tileY } = placement;
+    issue({ kind: 'build', player: humanPlayer, units: villagers, defId, tileX, tileY });
+    // Real undo: delete the foundation this confirm created (the sim spawns it at
+    // the next tick boundary, so the closure looks it up by footprint when tapped;
+    // deleteEntity refunds the unbuilt fraction via refundFoundation).
+    const undoBuild = (): void => {
+      for (const e of getState().entities.values()) {
+        if (e.kind === 'building' && e.player === humanPlayer && e.defId === defId
+          && e.tileX === tileX && e.tileY === tileY && (e.buildProgress ?? 1000) < 1000) {
+          issue({ kind: 'deleteEntity', player: humanPlayer, entityId: e.id });
+          return;
+        }
+      }
+    };
     if (def?.wall) {
       // v1 wall flow: single-tile walls placed repeatedly — placement mode stays
       // armed so a run of wall goes tap-confirm, tap-confirm (drag-placement is
-      // a wave-3 nicety; see GDD walls note).
-      hud.showUndoToast('Wall placed — keep tapping to extend, Cancel to stop', null);
+      // a wave-3 nicety; see GDD walls note). Undo removes the LAST segment.
+      hud.showUndoToast('Wall placed — keep tapping to extend, Cancel to stop', undoBuild);
       refreshGhost();
       return;
     }
-    hud.showUndoToast(`Building ${def?.name ?? placement.defId}`, null);
+    hud.showUndoToast(`Building ${def?.name ?? defId}`, undoBuild);
     placement = null;
     refreshGhost();
   };
@@ -355,6 +449,26 @@ export async function runGame(root: HTMLElement): Promise<void> {
     ungarrisonAll: (buildingId) => {
       issue({ kind: 'ungarrison', player: humanPlayer, buildingId });
       hud.showUndoToast('Ungarrisoning', null);
+    },
+    // GDD: "tap the flag control to clear". The sim has no unset command, so
+    // clearing rallies back onto the building's own center (no targetId) — the
+    // sim remaps the blocked center to the nearest walkable tile, i.e. the
+    // default spawn side (same convention as the rally-undo path in input.ts).
+    clearRally: (buildingId) => {
+      const b = getState().entities.get(buildingId);
+      if (!b) return;
+      const prev = b.rally ? { ...b.rally } : null;
+      issue({ kind: 'setRally', player: humanPlayer, buildingId, x: b.x, y: b.y });
+      hud.showUndoToast('Rally cleared', prev ? () => {
+        issue({ kind: 'setRally', player: humanPlayer, buildingId, x: prev.x, y: prev.y, targetId: prev.targetId });
+      } : null);
+    },
+    deleteBuilding: (buildingId) => {
+      const b = getState().entities.get(buildingId);
+      issue({ kind: 'deleteEntity', player: humanPlayer, entityId: buildingId });
+      deselect(); // the card was showing an entity that no longer exists
+      const wasFoundation = (b?.buildProgress ?? 1000) < 1000;
+      hud.showUndoToast(wasFoundation ? 'Construction cancelled — cost refunded' : 'Building deleted', null);
     },
     marketTrade: (sell, buy, amount) => {
       issue({ kind: 'marketTrade', player: humanPlayer, sell, buy, amount });
@@ -397,6 +511,10 @@ export async function runGame(root: HTMLElement): Promise<void> {
       issue({ kind: 'resign', player: humanPlayer });
       loop.resume(); // the resign must actually process (defeat -> end screen)
     },
+    // pause-overlay exit while spectating a finished match (the sim drops all
+    // commands post-finish, so Resign is swapped for this) — same full reboot
+    // the end screen's Return to Title performs
+    returnToTitle: () => window.location.reload(),
     getIdleCounts,
     cycleIdle,
     getGroupCounts,
@@ -453,6 +571,46 @@ export async function runGame(root: HTMLElement): Promise<void> {
   };
   const input = new InputController(app.canvas, bandOverlay, inputHost);
 
+  // Dev-only QA handle: lets automated browser sessions locate entities on screen and
+  // read sim state without poking at Pixi internals. Never present in production builds.
+  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+    const entScreen = (e: Entity): { x: number; y: number } => {
+      const w = tileToWorld(e.x / FP, e.y / FP);
+      return camera.worldToScreen(w.x, w.y);
+    };
+    (window as unknown as Record<string, unknown>).__bfQa = {
+      state: getState,
+      find: (defId?: string, playerId?: number): Array<Record<string, unknown>> => {
+        const out: Array<Record<string, unknown>> = [];
+        for (const e of getState().entities.values()) {
+          if (defId !== undefined && e.defId !== defId) continue;
+          if (playerId !== undefined && e.player !== playerId) continue;
+          out.push({
+            id: e.id, defId: e.defId, player: e.player, kind: e.kind,
+            tileX: e.tileX, tileY: e.tileY, hp: e.hp, activity: e.activity,
+            carrying: e.carrying, amountLeft: e.amountLeft,
+            buildProgress: e.buildProgress, garrison: e.garrison?.length,
+            screen: entScreen(e),
+          });
+        }
+        return out;
+      },
+      screenOf: (id: EntityId): { x: number; y: number } | null => {
+        const e = getState().entities.get(id);
+        return e ? entScreen(e) : null;
+      },
+      centerOnTile: (tx: number, ty: number): void => camera.centerOnTile(tx, ty),
+      selection: () => selection.slice(),
+      humanPlayer,
+      /** Fast-forward N ticks through the normal SimLoop path (QA sessions only). */
+      step: (ticks: number): void => {
+        for (let i = 0; i < ticks; i += 5) loop.update(TICK_MS * Math.min(5, ticks - i));
+      },
+      /** Queue a raw command like the HUD would (QA bulk re-tasking only). */
+      issue: (cmd: Command): void => issue(cmd),
+    };
+  }
+
   // initial fog
   fog.update(getState().players[humanPlayer]?.visibility ?? new Uint8Array(0));
 
@@ -478,5 +636,6 @@ export async function runGame(root: HTMLElement): Promise<void> {
     if (placement) refreshGhost();
     hud.update();
     minimap.update(now);
+    if (st.tick - lastSavedTick >= AUTOSAVE_TICKS) saveMatch();
   });
 }

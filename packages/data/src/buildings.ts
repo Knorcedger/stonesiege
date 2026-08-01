@@ -19,6 +19,9 @@ export const buildings: Record<string, BuildingDef> = {
     trains: ['villager'],
     researches: ['loom', 'wheelbarrow', 'handCart', 'feudalAge', 'castleAge', 'imperialAge'],
     popProvided: 5, los: 8,
+    // AOE2_REFERENCE §2: the qualifying list for Feudal is Mill/Lumber Camp/Mining
+    // Camp/Barracks — the (starting) TC never counts toward age-up requirements.
+    countsForAgeUp: false,
     icon: 'icon/townCenter',
   },
   house: {

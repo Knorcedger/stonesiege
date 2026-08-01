@@ -65,6 +65,15 @@ export type TapAction =
 export interface TapSelection {
   units: number;
   buildings: number;
+  /** Villagers within `units` (own herdables become gather targets for them). */
+  villagers?: number;
+}
+
+/** Own food-on-legs (captured sheep etc.): a def the sim lets villagers gather. */
+export function isFoodAnimal(e: Entity): boolean {
+  if (e.kind !== 'unit') return false;
+  const def = gameData.units[e.defId];
+  return !!(def?.herdable || def?.huntable);
 }
 
 /**
@@ -73,6 +82,9 @@ export interface TapSelection {
  * - With units selected, an enemy anywhere in the tap slop outranks everything
  *   (taps-with-selection are attacks in melee); an own unit only steals the tap
  *   as a reselect when it is the NEAREST pick and no enemy is in the slop.
+ *   Exception: with villagers selected, an own herdable/huntable (a captured
+ *   sheep) is a GATHER target, not a reselect — the AoE2 opening (eat the
+ *   starting sheep under the TC) must be one tap.
  * - With a buildings-only selection, GDD "tap a unit/building = select" wins:
  *   tapping any own unit, or an own building as the nearest pick, reselects
  *   (so TC -> Barracks is one tap and re-tapping the TC never moves its rally).
@@ -80,7 +92,11 @@ export interface TapSelection {
  * - Bare taps (no selection) stay instant-select.
  */
 export function resolveTapAction(picks: Entity[], sel: TapSelection, human: PlayerId): TapAction {
-  const ownUnit = picks.find((p) => p.player === human && p.kind === 'unit');
+  const villagersSelected = (sel.villagers ?? 0) > 0;
+  const ownUnit = picks.find((p) =>
+    p.player === human && p.kind === 'unit' &&
+    // own sheep are food, not a reselect, while villagers hold the selection
+    !(sel.units > 0 && villagersSelected && isFoodAnimal(p)));
   if (sel.units > 0) {
     const enemy = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
     if (!enemy && ownUnit && picks[0]?.id === ownUnit.id) return { type: 'select', id: ownUnit.id };
@@ -315,6 +331,7 @@ export class InputController {
     const selCtx: TapSelection = {
       units: sel.filter((e) => e.kind === 'unit').length,
       buildings: sel.filter((e) => e.kind === 'building').length,
+      villagers: sel.filter((e) => e.kind === 'unit' && e.defId === 'villager').length,
     };
     const action = resolveTapAction(picks, selCtx, this.host.humanPlayer);
     switch (action.type) {
@@ -394,7 +411,13 @@ export class InputController {
     const st = this.host.getState();
 
     const enemy = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
-    const gaiaOrRes = picks.find((p) => p.kind === 'resource' || (p.player === GAIA && p.kind === 'unit'));
+    // Gather targets: gaia resources/animals, plus OWN herdables/huntables when
+    // villagers are selected (captured sheep must be eatable — the sim's gather
+    // command already accepts own food animals).
+    const gaiaOrRes = picks.find((p) =>
+      p.kind === 'resource' ||
+      (p.player === GAIA && p.kind === 'unit') ||
+      (p.player === human && villagers.length > 0 && isFoodAnimal(p)));
     const ownBld = picks.find((p) => p.player === human && p.kind === 'building');
     const unitIds = units.map((e) => e.id);
     const undoStop = unitIds.length > 0

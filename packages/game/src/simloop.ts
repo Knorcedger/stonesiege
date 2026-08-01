@@ -13,6 +13,12 @@ export interface SimLoopCallbacks {
   onTick?: (events: SimEvent[], tick: number) => void;
   /** Pause state changed (manual or auto). */
   onPauseChanged?: (paused: boolean, auto: boolean) => void;
+  /**
+   * Just before a tick advances WITH commands: (pre-advance tick, batch).
+   * Feeds the match-snapshot command log (persist.ts) — replaying the same
+   * batches at the same ticks reproduces the match exactly.
+   */
+  onAdvance?: (tick: number, commands: Command[]) => void;
 }
 
 export class SimLoop {
@@ -81,11 +87,21 @@ export class SimLoop {
    */
   update(elapsedMs: number): void {
     if (this._paused) return;
+    if (this.game.state.finished) {
+      // Terminal state: advance() no-ops so the tick is frozen. Freeze the
+      // accumulator too — otherwise alpha saw-tooths 0→1→0 and the renderer's
+      // sim-time (tick + alpha) runs BACKWARD each wrap, producing negative
+      // animation ages (frame index -1 → magenta placeholders on the victory
+      // screen's "continue watching" backdrop).
+      this.accumulator = 0;
+      return;
+    }
     this.accumulator += elapsedMs;
     let steps = 0;
     while (this.accumulator >= TICK_MS && steps < MAX_CATCHUP_TICKS) {
       const commands = this.pending;
       this.pending = [];
+      if (commands.length > 0) this.callbacks.onAdvance?.(this.game.state.tick, commands);
       const events = this.game.advance(commands);
       this.callbacks.onTick?.(events, this.game.state.tick);
       this.accumulator -= TICK_MS;

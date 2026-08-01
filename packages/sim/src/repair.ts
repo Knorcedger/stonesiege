@@ -24,8 +24,12 @@ type RepairCmd = Extract<Command, { kind: 'repair' }>;
 export function handleRepair(state: SimState, cmd: RepairCmd): void {
   const b = state.entities.get(cmd.targetId);
   if (!b || b.kind !== 'building' || b.player !== cmd.player || b.hp <= 0) return;
-  if ((b.buildProgress ?? 1000) < 1000) return; // foundations are built, not repaired
-  if (b.hp >= b.maxHp) return;
+  // A tapped FOUNDATION resumes construction, it is not repaired (AoE2 tap semantics):
+  // the HUD issues `repair` for any damaged-or-unfinished own building and the sim
+  // routes it — build intent for foundations (tickConstruction picks the builders up),
+  // repair intent for completed buildings (integrator fix, wave 2).
+  const isFoundation = (b.buildProgress ?? 1000) < 1000;
+  if (!isFoundation && b.hp >= b.maxHp) return;
   const movers: EntityId[] = [];
   const seen = new Set<EntityId>();
   for (const id of cmd.units) {
@@ -35,7 +39,7 @@ export function handleRepair(state: SimState, cmd: RepairCmd): void {
     if (!e || e.kind !== 'unit' || e.player !== cmd.player || e.hp <= 0) continue;
     if (e.garrisonedIn !== undefined) continue;
     if (!gameData.units[e.defId]?.buildRate) continue; // builders repair
-    e.intent = { kind: 'repair', targetId: b.id };
+    e.intent = { kind: isFoundation ? 'build' : 'repair', targetId: b.id };
     e.targetId = undefined;
     state.fleeing.delete(id);
     state.gather.delete(id);

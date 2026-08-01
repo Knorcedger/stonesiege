@@ -13,7 +13,8 @@ import type { SimState } from './internal';
 import { garrisonUnit } from './flee';
 import { ejectGarrison } from './damage';
 import { orderMove } from './path';
-import { ACC_PER_UNIT, RES_SCALE } from './gather';
+import { ACC_PER_UNIT, handleGather, RES_SCALE } from './gather';
+import { handleRepair } from './repair';
 
 /** Give up entering after this many failed approaches. */
 const GARRISON_RETRIES = 4;
@@ -79,13 +80,33 @@ export function handleGarrison(state: SimState, cmd: GarrisonCmd): void {
   if (movers.length > 0) orderMove(state, movers, host.x, host.y);
 }
 
-/** Ungarrison ALL occupants of a building or ram (AoE2 "ungarrison" button). */
+/**
+ * Ungarrison ALL occupants of a building or ram (AoE2 "ungarrison" button). Doubles as
+ * the AoE2 return-to-work bell: villagers who garrisoned via the flee reflex get their
+ * pre-flee task re-dispatched through the normal command handlers (gather resumes on
+ * the same node; build/repair goes through handleRepair, which routes foundations to
+ * build-resume). A vanished/depleted target is dropped silently — the villager idles.
+ */
 export function handleUngarrison(state: SimState, cmd: UngarrisonCmd): void {
   const host = state.entities.get(cmd.buildingId);
   if (!host || host.player !== cmd.player || host.hp <= 0) return;
   if (!host.garrison || host.garrison.length === 0) return;
   const size = host.kind === 'building' ? gameData.buildings[host.defId]?.size ?? 1 : 1;
+  const occupants = [...host.garrison];
   ejectGarrison(state, host, size);
+  for (const id of occupants) {
+    const saved = state.shelterIntents.get(id);
+    if (!saved) continue;
+    state.shelterIntents.delete(id);
+    const e = state.entities.get(id);
+    if (!e || e.hp <= 0 || e.garrisonedIn !== undefined) continue;
+    if (saved.kind === 'gather') {
+      handleGather(state, { kind: 'gather', player: cmd.player, units: [id], targetId: saved.targetId });
+    } else if (saved.kind === 'build' || saved.kind === 'repair') {
+      handleRepair(state, { kind: 'repair', player: cmd.player, units: [id], targetId: saved.targetId });
+    }
+    // combat intents are deliberately NOT restored — the bell returns villagers to WORK
+  }
 }
 
 /** Per-tick: walkers enter on arrival; garrisoned units heal inside buildings. */

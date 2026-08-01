@@ -158,6 +158,7 @@ export function removeEntity(state: SimState, id: EntityId): void {
   // per-entity bookkeeping tied to this entity (economy + combat systems)
   state.gather.delete(id);
   state.fleeing.delete(id);
+  state.shelterIntents.delete(id);
   state.animalCd.delete(id);
   state.decayAcc.delete(id);
   state.repairs.delete(id);

@@ -3,6 +3,10 @@
 // every requesting unit's start tile is settled, then each unit's path is read off the
 // parent pointers. Searches carry over across ticks (per-tick expansion budget) and are
 // processed FIFO, so a huge command never stalls the sim.
+//
+// Unreachable goals are never a silent no-op (AoE2 behavior): when the flood exhausts
+// with units still waiting, rerouteRemaining walks them to the reachable tile closest
+// to the goal instead of dropping the order.
 
 import type { EntityId } from './types';
 import { FP } from './types';
@@ -132,18 +136,79 @@ function serveTile(state: SimState, s: GroupSearch, tile: number): void {
   }
 }
 
-function failRemaining(state: SimState, s: GroupSearch): void {
-  for (const waiting of s.waitingByTile.values()) {
+/**
+ * The goal flood exhausted with units still waiting: the goal sits in a region the
+ * units cannot reach (e.g. a sealed forest pocket). AoE2 walks units to the closest
+ * reachable point instead of ignoring the order, so: BFS from the waiting units' start
+ * tiles over passable terrain, pick the reached tile closest to the goal (deterministic
+ * tie-break on tile index), and issue a fresh group search toward it.
+ *
+ * The BFS runs synchronously (outside the per-tick budget): it only fires on the rare
+ * unreachable order, is bounded by map area, and is plain array work — far cheaper per
+ * tile than heap-based Dijkstra expansion.
+ *
+ * Termination: the fallback goal is reachable from at least one waiting unit's start,
+ * so the follow-up search always serves that unit's whole connected component; any
+ * units in other components fail again with a strictly smaller waiting set.
+ */
+function rerouteRemaining(state: SimState, s: GroupSearch): void {
+  const { width, height } = state.map;
+  const walk = state.walkTerrain, blockers = state.blockers;
+  const passable = (t: number): boolean => walk[t] === 1 && blockers[t] === 0;
+
+  // Collect still-waiting units. A unit standing ON a blocked tile can never be served
+  // by the tile flood (only passable tiles are settled) — drop those orders as before.
+  const units: EntityId[] = [];
+  const seeds: number[] = [];
+  for (const [tile, waiting] of s.waitingByTile) {
+    const ok = passable(tile);
+    let live = 0;
     for (const id of waiting) {
       const m = state.motion.get(id);
-      if (!m || m.groupId !== s.groupId) continue;
-      state.motion.delete(id); // unreachable: drop the order
+      if (!m || m.groupId !== s.groupId) continue; // unit got a newer order
+      if (ok) { units.push(id); live++; continue; }
+      state.motion.delete(id);
       const e = state.entities.get(id);
       if (e) e.activity = 'idle';
     }
+    if (ok && live > 0) seeds.push(tile);
   }
   s.waitingByTile.clear();
   s.waitingCount = 0;
+  if (units.length === 0) return;
+
+  // Multi-source 4-dir BFS (4-connectivity equals the flood's no-corner-cut 8-dir
+  // connectivity) tracking the reached tile closest to the goal.
+  const gx = s.goal % width, gy = (s.goal / width) | 0;
+  const visited = new Uint8Array(width * height);
+  const queue: number[] = [];
+  let bestTile = -1, bestD2 = -1;
+  const consider = (t: number): void => {
+    const dx = (t % width) - gx, dy = ((t / width) | 0) - gy;
+    const d2 = dx * dx + dy * dy;
+    if (bestTile === -1 || d2 < bestD2 || (d2 === bestD2 && t < bestTile)) { bestD2 = d2; bestTile = t; }
+  };
+  for (const t of seeds) {
+    if (visited[t]) continue;
+    visited[t] = 1; queue.push(t); consider(t);
+  }
+  for (let qi = 0; qi < queue.length; qi++) {
+    const t = queue[qi];
+    const tx = t % width, ty = (t / width) | 0;
+    if (tx > 0 && !visited[t - 1] && passable(t - 1)) { visited[t - 1] = 1; queue.push(t - 1); consider(t - 1); }
+    if (tx < width - 1 && !visited[t + 1] && passable(t + 1)) { visited[t + 1] = 1; queue.push(t + 1); consider(t + 1); }
+    if (ty > 0 && !visited[t - width] && passable(t - width)) { visited[t - width] = 1; queue.push(t - width); consider(t - width); }
+    if (ty < height - 1 && !visited[t + width] && passable(t + width)) { visited[t + width] = 1; queue.push(t + width); consider(t + width); }
+  }
+
+  // Retarget the survivors at the fallback tile's center and search toward it.
+  const cx = (bestTile % width) * FP + FP / 2;
+  const cy = ((bestTile / width) | 0) * FP + FP / 2;
+  for (const id of units) {
+    const m = state.motion.get(id);
+    if (m) { m.targetX = cx; m.targetY = cy; }
+  }
+  requestGroupPath(state, bestTile, units);
 }
 
 /** Advance all active searches within this tick's expansion budget. */
@@ -154,7 +219,7 @@ export function tickPathfinding(state: SimState): void {
     if (s.waitingCount <= 0) { state.pathSearches.shift(); continue; }
     budget = expandSearch(state, s, budget);
     if (s.waitingCount <= 0) state.pathSearches.shift();
-    else if (s.open.size === 0) { failRemaining(state, s); state.pathSearches.shift(); }
+    else if (s.open.size === 0) { rerouteRemaining(state, s); state.pathSearches.shift(); }
   }
 }
 
@@ -205,8 +270,11 @@ function expandSearch(state: SimState, s: GroupSearch, budget: number): number {
 export function orderMove(state: SimState, unitIds: EntityId[], x: number, y: number): void {
   if (unitIds.length === 0) return;
   const tx = Math.floor(x / FP), ty = Math.floor(y / FP);
-  const goalTile = nearestWalkableTile(state, tx, ty);
-  if (!goalTile) return;
+  // widen the spiral for clicks deep inside blocked areas (mid-lake, forest heart) so
+  // the order is never a silent no-op; unreachable goals then reroute via the search
+  const goalTile = nearestWalkableTile(state, tx, ty)
+    ?? nearestWalkableTile(state, tx, ty, Math.max(state.map.width, state.map.height));
+  if (!goalTile) return; // map has no walkable tile at all
   const remapped = goalTile.x !== tx || goalTile.y !== ty;
   const targetX = remapped ? goalTile.x * FP + FP / 2 : x;
   const targetY = remapped ? goalTile.y * FP + FP / 2 : y;
@@ -218,6 +286,7 @@ export function orderMove(state: SimState, unitIds: EntityId[], x: number, y: nu
     const m: Motion = {
       targetX, targetY, path: null, pathIndex: 0,
       groupId: -1, stuckTicks: 0, repaths: 0,
+      lastX: e.x, lastY: e.y,
     };
     state.motion.set(id, m);
     e.activity = 'moving';

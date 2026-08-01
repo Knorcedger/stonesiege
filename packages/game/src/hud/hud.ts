@@ -16,12 +16,14 @@ import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
 import type { IdleCategory } from '../selectionTools';
 import {
-  ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, millAutoReseedButton,
-  researchMenuButtons, trainMenuButtons, unitVerbButtons, WAVE2_REASON,
-  type ArmedVerb, type PlayerCardView,
+  ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, hasActiveRally,
+  millAutoReseedButton, queueChipModel, researchMenuButtons, trainMenuButtons,
+  unitVerbButtons, WAVE2_REASON,
+  type ArmedVerb, type CardButtonModel, type PlayerCardView,
 } from './cardModel';
 import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
+import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
 
 export interface HudHost {
@@ -34,7 +36,12 @@ export interface HudHost {
   cancelTrain(buildingId: EntityId, index: number): void;
   researchTech(buildingId: EntityId, techId: string): void;
   cancelResearch(buildingId: EntityId): void;
+  /** Ungarrison every occupant of a building OR a ram (unit host). */
   ungarrisonAll(buildingId: EntityId): void;
+  /** Clear a production building's rally (GDD: "tap the flag control to clear"). */
+  clearRally(buildingId: EntityId): void;
+  /** Delete an own building (deleteEntity command — refunds queue + unbuilt fraction). */
+  deleteBuilding(buildingId: EntityId): void;
   marketTrade(sell: ResourceType, buy: ResourceType, amount: number): void;
   reseedFarm(farmId: EntityId): void;
   /** Mill auto-reseed queue toggle (queueReseed command; state in PlayerState.autoReseed). */
@@ -53,6 +60,8 @@ export interface HudHost {
   isPaused(): boolean;
   resumeGame(): void;
   resign(): void;
+  /** Back to the title screen — the pause overlay's exit while spectating a finished match. */
+  returnToTitle(): void;
   /** Idle-unit badges (GDD: touch answer to AoE2's `.` hotkey). */
   getIdleCounts(): Record<IdleCategory, number>;
   cycleIdle(cat: IdleCategory): void;
@@ -67,6 +76,19 @@ const AGE_LABEL: Record<string, string> = {
   dark: 'Dark Age', feudal: 'Feudal Age', castle: 'Castle Age', imperial: 'Imperial Age',
 };
 
+/** Command-card cell metrics — must match the CSS (.bf-grid/.bf-cmdbtn/.bf-qitem: border-box 44px cells, 4px gaps). */
+const CARD_CELL = 44;
+const CARD_GAP = 4;
+const CARD_COLS = 5;
+/**
+ * Full production-queue block height (TRAIN_QUEUE_CAP chips wrapped at 5/row),
+ * reserved up front for any building that can queue: the card is bottom-anchored,
+ * so a queue that grows a row would otherwise push the train buttons up ~44px
+ * mid-tap and a spamming thumb would land on a single-tap-cancel queue chip.
+ */
+const QUEUE_ROWS = Math.ceil(TRAIN_QUEUE_CAP / CARD_COLS);
+const QUEUE_BLOCK_PX = `${QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP}px`;
+
 const HUD_CSS = `
 .bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Pixelify Sans","VT323",monospace; color:#EFDDB5; user-select:none; -webkit-user-select:none; }
 .bf-num { font-family:"VT323",monospace; } /* numerals: Pixelify's 2/5 read as S — VT323 digits are unambiguous */
@@ -79,7 +101,7 @@ const HUD_CSS = `
 .bf-btn:active { transform:translate(1px,1px); }
 .bf-btn:disabled { color:#8a8a8a; border-color:#5a5a5a; cursor:default; }
 /* ≥44px touch targets (mobile-first): invisible centered hit-area expansion keeps visuals small */
-.bf-btn::after, .bf-idle::after { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,44px); height:max(100%,44px); }
+.bf-btn::after, .bf-idle::after, .bf-mbtn::after { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,44px); height:max(100%,44px); }
 .bf-idle { position:relative; display:flex; align-items:center; gap:3px; background:#46331F; border:1px solid #8A6414; border-radius:3px; padding:1px 5px; cursor:pointer; pointer-events:auto; color:#EFDDB5; font-family:inherit; }
 .bf-idle canvas { width:22px; height:22px; image-rendering:pixelated; }
 .bf-idle:disabled { opacity:0.4; cursor:default; }
@@ -95,24 +117,36 @@ const HUD_CSS = `
 .bf-card.show { display:block; }
 .bf-cardtitle { font-size:13px; color:#C29422; margin:0 0 6px 2px; letter-spacing:1px; }
 .bf-grid { display:grid; grid-template-columns:repeat(5,44px); gap:4px; }
-.bf-cmdbtn { position:relative; width:44px; height:44px; padding:1px; background:#2C1F12; border:1px solid #8A6414; border-radius:3px; cursor:pointer; pointer-events:auto; }
+/* border-box: 44px means 44px INCLUDING border+padding, so buttons fill the grid's
+   44px tracks exactly and the 4px gaps stay real (content-box made them 48px,
+   overflowing the tracks and collapsing the gaps) */
+.bf-cmdbtn { position:relative; box-sizing:border-box; width:44px; height:44px; padding:1px; background:#2C1F12; border:1px solid #8A6414; border-radius:3px; cursor:pointer; pointer-events:auto; }
 .bf-cmdbtn canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
 /* disabled look via class (NOT the disabled attribute): a tap must still show the reason tip */
 .bf-cmdbtn:disabled, .bf-cmdbtn.disabled { border-color:#5a5a5a; opacity:0.9; }
 .bf-cmdbtn:disabled canvas, .bf-cmdbtn.disabled canvas { filter:grayscale(1) brightness(0.55); }
 .bf-cmdbtn.active { border-color:#E6C04A; box-shadow:0 0 0 1px #E6C04A; }
-.bf-queue { display:flex; gap:4px; margin-top:6px; min-height:46px; } /* fixed height: chips appearing must not reflow the card (misclick = cancel) */
-.bf-qitem { position:relative; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px: cancel-a-unit mis-taps are costly */
+/* non-blocking warning badge (housed): the order still queues — never grays the button */
+.bf-cmdbadge { position:absolute; top:0; right:2px; font-size:13px; line-height:1; color:#E6C04A; text-shadow:1px 1px 0 #1A1208, -1px 1px 0 #1A1208, 1px -1px 0 #1A1208, -1px -1px 0 #1A1208; pointer-events:none; }
+/* wrap: TRAIN_QUEUE_CAP is 15 — 3 rows of 5 border-box 44px chips fit the 246px
+   card. min-height is set from JS (QUEUE_BLOCK_PX) for buildings that can queue:
+   the FULL block is reserved up front so chips appearing/completing never move
+   the bottom-anchored card's train buttons under the player's thumb */
+.bf-queue { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
+.bf-queue:empty { margin-top:0; }
+.bf-qitem { position:relative; box-sizing:border-box; flex-shrink:0; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px hard floor: cancel-a-unit mis-taps are costly */
 .bf-qitem canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
 .bf-tip { position:absolute; right:6px; bottom:200px; max-width:250px; padding:6px 9px; font-size:14px; color:#1A1208; background:#DABE8D; border:1px solid #B99A6B; border-radius:3px; display:none; pointer-events:none; }
 .bf-note { font-size:13px; color:#DABE8D; margin:5px 2px 0; min-height:0; }
 .bf-note:empty { display:none; }
-.bf-market { display:none; flex-direction:column; gap:4px; margin-top:6px; }
+.bf-market { display:none; flex-direction:column; gap:6px; margin-top:6px; }
 .bf-market.show { display:flex; }
 .bf-mrow { display:flex; align-items:center; gap:6px; }
 .bf-mrow canvas { width:22px; height:22px; image-rendering:pixelated; }
-.bf-mbtn { position:relative; flex:1; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:"VT323",monospace; font-size:15px; padding:4px 2px; cursor:pointer; }
+/* native ≥44px height (touch-target contract): trades mutate the stockpile
+   instantly, so a thumb tap must never land on the adjacent resource row */
+.bf-mbtn { position:relative; box-sizing:border-box; flex:1; min-height:44px; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:"VT323",monospace; font-size:15px; padding:4px 2px; cursor:pointer; }
 .bf-mbtn.disabled { color:#8a8a8a; border-color:#5a5a5a; }
 .bf-garrison { display:none; margin-top:6px; }
 .bf-garrison.show { display:block; }
@@ -192,12 +226,14 @@ export class Hud {
   private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
   private lastCardKey = '';
   private queueProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId; index: number }> = [];
-  private researchProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId }> = [];
+  private utilRow!: HTMLDivElement;
   private noteRow!: HTMLDivElement;
   private marketBox!: HTMLDivElement;
   private garrisonBox!: HTMLDivElement;
   private resignArmed = false;
   private resignBtn!: HTMLButtonElement;
+  /** Spectating a finished match: Resign becomes Return to Title (sim drops all commands). */
+  private matchFinished = false;
 
   /** The minimap panel mounts here (bottom-left). */
   readonly minimapSlot: HTMLDivElement;
@@ -249,6 +285,13 @@ export class Hud {
     }
     this.pauseBtn.textContent = this.host.isPaused() ? '▶' : 'II';
     this.pauseOverlay.classList.toggle('show', this.host.isPaused());
+    // "Continue watching" spectating: applyCommands drops everything once
+    // state.finished, so Resign would silently no-op — swap it for the only
+    // meaningful action so the player is never stranded without a way out.
+    if (state.finished !== this.matchFinished) {
+      this.matchFinished = state.finished;
+      this.resetResign();
+    }
     if (!this.host.isPaused() && this.resignArmed) this.resetResign();
     this.updateIdleButtons();
     this.updateGroupChips();
@@ -374,12 +417,14 @@ export class Hud {
     this.garrisonBox.className = 'bf-garrison';
     this.queueRow = document.createElement('div');
     this.queueRow.className = 'bf-queue';
+    this.utilRow = document.createElement('div'); // delete-building etc.
     this.card.appendChild(this.cardTitle);
     this.card.appendChild(this.cardGrid);
     this.card.appendChild(this.noteRow);
     this.card.appendChild(this.marketBox);
     this.card.appendChild(this.garrisonBox);
     this.card.appendChild(this.queueRow);
+    this.card.appendChild(this.utilRow);
     this.el.appendChild(this.card);
 
     this.tip = document.createElement('div');
@@ -422,6 +467,11 @@ export class Hud {
     this.resignBtn.style.cssText = 'font-size:16px;color:#DABE8D;';
     this.resignBtn.textContent = 'Resign';
     this.resignBtn.addEventListener('click', () => {
+      if (this.matchFinished) {
+        // post-match spectating: the sim would drop a resign — leave instead
+        this.host.returnToTitle();
+        return;
+      }
       if (!this.resignArmed) {
         this.resignArmed = true;
         this.resignBtn.textContent = 'Tap again to resign';
@@ -442,7 +492,7 @@ export class Hud {
 
   private resetResign(): void {
     this.resignArmed = false;
-    this.resignBtn.textContent = 'Resign';
+    this.resignBtn.textContent = this.matchFinished ? 'Return to Title' : 'Resign';
     this.resignBtn.style.color = '#DABE8D';
   }
 
@@ -563,7 +613,19 @@ export class Hud {
     };
   }
 
-  /** Completed own building defIds (age-up requirement input). */
+  /** Every tech currently sitting in ANY own production queue (sim alreadyQueued mirror). */
+  private queuedTechIds(state: GameState): string[] {
+    const out: string[] = [];
+    for (const e of state.entities.values()) {
+      if (e.kind !== 'building' || e.player !== this.host.humanPlayer || !e.trainQueue) continue;
+      for (const item of e.trainQueue) {
+        if (item.techId !== undefined) out.push(item.techId);
+      }
+    }
+    return out;
+  }
+
+  /** Completed own building defIds (age-up requirement + build-prereq input). */
   private completedBuildingDefIds(state: GameState): string[] {
     const out: string[] = [];
     for (const e of state.entities.values()) {
@@ -574,33 +636,88 @@ export class Hud {
     return out;
   }
 
+  /**
+   * Rebuild-signature of every resource-/prereq-dependent button model the card
+   * would render for this selection. The model functions are cheap (a handful
+   * of defs each), so recomputing them per frame keeps enabled states and
+   * reasons EXACT at affordability boundaries — and completed-building changes
+   * (a mill finishing enables Farm and the age-up) refresh the card too.
+   */
+  private cardButtonsKey(state: GameState, sel: Entity[]): string {
+    const view = this.playerView(state);
+    if (!view) return '';
+    const parts: string[] = [];
+    const push = (btns: readonly CardButtonModel[]): void => {
+      for (const b of btns) {
+        parts.push(`${b.id}=${b.enabled ? 1 : 0}${b.badge ? 'b' : ''}${b.reason ? `(${b.reason})` : ''}`);
+      }
+    };
+    const buildings = sel.filter((e) => e.kind === 'building');
+    const units = sel.filter((e) => e.kind === 'unit');
+    const villagers = units.filter((e) => e.defId === 'villager');
+    if (buildings.length === 1 && units.length === 0 && (buildings[0].buildProgress ?? 1000) >= 1000) {
+      const b = buildings[0];
+      const busy = !!b.research;
+      const queued = this.queuedTechIds(state);
+      push(trainMenuButtons(view, b.defId));
+      push(researchMenuButtons(view, b.defId, busy, queued));
+      if (b.defId === 'townCenter') {
+        const up = ageUpButton(view, this.completedBuildingDefIds(state), busy, queued);
+        if (up) push([up]);
+      }
+      if (b.defId === 'farm') push([farmReseedButton(b, view.stockpile)]);
+      if (b.defId === 'market') {
+        const rates = state.marketRates;
+        const stock = {
+          food: view.stockpile.food, wood: view.stockpile.wood,
+          stone: view.stockpile.stone, gold: view.stockpile.gold,
+        };
+        const pendingReason = PENDING_COMMAND_KINDS.has('marketTrade') ? WAVE2_REASON : null;
+        for (const row of marketPanelRows(stock, pendingReason, rates ?? undefined)) {
+          parts.push(`${row.res}=${row.sellGold}/${row.buyGold}/${row.sellEnabled ? 1 : 0}${row.buyEnabled ? 1 : 0}`);
+        }
+      }
+      if (hasActiveRally(b)) parts.push('rallyset');
+    }
+    if (villagers.length > 0) {
+      push(buildMenuButtons(view.stockpile, view.age, view.researchedTechs, this.completedBuildingDefIds(state)));
+    }
+    return parts.join(',');
+  }
+
   private updateCard(state: GameState): void {
     const sel = this.host.getSelection().filter((e) => e.player === this.host.humanPlayer);
     const placement = this.host.getPlacement();
     const player = state.players[this.host.humanPlayer];
 
     // signature so we only rebuild the DOM when contents change
-    const resKey = player ? RESOURCES.map((r) => Math.floor((player.stockpile[r] ?? 0) / 25)).join(',') : '';
     const popKey = player && player.popCap - player.pop <= 5 ? `${player.pop}/${player.popCap}` : 'ok';
     const key = [
       placement ? `place:${placement.defId}` : '',
       sel.map((e) =>
-        `${e.id}:${e.defId}:${e.trainQueue?.length ?? ''}:${e.buildProgress ?? ''}` +
-        `:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
+        `${e.id}:${e.defId}:${e.trainQueue?.length ?? ''}:${e.trainQueue?.[0]?.started ?? ''}` +
+        `:${e.buildProgress ?? ''}:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
+        `:${e.rally ? `${e.rally.x},${e.rally.y},${e.rally.targetId ?? ''}` : ''}` +
         `:${e.amountLeft !== undefined ? (e.amountLeft > 0 ? 'r' : 'x') : ''}`,
       ).join('|'),
       this.host.getArmedVerb() ?? '',
       player?.age ?? '',
-      resKey,
+      // exact per-button enabled/reason/badge bits — the old floor(stockpile/25)
+      // buckets went stale at every affordability boundary that is not a
+      // multiple of 25 (militia 60f/20g, spearman 35f, farm 60w, watchTower
+      // 35w, gate 30s, stoneWall 5s) and ignored marketRates drift
+      this.cardButtonsKey(state, sel),
       popKey,
       player?.researchedTechs.length ?? 0,
       player?.autoReseed ? 'ar' : '',
+      // research buttons gray out when their tech queues at ANY own building
+      sel.length === 1 && sel[0].kind === 'building' ? this.queuedTechIds(state).join(',') : '',
     ].join('#');
     if (key !== this.lastCardKey) {
       this.lastCardKey = key;
       this.rebuildCard(state, sel, !!placement);
     }
-    // live queue progress
+    // live queue progress (unit and research items alike — both tick at the front)
     for (const q of this.queueProgressEls) {
       const b = state.entities.get(q.buildingId);
       const item = b?.trainQueue?.[q.index];
@@ -609,26 +726,19 @@ export class Hud {
         q.el.style.width = `${Math.round(frac * 100)}%`;
       }
     }
-    // live research progress
-    for (const r of this.researchProgressEls) {
-      const b = state.entities.get(r.buildingId);
-      if (b?.research) {
-        const frac = 1 - b.research.ticksLeft / Math.max(1, b.research.totalTicks);
-        r.el.style.width = `${Math.round(frac * 100)}%`;
-      }
-    }
   }
 
   private rebuildCard(state: GameState, sel: Entity[], placementActive: boolean): void {
     this.cardGrid.replaceChildren();
     this.queueRow.replaceChildren();
+    this.queueRow.style.minHeight = '0px'; // production buildings re-reserve below
+    this.utilRow.replaceChildren();
     this.noteRow.textContent = '';
     this.marketBox.replaceChildren();
     this.marketBox.classList.remove('show');
     this.garrisonBox.replaceChildren();
     this.garrisonBox.classList.remove('show');
     this.queueProgressEls = [];
-    this.researchProgressEls = [];
     this.tip.style.display = 'none';
     if (placementActive || sel.length === 0) {
       this.card.classList.remove('show');
@@ -653,8 +763,9 @@ export class Hud {
     if (villagers.length > 0) {
       this.cardTitle.textContent = 'Build';
       // cardModel decides enabled/gray: only genuinely unavailable actions
-      // (unaffordable, or a verb the sim would silently drop) render disabled.
-      for (const bb of buildMenuButtons(view.stockpile, view.age)) {
+      // (unaffordable, unmet building prereq, or a verb the sim would silently
+      // drop) render disabled — mirroring the sim's hasBuildPrereqs.
+      for (const bb of buildMenuButtons(view.stockpile, view.age, view.researchedTechs, this.completedBuildingDefIds(state))) {
         this.addButton(
           bb.icon,
           `${bb.name}\n${costText(bb.cost ?? {})} • ${bb.timeSeconds}s`,
@@ -681,6 +792,14 @@ export class Hud {
               : () => undefined;
         this.addButton(vb.icon, vb.tip, vb.enabled, vb.active ?? false, onClick, vb.reason);
       }
+      // A single selected ram (unit garrison host) gets the same garrison panel
+      // as buildings — without it, garrisoned infantry had no UI exit at all.
+      if (sel.length === 1 && units.length === 1) {
+        const gp = garrisonPanel(units[0], (id) => state.entities.get(id));
+        if (gp && gp.count > 0) {
+          this.rebuildGarrisonPanel(units[0].id, gp.occupants, gp.count, gp.capacity, gp.ungarrisonEnabled, gp.reason);
+        }
+      }
       shown = true;
     }
 
@@ -693,20 +812,28 @@ export class Hud {
     const name = def?.name ?? b.defId;
     if ((b.buildProgress ?? 1000) < 1000) {
       this.cardTitle.textContent = `${name} — under construction`;
+      this.addDeleteButton(b); // a misplaced foundation must be cancellable
       return true;
     }
     let shown = false;
     this.cardTitle.textContent = name;
+    // reserve the FULL queue block whenever this building can queue at all, so
+    // chips appearing (or completing) never displace the buttons above them
+    if ((def?.trains?.length ?? 0) > 0 || (def?.researches?.length ?? 0) > 0) {
+      this.queueRow.style.minHeight = QUEUE_BLOCK_PX;
+    }
 
-    // ---- train buttons
+    // ---- train buttons (housed renders as a non-blocking badge — queueing
+    // while housed is AoE2-correct, the sim stalls the item at the front)
     const trainBtns = trainMenuButtons(view, b.defId);
     for (const tb of trainBtns) {
       this.addButton(
         tb.icon,
-        `${tb.name}\n${costText(tb.cost ?? {})} • ${tb.timeSeconds}s`,
+        `${tb.name}\n${costText(tb.cost ?? {})} • ${tb.timeSeconds}s${tb.badge ? `\n${tb.badge.note}` : ''}`,
         tb.enabled, false,
         () => this.host.trainUnit(b.id, tb.id),
         tb.reason,
+        tb.badge?.glyph,
       );
       shown = true;
     }
@@ -714,7 +841,9 @@ export class Hud {
     // ---- research buttons (blacksmith/university/monastery/castle uniques
     // and unit-line upgrades at their production building)
     const busy = !!b.research;
-    for (const rb of researchMenuButtons(view, b.defId, busy)) {
+    // player-wide queued techs (the sim's alreadyQueued gate spans ALL buildings)
+    const queuedTechs = this.queuedTechIds(state);
+    for (const rb of researchMenuButtons(view, b.defId, busy, queuedTechs)) {
       this.addButton(
         rb.icon,
         `${rb.name}\n${costText(rb.cost ?? {})} • ${rb.timeSeconds}s`,
@@ -727,7 +856,7 @@ export class Hud {
 
     // ---- age-up on the TC, with requirement feedback ('2 Feudal Age buildings needed')
     if (b.defId === 'townCenter') {
-      const up = ageUpButton(view, this.completedBuildingDefIds(state), busy);
+      const up = ageUpButton(view, this.completedBuildingDefIds(state), busy, queuedTechs);
       if (up) {
         this.addButton(
           up.icon,
@@ -766,41 +895,75 @@ export class Hud {
       shown = true;
     }
 
-    // ---- train queue chips + research progress chip
+    // ---- shared production queue chips (units AND research — one chip each,
+    // cancelTrain is index-precise for both; the sim refunds techs via refundItem)
     (b.trainQueue ?? []).forEach((item, i) => {
-      const u = gameData.units[item.defId];
+      const model = queueChipModel(item);
       const chip = document.createElement('div');
       chip.className = 'bf-qitem';
-      chip.title = `${u?.name ?? item.defId} (tap to cancel)`;
-      chip.appendChild(this.host.assets.getIconCanvas(u?.icon ?? `icon/${item.defId}`));
+      chip.title = model.isTech
+        ? `Researching ${model.name} (tap to cancel)`
+        : `${model.name} (tap to cancel)`;
+      chip.appendChild(this.host.assets.getIconCanvas(model.icon));
       const prog = document.createElement('div');
       prog.className = 'bf-qprog';
       chip.appendChild(prog);
       chip.addEventListener('click', () => this.host.cancelTrain(b.id, i));
       this.queueRow.appendChild(chip);
       this.queueProgressEls.push({ el: prog, buildingId: b.id, index: i });
+      shown = true;
     });
-    if (b.research) {
-      const tech = gameData.techs[b.research.techId];
-      const chip = document.createElement('div');
-      chip.className = 'bf-qitem';
-      const cancelPending = PENDING_COMMAND_KINDS.has('cancelResearch');
-      chip.title = cancelPending
-        ? `Researching ${tech?.name ?? b.research.techId} (cancel ${WAVE2_REASON})`
-        : `Researching ${tech?.name ?? b.research.techId} (tap to cancel)`;
-      chip.appendChild(this.host.assets.getIconCanvas(tech?.icon ?? `icon/tech/${b.research.techId}`));
-      const prog = document.createElement('div');
-      prog.className = 'bf-qprog';
-      chip.appendChild(prog);
-      chip.addEventListener('click', () => {
-        if (cancelPending) this.showTip(`Cancel research ${WAVE2_REASON}`);
-        else this.host.cancelResearch(b.id);
-      });
-      this.queueRow.appendChild(chip);
-      this.researchProgressEls.push({ el: prog, buildingId: b.id });
+
+    // ---- housed queue-stall feedback (sim production.ts: a unit item at the
+    // front waits, unstarted, until pop room opens)
+    const front = b.trainQueue?.[0];
+    if (front && front.techId === undefined && !front.started) {
+      const p = state.players[this.host.humanPlayer];
+      if (p && p.pop + (gameData.units[front.defId]?.pop ?? 1) > p.popCap) {
+        const stall = 'Housed — build more houses';
+        this.noteRow.textContent = this.noteRow.textContent
+          ? `${this.noteRow.textContent} · ${stall}` : stall;
+      }
+    }
+
+    // ---- rally flag control (GDD: "tap the flag control to clear")
+    if (hasActiveRally(b)) {
+      const btn = document.createElement('button');
+      btn.className = 'bf-btn';
+      btn.style.cssText = 'margin-top:6px;margin-right:6px;';
+      btn.textContent = 'Clear rally';
+      btn.title = 'Remove the rally flag — new units step out beside the building again';
+      btn.addEventListener('click', () => this.host.clearRally(b.id));
+      this.utilRow.appendChild(btn);
       shown = true;
     }
+
+    this.addDeleteButton(b);
     return shown;
+  }
+
+  /**
+   * Delete for own buildings (foundations included): the sim's deleteEntity
+   * refunds the queue and the unbuilt foundation fraction. Destructive, so it
+   * takes two taps to confirm (same pattern as Resign).
+   */
+  private addDeleteButton(b: Entity): void {
+    const btn = document.createElement('button');
+    btn.className = 'bf-btn';
+    btn.style.cssText = 'margin-top:6px;color:#DABE8D;';
+    const isFoundation = (b.buildProgress ?? 1000) < 1000;
+    btn.textContent = isFoundation ? 'Cancel construction' : 'Delete building';
+    let armed = false;
+    btn.addEventListener('click', () => {
+      if (!armed) {
+        armed = true;
+        btn.textContent = 'Tap again to confirm';
+        btn.style.color = '#C05B4E';
+        return;
+      }
+      this.host.deleteBuilding(b.id);
+    });
+    this.utilRow.appendChild(btn);
   }
 
   /** GDD market: buy/sell each resource ×100 with live rate + ~30% fee shown. */
@@ -877,14 +1040,21 @@ export class Hud {
   /**
    * `icon` is the FINAL frame to render — cardModel already picked the colored
    * icon or its `/gray` companion, so gray can only mean genuinely unavailable.
+   * `badge` is a non-blocking warning glyph (housed) over a still-live button.
    */
-  private addButton(icon: string, tooltip: string, enabled: boolean, active: boolean, onClick: () => void, disabledReason?: string): void {
+  private addButton(icon: string, tooltip: string, enabled: boolean, active: boolean, onClick: () => void, disabledReason?: string, badge?: string): void {
     const btn = document.createElement('button');
     btn.className = 'bf-cmdbtn' + (active ? ' active' : '') + (enabled ? '' : ' disabled');
     // class instead of the disabled attribute: disabled buttons still receive the
     // tap so we can surface WHY they are disabled (cost / wave-2 gating)
     btn.setAttribute('aria-disabled', String(!enabled));
     btn.appendChild(this.host.assets.getIconCanvas(icon));
+    if (badge) {
+      const span = document.createElement('span');
+      span.className = 'bf-cmdbadge';
+      span.textContent = badge;
+      btn.appendChild(span);
+    }
     const fullTip = enabled ? tooltip : `${tooltip}\n(${disabledReason ?? 'not enough resources'})`;
     btn.addEventListener('click', () => {
       if (enabled) onClick();
@@ -914,8 +1084,18 @@ export class Hud {
     const def = gameData.buildings[placement.defId];
     this.placeLabel.textContent = `${def?.name ?? placement.defId} — ${costText(def?.cost ?? {})}`;
     this.placeConfirm.disabled = !placement.valid || !placement.affordable;
+    // an unmet building prereq blocks EVERY tile (sim canPlace → hasBuildPrereqs);
+    // name the missing building instead of showing a bare 'Blocked'
+    let blockedText = 'Blocked';
+    if (!placement.valid && def?.requiresBuildings) {
+      const completed = new Set(this.completedBuildingDefIds(this.host.getState()));
+      const missing = def.requiresBuildings.find((req) => !completed.has(req));
+      if (missing !== undefined) {
+        blockedText = `Needs a ${gameData.buildings[missing]?.name ?? missing}`;
+      }
+    }
     this.placeConfirm.textContent = !placement.affordable
       ? 'Need resources'
-      : placement.valid ? 'Build here' : 'Blocked';
+      : placement.valid ? 'Build here' : blockedText;
   }
 }

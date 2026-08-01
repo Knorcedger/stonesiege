@@ -32,8 +32,27 @@ function ensureFonts(): void {
   document.head.appendChild(link);
 }
 
-/** Show the title screen; resolves when the player picks Practice. */
-export function showTitleScreen(root: HTMLElement): Promise<'practice'> {
+import type { BotDifficulty } from '@bf/ai';
+
+/** What the title screen resolved to: a fresh practice match, or a resumed one. */
+export type TitleChoice =
+  | { mode: 'practice'; difficulty: BotDifficulty }
+  | { mode: 'resume' };
+
+const DIFFICULTIES: Array<{ id: BotDifficulty; label: string; blurb: string }> = [
+  { id: 'easy', label: 'Easy', blurb: 'a slow, forgiving foe' },
+  { id: 'standard', label: 'Standard', blurb: 'booms, ages up, attacks' },
+  { id: 'hard', label: 'Hard', blurb: 'fast hands, big armies' },
+];
+
+/**
+ * Show the title screen; resolves when the player picks a Practice difficulty
+ * (GDD: Easy / Standard / Hard) or taps Resume on a snapshotted match.
+ */
+export function showTitleScreen(
+  root: HTMLElement,
+  opts: { canResume?: boolean } = {},
+): Promise<TitleChoice> {
   ensureFonts();
   if (!document.getElementById('bf-title-style')) {
     const style = document.createElement('style');
@@ -54,20 +73,51 @@ export function showTitleScreen(root: HTMLElement): Promise<'practice'> {
     sub.className = 'bf-title-sub';
     sub.textContent = 'Raise your banner. Advance the ages.';
 
-    const practice = document.createElement('button');
-    practice.className = 'bf-title-btn';
-    practice.textContent = 'Practice';
-    practice.addEventListener('click', () => {
+    const menu = document.createElement('div');
+
+    const done = (choice: TitleChoice): void => {
       screen.remove();
-      resolve('practice');
-    });
+      resolve(choice);
+    };
 
-    const campaign = document.createElement('button');
-    campaign.className = 'bf-title-btn';
-    campaign.disabled = true;
-    campaign.innerHTML = 'Campaign<span class="bf-title-soon">coming soon</span>';
+    const mainMenu = (): void => {
+      menu.replaceChildren();
+      if (opts.canResume) {
+        const resume = document.createElement('button');
+        resume.className = 'bf-title-btn';
+        resume.innerHTML = 'Resume match<span class="bf-title-soon">pick up where you left off</span>';
+        resume.addEventListener('click', () => done({ mode: 'resume' }));
+        menu.appendChild(resume);
+      }
+      const practice = document.createElement('button');
+      practice.className = 'bf-title-btn';
+      practice.textContent = 'Practice';
+      practice.addEventListener('click', difficultyMenu);
+      const campaign = document.createElement('button');
+      campaign.className = 'bf-title-btn';
+      campaign.disabled = true;
+      campaign.innerHTML = 'Campaign<span class="bf-title-soon">coming soon</span>';
+      menu.append(practice, campaign);
+    };
 
-    panel.append(h1, sub, practice, campaign);
+    const difficultyMenu = (): void => {
+      menu.replaceChildren();
+      for (const d of DIFFICULTIES) {
+        const btn = document.createElement('button');
+        btn.className = 'bf-title-btn';
+        btn.innerHTML = `${d.label}<span class="bf-title-soon">${d.blurb}</span>`;
+        btn.addEventListener('click', () => done({ mode: 'practice', difficulty: d.id }));
+        menu.appendChild(btn);
+      }
+      const back = document.createElement('button');
+      back.className = 'bf-title-btn';
+      back.textContent = 'Back';
+      back.addEventListener('click', mainMenu);
+      menu.appendChild(back);
+    };
+
+    mainMenu();
+    panel.append(h1, sub, menu);
     screen.appendChild(panel);
     root.appendChild(screen);
   });

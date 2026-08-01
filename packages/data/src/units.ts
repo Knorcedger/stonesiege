@@ -18,9 +18,12 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 0 }],
     range: 0, rof: 2, speed: 0.8, los: 4,
     classes: ['villager'],
-    // farm 0.32 is the walk-inclusive effective AoE2 rate: Bannerfall applies gather rates
-    // directly (no farm work-rate cap mechanic), so AoE2's capped 0.40 would over-collect.
-    gather: { forage: 0.31, hunt: 0.41, farm: 0.32, wood: 0.39, gold: 0.38, stone: 0.36 },
+    // farm 0.40 is AoE2's farm-capped ON-FARM work rate (AOE2_REFERENCE §1: 0.53 worker
+    // rate capped by the farm at 0.40). Bannerfall farmers physically walk 10-food loads
+    // to the mill/TC, so the drop-off walk itself produces the correct effective
+    // ~0.30-0.34 food/s. (A previous 0.32 here double-counted the walk penalty and ran
+    // the food economy at roughly half AoE2 speed.)
+    gather: { forage: 0.31, hunt: 0.41, farm: 0.4, wood: 0.39, gold: 0.38, stone: 0.36 },
     buildRate: 1,
     // GDD: villagers carry ~10; hunters carry more (35, as in AoE2). Sheep share the
     // 'hunt' task in v1, so shepherds get the larger carry too — accepted simplification.

@@ -2,8 +2,13 @@
 // accuracy roll at fire time (a miss lands at a scatter point and may graze whoever is
 // standing there — AoE2 style), Ballistics leads the target's current velocity, and the
 // mangonel line deals splash with friendly fire to UNITS but never to friendly
-// buildings (AOE2_REFERENCE §3). Impact points are fixed once fired: moving targets
-// genuinely dodge (the AoE2 mangonel-dodge micro).
+// buildings (AOE2_REFERENCE §3). Hit resolution follows AoE2: a PASSED accuracy roll
+// connects with the target at impact tick wherever it now stands (arrows track their
+// victim — closing units run INTO arrows, they don't dodge them); only the mangonel
+// line's splash resolves at the frozen impact point, so moving targets genuinely dodge
+// it (the AoE2 mangonel-dodge micro). AOE2_REFERENCE §3 reserves the dodgeable
+// frozen-point model for the mangonel line; the GDD says moving targets "can be
+// missed" (the accuracy roll), not "are always missed".
 
 import { gameData } from '@bf/data';
 import type { ClassValue } from '@bf/data';
@@ -14,7 +19,7 @@ import type { Projectile, SimState } from './internal';
 import { resolveUnitStats } from './stats';
 import { applyRangedHit, isEnemy } from './damage';
 
-/** A hit connects when the intended target is within this radius of the impact point. */
+/** Stray-shot graze radius: a MISSED shot hits whoever stands this close to its scatter point. */
 export const HIT_RADIUS_FP = 96;
 /** Missed shots land up to this far from the aim point (each axis, uniform). */
 const MISS_SCATTER_FP = 160;
@@ -137,14 +142,14 @@ function resolveSingle(state: SimState, p: Projectile, events: SimEvent[]): void
     applyRangedHit(state, p.attackerId, p.player, p.x, p.y, p.attacks, t, events);
     return;
   }
+  // A passed accuracy roll connects wherever the target now stands (AoE2 arrows track
+  // their victim); only the mangonel-line splash path resolves at the frozen point.
   if (p.hit && t && t.kind === 'unit' && t.hp > 0 && t.garrisonedIn === undefined) {
-    const dx = t.x - p.x, dy = t.y - p.y;
-    if (dx * dx + dy * dy <= HIT_RADIUS_FP * HIT_RADIUS_FP) {
-      applyRangedHit(state, p.attackerId, p.player, p.x, p.y, p.attacks, t, events);
-      return;
-    }
+    applyRangedHit(state, p.attackerId, p.player, p.x, p.y, p.attacks, t, events);
+    return;
   }
-  // stray shot: the nearest hostile unit standing at the impact point takes it instead
+  // failed roll (or the target died / garrisoned mid-flight): the stray shot lands at
+  // the scatter point and the nearest hostile unit standing there takes it instead
   state.unitsGrid.queryCircle(p.x, p.y, HIT_RADIUS_FP, queryBuf);
   let best: Entity | null = null;
   let bestD = Infinity;

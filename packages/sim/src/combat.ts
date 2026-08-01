@@ -12,8 +12,8 @@
 import { gameData } from '@bf/data';
 import type { UnitDef } from '@bf/data';
 import { FP, GAIA, TICKS_PER_SECOND } from './types';
-import type { Command, Entity, EntityId, SimEvent } from './types';
-import { effDistFp, facingFromDelta } from './internal';
+import type { Command, Entity, EntityId, Fixed, SimEvent } from './types';
+import { adjacentToFootprint, effDistFp, facingFromDelta, isTileWalkable } from './internal';
 import type { CombatInfo, SimState } from './internal';
 import { resolveBuildingStats, resolveUnitStats } from './stats';
 import { orderMove } from './path';
@@ -105,12 +105,82 @@ function tickPackTransitions(state: SimState): void {
   }
 }
 
-/** (Re)aim the chase walk when the target drifted from the recorded destination. */
-function chase(state: SimState, e: Entity, target: Entity): void {
-  const m = state.motion.get(e.id);
-  if (!m || (m.targetX - target.x) ** 2 + (m.targetY - target.y) ** 2 > FP * FP) {
-    orderMove(state, [e.id], target.x, target.y);
+/** Ticks between chase re-path attempts after a walk ended still out of range. */
+const CHASE_RETRY_TICKS = 10;
+/** Auto engagements drop after this many chase walks that ended still out of range. */
+const CHASE_GIVE_UP = 8;
+
+/**
+ * A building target: walk to the currently-nearest FREE tile on the footprint ring
+ * (per attacker), so a group spreads around the building instead of funneling onto
+ * the single ring tile orderMove would remap the blocked center to — with 4x4
+ * buildings that funnel left most of a raid milling behind one melee slot.
+ */
+function buildingApproachPoint(state: SimState, e: Entity, info: CombatInfo, target: Entity): { x: Fixed; y: Fixed } | null {
+  const size = gameData.buildings[target.defId]?.size ?? 1;
+  // melee slots claimed by other attackers of this building (reservation, not just
+  // standing occupancy — a blob approaching from one side otherwise all walks at the
+  // same near tile, one wins the slot, the rest rebound and mill forever)
+  const reserved = new Set<number>();
+  for (const [uid, ci] of state.combat) {
+    if (uid === e.id || ci.targetId !== target.id || ci.slotX === undefined) continue;
+    reserved.add(ci.slotY! * state.map.width + ci.slotX);
   }
+  const taken = (tx: number, ty: number): boolean => {
+    if (reserved.has(ty * state.map.width + tx)) return true;
+    state.unitsGrid.queryCircle(tx * FP + FP / 2, ty * FP + FP / 2, FP / 2, queryBuf);
+    for (const id of queryBuf) {
+      if (id === e.id) continue;
+      const u = state.entities.get(id);
+      if (u && u.kind === 'unit' && u.hp > 0 && u.garrisonedIn === undefined
+        && u.tileX === tx && u.tileY === ty) return true;
+    }
+    return false;
+  };
+  let bx = -1;
+  let by = -1;
+  let bd = Infinity;
+  for (let ty = target.tileY - 1; ty <= target.tileY + size; ty++) {
+    for (let tx = target.tileX - 1; tx <= target.tileX + size; tx++) {
+      const onRing = tx === target.tileX - 1 || tx === target.tileX + size
+        || ty === target.tileY - 1 || ty === target.tileY + size;
+      if (!onRing || !isTileWalkable(state, tx, ty) || taken(tx, ty)) continue;
+      const dx = tx * FP + FP / 2 - e.x;
+      const dy = ty * FP + FP / 2 - e.y;
+      const d = dx * dx + dy * dy;
+      if (d < bd) { bd = d; bx = tx; by = ty; }
+    }
+  }
+  if (bx < 0) { info.slotX = undefined; info.slotY = undefined; return null; }
+  info.slotX = bx;
+  info.slotY = by;
+  // aim a quarter tile INTO the ring tile toward the wall (still on the walkable tile,
+  // so orderMove does not remap): a plain tile-center stop is half a tile from the
+  // footprint — right at the edge of melee reach for wide units like rams
+  const sx = bx < target.tileX ? 1 : bx >= target.tileX + size ? -1 : 0;
+  const sy = by < target.tileY ? 1 : by >= target.tileY + size ? -1 : 0;
+  return { x: bx * FP + FP / 2 + sx * (FP / 4), y: by * FP + FP / 2 + sy * (FP / 4) };
+}
+
+/**
+ * (Re)aim the chase walk. Re-path when the target drifted > 1 tile from where the walk
+ * was ordered, or when the walk ended while still out of range (with a short backoff so
+ * a crowded ring doesn't re-path every tick). The comparison uses the chase point stored
+ * on the engagement — NOT the motion target, which orderMove remaps to a ring tile for
+ * buildings (comparing that against the building center re-paths forever).
+ */
+function chase(state: SimState, e: Entity, info: CombatInfo, target: Entity): void {
+  const m = state.motion.get(e.id);
+  const drifted = info.chaseX === undefined || info.chaseY === undefined
+    || (info.chaseX - target.x) ** 2 + (info.chaseY - target.y) ** 2 > FP * FP;
+  if (m && !drifted) return; // walk in progress toward (near enough) the target
+  if (!m && !drifted && state.tick < (info.nextChaseTick ?? 0)) return; // backoff
+  if (!m) info.chaseFails = (info.chaseFails ?? 0) + 1; // ordering a walk from a standstill
+  info.chaseX = target.x;
+  info.chaseY = target.y;
+  info.nextChaseTick = state.tick + CHASE_RETRY_TICKS;
+  const goal = target.kind === 'building' ? buildingApproachPoint(state, e, info, target) : null;
+  orderMove(state, [e.id], goal?.x ?? target.x, goal?.y ?? target.y);
 }
 
 /** Drop the engagement: resume attack-move, or walk auto-acquirers back to anchor. */
@@ -161,7 +231,14 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
   const ranged = stats.projectileSpeedFpPerTick > 0;
   const rangeFp = ranged ? Math.round(stats.range * FP) : MELEE_REACH_FP;
   const minRangeFp = stats.minRange * FP;
-  const dist = effDistFp(state, e, target);
+  let dist = effDistFp(state, e, target);
+  // Melee vs a building: standing anywhere on the footprint ring IS in reach.
+  // Separation shoves can push effDist past MELEE_REACH_FP for a unit wedged on a
+  // ring corner, leaving it 'idle' with a live engagement, never striking (deadlock).
+  if (!ranged && target.kind === 'building' && dist > rangeFp
+    && adjacentToFootprint(e, target.tileX, target.tileY, gameData.buildings[target.defId]?.size ?? 1)) {
+    dist = rangeFp;
+  }
 
   // trebuchet: mobile only while packed; deploys automatically once in position
   if (def.pack) {
@@ -174,7 +251,7 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
         });
         e.activity = 'idle';
       } else {
-        chase(state, e, target);
+        chase(state, e, info, target);
       }
       return;
     }
@@ -185,11 +262,15 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
     e.activity = 'idle';
     return;
   } else if (dist > rangeFp) {
-    chase(state, e, target);
+    // auto engagements that repeatedly fail to close (full melee ring, unreachable
+    // target) drop the fight instead of standing under fire forever
+    if (info.auto && (info.chaseFails ?? 0) >= CHASE_GIVE_UP) { disengage(state, e, info); return; }
+    chase(state, e, info, target);
     return;
   }
 
   // in range
+  info.chaseFails = 0;
   state.motion.delete(e.id);
   e.facing = facingFromDelta(target.x - e.x, target.y - e.y);
   e.activity = 'attacking';

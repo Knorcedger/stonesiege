@@ -7,7 +7,7 @@ import { describe, expect, it } from 'vitest';
 import type { Game, SimEvent } from './types';
 import { createGame } from './game';
 import type { SimState } from './internal';
-import { completeResearch } from './research';
+import { canResearch, completeResearch } from './research';
 import { entitiesOf, grassMap, player, scenarioConfig } from './testutil';
 
 const P1 = 1;
@@ -125,10 +125,13 @@ describe('upgradeUnit transforms living units', () => {
 });
 
 describe('age-up chain (dark → imperial with building requirements)', () => {
-  it('rejects feudal age below 2 distinct dark building types (lone TC = 1 of 2)', () => {
+  it('rejects feudal age below 2 distinct qualifying dark buildings (TC and house never count: mill = 1 of 2)', () => {
+    // AOE2_REFERENCE §2: Feudal qualifiers are Mill/Lumber Camp/Mining Camp/Barracks.
+    // If the TC counted, TC+mill would be 2 of 2 and this research would be accepted.
     const game = createGame(scenarioConfig(206, grassMap(30, 30), [
       { defId: 'townCenter', player: P1, tileX: 5, tileY: 5, ref: 'tc' },
-      { defId: 'house', player: P1, tileX: 10, tileY: 5 }, // houses never qualify (GDD)
+      { defId: 'mill', player: P1, tileX: 10, tileY: 5 },
+      { defId: 'house', player: P1, tileX: 13, tileY: 5 }, // houses never qualify (GDD)
     ], [player({ startingResources: rich })]));
     const tc = game.state.refs.get('tc')!;
     game.advance([{ kind: 'research', player: P1, buildingId: tc, techId: 'feudalAge' }]);
@@ -138,7 +141,8 @@ describe('age-up chain (dark → imperial with building requirements)', () => {
     // duplicate types count once (matches the HUD's ageUpRequirement model)
     const dupes = createGame(scenarioConfig(212, grassMap(30, 30), [
       { defId: 'townCenter', player: P1, tileX: 5, tileY: 5, ref: 'tc' },
-      { defId: 'townCenter', player: P1, tileX: 15, tileY: 5 },
+      { defId: 'mill', player: P1, tileX: 10, tileY: 5 },
+      { defId: 'mill', player: P1, tileX: 15, tileY: 5 },
     ], [player({ startingResources: rich })]));
     const tc2 = dupes.state.refs.get('tc')!;
     dupes.advance([{ kind: 'research', player: P1, buildingId: tc2, techId: 'feudalAge' }]);
@@ -185,6 +189,37 @@ describe('age-up chain (dark → imperial with building requirements)', () => {
     const tc = game.state.refs.get('tc')!;
     game.advance([{ kind: 'research', player: P1, buildingId: tc, techId: 'castleAge' }]);
     expect(game.state.entities.get(tc)!.trainQueue).toHaveLength(0);
+  });
+
+  it('startingAge seeds the age-tech chain: a feudal-start player can reach castle', () => {
+    const game = createGame(scenarioConfig(209, grassMap(30, 30), [
+      { defId: 'townCenter', player: P1, tileX: 5, tileY: 5, ref: 'tc' },
+      { defId: 'blacksmith', player: P1, tileX: 12, tileY: 5 }, // 2 feudal buildings
+      { defId: 'market', player: P1, tileX: 12, tileY: 10 },
+    ], [player({ startingAge: 'feudal', startingResources: rich })]));
+    const p = game.state.players[P1];
+    expect(p.age).toBe('feudal');
+    expect(p.researchedTechs).toContain('feudalAge'); // seeded, NOT re-run
+    expect(canResearch(game.state as unknown as SimState, P1, 'castleAge')).toBe(true);
+
+    const tc = game.state.refs.get('tc')!;
+    game.advance([{ kind: 'research', player: P1, buildingId: tc, techId: 'castleAge' }]);
+    expect(game.state.entities.get(tc)!.trainQueue).toHaveLength(1); // accepted
+    const evs: Timed[] = [];
+    run(game, 160 * 20 + 30, evs);
+    expect(game.state.players[P1].age).toBe('castle');
+    expect(evs.some((e) => e.ev.kind === 'ageAdvanced'
+      && (e.ev as Extract<SimEvent, { kind: 'ageAdvanced' }>).age === 'castle')).toBe(true);
+  });
+
+  it('a castle-start player has the whole chain below seeded', () => {
+    const game = createGame(scenarioConfig(210, grassMap(30, 30), [
+      { defId: 'townCenter', player: P1, tileX: 5, tileY: 5 },
+    ], [player({ startingAge: 'castle' })]));
+    const techs = game.state.players[P1].researchedTechs;
+    expect(techs).toContain('feudalAge');
+    expect(techs).toContain('castleAge');
+    expect(techs).not.toContain('imperialAge');
   });
 });
 

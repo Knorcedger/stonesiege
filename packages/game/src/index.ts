@@ -2,6 +2,7 @@
 // soon" (scenario loader + triggers land with @bf/scenarios integration).
 
 import { showTitleScreen } from './screens/title';
+import { hasSnapshot } from './persist';
 
 export { resolveFrameName, facingFromDelta, animForActivity } from './frames';
 export { Camera, tileToWorld, worldToTile } from './camera';
@@ -10,7 +11,11 @@ export { Camera, tileToWorld, worldToTile } from './camera';
 export async function startApp(root: HTMLElement): Promise<void> {
   root.innerHTML = '';
   root.style.position = 'relative';
-  await showTitleScreen(root); // resolves on Practice
+  // Resume is offered when a backgrounded/killed match left a snapshot (GDD:
+  // a phone call at minute 90 never loses a game)
+  const choice = await showTitleScreen(root, { canResume: hasSnapshot() });
   const { runGame } = await import('./game');
-  await runGame(root);
+  await runGame(root, choice.mode === 'resume'
+    ? { resume: true }
+    : { difficulty: choice.difficulty });
 }

@@ -54,6 +54,29 @@ describe('repair', () => {
   });
 });
 
+describe('repair on a foundation resumes construction (HUD tap contract)', () => {
+  it('an abandoned foundation is raised to completion by a repair-tapped villager', () => {
+    const game = createGame(scenarioConfig(54, grassMap(30, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v' },
+    ], [player()]));
+    const vid = game.state.refs.get('v')!;
+    // place, build a little, then abandon (move away)
+    run(game, 120, [{ kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 12, tileY: 10 }]);
+    const house = entitiesOf(game.state.entities, HUMAN, 'house')[0];
+    const partial = house.buildProgress!;
+    expect(partial).toBeGreaterThan(0);
+    expect(partial).toBeLessThan(1000);
+    run(game, 40, [{ kind: 'move', player: HUMAN, units: [vid], x: 9 * 256, y: 10 * 256 }]);
+    expect(house.buildProgress).toBeLessThan(1000);
+
+    // the HUD's foundation tap: a repair command targeting the foundation
+    const events = run(game, 600, [{ kind: 'repair', player: HUMAN, units: [vid], targetId: house.id }]);
+    expect(events.some((e) => e.kind === 'buildingComplete' && e.defId === 'house')).toBe(true);
+    expect(house.buildProgress).toBe(1000);
+    expect(game.state.players[HUMAN].stockpile.wood).toBe(175); // paid once, at placement
+  });
+});
+
 describe('construction auto-join (AoE2: finished builders hop to a nearby foundation)', () => {
   it('after completing a building, a builder joins an own foundation within a short radius', () => {
     const game = createGame(scenarioConfig(53, grassMap(40, 40), [

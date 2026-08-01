@@ -56,6 +56,7 @@ function mixEntity(h: number, e: Entity): number {
     h = mix(h, e.carrying.amount);
   }
   if (e.garrisonedIn !== undefined) h = mix(h, e.garrisonedIn);
+  if (e.sheltering) h = mix(h, 13);
   if (e.garrison !== undefined) {
     h = mix(h, e.garrison.length);
     for (const id of e.garrison) h = mix(h, id);

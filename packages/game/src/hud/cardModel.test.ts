@@ -12,11 +12,11 @@
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
-import type { Entity, EntityId } from '@bf/sim/types';
+import { FP, type Entity, type EntityId } from '@bf/sim/types';
 import {
   ageUpButton, ageUpRequirement, buildMenuButtons, canAffordCost, civUnitCost,
-  farmReseedButton, garrisonPanel, iconVariant, millAutoReseedButton,
-  researchMenuButtons, trainMenuButtons, unitVerbButtons,
+  farmReseedButton, garrisonPanel, hasActiveRally, iconVariant, millAutoReseedButton,
+  queueChipModel, researchMenuButtons, trainMenuButtons, unitVerbButtons,
   type PlayerCardView,
 } from './cardModel';
 
@@ -46,9 +46,12 @@ function ent(partial: Partial<Entity>): Entity {
   } as Entity;
 }
 
+/** Every prereq any v1 building can require — completed, so only cost/age gate. */
+const ALL_PREREQS = ['mill', 'barracks', 'blacksmith'];
+
 describe('buildMenuButtons', () => {
   it('with the starting stockpile, every affordable dark-age building is enabled and colored', () => {
-    const buttons = buildMenuButtons(RICH, 'dark');
+    const buttons = buildMenuButtons(RICH, 'dark', [], ALL_PREREQS);
     expect(buttons.length).toBeGreaterThan(0);
     for (const b of buttons) {
       const cost = gameData.buildings[b.id].cost;
@@ -72,19 +75,62 @@ describe('buildMenuButtons', () => {
   });
 
   it('with an empty stockpile, every button is gray with a cost reason', () => {
-    for (const b of buildMenuButtons(BROKE, 'dark')) {
+    for (const b of buildMenuButtons(BROKE, 'dark', [], ALL_PREREQS)) {
       expect(b.enabled).toBe(false);
       expect(b.icon.endsWith('/gray')).toBe(true);
       expect(b.reason).toBe('not enough resources');
     }
   });
 
-  it('only shows buildings of the current age or earlier, without tech gates', () => {
+  it('unmet requiresBuildings gray the button with an honest reason (sim hasBuildPrereqs mirror)', () => {
+    // no completed buildings: Farm (mill), Range/Stable (barracks), Siege Workshop (blacksmith)
+    const none = buildMenuButtons(LOADED, 'castle', []);
+    expect(none.find((b) => b.id === 'farm')).toMatchObject({
+      enabled: false, icon: `${gameData.buildings.farm.icon}/gray`, reason: 'requires a Mill',
+    });
+    expect(none.find((b) => b.id === 'archeryRange')).toMatchObject({ enabled: false, reason: 'requires a Barracks' });
+    expect(none.find((b) => b.id === 'stable')).toMatchObject({ enabled: false, reason: 'requires a Barracks' });
+    expect(none.find((b) => b.id === 'siegeWorkshop')).toMatchObject({ enabled: false, reason: 'requires a Blacksmith' });
+    // prereq completed: the same buttons come alive
+    const met = buildMenuButtons(LOADED, 'castle', [], ALL_PREREQS);
+    for (const id of ['farm', 'archeryRange', 'stable', 'siegeWorkshop']) {
+      expect(met.find((b) => b.id === id), id).toMatchObject({ enabled: true });
+    }
+  });
+
+  it('the prereq reason outranks affordability (name the actionable blocker first)', () => {
+    const farm = buildMenuButtons(BROKE, 'dark', [], []).find((b) => b.id === 'farm')!;
+    expect(farm.enabled).toBe(false);
+    expect(farm.reason).toBe('requires a Mill');
+  });
+
+  it('only shows buildings of the current age or earlier, without unmet tech gates', () => {
     for (const b of buildMenuButtons(RICH, 'dark')) {
       const def = gameData.buildings[b.id];
       expect(def.age).toBe('dark');
       expect(def.requiresTech).toBeUndefined();
     }
+  });
+
+  it('tech-gated towers appear once researched, collapsing the superseded tier (sim hasBuildPrereqs mirror)', () => {
+    // before the university techs: only the Watch Tower is constructible
+    const base = buildMenuButtons(LOADED, 'castle').map((b) => b.id);
+    expect(base).toContain('watchTower');
+    expect(base).not.toContain('guardTower'); // requiresTech unmet
+    expect(base).not.toContain('keep');
+    // guardTowerUpgrade researched: new towers build as Guard Towers — and the
+    // weaker Watch Tower button collapses away (one tower button per tier)
+    const guard = buildMenuButtons(LOADED, 'castle', ['guardTowerUpgrade']).map((b) => b.id);
+    expect(guard).toContain('guardTower');
+    expect(guard).not.toContain('watchTower');
+    // keepUpgrade in Imperial: Keep replaces Guard Tower
+    const keep = buildMenuButtons(LOADED, 'imperial', ['guardTowerUpgrade', 'keepUpgrade']).map((b) => b.id);
+    expect(keep).toContain('keep');
+    expect(keep).not.toContain('guardTower');
+    expect(keep).not.toContain('watchTower');
+    // the age gate still applies even with the tech (Keep is Imperial-only)
+    expect(buildMenuButtons(LOADED, 'castle', ['guardTowerUpgrade', 'keepUpgrade']).map((b) => b.id))
+      .not.toContain('keep');
   });
 });
 
@@ -102,11 +148,26 @@ describe('trainMenuButtons', () => {
     }
   });
 
-  it('pop-capped trains are disabled with a housed reason', () => {
+  it('housed trains stay ENABLED with a non-blocking badge (queue-while-housed is AoE2 play)', () => {
+    // sim production.ts: cost deducts on queue, the item stalls at the front until
+    // a house completes — so the button must keep taking taps at 25/25
     const buttons = trainMenuButtons(view({ pop: 10, popCap: 10 }), 'townCenter');
     const vill = buttons.find((b) => b.id === 'villager')!;
+    expect(vill.enabled).toBe(true);
+    expect(vill.icon).toBe(gameData.units.villager.icon); // colored, not /gray
+    expect(vill.reason).toBeUndefined();
+    expect(vill.badge?.note).toContain('house');
+    // not housed: no badge
+    const roomy = trainMenuButtons(view(), 'townCenter').find((b) => b.id === 'villager')!;
+    expect(roomy.badge).toBeUndefined();
+  });
+
+  it('housed AND broke: disabled for cost, badge still warns about housing', () => {
+    const vill = trainMenuButtons(view({ stockpile: BROKE, pop: 10, popCap: 10 }), 'townCenter')
+      .find((b) => b.id === 'villager')!;
     expect(vill.enabled).toBe(false);
-    expect(vill.reason).toContain('house');
+    expect(vill.reason).toBe('not enough resources');
+    expect(vill.badge).toBeDefined();
   });
 
   it('line upgrades collapse the line: Man-at-Arms replaces Militia once researched', () => {
@@ -207,21 +268,32 @@ describe('researchMenuButtons', () => {
     const buttons = researchMenuButtons(view({ stockpile: LOADED }), 'townCenter', true);
     for (const b of buttons) expect(b.enabled).toBe(false);
   });
+
+  it('a tech queued anywhere renders disabled with "already queued" (sim alreadyQueued mirror)', () => {
+    const buttons = researchMenuButtons(view({ stockpile: LOADED }), 'townCenter', false, ['loom']);
+    const loom = buttons.find((b) => b.id === 'loom')!;
+    expect(loom.enabled).toBe(false);
+    expect(loom.reason).toBe('already queued');
+    expect(loom.icon).toBe(`${gameData.techs.loom.icon}/gray`);
+    // other techs are unaffected
+    const wheelbarrow = buttons.find((b) => b.id === 'wheelbarrow');
+    if (wheelbarrow) expect(wheelbarrow.reason).not.toBe('already queued');
+  });
 });
 
 describe('ageUpButton', () => {
   it('reports requirement progress and the "N buildings needed" reason', () => {
-    const up = ageUpButton(view({ stockpile: LOADED }), ['townCenter', 'house'])!;
+    const up = ageUpButton(view({ stockpile: LOADED }), ['townCenter', 'house', 'mill'])!;
     expect(up.techId).toBe('feudalAge');
-    // houses never count (GDD) — only the TC qualifies
+    // the TC and houses never count (AOE2_REFERENCE §2 / GDD) — only the mill qualifies
     expect(up.requirementMet).toBe(false);
     expect(up.requirementText).toBe('1 / 2 Dark Age buildings');
     expect(up.enabled).toBe(false);
     expect(up.reason).toBe('2 Dark Age buildings needed');
   });
 
-  it('two distinct qualifying buildings meet the requirement', () => {
-    const up = ageUpButton(view({ stockpile: LOADED }), ['townCenter', 'barracks', 'house', 'farm'])!;
+  it('two distinct qualifying buildings meet the requirement (TC/house/farm never count)', () => {
+    const up = ageUpButton(view({ stockpile: LOADED }), ['townCenter', 'barracks', 'mill', 'house', 'farm'])!;
     expect(up.requirementMet).toBe(true);
     expect(up.enabled).toBe(!PENDING_COMMAND_KINDS.has('research'));
   });
@@ -239,6 +311,39 @@ describe('ageUpButton', () => {
 
   it('returns null in the Imperial Age', () => {
     expect(ageUpButton(view({ age: 'imperial' }), [])).toBeNull();
+  });
+
+  it('an age-up already sitting in the shared queue disables the button honestly', () => {
+    // the common flow: villagers queued first, Advance to Feudal queued behind them —
+    // b.research stays unset, but a re-tap would be silently dropped by the sim
+    const up = ageUpButton(
+      view({ stockpile: LOADED }), ['townCenter', 'barracks', 'mill'], false, ['feudalAge'],
+    )!;
+    expect(up.enabled).toBe(false);
+    expect(up.reason).toBe('already queued');
+    expect(up.icon).toBe(`${gameData.techs.feudalAge.icon}/gray`);
+  });
+});
+
+describe('queueChipModel (shared production queue chips)', () => {
+  it('every tech in the game resolves to its TechDef icon + name — never icon/<techId>', () => {
+    for (const tech of Object.values(gameData.techs)) {
+      // the sim queues research as { defId: techId, techId } (research.ts)
+      const chip = queueChipModel({ defId: tech.id, techId: tech.id });
+      expect(chip.isTech).toBe(true);
+      expect(chip.icon).toBe(tech.icon); // a real atlas frame, not a missing-icon fallback
+      expect(chip.name).toBe(tech.name);
+    }
+  });
+
+  it('every trainable unit resolves to its UnitDef icon + name', () => {
+    for (const unit of Object.values(gameData.units)) {
+      if (unit.trainedAt.length === 0) continue; // gaia animals never queue
+      const chip = queueChipModel({ defId: unit.id });
+      expect(chip.isTech).toBe(false);
+      expect(chip.icon).toBe(unit.icon);
+      expect(chip.name).toBe(unit.name);
+    }
   });
 });
 
@@ -289,6 +394,15 @@ describe('unitVerbButtons', () => {
     expect(unitVerbButtons([], null)).toEqual([]);
     expect(unitVerbButtons([ent({ kind: 'building', defId: 'barracks' })], null)).toEqual([]);
   });
+
+  it('captured sheep get a minimal card: no attack-move (livestock is not military)', () => {
+    const ids = unitVerbButtons([ent({ defId: 'sheep' })], null).map((b) => b.id);
+    expect(ids).not.toContain('attackMove');
+    expect(ids).toContain('stop');
+    // a sheep mixed into an army must not change the military card either way
+    const mixed = unitVerbButtons([ent({ defId: 'sheep' }), ent({ defId: 'militia' })], null).map((b) => b.id);
+    expect(mixed).toContain('attackMove');
+  });
 });
 
 describe('farm & mill buttons', () => {
@@ -328,6 +442,42 @@ describe('garrisonPanel', () => {
     const panel = garrisonPanel(tc, () => undefined)!;
     expect(panel.count).toBe(0);
     expect(panel.ungarrisonEnabled).toBe(false);
+  });
+
+  it('rams (unit hosts) get the same panel — garrisoned infantry must have a UI exit', () => {
+    const militia = ent({ defId: 'militia' });
+    const ram = ent({ defId: 'batteringRam', garrison: [militia.id] });
+    const panel = garrisonPanel(ram, (id) => (id === militia.id ? militia : undefined))!;
+    expect(panel).not.toBeNull();
+    expect(panel.capacity).toBe(gameData.units.batteringRam.garrisonCapacity);
+    expect(panel.count).toBe(1);
+    expect(panel.occupants[0].defId).toBe('militia');
+    expect(panel.ungarrisonEnabled).toBe(!PENDING_COMMAND_KINDS.has('ungarrison'));
+    // ordinary units can hold nobody
+    expect(garrisonPanel(ent({ defId: 'militia' }), () => undefined)).toBeNull();
+  });
+});
+
+describe('hasActiveRally', () => {
+  const bld = (over: Partial<Entity>): Entity =>
+    ent({ kind: 'building', defId: 'barracks', x: 10 * FP, y: 10 * FP, tileX: 10, tileY: 10, ...over });
+
+  it('false without a rally; true for a rally on open ground', () => {
+    expect(hasActiveRally(bld({}))).toBe(false);
+    expect(hasActiveRally(bld({ rally: { x: 20 * FP, y: 10 * FP } }))).toBe(true);
+  });
+
+  it('a rally onto a target (berries/enemy) is always active, wherever it sits', () => {
+    expect(hasActiveRally(bld({ rally: { x: 10 * FP, y: 10 * FP, targetId: 7 as EntityId } }))).toBe(true);
+  });
+
+  it('a cleared rally (back onto the building footprint, no target) is NOT active', () => {
+    // clearRally re-rallies onto the building center — flag and Clear control must vanish
+    expect(hasActiveRally(bld({ rally: { x: 10 * FP, y: 10 * FP } }))).toBe(false);
+  });
+
+  it('units never report a rally', () => {
+    expect(hasActiveRally(ent({ defId: 'militia', rally: { x: 99 * FP, y: 99 * FP } }))).toBe(false);
   });
 });
 

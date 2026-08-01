@@ -264,18 +264,18 @@ export function resolveBuildingStats(state: SimState, player: number, defId: str
 
 /**
  * Total food a farm provides for this player: base def.providesFood plus 'farmFood'
- * modifiers (Horse Collar line techs push these in wave 2). Buildings have no armor
- * classes, so only untargeted farmFood modifiers apply.
+ * modifiers (Horse Collar line techs push these with targetIds ['farm']). Uses the
+ * same matches() targeting as every other stat, so class- and id-scoped modifiers apply.
  */
 export function resolveFarmFood(state: SimState, player: number, def: BuildingDef): number {
   let v = def.providesFood ?? 0;
   const table = state.modifiers[player];
   if (!table) return Math.max(0, Math.round(v));
   for (const m of table.statAdd) {
-    if (m.stat === 'farmFood' && !m.targetClasses && !m.targetIds) v += m.amount;
+    if (m.stat === 'farmFood' && matches(def, m.targetClasses, m.targetIds)) v += m.amount;
   }
   for (const m of table.statMult) {
-    if (m.stat === 'farmFood' && !m.targetClasses && !m.targetIds) v = (v * (100 + m.percent)) / 100;
+    if (m.stat === 'farmFood' && matches(def, m.targetClasses, m.targetIds)) v = (v * (100 + m.percent)) / 100;
   }
   return Math.max(0, Math.round(v));
 }

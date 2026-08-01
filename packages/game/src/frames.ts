@@ -2,6 +2,7 @@
 // Naming rules per docs/ASSET_CONTRACT.md.
 
 import type { UnitActivity } from '@bf/sim/types';
+import { gameData } from '@bf/data';
 
 export interface FrameRef {
   /** Atlas frame name to actually look up (dirs 5-7 remapped to 3/2/1). */
@@ -30,6 +31,20 @@ export function resolveFrameName(name: string): FrameRef {
     }
   }
   return { name, mirrored: false };
+}
+
+/**
+ * Candidate frame names for the building-placement ghost, most specific first
+ * (callers tryResolve all but the last, then resolveFrame the last so a truly
+ * missing frame still surfaces the diagnosable placeholder). Farms — any def
+ * with providesFood — have NO bld/ frames (ASSET_CONTRACT: the renderer draws
+ * obj/farm/<stage>), so their ghost previews the mature field, matching the
+ * fog-remembered farm ghost in world.ts; resolving bld/farm/done rendered the
+ * magenta missing-frame box on every farm placement.
+ */
+export function placementGhostFrames(defId: string, age: string): string[] {
+  if (gameData.buildings[defId]?.providesFood !== undefined) return ['obj/farm/2'];
+  return [`bld/${defId}/${age}/done`, `bld/${defId}/done`];
 }
 
 /** Insert the baked player-color token into a frame name: unit/villager/... -> unit/villager@p2/... */
@@ -101,7 +116,9 @@ export const ANIM_FPS: Readonly<Record<AnimName, number>> = {
 /** Frame index for an anim at a given sim-time (seconds). die/decay clamp; others loop. */
 export function animFrameIndex(anim: AnimName, animAgeSeconds: number, frameCount: number): number {
   if (frameCount <= 1) return 0;
-  const raw = Math.floor(animAgeSeconds * ANIM_FPS[anim]);
+  // Clamp: a caller-side clock hiccup (e.g. sim time frozen at game end while
+  // interpolation alpha wraps) must never yield a negative frame index.
+  const raw = Math.max(0, Math.floor(animAgeSeconds * ANIM_FPS[anim]));
   if (anim === 'die' || anim === 'decay') return Math.min(raw, frameCount - 1);
   return raw % frameCount;
 }

@@ -186,6 +186,29 @@ describe('AoE2 slot etiquette', () => {
     expect(extracted).toBeGreaterThanOrEqual(4);
   });
 
+  it('extras on an occupied tree bump to nearby free trees (lumberjack spread)', () => {
+    const game = createGame(scenarioConfig(13, grassMap(30, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 9, ref: 'v0' },
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v1' },
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 11, ref: 'v2' },
+      { defId: 'tree', player: 0, tileX: 10, tileY: 10, ref: 't0' },
+      { defId: 'tree', player: 0, tileX: 12, tileY: 10, ref: 't1' },
+      { defId: 'tree', player: 0, tileX: 10, tileY: 13, ref: 't2' },
+    ], [player({ civ: 'english' })]));
+    const units = ['v0', 'v1', 'v2'].map((r) => game.state.refs.get(r)!);
+    game.advance([{ kind: 'gather', player: HUMAN, units, targetId: game.state.refs.get('t0')! }]);
+    for (let t = 0; t < 300; t++) game.advance([]);
+
+    // instead of two queueing idle at t0, everyone works their own tree
+    const targets = new Set(units.map((id) => {
+      const intent = game.state.entities.get(id)!.intent;
+      return intent?.kind === 'gather' ? intent.targetId : -1;
+    }));
+    expect(targets.size).toBe(3);
+    const gathering = units.filter((id) => game.state.entities.get(id)!.activity === 'gathering');
+    expect(gathering).toHaveLength(3);
+  });
+
   it('mines support several gatherers at once', () => {
     const game = createGame(scenarioConfig(11, grassMap(30, 30), [
       { defId: 'villager', player: HUMAN, tileX: 9, tileY: 9, ref: 'v0' },

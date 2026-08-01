@@ -97,6 +97,35 @@ describe('resolveTapAction — buildings-only selection (GDD: tap a building = s
   });
 });
 
+describe('resolveTapAction — captured sheep are food, not a reselect (AoE2 opening)', () => {
+  const VILL_SEL: TapSelection = { units: 2, buildings: 0, villagers: 2 };
+  const MIL_SEL: TapSelection = { units: 2, buildings: 0, villagers: 0 };
+
+  it('villagers selected: tapping an OWN sheep is a command (gather), even dead-center', () => {
+    const ownSheep = ent({ kind: 'unit', defId: 'sheep', player: HUMAN });
+    expect(resolveTapAction([ownSheep], VILL_SEL, HUMAN)).toEqual({ type: 'command' });
+    // an own non-food unit further out must not steal it either
+    const ownVill = ent({ kind: 'unit', defId: 'villager', player: HUMAN });
+    expect(resolveTapAction([ownSheep, ownVill], VILL_SEL, HUMAN)).toEqual({ type: 'command' });
+  });
+
+  it('military-only selection: tapping an own sheep keeps the reselect behavior', () => {
+    const ownSheep = ent({ kind: 'unit', defId: 'sheep', player: HUMAN });
+    expect(resolveTapAction([ownSheep], MIL_SEL, HUMAN)).toEqual({ type: 'select', id: ownSheep.id });
+  });
+
+  it('no selection: tapping an own sheep still selects it', () => {
+    const ownSheep = ent({ kind: 'unit', defId: 'sheep', player: HUMAN });
+    expect(resolveTapAction([ownSheep], NO_SEL, HUMAN)).toEqual({ type: 'select', id: ownSheep.id });
+  });
+
+  it('an enemy in the slop still outranks the sheep (melee taps stay attacks)', () => {
+    const ownSheep = ent({ kind: 'unit', defId: 'sheep', player: HUMAN });
+    const enemy = ent({ player: ENEMY });
+    expect(resolveTapAction([ownSheep, enemy], VILL_SEL, HUMAN)).toEqual({ type: 'command' });
+  });
+});
+
 describe('resolveTapAction — no selection', () => {
   it('bare taps stay instant select: own unit, then own building', () => {
     const own = ent({ player: HUMAN });

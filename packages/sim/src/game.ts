@@ -21,6 +21,7 @@ import { tickProduction } from './production';
 import { tickPathfinding } from './path';
 import { tickMovement } from './movement';
 import { buildAgeIndex, hasBuildPrereqs, rivalUnitOnFootprint, tickConstruction } from './construction';
+import { rebuildModifiers } from './research';
 import { tickRepair } from './repair';
 import { tickGathering } from './gather';
 import { tickAnimals } from './animals';
@@ -36,6 +37,9 @@ import { hashState } from './hash';
 
 /** AoE2 standard starting kit (see docs/AOE2_REFERENCE.md). */
 const DEFAULT_STOCKPILE: Stockpile = { food: 200, wood: 200, gold: 100, stone: 200 };
+
+/** AGE_CHAIN_TECHS[i] advances INTO AGES[i + 1] (castleAge requiresTech feudalAge, ...). */
+const AGE_CHAIN_TECHS = ['feudalAge', 'castleAge', 'imperialAge'] as const;
 
 function buildWalkTerrain(map: GameMap): Uint8Array {
   const walk = new Uint8Array(map.width * map.height);
@@ -126,6 +130,7 @@ export function createGame(config: GameConfig): Game {
     buildingStatsCache: new Map(),
     gather: new Map(),
     fleeing: new Map(),
+    shelterIntents: new Map(),
     animalCd: new Map(),
     decayAcc: new Map(),
     repairs: new Map(),
@@ -144,6 +149,22 @@ export function createGame(config: GameConfig): Game {
     enabledUnits: players.map(() => new Set<string>()),
     enabledBuildings: players.map(() => new Set<string>()),
   };
+
+  // A startingAge above Dark implies the age-chain techs below it were "already
+  // researched": seed them (WITHOUT re-running effects — the age is already set) so
+  // the next age-up stays reachable (castleAge requiresTech feudalAge, and so on).
+  for (const p of players) {
+    if (p.id === GAIA) continue;
+    const ageIdx = AGES.indexOf(p.age);
+    if (ageIdx <= 0) continue;
+    for (let i = 0; i < ageIdx && i < AGE_CHAIN_TECHS.length; i++) {
+      const techId = AGE_CHAIN_TECHS[i];
+      if (gameData.techs[techId] && !p.researchedTechs.includes(techId)) {
+        p.researchedTechs.push(techId);
+      }
+    }
+    rebuildModifiers(state, p.id); // age techs carry no passives today; rebuild anyway
+  }
 
   if (scenario) {
     for (const init of scenario.entities) {

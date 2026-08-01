@@ -19,10 +19,22 @@ export function createGame(config: GameConfig): Game {
   return createRealGame(config);
 }
 
-/** Monotonic seed counter: each Practice click gets a fresh (but reproducible) map. */
-let seedCounter = 1;
+/**
+ * Per-launch random base + per-click monotonic bump: every Practice match gets a
+ * fresh random map (GDD random-map skirmish). A fixed `= 1` initializer reset on
+ * every page load, so the first match after each app launch always replayed seed
+ * 1 — the same map, sheep, and wolf every session. Wall clock is fine HERE (the
+ * determinism rules bind packages/sim only) because the chosen seed is recorded
+ * in GameConfig and persisted with the match snapshot, so resume and replay
+ * still reproduce the exact same game.
+ */
+let seedCounter = (Date.now() % 2147483647) + 1;
 
-/** Default 2-player practice setup: human (blue, Scots) vs idle bot (red, English). */
+/**
+ * Default 2-player practice setup: human (blue, Scots) vs a bot (red, English).
+ * The bot controller itself (difficulty, scripts) is created in game.ts via
+ * @bf/ai createBot — the sim config only marks the seat as non-human.
+ */
 export function practiceConfig(): GameConfig {
   return {
     seed: seedCounter++, // renderer-side seed pick; the sim itself stays deterministic per seed

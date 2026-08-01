@@ -47,8 +47,8 @@ see Out of scope.)
 ## Ages
 Dark → **Feudal** → **Castle** → **Imperial**. Advancing is researched at the Town Center,
 costs escalating food/gold, and requires **two qualifying buildings of your current age**
-(AoE2 rule — houses, farms, walls, gates, and towers don't count; a Castle alone satisfies
-Imperial).
+(AoE2 rule — the Town Center, houses, farms, walls, gates, and towers don't count; a Castle
+alone satisfies Imperial).
 Each age unlocks buildings, units, and technologies. Age-up times are substantial (~2 min)
 so timing decisions matter.
 

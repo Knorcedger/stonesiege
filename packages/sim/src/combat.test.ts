@@ -166,6 +166,46 @@ describe('auto-engage defaults (GDD per-category behavior)', () => {
     expect(game.state.entities.get(bait)!.hp).toBe(25); // untouched
   });
 
+  it('damage never interrupts a plain move: a unit under TC fire keeps walking', () => {
+    const game = createGame(scenarioConfig(110, grassMap(40, 30), [
+      { defId: 'scout', player: P1, tileX: 5, tileY: 10, ref: 's' },
+      { defId: 'townCenter', player: P2, tileX: 14, tileY: 3, ref: 'tc' }, // range clips the path
+    ], [player(), player({ civ: 'english' })]));
+    const s = game.state.refs.get('s')!;
+    game.advance([{ kind: 'move', player: P1, units: [s], x: fp(30), y: fp(10) }]);
+    const evs: Timed[] = [];
+    let engaged = false;
+    for (let t = 0; t < 600; t++) {
+      const tick = game.state.tick;
+      for (const ev of game.advance([])) evs.push({ tick, ev });
+      if ((game.state as unknown as SimState).combat.has(s)) engaged = true;
+    }
+    expect(impacts(evs).some((h) => h.targetId === s)).toBe(true); // it WAS shot en route
+    expect(engaged).toBe(false); // ...but the move order held: no retaliation hijack
+    const scout = game.state.entities.get(s)!;
+    expect(scout.hp).toBeGreaterThan(0);
+    expect(scout.tileX).toBeGreaterThanOrEqual(28); // finished the ordered move
+  });
+
+  it('an IDLE unit shot by a TC retaliates, closes in, and lands melee hits on it', () => {
+    const game = createGame(scenarioConfig(111, grassMap(30, 30), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'm' },
+      { defId: 'townCenter', player: P2, tileX: 12, tileY: 8, ref: 'tc' },
+    ], [player(), player({ civ: 'english' })]));
+    const m = game.state.refs.get('m')!;
+    const tc = game.state.refs.get('tc')!;
+    const evs: Timed[] = [];
+    run(game, 300, evs);
+
+    // retaliation vs the building attacker really fights: melee hits land (1 = armor floor)
+    const onTc = impacts(evs).filter((h) => h.attackerId === m && h.targetId === tc);
+    expect(onTc.length).toBeGreaterThanOrEqual(3);
+    expect(game.state.entities.get(tc)!.hp).toBeLessThan(2400);
+    // never wedged 'idle' beside the target with a live engagement (deadlock guard)
+    const militia = game.state.entities.get(m)!;
+    expect(militia.activity).toBe('attacking');
+  });
+
   it('attack-move engages en route, then the survivor resumes the march', () => {
     const game = createGame(scenarioConfig(107, grassMap(40, 30), [
       { defId: 'knight', player: P1, tileX: 5, tileY: 10, ref: 'k' },

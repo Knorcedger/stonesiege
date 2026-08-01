@@ -4,7 +4,7 @@
 import { gameData } from '@bf/data';
 import type { ClassValue, GatherTask } from '@bf/data';
 import { FP } from './types';
-import type { Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile } from './types';
+import type { Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile, UnitIntent } from './types';
 import type { SimRng } from './rng';
 import type { SpatialGrid } from './spatial';
 import type { PlayerModifierTable, ResolvedBuildingStats, ResolvedUnitStats } from './stats';
@@ -22,6 +22,14 @@ export interface Motion {
   groupId: number;
   stuckTicks: number;
   repaths: number;
+  /**
+   * Position after last tick's follow step (pre-separation). Stuck detection compares
+   * against it so NET movement counts: a unit whose step "succeeds" but is pushed
+   * straight back by the crowd every tick is stuck (head-on jams livelocked forever
+   * when only the own-step delta was measured).
+   */
+  lastX: Fixed;
+  lastY: Fixed;
 }
 
 /** Last fog stamp applied for an entity (needed to remove it on move/death). */
@@ -63,6 +71,8 @@ export interface GatherInfo {
 export interface FleeState {
   buildingId: EntityId;
   retries: number;
+  /** The task the flee interrupted — restored by ungarrison (AoE2 return-to-work bell). */
+  savedIntent?: UnitIntent;
 }
 
 /** Under-repair building: scaled HP accumulator + scaled resource debt (cost trickle). */
@@ -80,6 +90,29 @@ export interface CombatInfo {
   /** Where the unit stood when it auto-acquired — it returns here after disengaging. */
   anchorX: Fixed;
   anchorY: Fixed;
+  /**
+   * Target position the current chase walk was ordered at. Re-path only when the target
+   * genuinely drifts (> 1 tile): orderMove remaps a building's blocked center to a ring
+   * tile, so comparing the MOTION target against the center would re-path every tick and
+   * the walk would never start (integrator fix, caught by macro.test.ts).
+   */
+  chaseX?: Fixed;
+  chaseY?: Fixed;
+  /** Earliest tick to retry the chase walk after it ended short (crowded ring tile). */
+  nextChaseTick?: number;
+  /**
+   * Chase walks that ENDED while still out of range (reset once in range). Auto
+   * engagements give up past a small cap instead of standing under fire forever
+   * (full melee ring / unreachable target).
+   */
+  chaseFails?: number;
+  /**
+   * Reserved footprint-ring tile when chasing a BUILDING (melee slot claim): other
+   * attackers of the same building skip reserved tiles, so a blob approaching from one
+   * side fans out around the footprint instead of contending for the same near tile.
+   */
+  slotX?: number;
+  slotY?: number;
 }
 
 /** An in-flight projectile. Damage payload frozen at fire time (attacker may die). */
@@ -87,7 +120,11 @@ export interface Projectile {
   attackerId: EntityId;
   player: PlayerId;
   targetId: EntityId;
-  /** Impact point (fixed-point). Aim was rolled/led at fire time; flight is fixed. */
+  /**
+   * Impact point (fixed-point), rolled/led at fire time. Splash (mangonel line)
+   * resolves HERE — moving targets dodge it. Single-target shots with a passed roll
+   * connect with the target wherever it stands at impact tick (AoE2 arrow behavior).
+   */
   x: Fixed;
   y: Fixed;
   impactTick: number;
@@ -180,6 +217,12 @@ export interface SimState {
   gather: Map<EntityId, GatherInfo>;
   /** Villagers fleeing to garrison after taking damage (GDD combat rules). */
   fleeing: Map<EntityId, FleeState>;
+  /**
+   * Pre-flee task of each flee-garrisoned (sheltering) villager, keyed by unit id.
+   * Ungarrison re-dispatches it through the normal command handlers (AoE2
+   * return-to-work bell). Entries die with the unit or with any explicit new order.
+   */
+  shelterIntents: Map<EntityId, UnitIntent>;
   /** Gaia-animal (wolf) attack cooldowns: next allowed strike tick. */
   animalCd: Map<EntityId, number>;
   /** Carcass rot accumulators (scaled like GatherInfo.acc). */

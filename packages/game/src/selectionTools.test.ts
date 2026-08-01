@@ -38,6 +38,15 @@ describe('isIdleOwnUnit', () => {
     expect(isIdleOwnUnit(ent({ hp: 0 }), HUMAN)).toBe(false);
     expect(isIdleOwnUnit(ent({ garrisonedIn: 99 as EntityId }), HUMAN)).toBe(false);
   });
+
+  it('sheltering (flee-garrisoned) villagers count — a raid cannot bury them invisibly', () => {
+    const hiding = ent({ activity: 'garrisoned', garrisonedIn: 99 as EntityId, sheltering: true });
+    expect(isIdleOwnUnit(hiding, HUMAN)).toBe(true);
+    // deliberately garrisoned units stay excluded (no sheltering flag)
+    expect(isIdleOwnUnit(ent({ activity: 'garrisoned', garrisonedIn: 99 as EntityId }), HUMAN)).toBe(false);
+    // and a dead sheltering entry can never linger in the badge
+    expect(isIdleOwnUnit(ent({ sheltering: true, hp: 0 }), HUMAN)).toBe(false);
+  });
 });
 
 describe('idleUnits', () => {
@@ -49,6 +58,18 @@ describe('idleUnits', () => {
     const st = stateWith([v1, m1, v2, busy]);
     expect(idleUnits(st, HUMAN, 'villager').map((e) => e.id)).toEqual([v1.id, v2.id]);
     expect(idleUnits(st, HUMAN, 'military').map((e) => e.id)).toEqual([m1.id]);
+  });
+
+  it('captured herdables/huntables never count as idle military (or villagers)', () => {
+    // captured sheep are own idle units — but they are food, not soldiers
+    const sheep = ent({ defId: 'sheep' });
+    const deer = ent({ defId: 'deer' });
+    const scout = ent({ defId: 'scout' });
+    const st = stateWith([sheep, deer, scout]);
+    expect(isIdleOwnUnit(sheep, HUMAN)).toBe(false);
+    expect(isIdleOwnUnit(deer, HUMAN)).toBe(false);
+    expect(idleUnits(st, HUMAN, 'military').map((e) => e.id)).toEqual([scout.id]);
+    expect(idleUnits(st, HUMAN, 'villager')).toEqual([]);
   });
 });
 

@@ -85,6 +85,12 @@ export interface Entity {
   targetId?: EntityId;
   carrying?: { type: ResourceType; amount: number };
   garrisonedIn?: EntityId;
+  /**
+   * Garrisoned by the villager-flee reflex, NOT by an explicit order (additive). The
+   * HUD counts sheltering villagers in the idle-villager badge so a raid can't bury
+   * the workforce invisibly; ungarrison clears it and restores the pre-flee task.
+   */
+  sheltering?: boolean;
   /** Wave-2 hook: intent recorded by attack-move / rally-onto-target (additive). */
   intent?: UnitIntent;
   // buildings

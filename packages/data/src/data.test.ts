@@ -127,6 +127,17 @@ describe('unit stats', () => {
       }
     }
   });
+
+  it('villager gather rates are the AoE2 at-resource rates (AOE2_REFERENCE §1)', () => {
+    // These are steady-state ON-RESOURCE rates. The sim makes villagers physically
+    // walk carry loads to drop-offs, so walk time must NOT be pre-discounted here.
+    // Farm in particular is the farm-capped 0.40 (0.53 worker rate capped by the farm);
+    // shipping a walk-inclusive "effective" rate double-counts the walk and starves
+    // the whole food economy (late age-ups, failed unit orders).
+    expect(units.villager.gather).toEqual({
+      forage: 0.31, hunt: 0.41, farm: 0.4, wood: 0.39, gold: 0.38, stone: 0.36,
+    });
+  });
 });
 
 describe('costs', () => {

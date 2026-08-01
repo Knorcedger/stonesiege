@@ -235,11 +235,19 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
       state.foundations.delete(id);
       recomputePopCap(state, site.player);
       events.push({ kind: 'buildingComplete', id: site.id, defId: site.defId, player: site.player });
+      // AoE2: the villager who builds a farm starts farming it immediately
+      let farmable = gameData.buildings[site.defId]?.providesFood !== undefined
+        && (site.amountLeft ?? 0) > 0;
       for (const e of state.entities.values()) {
         if (e.kind === 'unit' && e.intent?.kind === 'build' && e.intent.targetId === id) {
           e.intent = undefined;
           state.buildRetries.delete(e.id);
           if (e.activity === 'building') e.activity = 'idle';
+          if (farmable && gameData.units[e.defId]?.gather !== undefined) {
+            farmable = false; // farms feed exactly one farmer — first builder takes it
+            e.intent = { kind: 'gather', targetId: site.id }; // gather pass books it lazily
+            continue;
+          }
           // AoE2 behavior: a finished builder auto-joins a nearby own foundation, else idles
           autoJoinNearbyFoundation(state, e);
         }
