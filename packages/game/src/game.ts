@@ -3,8 +3,8 @@
 
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import {
-  FP, fp,
-  type Command, type Entity, type EntityId, type GameState, type PlayerId,
+  FP, fp, TICKS_PER_SECOND,
+  type Command, type Entity, type EntityId, type GameState, type PlayerId, type SimEvent,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
@@ -13,11 +13,16 @@ import { centroidTile, idleUnits, liveGroupIds, sameIdSet, type IdleCategory } f
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
 import { WorldLayer } from './world';
+import { FxLayer } from './fx';
 import { FogLayer } from './fog';
 import { SimLoop } from './simloop';
+import { playHornSting } from './audio';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
+import { AGE_LABEL, type ArmedVerb } from './hud/cardModel';
 import { Minimap } from './hud/minimap';
+import { Overlays } from './hud/overlays';
+import { deriveMatchSummary, emptyTallies, formatMatchTime, recordDeath } from './hud/summary';
 import { createGame, practiceConfig } from './simBridge';
 
 const PLACE_GREEN = 0x3e8c34;
@@ -55,6 +60,7 @@ export async function runGame(root: HTMLElement): Promise<void> {
   const worldRoot = new Container();
   const terrain = new TerrainLayer(app.renderer, assets, game.state.map);
   const world = new WorldLayer(assets, humanPlayer);
+  const fx = new FxLayer(assets);
   const fog = new FogLayer(game.state.map);
   const ghostLayer = new Container();
   const ghostFoot = new Graphics();
@@ -62,7 +68,8 @@ export async function runGame(root: HTMLElement): Promise<void> {
   ghostSprite.alpha = 0.6;
   ghostLayer.addChild(ghostFoot, ghostSprite);
   ghostLayer.visible = false;
-  worldRoot.addChild(terrain.container, world.container, ghostLayer, fog.sprite);
+  // fx.ground (corpses/rubble) under entities; fx.air (projectiles/beams) above
+  worldRoot.addChild(terrain.container, fx.ground, world.container, fx.air, ghostLayer, fog.sprite);
   app.stage.addChild(worldRoot);
   const bandOverlay = new Graphics();
   app.stage.addChild(bandOverlay);
@@ -78,8 +85,12 @@ export async function runGame(root: HTMLElement): Promise<void> {
 
   // --------------------------------------------------------------- state
   let selection: EntityId[] = [];
-  let attackMoveArmed = false;
+  let armedVerb: ArmedVerb | null = null;
   let placement: { defId: string; tileX: number; tileY: number } | null = null;
+  const tallies = emptyTallies();
+  let housed = false;
+  let wonderOwner: PlayerId | null = null; // whose countdown the banner tracks
+  let endShown = false;
 
   const getState = (): GameState => game.state;
   const liveSelection = (): Entity[] => {
@@ -94,7 +105,7 @@ export async function runGame(root: HTMLElement): Promise<void> {
   const setSelection = (ids: EntityId[]): void => {
     selection = ids;
     world.selection = new Set(ids);
-    attackMoveArmed = false;
+    armedVerb = null;
   };
   const deselect = (): void => setSelection([]);
 
@@ -140,12 +151,95 @@ export async function runGame(root: HTMLElement): Promise<void> {
     setSelection(ids);
   };
 
+  // --------------------------------------------------------------- sim events
+  const showEnd = (victory: boolean): void => {
+    if (endShown) return;
+    endShown = true;
+    deselect();
+    overlays.showEndScreen(
+      victory,
+      deriveMatchSummary(getState(), humanPlayer, tallies),
+      () => window.location.reload(), // full reboot back to the title screen
+    );
+  };
+
+  const handleSimEvents = (events: SimEvent[]): void => {
+    const st = getState();
+    for (const ev of events) {
+      switch (ev.kind) {
+        case 'entityDied':
+          recordDeath(tallies, ev, humanPlayer);
+          break;
+        case 'ageAdvanced':
+          if (ev.player === humanPlayer) {
+            overlays.showAgeBanner(AGE_LABEL[ev.age]);
+            playHornSting(); // GDD audio: horn sting on age-up
+          }
+          break;
+        case 'underAttack':
+          if (ev.player === humanPlayer) {
+            overlays.pulseUnderAttack();
+            minimap.ping(ev.x / FP, ev.y / FP);
+            playHornSting(); // GDD audio: horn sting on attack warning
+          }
+          break;
+        case 'researchComplete':
+          if (ev.player === humanPlayer) {
+            hud.showUndoToast(`${gameData.techs[ev.techId]?.name ?? ev.techId} complete`, null);
+          }
+          break;
+        case 'conversionComplete':
+          if (ev.fromPlayer === humanPlayer) hud.showUndoToast('A unit was converted away!', null);
+          else if (ev.toPlayer === humanPlayer) hud.showUndoToast('Enemy unit converted!', null);
+          break;
+        case 'playerDefeated':
+          if (ev.player === humanPlayer) showEnd(false);
+          break;
+        case 'victory':
+          showEnd(ev.winners.includes(humanPlayer));
+          break;
+        // wonder countdown stream (sim: started / once-per-second / cancelled)
+        case 'wonderStarted':
+        case 'wonderCountdown':
+          if (ev.kind === 'wonderStarted' && ev.player !== humanPlayer) playHornSting();
+          wonderOwner = ev.player;
+          overlays.setWonderBanner({
+            owner: st.players[ev.player]?.setup.name ?? 'Enemy',
+            timeText: formatMatchTime(ev.secondsLeft * TICKS_PER_SECOND),
+          });
+          break;
+        case 'wonderDestroyed':
+          if (ev.player === wonderOwner) {
+            wonderOwner = null;
+            overlays.setWonderBanner(null);
+          }
+          break;
+        default:
+          break;
+      }
+    }
+
+    // housed warning: production stalls until more houses go up (GDD tension)
+    const p = st.players[humanPlayer];
+    if (p) {
+      const isHoused = p.pop >= p.popCap;
+      if (isHoused && !housed) {
+        hud.showUndoToast(p.popCap >= config.popCap ? 'Population limit reached' : 'Housed — build more houses!', null);
+      }
+      housed = isHoused;
+    }
+
+  };
+
   // --------------------------------------------------------------- sim loop
   const loop = new SimLoop(game, {
     onTick: (events) => {
-      world.onTick(getState());
-      world.onSimEvents(events, getState().tick);
-      fog.update(getState().players[humanPlayer]?.visibility ?? new Uint8Array(0));
+      const st = getState();
+      world.onTick(st);
+      world.onSimEvents(events, st.tick);
+      fx.onSimEvents(st, events, st.tick);
+      handleSimEvents(events);
+      fog.update(st.players[humanPlayer]?.visibility ?? new Uint8Array(0));
     },
   });
   loop.attachAutoPause();
@@ -220,8 +314,17 @@ export async function runGame(root: HTMLElement): Promise<void> {
       hud.showUndoToast('Select a villager to build', null);
       return;
     }
+    const def = gameData.buildings[placement.defId];
     issue({ kind: 'build', player: humanPlayer, units: villagers, defId: placement.defId, tileX: placement.tileX, tileY: placement.tileY });
-    hud.showUndoToast(`Building ${gameData.buildings[placement.defId]?.name ?? placement.defId}`, null);
+    if (def?.wall) {
+      // v1 wall flow: single-tile walls placed repeatedly — placement mode stays
+      // armed so a run of wall goes tap-confirm, tap-confirm (drag-placement is
+      // a wave-3 nicety; see GDD walls note).
+      hud.showUndoToast('Wall placed — keep tapping to extend, Cancel to stop', null);
+      refreshGhost();
+      return;
+    }
+    hud.showUndoToast(`Building ${def?.name ?? placement.defId}`, null);
     placement = null;
     refreshGhost();
   };
@@ -242,6 +345,29 @@ export async function runGame(root: HTMLElement): Promise<void> {
       });
     },
     cancelTrain: (buildingId, index) => issue({ kind: 'cancelTrain', player: humanPlayer, buildingId, index }),
+    researchTech: (buildingId, techId) => {
+      issue({ kind: 'research', player: humanPlayer, buildingId, techId });
+      hud.showUndoToast(`Researching ${gameData.techs[techId]?.name ?? techId}`, () => {
+        issue({ kind: 'cancelResearch', player: humanPlayer, buildingId });
+      });
+    },
+    cancelResearch: (buildingId) => issue({ kind: 'cancelResearch', player: humanPlayer, buildingId }),
+    ungarrisonAll: (buildingId) => {
+      issue({ kind: 'ungarrison', player: humanPlayer, buildingId });
+      hud.showUndoToast('Ungarrisoning', null);
+    },
+    marketTrade: (sell, buy, amount) => {
+      issue({ kind: 'marketTrade', player: humanPlayer, sell, buy, amount });
+      hud.showUndoToast(sell === 'gold' ? `Bought ${amount} ${buy}` : `Sold ${amount} ${sell}`, null);
+    },
+    reseedFarm: (farmId) => {
+      issue({ kind: 'reseedFarm', player: humanPlayer, farmId });
+      hud.showUndoToast('Reseeding farm', null);
+    },
+    setAutoReseed: (enabled) => {
+      issue({ kind: 'queueReseed', player: humanPlayer, enabled });
+      hud.showUndoToast(enabled ? 'Auto-reseed ON' : 'Auto-reseed OFF', null);
+    },
     startPlacement,
     confirmPlacement,
     cancelPlacement,
@@ -254,11 +380,23 @@ export async function runGame(root: HTMLElement): Promise<void> {
       const units = liveSelection().filter((e) => e.kind === 'unit').map((e) => e.id);
       if (units.length > 0) issue({ kind: 'stop', player: humanPlayer, units });
     },
-    toggleAttackMove: () => { attackMoveArmed = !attackMoveArmed; },
-    isAttackMoveArmed: () => attackMoveArmed,
+    packSelection: (pack) => {
+      const units = liveSelection()
+        .filter((e) => e.kind === 'unit' && !!gameData.units[e.defId]?.pack)
+        .map((e) => e.id);
+      if (units.length === 0) return;
+      issue({ kind: pack ? 'pack' : 'unpack', player: humanPlayer, units });
+      hud.showUndoToast(pack ? 'Packing up' : 'Unpacking to fire', null);
+    },
+    armVerb: (verb) => { armedVerb = armedVerb === verb ? null : verb; },
+    getArmedVerb: () => armedVerb,
     togglePause: () => loop.togglePause(),
     isPaused: () => loop.paused,
     resumeGame: () => loop.resume(),
+    resign: () => {
+      issue({ kind: 'resign', player: humanPlayer });
+      loop.resume(); // the resign must actually process (defeat -> end screen)
+    },
     getIdleCounts,
     cycleIdle,
     getGroupCounts,
@@ -266,6 +404,7 @@ export async function runGame(root: HTMLElement): Promise<void> {
     selectGroup,
   };
   const hud = new Hud(root, hudHost);
+  const overlays = new Overlays(root);
 
   const minimap = new Minimap(
     hud.minimapSlot,
@@ -305,8 +444,10 @@ export async function runGame(root: HTMLElement): Promise<void> {
       return Math.max(Math.abs(t.x - cx), Math.abs(t.y - cy)) <= size / 2 + 1;
     },
     cancelPlacement,
-    isAttackMoveArmed: () => attackMoveArmed,
-    setAttackMoveArmed: (v) => { attackMoveArmed = v; },
+    isAttackMoveArmed: () => armedVerb === 'attackMove',
+    setAttackMoveArmed: (v) => { armedVerb = v ? 'attackMove' : null; },
+    getArmedVerb: () => armedVerb,
+    clearArmedVerb: () => { armedVerb = null; },
     togglePause: () => loop.togglePause(),
     showToast: (label) => hud.showUndoToast(label, null),
   };
@@ -333,6 +474,7 @@ export async function runGame(root: HTMLElement): Promise<void> {
     const alpha = loop.alpha;
     terrain.update(camera.getWorldView());
     world.update(st, alpha, st.tick + alpha);
+    fx.update(st, st.tick + alpha);
     if (placement) refreshGhost();
     hud.update();
     minimap.update(now);

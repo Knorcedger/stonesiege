@@ -16,11 +16,14 @@ const RES_COLORS: Record<string, string> = {
   goldMine: '#E6C04A', stoneMine: '#C0C0C6', berryBush: '#A62E3E', tree: '#2E5426',
 };
 
+const PING_MS = 3000;
+
 export class Minimap {
   readonly canvas: HTMLCanvasElement;
   private ctx: CanvasRenderingContext2D;
   private terrainBase: HTMLCanvasElement; // tile-space, 1px per tile
   private lastRefresh = 0;
+  private pings: Array<{ tileX: number; tileY: number; at: number }> = [];
 
   constructor(
     slot: HTMLElement,
@@ -73,8 +76,16 @@ export class Minimap {
 
   /** ~4 Hz refresh; call every frame with the elapsed clock. */
   update(nowMs: number): void {
-    if (nowMs - this.lastRefresh < 250) return;
+    // active pings animate at full refresh so the alert reads as motion
+    const interval = this.pings.length > 0 ? 80 : 250;
+    if (nowMs - this.lastRefresh < interval) return;
     this.lastRefresh = nowMs;
+    this.redraw();
+  }
+
+  /** Red expanding alert ring (underAttack event). Redraws immediately. */
+  ping(tileX: number, tileY: number): void {
+    this.pings.push({ tileX, tileY, at: performance.now() });
     this.redraw();
   }
 
@@ -129,6 +140,21 @@ export class Minimap {
         const s = e.kind === 'building' ? 3 : 2;
         ctx.fillRect(px - s / 2, py - s / 2, s, s);
       }
+    }
+
+    // under-attack pings: expanding red rings, ~3 s
+    const now = performance.now();
+    this.pings = this.pings.filter((p) => now - p.at < PING_MS);
+    for (const p of this.pings) {
+      const t = (now - p.at) / PING_MS;
+      const px = m.a * p.tileX + m.c * p.tileY + m.e;
+      const py = m.b * p.tileX + m.d * p.tileY + m.f;
+      const cycle = (t * 3) % 1; // three expanding pulses over the ping's life
+      ctx.strokeStyle = `rgba(214,49,38,${(1 - cycle).toFixed(2)})`;
+      ctx.lineWidth = 1.5;
+      ctx.beginPath();
+      ctx.arc(px, py, 3 + cycle * 9, 0, Math.PI * 2);
+      ctx.stroke();
     }
 
     // camera view trapezoid

@@ -3,7 +3,8 @@
 // (moving or resting), so groups arrive, spread out, and never stack at rest.
 // All arithmetic is integer fixed-point; iteration orders are insertion-stable.
 
-import { FP, GAIA } from './types';
+import { gameData } from '@bf/data';
+import { FP, TICKS_PER_SECOND } from './types';
 import type { Entity, EntityId, Fixed } from './types';
 import { facingFromDelta, isqrt, isTileWalkable } from './internal';
 import type { SimState } from './internal';
@@ -58,9 +59,14 @@ function followPaths(state: SimState): void {
     if (!e) { arrived.push(id); continue; }
     if (m.path === null) continue; // pathfinder hasn't answered yet
 
-    const speedFp = e.player === GAIA
-      ? Math.max(1, Math.round(1.0 * FP / 20))
-      : resolveUnitStats(state, e.player, e.defId).speedFp;
+    // stats layer for everyone — Gaia player 0 has an empty modifier table, so animals
+    // move at their def speed (deer 1.2 outruns a hunter; sheep amble at 0.8)
+    let speedFp = resolveUnitStats(state, e.player, e.defId).speedFp;
+    // rams: each garrisoned infantryman adds def.garrisonSpeedPerUnit (AoE2 +0.05)
+    if (e.garrison && e.garrison.length > 0) {
+      const perUnit = gameData.units[e.defId]?.garrisonSpeedPerUnit;
+      if (perUnit) speedFp += Math.round(e.garrison.length * perUnit * FP / TICKS_PER_SECOND);
+    }
 
     // waypoint target: tile centers along the path, exact coords for the last leg
     let wx: Fixed, wy: Fixed;
@@ -126,6 +132,7 @@ function separationPass(state: SimState): void {
   const neighbors: EntityId[] = [];
   for (const e of state.entities.values()) {
     if (e.kind !== 'unit' || e.garrisonedIn !== undefined) continue;
+    if (e.hp <= 0) continue; // carcasses are scenery, not soft bodies
     state.unitsGrid.queryCircle(e.x, e.y, SEPARATION_DIST, neighbors);
     let pushX = 0, pushY = 0;
     for (let i = 0; i < neighbors.length; i++) {

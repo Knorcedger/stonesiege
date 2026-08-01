@@ -1,14 +1,50 @@
 // Command-card model: affordable actions must render their COLORED icon and be
 // enabled; gray (`<icon>/gray`) is reserved for genuinely unavailable actions.
 // Regression coverage for the wave-1 card that rendered every build icon gray
-// despite a full stockpile.
+// despite a full stockpile, plus wave-2 coverage: civ tech-tree filtering,
+// line-upgrade collapsing, pop-cap disabling, research menus, the age-up
+// requirement counter, unit verb buttons, and the garrison panel.
+//
+// NOTE on wave-2 gating: enabled-ness of research/garrison/etc. buttons tracks
+// PENDING_COMMAND_KINDS, which SHRINKS as sim systems land. Assertions compare
+// against the live set so these tests stay green through sim integration.
 
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
-import { buildMenuButtons, trainMenuButtons, canAffordCost, iconVariant } from './cardModel';
+import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
+import type { Entity, EntityId } from '@bf/sim/types';
+import {
+  ageUpButton, ageUpRequirement, buildMenuButtons, canAffordCost, civUnitCost,
+  farmReseedButton, garrisonPanel, iconVariant, millAutoReseedButton,
+  researchMenuButtons, trainMenuButtons, unitVerbButtons,
+  type PlayerCardView,
+} from './cardModel';
 
 const RICH = { food: 200, wood: 200, gold: 100, stone: 200 };
 const BROKE = { food: 0, wood: 0, gold: 0, stone: 0 };
+const LOADED = { food: 9999, wood: 9999, gold: 9999, stone: 9999 };
+
+function view(over: Partial<PlayerCardView> = {}): PlayerCardView {
+  return {
+    stockpile: RICH, age: 'dark', civ: 'scots', researchedTechs: [],
+    pop: 4, popCap: 10, ...over,
+  };
+}
+
+let nextId = 1;
+function ent(partial: Partial<Entity>): Entity {
+  return {
+    id: (nextId++) as EntityId,
+    kind: 'unit',
+    defId: 'militia',
+    player: 1,
+    x: 0, y: 0, tileX: 0, tileY: 0,
+    facing: 0,
+    hp: 40, maxHp: 40,
+    activity: 'idle',
+    ...partial,
+  } as Entity;
+}
 
 describe('buildMenuButtons', () => {
   it('with the starting stockpile, every affordable dark-age building is enabled and colored', () => {
@@ -30,7 +66,7 @@ describe('buildMenuButtons', () => {
     // GDD: extra TCs unlock in Castle Age — hidden from the dark-age card entirely
     // (mirrors the sim's buildAgeIndex gate, so the button never lies about placeability)
     expect(buttons.find((b) => b.id === 'townCenter')).toBeUndefined();
-    const castleButtons = buildMenuButtons({ food: 999, wood: 999, gold: 999, stone: 999 }, 'castle');
+    const castleButtons = buildMenuButtons(LOADED, 'castle');
     const tc = castleButtons.find((b) => b.id === 'townCenter')!;
     expect(tc).toMatchObject({ enabled: true, icon: 'icon/townCenter' });
   });
@@ -54,17 +90,244 @@ describe('buildMenuButtons', () => {
 
 describe('trainMenuButtons', () => {
   it('town center offers an affordable villager as enabled + colored', () => {
-    const buttons = trainMenuButtons(RICH, 'dark', 'townCenter');
+    const buttons = trainMenuButtons(view(), 'townCenter');
     const vill = buttons.find((b) => b.id === 'villager')!;
     expect(vill).toMatchObject({ enabled: true, icon: gameData.units.villager.icon });
   });
 
   it('unaffordable units render the /gray companion', () => {
-    const buttons = trainMenuButtons(BROKE, 'dark', 'townCenter');
-    for (const b of buttons) {
+    for (const b of trainMenuButtons(view({ stockpile: BROKE }), 'townCenter')) {
       expect(b.enabled).toBe(false);
       expect(b.icon.endsWith('/gray')).toBe(true);
     }
+  });
+
+  it('pop-capped trains are disabled with a housed reason', () => {
+    const buttons = trainMenuButtons(view({ pop: 10, popCap: 10 }), 'townCenter');
+    const vill = buttons.find((b) => b.id === 'villager')!;
+    expect(vill.enabled).toBe(false);
+    expect(vill.reason).toContain('house');
+  });
+
+  it('line upgrades collapse the line: Man-at-Arms replaces Militia once researched', () => {
+    const before = trainMenuButtons(view({ age: 'feudal' }), 'barracks').map((b) => b.id);
+    expect(before).toContain('militia');
+    expect(before).not.toContain('manAtArms'); // requiresTech unmet
+    const after = trainMenuButtons(
+      view({ age: 'feudal', researchedTechs: ['manAtArmsUpgrade'] }),
+      'barracks',
+    ).map((b) => b.id);
+    expect(after).toContain('manAtArms');
+    expect(after).not.toContain('militia'); // upgraded away
+  });
+
+  it('the castle trains only the OWN civ unique unit', () => {
+    const scots = trainMenuButtons(view({ age: 'castle', stockpile: LOADED }), 'castle').map((b) => b.id);
+    expect(scots).toContain('highlandRaider');
+    expect(scots).not.toContain('longbowman');
+    const english = trainMenuButtons(view({ age: 'castle', civ: 'english', stockpile: LOADED }), 'castle').map((b) => b.id);
+    expect(english).toContain('longbowman');
+    expect(english).not.toContain('highlandRaider');
+  });
+
+  it('civ tech-tree cuts hide units (Scots have no Paladin)', () => {
+    const ids = trainMenuButtons(
+      view({ age: 'imperial', stockpile: LOADED, researchedTechs: ['lightCavalryUpgrade', 'cavalierUpgrade', 'paladinUpgrade'] }),
+      'stable',
+    ).map((b) => b.id);
+    expect(ids).not.toContain('paladin');
+  });
+
+  it('civ cost bonuses show the price the sim will charge (Scots siege −15%)', () => {
+    const v = view({ age: 'castle', civ: 'scots', stockpile: LOADED });
+    const mang = trainMenuButtons(v, 'siegeWorkshop').find((b) => b.id === 'mangonel')!;
+    const base = gameData.units.mangonel.cost;
+    const scaled = civUnitCost('scots', 'castle', gameData.units.mangonel);
+    expect(mang.cost).toEqual(scaled);
+    expect(scaled.wood!).toBeLessThan(base.wood!);
+    // English pay full price for siege
+    expect(civUnitCost('english', 'castle', gameData.units.mangonel).wood).toBe(base.wood);
+  });
+});
+
+describe('researchMenuButtons', () => {
+  const pending = PENDING_COMMAND_KINDS.has('research');
+
+  it('blacksmith in Feudal shows only feudal tier-1 techs; enabled tracks the wave-2 gate', () => {
+    const ids = researchMenuButtons(view({ age: 'feudal', stockpile: LOADED }), 'blacksmith');
+    const names = ids.map((b) => b.id);
+    expect(names).toContain('forging');
+    expect(names).toContain('fletching');
+    expect(names).not.toContain('ironCasting'); // castle tier, chain unmet
+    for (const b of ids) {
+      expect(b.enabled).toBe(!pending);
+      if (pending) expect(b.reason).toContain('wave-2');
+    }
+  });
+
+  it('chained tiers appear once the previous tier is researched and the age allows', () => {
+    const withChain = researchMenuButtons(
+      view({ age: 'castle', stockpile: LOADED, researchedTechs: ['forging'] }),
+      'blacksmith',
+    ).map((b) => b.id);
+    expect(withChain).toContain('ironCasting');
+    expect(withChain).not.toContain('forging'); // already researched
+  });
+
+  it('castle unique techs are civ-filtered', () => {
+    const scots = researchMenuButtons(view({ age: 'castle', stockpile: LOADED }), 'castle').map((b) => b.id);
+    expect(scots).toContain('schiltron');
+    expect(scots).not.toContain('yeomanLevy');
+    const english = researchMenuButtons(view({ age: 'imperial', civ: 'english', stockpile: LOADED }), 'castle').map((b) => b.id);
+    expect(english).toContain('yeomanLevy');
+    expect(english).toContain('eliteLongbowmanUpgrade');
+    expect(english).not.toContain('eliteHighlandRaiderUpgrade');
+  });
+
+  it('civ tech cuts hide techs (Scots lack Crop Rotation)', () => {
+    const ids = researchMenuButtons(
+      view({ age: 'imperial', stockpile: LOADED, researchedTechs: ['horseCollar', 'heavyPlow'] }),
+      'mill',
+    ).map((b) => b.id);
+    expect(ids).not.toContain('cropRotation');
+    const english = researchMenuButtons(
+      view({ age: 'imperial', civ: 'english', stockpile: LOADED, researchedTechs: ['horseCollar', 'heavyPlow'] }),
+      'mill',
+    ).map((b) => b.id);
+    expect(english).toContain('cropRotation');
+  });
+
+  it('age-up techs never appear in the TC research list (dedicated button)', () => {
+    const ids = researchMenuButtons(view({ stockpile: LOADED }), 'townCenter').map((b) => b.id);
+    expect(ids).not.toContain('feudalAge');
+    expect(ids).toContain('loom');
+  });
+
+  it('a busy building disables research with a reason', () => {
+    const buttons = researchMenuButtons(view({ stockpile: LOADED }), 'townCenter', true);
+    for (const b of buttons) expect(b.enabled).toBe(false);
+  });
+});
+
+describe('ageUpButton', () => {
+  it('reports requirement progress and the "N buildings needed" reason', () => {
+    const up = ageUpButton(view({ stockpile: LOADED }), ['townCenter', 'house'])!;
+    expect(up.techId).toBe('feudalAge');
+    // houses never count (GDD) — only the TC qualifies
+    expect(up.requirementMet).toBe(false);
+    expect(up.requirementText).toBe('1 / 2 Dark Age buildings');
+    expect(up.enabled).toBe(false);
+    expect(up.reason).toBe('2 Dark Age buildings needed');
+  });
+
+  it('two distinct qualifying buildings meet the requirement', () => {
+    const up = ageUpButton(view({ stockpile: LOADED }), ['townCenter', 'barracks', 'house', 'farm'])!;
+    expect(up.requirementMet).toBe(true);
+    expect(up.enabled).toBe(!PENDING_COMMAND_KINDS.has('research'));
+  });
+
+  it('duplicate building types do not count twice', () => {
+    const r = ageUpRequirement('dark', ['barracks', 'barracks'], 2);
+    expect(r).toEqual({ have: 1, met: false });
+  });
+
+  it('a Castle alone satisfies the Imperial requirement (GDD)', () => {
+    const up = ageUpButton(view({ age: 'castle', stockpile: LOADED, researchedTechs: ['feudalAge', 'castleAge'] }), ['castle'])!;
+    expect(up.techId).toBe('imperialAge');
+    expect(up.requirementMet).toBe(true);
+  });
+
+  it('returns null in the Imperial Age', () => {
+    expect(ageUpButton(view({ age: 'imperial' }), [])).toBeNull();
+  });
+});
+
+describe('unitVerbButtons', () => {
+  it('military selection: attack-move toggle (active when armed), stop, garrison', () => {
+    const sel = [ent({ defId: 'militia' })];
+    const idle = unitVerbButtons(sel, null);
+    expect(idle.map((b) => b.id)).toEqual(['attackMove', 'stop', 'garrison']);
+    expect(idle[0].active).toBe(false);
+    const armed = unitVerbButtons(sel, 'attackMove');
+    expect(armed[0].active).toBe(true);
+    // garrison enabled-ness tracks the wave-2 gate
+    expect(idle[2].enabled).toBe(!PENDING_COMMAND_KINDS.has('garrison'));
+  });
+
+  it('villager-only selection: no attack-move, but stop + garrison', () => {
+    const ids = unitVerbButtons([ent({ defId: 'villager' })], null).map((b) => b.id);
+    expect(ids).not.toContain('attackMove');
+    expect(ids).toContain('stop');
+    expect(ids).toContain('garrison');
+  });
+
+  it('monks add convert + heal', () => {
+    const ids = unitVerbButtons([ent({ defId: 'monk' })], null).map((b) => b.id);
+    expect(ids).toContain('convert');
+    expect(ids).toContain('heal');
+  });
+
+  it('trebuchets get a live unpack button while packed, pack while deployed', () => {
+    // spawn state: packed (mobile) → the button unpacks (deploy to fire)
+    const packedBtns = unitVerbButtons([ent({ defId: 'trebuchet', packed: true })], null);
+    const unpack = packedBtns.find((b) => b.id === 'unpack')!;
+    expect(unpack.enabled).toBe(true);
+    expect(unpack.reason).toBeUndefined();
+    expect(packedBtns.some((b) => b.id === 'pack')).toBe(false);
+    // deployed (packed === false) → the button packs (fold to move)
+    const deployedBtns = unitVerbButtons([ent({ defId: 'trebuchet', packed: false })], null);
+    expect(deployedBtns.find((b) => b.id === 'pack')!.enabled).toBe(true);
+    // mixed selection: any deployed treb → pack them all
+    const mixed = unitVerbButtons(
+      [ent({ defId: 'trebuchet', packed: true }), ent({ defId: 'trebuchet', packed: false })],
+      null,
+    );
+    expect(mixed.some((b) => b.id === 'pack')).toBe(true);
+  });
+
+  it('empty / building-only selections produce no verb buttons', () => {
+    expect(unitVerbButtons([], null)).toEqual([]);
+    expect(unitVerbButtons([ent({ kind: 'building', defId: 'barracks' })], null)).toEqual([]);
+  });
+});
+
+describe('farm & mill buttons', () => {
+  it('farm reseed tracks the wave-2 gate and wood affordability', () => {
+    const pending = PENDING_COMMAND_KINDS.has('reseedFarm');
+    const rich = farmReseedButton({ amountLeft: 0 }, RICH);
+    expect(rich.enabled).toBe(!pending);
+    const broke = farmReseedButton({ amountLeft: 0 }, BROKE);
+    expect(broke.enabled).toBe(false);
+  });
+
+  it('mill auto-reseed toggle reflects the sim-side flag', () => {
+    const on = millAutoReseedButton(true);
+    expect(on.active).toBe(true);
+    expect(on.enabled).toBe(!PENDING_COMMAND_KINDS.has('queueReseed'));
+    expect(millAutoReseedButton(false).active).toBe(false);
+  });
+});
+
+describe('garrisonPanel', () => {
+  it('lists occupant icons and caps; null for buildings that cannot garrison', () => {
+    const vill = ent({ defId: 'villager' });
+    const militia = ent({ defId: 'militia' });
+    const byId = new Map<EntityId, Entity>([[vill.id, vill], [militia.id, militia]]);
+    const tc = ent({ kind: 'building', defId: 'townCenter', garrison: [vill.id, militia.id] });
+    const panel = garrisonPanel(tc, (id) => byId.get(id))!;
+    expect(panel.count).toBe(2);
+    expect(panel.capacity).toBe(gameData.buildings.townCenter.garrisonCapacity);
+    expect(panel.occupants.map((o) => o.defId)).toEqual(['villager', 'militia']);
+    expect(panel.ungarrisonEnabled).toBe(!PENDING_COMMAND_KINDS.has('ungarrison'));
+    // houses hold nobody
+    expect(garrisonPanel(ent({ kind: 'building', defId: 'house' }), () => undefined)).toBeNull();
+  });
+
+  it('dead/missing occupants are dropped from the panel', () => {
+    const tc = ent({ kind: 'building', defId: 'townCenter', garrison: [999 as EntityId] });
+    const panel = garrisonPanel(tc, () => undefined)!;
+    expect(panel.count).toBe(0);
+    expect(panel.ungarrisonEnabled).toBe(false);
   });
 });
 

@@ -49,6 +49,14 @@ export interface UnitDef {
   carryCapacity?: number | Partial<Record<GatherTask, number>>;
   /** Built-in resistance to monk conversion, 0..100 (the Faith tech adds on this scale). */
   conversionResist?: number;
+  /** Monks: healing reach in tiles (AoE2: 4; conversion uses `range`). */
+  healRange?: number;
+  /** Monks: HP restored per second while healing. */
+  healRate?: number;
+  /** Rams: added speed (tiles/second) per garrisoned unit (AoE2: +0.05). */
+  garrisonSpeedPerUnit?: number;
+  /** Rams: bonus damage entries added per garrisoned unit (AoE2: +10 vs buildings). */
+  garrisonAttackPerUnit?: ClassValue[];
   requiresTech?: string; // e.g. line upgrade tech id
   // --- gaia animals (additive) ---
   foodAmount?: number; // food left on the carcass when hunted (sheep/deer)
@@ -85,6 +93,8 @@ export interface BuildingDef {
   arrowsPerGarrison?: number;
   arrowsMax?: number; // cap on simultaneous projectiles (arrowsBase + garrison arrows)
   garrisonCapacity?: number;
+  /** HP/second restored to each unit garrisoned inside (AoE2: 0.1; castle 0.2). */
+  garrisonHealRate?: number;
   dropOffFor?: ResourceType[];
   trains?: string[]; // unit def ids
   researches?: string[]; // tech ids
@@ -93,6 +103,8 @@ export interface BuildingDef {
   wall?: boolean;
   gate?: boolean;
   wonder?: boolean;
+  /** Wonder: seconds it must stand before victory (AoE2 ≈ 1000 in-game seconds). */
+  wonderTimer?: number;
   requiresTech?: string;
   /** Buildings that must exist before this can be placed (e.g. castle needs castle age only). */
   requiresBuildings?: string[];

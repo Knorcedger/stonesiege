@@ -17,6 +17,8 @@ import {
   type Command, type Entity, type EntityId, type GameState, type PlayerId,
 } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
+import { gameData } from '@bf/data';
+import type { ArmedVerb } from './hud/cardModel';
 import { worldToTile, type Camera } from './camera';
 import type { WorldLayer } from './world';
 import {
@@ -44,6 +46,9 @@ export interface InputHost {
   cancelPlacement(): void;
   isAttackMoveArmed(): boolean;
   setAttackMoveArmed(v: boolean): void;
+  /** Armed "next tap = target" verb (attack-move / garrison / convert / heal). */
+  getArmedVerb(): ArmedVerb | null;
+  clearArmedVerb(): void;
   togglePause(): void;
   showToast(label: string): void;
 }
@@ -171,7 +176,7 @@ export class InputController {
         ev.preventDefault();
       } else if (ev.key === 'Escape') {
         if (this.host.isPlacing()) this.host.cancelPlacement();
-        else if (this.host.isAttackMoveArmed()) this.host.setAttackMoveArmed(false);
+        else if (this.host.getArmedVerb() !== null) this.host.clearArmedVerb();
         else this.host.deselect();
       } else if (ev.key === 'p' || ev.key === 'P') {
         this.host.togglePause();
@@ -430,8 +435,9 @@ export class InputController {
     }
     if (unitIds.length === 0) return;
 
-    const armed = this.host.isAttackMoveArmed();
-    this.host.setAttackMoveArmed(false);
+    const armedVerb = this.host.getArmedVerb();
+    const armed = armedVerb === 'attackMove';
+    this.host.clearArmedVerb();
 
     // Wave-2 verbs the sim would silently drop are downgraded to an HONEST move
     // toward the target — the toast confirms exactly what happened, never a no-op.
@@ -439,6 +445,13 @@ export class InputController {
     const moveTo = (x: number, y: number, ids: EntityId[], label: string): void => {
       this.host.issueWithUndo({ kind: 'move', player: human, units: ids, x, y }, label, undoStop);
     };
+
+    // Armed targeting verbs (garrison / convert / heal) outrank the default
+    // tap inference — the player explicitly chose the verb on the card.
+    if (armedVerb === 'garrison' || armedVerb === 'convert' || armedVerb === 'heal') {
+      if (this.armedVerbCommand(armedVerb, picks, units, undoStop)) return;
+      // no valid target under the tap: explain, then fall through to inference
+    }
 
     if (enemy) {
       if (can('attack')) {
@@ -497,6 +510,64 @@ export class InputController {
         'Move', undoStop,
       );
     }
+  }
+
+  /**
+   * Execute an armed garrison/convert/heal on the tapped target. Returns true
+   * when a command was issued; false leaves the tap to default inference
+   * (after a toast explaining what a valid target would be).
+   */
+  private armedVerbCommand(
+    verb: 'garrison' | 'convert' | 'heal',
+    picks: Entity[],
+    units: Entity[],
+    undoStop: (() => void) | null,
+  ): boolean {
+    const human = this.host.humanPlayer;
+    if (PENDING_COMMAND_KINDS.has(verb)) return false; // defensive: button was disabled
+    if (verb === 'garrison') {
+      const target = picks.find((p) =>
+        p.player === human && (
+          (p.kind === 'building' &&
+            (gameData.buildings[p.defId]?.garrisonCapacity ?? 0) > 0 &&
+            (p.buildProgress ?? 1000) >= 1000) ||
+          (p.kind === 'unit' && (gameData.units[p.defId]?.garrisonCapacity ?? 0) > 0)
+        ));
+      if (!target) {
+        this.host.showToast('Tap a building with room to garrison');
+        return false;
+      }
+      this.host.issueWithUndo(
+        { kind: 'garrison', player: human, units: units.map((e) => e.id), targetId: target.id },
+        'Garrison', undoStop,
+      );
+      return true;
+    }
+    if (verb === 'convert') {
+      const monks = units.filter((e) => gameData.units[e.defId]?.converts).map((e) => e.id);
+      const target = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
+      if (monks.length === 0 || !target) {
+        this.host.showToast('Tap an enemy to convert');
+        return false;
+      }
+      this.host.issueWithUndo(
+        { kind: 'convert', player: human, units: monks, targetId: target.id },
+        'Converting', undoStop,
+      );
+      return true;
+    }
+    // heal
+    const healers = units.filter((e) => gameData.units[e.defId]?.heals).map((e) => e.id);
+    const wounded = picks.find((p) => p.player === human && p.kind === 'unit' && p.hp < p.maxHp);
+    if (healers.length === 0 || !wounded) {
+      this.host.showToast('Tap a wounded friendly unit to heal');
+      return false;
+    }
+    this.host.issueWithUndo(
+      { kind: 'heal', player: human, units: healers, targetId: wounded.id },
+      'Healing', undoStop,
+    );
+    return true;
   }
 
   private movePlacementToWorld(wx: number, wy: number): void {

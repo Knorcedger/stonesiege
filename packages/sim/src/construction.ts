@@ -36,6 +36,29 @@ export function buildAgeIndex(def: BuildingDef): number {
 }
 
 /**
+ * Non-age construction gates from the def: prerequisite buildings (completed, own —
+ * e.g. Farm needs a Mill, Stable needs a Barracks) and prerequisite techs
+ * (tower upgrades). Shared by handleBuild and Game.canPlace.
+ */
+export function hasBuildPrereqs(state: SimState, playerId: PlayerId, def: BuildingDef): boolean {
+  const player = state.players[playerId];
+  if (!player) return false;
+  if (state.enabledBuildings[playerId]?.has(def.id)) return true; // enableBuilding override
+  if (def.requiresTech && !player.researchedTechs.includes(def.requiresTech)) return false;
+  if (def.requiresBuildings) {
+    for (const req of def.requiresBuildings) {
+      let ok = false;
+      for (const e of state.entities.values()) {
+        if (e.kind === 'building' && e.player === playerId && e.defId === req &&
+          e.hp > 0 && (e.buildProgress ?? 1000) >= 1000) { ok = true; break; }
+      }
+      if (!ok) return false;
+    }
+  }
+  return true;
+}
+
+/**
  * AoE2-style placement rule: a rival's (non-Gaia, non-own) living unit standing on the
  * footprint blocks placement. One player's command must never move another player's units
  * or cancel their orders, so we reject instead of nudging them.
@@ -92,9 +115,11 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
   const def = gameData.buildings[cmd.defId];
   const player = state.players[cmd.player];
   if (!def || !player) return;
-  if (buildAgeIndex(def) > AGES.indexOf(player.age)) return;
+  const enabled = state.enabledBuildings[cmd.player]?.has(cmd.defId) === true;
+  if (!enabled && buildAgeIndex(def) > AGES.indexOf(player.age)) return;
+  if (!hasBuildPrereqs(state, cmd.player, def)) return;
   const civ = gameData.civs[player.setup.civ];
-  if (civ && civ.disabled.includes(cmd.defId)) return;
+  if (!enabled && civ && civ.disabled.includes(cmd.defId)) return;
 
   // builders: owned, alive, un-garrisoned units that can actually build (villagers)
   const builders: Entity[] = [];
@@ -145,7 +170,12 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
 
   for (const b of builders) {
     b.intent = { kind: 'build', targetId: foundation.id };
+    b.targetId = undefined;
     state.buildRetries.delete(b.id);
+    state.combat.delete(b.id);
+    state.garrisoning.delete(b.id);
+    state.gather.delete(b.id);
+    state.fleeing.delete(b.id);
   }
   // blocked center remaps to the nearest walkable tile — i.e. adjacent to the footprint
   orderMove(state, builders.map((b) => b.id), foundation.x, foundation.y);
@@ -210,12 +240,38 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
           e.intent = undefined;
           state.buildRetries.delete(e.id);
           if (e.activity === 'building') e.activity = 'idle';
+          // AoE2 behavior: a finished builder auto-joins a nearby own foundation, else idles
+          autoJoinNearbyFoundation(state, e);
         }
       }
     } else {
       site.buildProgress = Math.min(999, Math.floor((info.acc * 1000) / info.accNeeded));
     }
   }
+}
+
+/** Auto-join: how far (tiles) a finished builder looks for the next own foundation. */
+const AUTO_JOIN_RADIUS = 4;
+
+/** Send a just-released builder to the nearest own foundation within a short radius. */
+function autoJoinNearbyFoundation(state: SimState, builder: Entity): void {
+  let best: Entity | null = null;
+  let bestD = Infinity;
+  for (const id of state.foundations.keys()) {
+    const site = state.entities.get(id);
+    if (!site || site.player !== builder.player || site.hp <= 0) continue;
+    if ((site.buildProgress ?? 1000) >= 1000) continue;
+    const size = gameData.buildings[site.defId]?.size ?? 1;
+    // chebyshev distance from the builder to the nearest footprint tile
+    const dx = Math.max(site.tileX - builder.tileX, builder.tileX - (site.tileX + size - 1), 0);
+    const dy = Math.max(site.tileY - builder.tileY, builder.tileY - (site.tileY + size - 1), 0);
+    if (Math.max(dx, dy) > AUTO_JOIN_RADIUS) continue;
+    const dd = dx * dx + dy * dy;
+    if (dd < bestD) { bestD = dd; best = site; }
+  }
+  if (!best) return;
+  builder.intent = { kind: 'build', targetId: best.id };
+  orderMove(state, [builder.id], best.x, best.y);
 }
 
 /** Refund the unbuilt fraction of a deleted foundation (no-op for completed buildings). */

@@ -1,8 +1,9 @@
-// Production: per-building train queues (cap 15). Costs are deducted when queued and
-// refunded exactly on cancel; population is reserved when an item reaches the front
-// (AoE2 "housed" stall) and released on cancel/death. Spawned units step to a free
-// adjacent tile and walk to the rally; rallies onto a resource/enemy record intent
-// for the wave-2 gather/attack systems.
+// Production: per-building train queues (cap 15) SHARED with research (AoE2: a tech
+// occupies the same queue — a TC researching Loom stalls villager production). Costs
+// are deducted when queued and refunded exactly on cancel; population is reserved when
+// a unit item reaches the front (AoE2 "housed" stall) and released on cancel/death
+// (tech items reserve none). Spawned units step to a free adjacent tile and walk to
+// the rally; rallies onto a resource/enemy record gather/attack intent.
 
 import { gameData } from '@bf/data';
 import { GAIA } from './types';
@@ -11,17 +12,35 @@ import type { SimState } from './internal';
 import { findFreeAdjacentTile, spawnEntity } from './entities';
 import { resolveUnitStats } from './stats';
 import { orderMove } from './path';
+import { completeResearch } from './research';
 
 export const TRAIN_QUEUE_CAP = 15;
 
 export function tickProduction(state: SimState, events: SimEvent[]): void {
   for (const e of state.entities.values()) {
-    if (e.kind !== 'building' || !e.trainQueue || e.trainQueue.length === 0) continue;
+    if (e.kind !== 'building' || !e.trainQueue) continue;
     if ((e.buildProgress ?? 1000) < 1000) continue;
     const player = state.players[e.player];
     if (!player || player.defeated) continue;
 
-    const item = e.trainQueue[0];
+    const item = e.trainQueue[0] as TrainQueueItem | undefined;
+    if (!item?.techId && e.research) e.research = undefined; // cancelled/reordered research
+    if (!item) continue;
+
+    if (item.techId) {
+      // research occupies the queue: no pop reservation, ticks straight down
+      item.started = true;
+      if (item.ticksLeft > 0) item.ticksLeft--;
+      if (item.ticksLeft > 0) {
+        e.research = { techId: item.techId, ticksLeft: item.ticksLeft, totalTicks: item.totalTicks };
+        continue;
+      }
+      e.trainQueue.shift();
+      e.research = undefined;
+      completeResearch(state, e.player, item.techId, events);
+      continue;
+    }
+
     const stats = resolveUnitStats(state, e.player, item.defId);
 
     if (!item.started) {
@@ -54,7 +73,10 @@ function sendToRally(state: SimState, building: Entity, unit: Entity): void {
   if (rally.targetId !== undefined) {
     const target = state.entities.get(rally.targetId);
     if (target) {
-      if (target.kind === 'resource' || (target.player === GAIA && gameData.units[target.defId]?.huntable)) {
+      const isOwnFarm = target.kind === 'building' && target.player === unit.player &&
+        gameData.buildings[target.defId]?.providesFood !== undefined;
+      if (target.kind === 'resource' || isOwnFarm ||
+        (target.player === GAIA && gameData.units[target.defId]?.huntable)) {
         unit.intent = { kind: 'gather', targetId: target.id };
       } else if (target.player !== GAIA && target.player !== unit.player) {
         unit.intent = { kind: 'attackTarget', targetId: target.id };
@@ -86,7 +108,7 @@ export function refundItem(state: SimState, playerId: number, item: TrainQueueIt
     player.stockpile.gold += item.paid.gold ?? 0;
     player.stockpile.stone += item.paid.stone ?? 0;
   }
-  if (item.started) {
+  if (item.started && !item.techId) { // research reserves no population
     const stats = resolveUnitStats(state, playerId, item.defId);
     player.pop -= stats.pop;
   }

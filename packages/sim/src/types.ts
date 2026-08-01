@@ -46,6 +46,11 @@ export interface TrainQueueItem {
   paid?: Partial<Stockpile>;
   /** True once the item reached the front and reserved population (additive, sim-internal). */
   started?: boolean;
+  /**
+   * Set = this queue slot is a RESEARCH, not a unit (AoE2: research occupies the same
+   * production queue). defId mirrors the tech id; no population is reserved (additive).
+   */
+  techId?: string;
 }
 
 /**
@@ -56,7 +61,8 @@ export type UnitIntent =
   | { kind: 'attackMove'; x: Fixed; y: Fixed }
   | { kind: 'attackTarget'; targetId: EntityId }
   | { kind: 'gather'; targetId: EntityId }
-  | { kind: 'build'; targetId: EntityId };
+  | { kind: 'build'; targetId: EntityId }
+  | { kind: 'repair'; targetId: EntityId };
 
 export interface ResearchState {
   techId: string;
@@ -90,6 +96,16 @@ export interface Entity {
   // resources (and farms via building def providesFood)
   amountLeft?: number;
   resourceType?: ResourceType;
+  /**
+   * Depleted tree remnant: the entity stays for the renderer (stump visual) but no
+   * longer blocks its tile (additive; set by the gathering system).
+   */
+  stump?: boolean;
+  /**
+   * Pack-capable siege (trebuchet): true = packed/mobile (cannot fire), false =
+   * unpacked/immobile (can fire). Undefined for everything else (additive).
+   */
+  packed?: boolean;
 }
 
 // ---------- players ----------
@@ -112,6 +128,11 @@ export interface PlayerState {
   popCap: number; // min(sum of popProvided, config.popCap)
   researchedTechs: string[]; // insertion order
   defeated: boolean;
+  /**
+   * GDD: the Mill/TC auto-reseed queue toggle — when on, an exhausted farm is
+   * instantly replanted, deducting its full wood cost (additive; queueReseed command).
+   */
+  autoReseed?: boolean;
   /** 0 = unexplored, 1 = explored, 2 = visible; row-major like GameMap.terrain */
   visibility: Uint8Array;
 }
@@ -136,6 +157,10 @@ export type Command =
   | { kind: 'heal'; player: PlayerId; units: EntityId[]; targetId: EntityId }
   | { kind: 'deleteEntity'; player: PlayerId; entityId: EntityId }
   | { kind: 'marketTrade'; player: PlayerId; sell: ResourceType; buy: ResourceType; amount: number }
+  | { kind: 'reseedFarm'; player: PlayerId; farmId: EntityId } // GDD: reseed a fallow farm at full wood cost
+  | { kind: 'queueReseed'; player: PlayerId; enabled: boolean } // GDD: Mill/TC auto-reseed toggle
+  | { kind: 'pack'; player: PlayerId; units: EntityId[] } // trebuchets: fold up to move
+  | { kind: 'unpack'; player: PlayerId; units: EntityId[] } // trebuchets: deploy to fire
   | { kind: 'resign'; player: PlayerId };
 
 // ---------- events (for renderer, audio, triggers, AI) ----------
@@ -154,7 +179,13 @@ export type SimEvent =
   | { kind: 'conversionComplete'; monkId: EntityId; targetId: EntityId; fromPlayer: PlayerId; toPlayer: PlayerId }
   | { kind: 'underAttack'; player: PlayerId; x: Fixed; y: Fixed } // throttled town-bell alert
   | { kind: 'playerDefeated'; player: PlayerId }
-  | { kind: 'victory'; winners: PlayerId[] };
+  | { kind: 'victory'; winners: PlayerId[] }
+  // market (GDD: global drifting rate, ~30% fee). One event per marketTrade command.
+  | { kind: 'marketTraded'; player: PlayerId; resource: ResourceType; direction: 'buy' | 'sell'; amount: number; gold: number; rate: number }
+  // wonder victory countdown stream (started/once-per-second/cancelled)
+  | { kind: 'wonderStarted'; player: PlayerId; secondsLeft: number }
+  | { kind: 'wonderCountdown'; player: PlayerId; secondsLeft: number }
+  | { kind: 'wonderDestroyed'; player: PlayerId };
 
 // ---------- game ----------
 export interface MapGenConfig {
@@ -188,6 +219,45 @@ export interface GameState {
   /** Entity ids by scenario ref name (empty for practice games). */
   refs: ReadonlyMap<string, EntityId>;
   finished: boolean;
+  /**
+   * GDD market: the live GLOBAL exchange rates (gold per 100), shared by all players
+   * and drifted by every trade. Additive/optional so mock states stay valid; the HUD
+   * should quote from these when present.
+   */
+  marketRates?: Readonly<{ food: number; wood: number; stone: number }>;
+}
+
+// ---------- scenario ops (narrow sim-side surface for the trigger engine) ----------
+/** Tile rectangle (x, y = top-left; w × h tiles). */
+export interface TileRect { x: number; y: number; w: number; h: number }
+
+export interface SimOpsSpawn {
+  defId: string; player: PlayerId; tileX: number; tileY: number;
+  hp?: number; facing?: number; amountLeft?: number; ref?: string;
+}
+
+/** Filter for SimOps.getCounts. Omitted fields match everything. */
+export interface SimOpsQuery {
+  player?: PlayerId;
+  defIds?: string[];
+  /** An entity matches when its ANCHOR tile (buildings: top-left) lies inside. */
+  area?: TileRect;
+}
+
+/**
+ * Narrow deterministic write/read surface for the scenario trigger engine (additive).
+ * Everything here mutates/reads sim state through the same code paths commands use.
+ */
+export interface SimOps {
+  /** Spawn entities immediately (refs registered in state.refs). Returns created ids (null entries dropped). */
+  spawn(entities: SimOpsSpawn[]): EntityId[];
+  /** Transfer entities to another player (hp preserved; fog/pop/popCap re-booked). */
+  changeOwner(entityIds: EntityId[], toPlayer: PlayerId): void;
+  /** Permanently mark a tile rect explored for a player (their team's shared map). */
+  revealArea(player: PlayerId, area: TileRect): void;
+  addResources(player: PlayerId, amounts: Partial<Stockpile>): void;
+  /** Count live entities matching the query (corpses and under-construction buildings excluded). */
+  getCounts(query: SimOpsQuery): number;
 }
 
 export interface Game {
@@ -200,4 +270,6 @@ export interface Game {
   canPlace(player: PlayerId, defId: string, tileX: number, tileY: number): boolean;
   /** Walkability grid snapshot (for AI/debug). */
   isWalkable(tileX: number, tileY: number): boolean;
+  /** Scenario-engine surface (additive; absent on mock/replay implementations). */
+  readonly ops?: SimOps;
 }

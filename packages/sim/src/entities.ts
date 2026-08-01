@@ -8,7 +8,7 @@ import type { Entity, EntityId, EntityKind } from './types';
 import { inBounds, tileIndex } from './internal';
 import type { SimState } from './internal';
 import { fogOnDeath, fogOnSpawn } from './fog';
-import { resolveUnitStats } from './stats';
+import { resolveFarmFood, resolveUnitStats } from './stats';
 
 export function defKind(defId: string): EntityKind | null {
   if (gameData.units[defId]) return 'unit';
@@ -19,7 +19,7 @@ export function defKind(defId: string): EntityKind | null {
 
 export function footprintSize(e: Entity): number {
   if (e.kind === 'building') return gameData.buildings[e.defId]?.size ?? 1;
-  if (e.kind === 'resource') return 1;
+  if (e.kind === 'resource') return e.stump ? 0 : 1; // stumps no longer block
   return 0; // units don't block tiles
 }
 
@@ -67,6 +67,7 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
       hp: init.hp ?? maxHp, maxHp,
       activity: 'idle',
     };
+    if (gameData.units[init.defId].pack) e.packed = true; // trebuchets arrive packed
     if (init.player !== GAIA) {
       const player = state.players[init.player];
       if (player && init.countsPop !== false) player.pop += stats.pop;
@@ -83,6 +84,13 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
       buildProgress: init.buildProgress ?? 1000, // scenario/mapgen buildings arrive complete
     };
     if (def.trains && def.trains.length > 0) e.trainQueue = [];
+    if (def.providesFood !== undefined) {
+      // farms are gatherable food sources; amountLeft 0 = fallow (renderer state)
+      e.amountLeft = init.amountLeft ?? (init.player === GAIA
+        ? def.providesFood
+        : resolveFarmFood(state, init.player, def));
+      e.resourceType = 'food';
+    }
   } else {
     const def = gameData.resources[init.defId];
     e = {
@@ -106,6 +114,17 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
   return e;
 }
 
+/**
+ * Deplete a blocking resource into a non-blocking remnant (tree stump): the tile
+ * unblocks, the entity stays for the renderer. Idempotent.
+ */
+export function stumpify(state: SimState, e: Entity): void {
+  if (e.kind !== 'resource' || e.stump) return;
+  addBlockers(state, e, -1); // while footprintSize still reports 1
+  e.stump = true;
+  e.amountLeft = 0;
+}
+
 /** Remove an entity and unwind every side effect. Does NOT emit events (caller's job). */
 export function removeEntity(state: SimState, id: EntityId): void {
   const e = state.entities.get(id);
@@ -114,14 +133,44 @@ export function removeEntity(state: SimState, id: EntityId): void {
   if (e.kind === 'unit') {
     state.unitsGrid.remove(id);
     state.motion.delete(id);
-    if (e.player !== GAIA) {
+    if (e.garrisonedIn !== undefined) {
+      const host = state.entities.get(e.garrisonedIn);
+      if (host?.garrison) {
+        const i = host.garrison.indexOf(id);
+        if (i >= 0) host.garrison.splice(i, 1);
+      }
+    }
+    if (e.player !== GAIA && !state.corpses.has(id)) {
+      // corpses already released their population at the moment of death
       const player = state.players[e.player];
       const def = gameData.units[e.defId];
       if (player && def) player.pop -= def.pop ?? 1;
     }
   }
+  // GDD: a destroyed building kills everything garrisoned inside it
+  if (e.garrison && e.garrison.length > 0) {
+    const inside = e.garrison;
+    e.garrison = [];
+    for (const gid of inside) removeEntity(state, gid);
+  }
   fogOnDeath(state, e);
   state.entities.delete(id);
+  // per-entity bookkeeping tied to this entity (economy + combat systems)
+  state.gather.delete(id);
+  state.fleeing.delete(id);
+  state.animalCd.delete(id);
+  state.decayAcc.delete(id);
+  state.repairs.delete(id);
+  state.buildRetries.delete(id);
+  state.combat.delete(id);
+  state.monks.delete(id);
+  state.garrisoning.delete(id);
+  state.healAcc.delete(id);
+  state.corpses.delete(id);
+  state.packTransitions.delete(id);
+  state.buildingCd.delete(id);
+  // NOTE: state.wonders entries are NOT cleared here — tickWonders detects the missing
+  // entity and emits wonderDestroyed (the cancel event must outlive the entity).
   if (e.kind === 'building' && e.player !== GAIA) recomputePopCap(state, e.player);
 }
 
@@ -135,6 +184,59 @@ export function recomputePopCap(state: SimState, playerId: number): void {
     provided += gameData.buildings[e.defId]?.popProvided ?? 0;
   }
   player.popCap = Math.min(provided, state.popCapLimit);
+}
+
+/**
+ * Transfer an entity to another player (monk conversion, scenario changeOwner).
+ * HP is preserved; maxHp re-resolves under the new owner's researched upgrades
+ * (AoE2 conversion rule); pop, popCap and fog stamps are re-booked; all standing
+ * orders under the old owner are cancelled. Building queues are cleared, releasing
+ * the old owner's reserved population (queued costs are not refunded).
+ */
+export function transferOwnership(state: SimState, e: Entity, toPlayer: number): void {
+  if (e.player === toPlayer || e.hp <= 0) return;
+  const fromPlayer = e.player;
+  fogOnDeath(state, e); // drop the old owner's LOS stamp
+  if (e.kind === 'unit') {
+    const def = gameData.units[e.defId];
+    const pop = def?.pop ?? 1;
+    if (fromPlayer !== GAIA && state.players[fromPlayer]) state.players[fromPlayer].pop -= pop;
+    if (toPlayer !== GAIA && state.players[toPlayer]) state.players[toPlayer].pop += pop;
+    if (toPlayer !== GAIA) {
+      const stats = resolveUnitStats(state, toPlayer, e.defId);
+      e.maxHp = stats.hp;
+      if (e.hp > stats.hp) e.hp = stats.hp;
+    }
+    e.intent = undefined;
+    e.targetId = undefined;
+    e.activity = 'idle';
+    state.motion.delete(e.id);
+    state.gather.delete(e.id);
+    state.fleeing.delete(e.id);
+    state.combat.delete(e.id);
+    state.monks.delete(e.id);
+    state.garrisoning.delete(e.id);
+    state.buildRetries.delete(e.id);
+  } else if (e.kind === 'building') {
+    if (e.trainQueue && e.trainQueue.length > 0) {
+      const old = state.players[fromPlayer];
+      for (const item of e.trainQueue) {
+        if (item.started && !item.techId && old) {
+          old.pop -= resolveUnitStats(state, fromPlayer, item.defId).pop;
+        }
+      }
+      e.trainQueue.length = 0;
+    }
+    e.research = undefined;
+    e.rally = undefined;
+    state.buildingCd.delete(e.id);
+  }
+  e.player = toPlayer;
+  fogOnSpawn(state, e);
+  if (e.kind === 'building') {
+    if (fromPlayer !== GAIA) recomputePopCap(state, fromPlayer);
+    if (toPlayer !== GAIA) recomputePopCap(state, toPlayer);
+  }
 }
 
 /** First free (walkable) tile adjacent to a footprint, scanning outward ring by ring. */

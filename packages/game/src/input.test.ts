@@ -116,11 +116,11 @@ describe('resolveTapAction — no selection', () => {
 });
 
 describe('wave-2 gating contract', () => {
-  it('sim reports the wave-2 verbs the HUD must not confirm', () => {
-    for (const k of ['attack', 'gather', 'repair'] as const) {
-      expect(PENDING_COMMAND_KINDS.has(k)).toBe(true);
-    }
-    for (const k of ['move', 'attackMove', 'stop', 'train', 'cancelTrain', 'setRally', 'build'] as const) {
+  // PENDING_COMMAND_KINDS shrinks as wave-2 sim systems land — asserting that a
+  // specific verb IS pending would go stale mid-integration. The stable invariant
+  // the HUD depends on: core wave-1 verbs are implemented and never gated.
+  it('core verbs are never reported as pending (HUD relies on issuing them)', () => {
+    for (const k of ['move', 'attackMove', 'stop', 'train', 'cancelTrain', 'setRally', 'build', 'deleteEntity', 'resign'] as const) {
       expect(PENDING_COMMAND_KINDS.has(k)).toBe(false);
     }
   });

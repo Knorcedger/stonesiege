@@ -1,0 +1,194 @@
+// Full-screen / edge DOM overlays that sit outside the command card:
+// - age-advance celebration banner (transient, Jacquard display face)
+// - wonder countdown banner (persistent strip while a wonder stands)
+// - under-attack screen-edge red pulse
+// - victory / defeat end screen (ART_BIBLE dark wood + parchment + gold),
+//   with match time + basic counts and Return to Title / Continue watching.
+// Pure-DOM presentation; all game data arrives pre-derived (hud/summary.ts).
+
+import type { MatchSummary } from './summary';
+
+const OVERLAY_CSS = `
+.bf-agebanner { position:absolute; left:50%; top:22%; transform:translateX(-50%); text-align:center;
+  pointer-events:none; opacity:0; transition:opacity 0.5s; z-index:30; }
+.bf-agebanner.show { opacity:1; }
+.bf-agebanner h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:52px; color:#E6C04A;
+  text-shadow:2px 2px 0 #1A1208, 0 0 24px rgba(230,192,74,0.5); margin:0; letter-spacing:2px; }
+.bf-agebanner p { font-family:"Pixelify Sans",monospace; font-size:16px; color:#EFDDB5;
+  text-shadow:1px 1px 0 #1A1208; margin:4px 0 0; }
+.bf-wonder { position:absolute; left:50%; top:48px; transform:translateX(-50%); padding:4px 14px;
+  display:none; font-family:"Pixelify Sans",monospace; font-size:14px; color:#1A1208;
+  background:linear-gradient(#F2E3B8,#DABE8D); border:1px solid #B99A6B; border-radius:3px;
+  box-shadow:0 0 0 1px #8A6414; pointer-events:none; z-index:25; }
+.bf-wonder.show { display:block; }
+.bf-wonder .bf-num { font-family:"VT323",monospace; font-size:16px; }
+.bf-attackpulse { position:absolute; inset:0; pointer-events:none; opacity:0; z-index:35;
+  box-shadow:inset 0 0 0 3px rgba(179,38,30,0.9), inset 0 0 60px 18px rgba(179,38,30,0.45); }
+.bf-attackpulse.show { animation:bfAttackPulse 1.6s ease-out; }
+@keyframes bfAttackPulse { 0% {opacity:0;} 12% {opacity:1;} 55% {opacity:0.55;} 100% {opacity:0;} }
+.bf-end { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
+  background:rgba(10,8,5,0.82); pointer-events:auto; z-index:50; font-family:"Pixelify Sans",monospace; }
+.bf-end.show { display:flex; }
+.bf-end-panel { width:min(420px, 88vw); padding:26px 26px 22px; text-align:center; color:#EFDDB5;
+  background:linear-gradient(#3a2a18,#2C1F12); border:2px solid #1A1208; border-radius:6px;
+  box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.65); }
+.bf-end-title { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:54px; line-height:1;
+  margin:0 0 4px; letter-spacing:2px; text-shadow:2px 2px 0 #1A1208; }
+.bf-end-title.victory { color:#E6C04A; }
+.bf-end-title.defeat { color:#C05B4E; }
+.bf-end-sub { font-size:14px; color:#B99A6B; margin:0 0 16px; }
+.bf-end-time { font-family:"VT323",monospace; font-size:26px; color:#EFDDB5; margin:0 0 14px; }
+.bf-end-stats { display:grid; grid-template-columns:1fr auto; gap:3px 18px; text-align:left;
+  font-size:15px; margin:0 auto 18px; max-width:280px; }
+.bf-end-stats .bf-num { font-family:"VT323",monospace; font-size:18px; text-align:right; color:#E6C04A; }
+.bf-end-btn { display:block; width:100%; margin:8px 0 0; padding:11px 0; font-family:inherit; font-size:18px;
+  color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border:1px solid #B99A6B; border-radius:4px;
+  box-shadow:0 2px 0 #8A6414; cursor:pointer; letter-spacing:1px; }
+.bf-end-btn:hover { background:linear-gradient(#F7EBCB,#E4CBA0); }
+.bf-end-btn:active { transform:translateY(1px); box-shadow:0 1px 0 #8A6414; }
+.bf-end-btn.ghost { background:none; color:#DABE8D; border-color:#64492B; box-shadow:none; }
+`;
+
+const AGE_FLAVOR: Record<string, string> = {
+  'Feudal Age': 'Your banners rise over new workshops.',
+  'Castle Age': 'Stone keeps and knights answer your call.',
+  'Imperial Age': 'The full might of your realm is unleashed.',
+};
+
+export class Overlays {
+  private el: HTMLDivElement;
+  private ageBanner: HTMLDivElement;
+  private ageTitle: HTMLHeadingElement;
+  private ageSub: HTMLParagraphElement;
+  private ageTimer: ReturnType<typeof setTimeout> | null = null;
+  private wonderStrip: HTMLDivElement;
+  private attackPulse: HTMLDivElement;
+  private endScreen: HTMLDivElement;
+  private endShown = false;
+
+  constructor(root: HTMLElement) {
+    if (!document.getElementById('bf-overlay-style')) {
+      const style = document.createElement('style');
+      style.id = 'bf-overlay-style';
+      style.textContent = OVERLAY_CSS;
+      document.head.appendChild(style);
+    }
+    this.el = document.createElement('div');
+    this.el.style.cssText = 'position:absolute;inset:0;pointer-events:none;';
+    root.appendChild(this.el);
+
+    this.ageBanner = document.createElement('div');
+    this.ageBanner.className = 'bf-agebanner';
+    this.ageTitle = document.createElement('h2');
+    this.ageSub = document.createElement('p');
+    this.ageBanner.append(this.ageTitle, this.ageSub);
+    this.el.appendChild(this.ageBanner);
+
+    this.wonderStrip = document.createElement('div');
+    this.wonderStrip.className = 'bf-wonder';
+    this.el.appendChild(this.wonderStrip);
+
+    this.attackPulse = document.createElement('div');
+    this.attackPulse.className = 'bf-attackpulse';
+    this.el.appendChild(this.attackPulse);
+
+    this.endScreen = document.createElement('div');
+    this.endScreen.className = 'bf-end';
+    this.el.appendChild(this.endScreen);
+  }
+
+  destroy(): void {
+    this.el.remove();
+  }
+
+  /** Transient celebration banner ("Castle Age!"), ~4.5 s. */
+  showAgeBanner(ageLabel: string): void {
+    this.ageTitle.textContent = `${ageLabel}!`;
+    this.ageSub.textContent = AGE_FLAVOR[ageLabel] ?? 'A new age dawns.';
+    this.ageBanner.classList.add('show');
+    if (this.ageTimer) clearTimeout(this.ageTimer);
+    this.ageTimer = setTimeout(() => this.ageBanner.classList.remove('show'), 4500);
+  }
+
+  /** Persistent strip while a completed wonder stands (null hides it). */
+  setWonderBanner(html: { owner: string; timeText: string } | null): void {
+    if (!html) {
+      this.wonderStrip.classList.remove('show');
+      return;
+    }
+    this.wonderStrip.replaceChildren();
+    this.wonderStrip.appendChild(document.createTextNode(`${html.owner}'s Wonder stands — `));
+    const t = document.createElement('span');
+    t.className = 'bf-num';
+    t.textContent = html.timeText;
+    this.wonderStrip.appendChild(t);
+    this.wonderStrip.classList.add('show');
+  }
+
+  /** Screen-edge red pulse for underAttack (sim already throttles the event). */
+  pulseUnderAttack(): void {
+    this.attackPulse.classList.remove('show');
+    // force a reflow so re-adding the class restarts the CSS animation
+    void this.attackPulse.offsetWidth;
+    this.attackPulse.classList.add('show');
+  }
+
+  get endScreenShown(): boolean {
+    return this.endShown;
+  }
+
+  /** Victory/defeat end screen. Shown once; Continue watching dismisses it. */
+  showEndScreen(
+    victory: boolean,
+    summary: MatchSummary,
+    onReturnToTitle: () => void,
+  ): void {
+    if (this.endShown) return;
+    this.endShown = true;
+    this.endScreen.replaceChildren();
+    const panel = document.createElement('div');
+    panel.className = 'bf-end-panel';
+
+    const title = document.createElement('h2');
+    title.className = `bf-end-title ${victory ? 'victory' : 'defeat'}`;
+    title.textContent = victory ? 'Victory!' : 'Defeat';
+    const sub = document.createElement('p');
+    sub.className = 'bf-end-sub';
+    sub.textContent = victory
+      ? 'Your banner flies over the field.'
+      : 'Your banner has fallen.';
+    const time = document.createElement('p');
+    time.className = 'bf-end-time';
+    time.textContent = `Match time ${summary.timeText}`;
+
+    const stats = document.createElement('div');
+    stats.className = 'bf-end-stats';
+    const row = (label: string, value: string): void => {
+      const l = document.createElement('span');
+      l.textContent = label;
+      const v = document.createElement('span');
+      v.className = 'bf-num';
+      v.textContent = value;
+      stats.append(l, v);
+    };
+    row('Units standing', String(summary.unitsAlive));
+    row('Buildings standing', String(summary.buildingsAlive));
+    row('Enemies slain', String(summary.tallies.unitsKilled));
+    row('Buildings razed', String(summary.tallies.buildingsRazed));
+    row('Units lost', String(summary.tallies.unitsLost));
+    row('Technologies', String(summary.techsResearched));
+
+    const returnBtn = document.createElement('button');
+    returnBtn.className = 'bf-end-btn';
+    returnBtn.textContent = 'Return to Title';
+    returnBtn.addEventListener('click', onReturnToTitle);
+    const watchBtn = document.createElement('button');
+    watchBtn.className = 'bf-end-btn ghost';
+    watchBtn.textContent = 'Continue watching';
+    watchBtn.addEventListener('click', () => this.endScreen.classList.remove('show'));
+
+    panel.append(title, sub, time, stats, returnBtn, watchBtn);
+    this.endScreen.appendChild(panel);
+    this.endScreen.classList.add('show');
+  }
+}

@@ -14,6 +14,7 @@ export const buildings: Record<string, BuildingDef> = {
     attacks: [{ cls: 'pierce', amount: 5 }],
     range: 6, rof: 2, projectileSpeed: 7,
     arrowsBase: 1, arrowsPerGarrison: 1, arrowsMax: 11, garrisonCapacity: 15,
+    garrisonHealRate: 0.1, // AoE2: garrisoned units heal 0.1 HP/s in TCs/towers
     dropOffFor: ['food', 'wood', 'gold', 'stone'],
     trains: ['villager'],
     researches: ['loom', 'wheelbarrow', 'handCart', 'feudalAge', 'castleAge', 'imperialAge'],
@@ -82,6 +83,7 @@ export const buildings: Record<string, BuildingDef> = {
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 7 }],
     classes: ['building'],
     garrisonCapacity: 10,
+    garrisonHealRate: 0.1,
     trains: ['militia', 'manAtArms', 'longswordsman', 'champion', 'spearman', 'pikeman'],
     researches: ['manAtArmsUpgrade', 'longswordsmanUpgrade', 'championUpgrade', 'pikemanUpgrade'],
     los: 6,
@@ -94,6 +96,7 @@ export const buildings: Record<string, BuildingDef> = {
     armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 8 }],
     classes: ['building'],
     garrisonCapacity: 10,
+    garrisonHealRate: 0.1,
     trains: ['archer', 'crossbowman', 'arbalester', 'skirmisher', 'eliteSkirmisher'],
     researches: ['crossbowmanUpgrade', 'arbalesterUpgrade', 'eliteSkirmisherUpgrade'],
     requiresBuildings: ['barracks'],
@@ -107,6 +110,7 @@ export const buildings: Record<string, BuildingDef> = {
     armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 8 }],
     classes: ['building'],
     garrisonCapacity: 10,
+    garrisonHealRate: 0.1,
     trains: ['scout', 'lightCavalry', 'knight', 'cavalier', 'paladin'],
     researches: ['lightCavalryUpgrade', 'cavalierUpgrade', 'paladinUpgrade'],
     requiresBuildings: ['barracks'],
@@ -120,6 +124,7 @@ export const buildings: Record<string, BuildingDef> = {
     armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 8 }],
     classes: ['building'],
     garrisonCapacity: 10,
+    garrisonHealRate: 0.1,
     trains: ['batteringRam', 'cappedRam', 'siegeRam', 'mangonel', 'onager'],
     researches: ['cappedRamUpgrade', 'siegeRamUpgrade', 'onagerUpgrade'],
     requiresBuildings: ['blacksmith'],
@@ -158,6 +163,8 @@ export const buildings: Record<string, BuildingDef> = {
     hp: 2100, size: 3,
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 7 }],
     classes: ['building'],
+    garrisonCapacity: 10,
+    garrisonHealRate: 0.1,
     trains: ['monk'],
     researches: ['sanctity', 'fervor', 'blockPrinting', 'faith'],
     los: 6,
@@ -185,6 +192,7 @@ export const buildings: Record<string, BuildingDef> = {
     attacks: [{ cls: 'pierce', amount: 5 }],
     range: 8, minRange: 1, rof: 2, projectileSpeed: 7,
     arrowsBase: 1, arrowsPerGarrison: 1, arrowsMax: 5, garrisonCapacity: 5,
+    garrisonHealRate: 0.1,
     countsForAgeUp: false, // towers don't qualify for age-up (nor do their upgrades)
     los: 10,
     icon: 'icon/watchTower',
@@ -198,6 +206,7 @@ export const buildings: Record<string, BuildingDef> = {
     attacks: [{ cls: 'pierce', amount: 7 }],
     range: 8, minRange: 1, rof: 2, projectileSpeed: 7,
     arrowsBase: 1, arrowsPerGarrison: 1, arrowsMax: 5, garrisonCapacity: 5,
+    garrisonHealRate: 0.1,
     requiresTech: 'guardTowerUpgrade',
     countsForAgeUp: false,
     los: 10,
@@ -212,6 +221,7 @@ export const buildings: Record<string, BuildingDef> = {
     attacks: [{ cls: 'pierce', amount: 8 }],
     range: 8, minRange: 1, rof: 2, projectileSpeed: 7,
     arrowsBase: 1, arrowsPerGarrison: 1, arrowsMax: 5, garrisonCapacity: 5,
+    garrisonHealRate: 0.1,
     requiresTech: 'keepUpgrade',
     countsForAgeUp: false,
     los: 10,
@@ -244,6 +254,7 @@ export const buildings: Record<string, BuildingDef> = {
     attacks: [{ cls: 'pierce', amount: 11 }],
     range: 8, minRange: 1, rof: 2, projectileSpeed: 7,
     arrowsBase: 5, arrowsPerGarrison: 1, arrowsMax: 21, garrisonCapacity: 20,
+    garrisonHealRate: 0.2, // AoE2: castles heal garrisons twice as fast
     // Unique units/techs listed for both civs; the sim restricts to the player's civ.
     trains: ['highlandRaider', 'eliteHighlandRaider', 'longbowman', 'eliteLongbowman', 'trebuchet'],
     researches: [
@@ -261,7 +272,7 @@ export const buildings: Record<string, BuildingDef> = {
     hp: 4800, size: 5,
     armor: [{ cls: 'melee', amount: 3 }, { cls: 'pierce', amount: 10 }],
     classes: ['building'],
-    wonder: true, los: 8,
+    wonder: true, wonderTimer: 1000, los: 8, // AoE2: stand ~1000 in-game seconds to win
     icon: 'icon/wonder',
   },
 };

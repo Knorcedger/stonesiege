@@ -10,7 +10,7 @@ semantics.
 ## Wiring
 
 ```ts
-const { start, meta } = loadScenario(wallace1);
+const { start, meta } = loadScenario(wallace1, campaignGameData); // heroes merged in — see gap 1
 const game = createGame({ seed, map: start, players: meta.playerSetups, popCap: meta.popCap });
 const runtime = new TriggerRuntime(wallace1, ops); // ops closes over `game` + UI
 // each frame step:
@@ -69,10 +69,12 @@ replays identically.
 ## Known gaps / asks
 
 1. **Hero defs** (`heroWallace`, `heroHeselrig`, later `heroMoray` etc. —
-   docs/CAMPAIGN_WALLACE.md Appendix A) are not in `@bf/data` yet. `wallace-1` references
-   them; `loadScenario(wallace1)` fails validation against default `gameData` until they
-   land (tests inject placeholder defs). Nothing in the loader/engine needs changing when
-   they land.
+   docs/CAMPAIGN_WALLACE.md Appendix A) are not in `@bf/data` yet. Until they land, this
+   package ships placeholder defs in `src/heroes.ts`: load campaign scenarios with
+   `loadScenario(wallace1, campaignGameData)` (or `withCampaignHeroes(gameData)`). The
+   merge prefers `@bf/data` — the moment real hero defs land there, the placeholders are
+   inert and nothing here needs changing. Placeholder icons reuse existing atlas frames
+   (`icon/champion` etc.) so no missing-art references exist.
 2. **Per-player pop caps**: `ScenarioPlayer.popCap` exists per player, but `GameConfig`
    takes one global `popCap`. `meta.popCap` is the max across players; per-player caps in
    `meta.players[i].popCap` are ready whenever the sim supports them.

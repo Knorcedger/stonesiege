@@ -1,10 +1,13 @@
 // Internal (non-public) sim state shared by the system modules. Everything here is part
 // of the deterministic state: integers only, insertion-ordered Maps, no wall clock.
 
-import type { Entity, EntityId, Fixed, GameMap, PlayerState, Stockpile } from './types';
+import { gameData } from '@bf/data';
+import type { ClassValue, GatherTask } from '@bf/data';
+import { FP } from './types';
+import type { Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile } from './types';
 import type { SimRng } from './rng';
 import type { SpatialGrid } from './spatial';
-import type { PlayerModifierTable, ResolvedUnitStats } from './stats';
+import type { PlayerModifierTable, ResolvedBuildingStats, ResolvedUnitStats } from './stats';
 import type { GroupSearch } from './path';
 
 /** Per-unit movement state (exists only while the unit has an active move order). */
@@ -34,6 +37,97 @@ export interface FoundationSite {
   acc: number; // scaled builder-tick accumulator (integer)
   accNeeded: number; // 3 * buildTimeTicks * RATE_SCALE
   paid: Stockpile;
+}
+
+/** Per-villager gathering bookkeeping (exists while the unit has a gather intent). */
+export interface GatherInfo {
+  /** Scaled extraction accumulator: RES_SCALE * TICKS_PER_SECOND per whole resource. */
+  acc: number;
+  /** Failed approach attempts since the last successful arrival. */
+  retries: number;
+  /** Walking a full (or final) load to the drop-off instead of working the node. */
+  depositing: boolean;
+  /** Chosen drop-off building; revalidated every tick. */
+  dropoffId?: EntityId;
+  /** Hunters: next tick this villager may strike a live animal. */
+  nextAttackTick: number;
+  /** Task + last known target tile (auto-continue retargets near the depleted node). */
+  task: GatherTask | null;
+  lastX: number;
+  lastY: number;
+  /** Deposit what is carried, then go idle (nothing left to retarget). */
+  finishAfterDeposit: boolean;
+}
+
+/** A villager running for a garrison after taking damage (GDD villager-flee rule). */
+export interface FleeState {
+  buildingId: EntityId;
+  retries: number;
+}
+
+/** Under-repair building: scaled HP accumulator + scaled resource debt (cost trickle). */
+export interface RepairSite {
+  acc: number;
+  debt: Stockpile; // scaled by REPAIR_SCALE; whole units are deducted as debt crosses it
+}
+
+/** A unit's live engagement (explicit attack order or auto-acquired target). */
+export interface CombatInfo {
+  targetId: EntityId;
+  /** Auto-acquired (LOS scan / retaliation): leash + return-to-anchor rules apply. */
+  auto: boolean;
+  nextAttackTick: number;
+  /** Where the unit stood when it auto-acquired — it returns here after disengaging. */
+  anchorX: Fixed;
+  anchorY: Fixed;
+}
+
+/** An in-flight projectile. Damage payload frozen at fire time (attacker may die). */
+export interface Projectile {
+  attackerId: EntityId;
+  player: PlayerId;
+  targetId: EntityId;
+  /** Impact point (fixed-point). Aim was rolled/led at fire time; flight is fixed. */
+  x: Fixed;
+  y: Fixed;
+  impactTick: number;
+  /** Accuracy roll at fire time (a miss lands at a scatter point — may graze someone). */
+  hit: boolean;
+  /** Splash radius in fixed units (mangonel line); 0 = single target. */
+  splashFp: number;
+  /** Resolved attack entries at fire time (tech bonuses included). */
+  attacks: ClassValue[];
+}
+
+/** Per-monk faith + current channel (heal or convert). */
+export interface MonkInfo {
+  faith: number; // 0..100
+  faithAcc: number; // scaled regen accumulator (RES_SCALE * TICKS_PER_SECOND per point)
+  convertTargetId?: EntityId;
+  /** Ticks spent channeling IN RANGE on the current conversion target. */
+  channelTicks: number;
+  healTargetId?: EntityId;
+  /** True while the heal target came from an explicit command (monk will chase). */
+  healExplicit: boolean;
+  healAcc: number; // scaled HP accumulator
+}
+
+/** A unit walking to a garrison target (explicit garrison command). */
+export interface GarrisonWalk {
+  targetId: EntityId;
+  retries: number;
+}
+
+/** Trebuchet fold/unfold in progress. */
+export interface PackTransition {
+  ticksLeft: number;
+  toPacked: boolean;
+}
+
+/** A completed Wonder counting down to victory (GDD optional wonder win). */
+export interface WonderTimer {
+  player: PlayerId;
+  ticksLeft: number;
 }
 
 /** Shared-vision group (a team, or a solo player). Allied players point at the same arrays. */
@@ -80,6 +174,47 @@ export interface SimState {
   modifiers: PlayerModifierTable[];
   /** resolveUnitStats cache, keyed `${player}:${defId}`; cleared when modifiers change. */
   statsCache: Map<string, ResolvedUnitStats>;
+  /** resolveBuildingStats cache, same keying/invalidations. */
+  buildingStatsCache: Map<string, ResolvedBuildingStats>;
+  /** Gathering state per villager (exists while the unit has a gather intent). */
+  gather: Map<EntityId, GatherInfo>;
+  /** Villagers fleeing to garrison after taking damage (GDD combat rules). */
+  fleeing: Map<EntityId, FleeState>;
+  /** Gaia-animal (wolf) attack cooldowns: next allowed strike tick. */
+  animalCd: Map<EntityId, number>;
+  /** Carcass rot accumulators (scaled like GatherInfo.acc). */
+  decayAcc: Map<EntityId, number>;
+  /** Buildings under repair (HP accumulator + cost-trickle debt). */
+  repairs: Map<EntityId, RepairSite>;
+
+  // --- combat / tech / endgame (wave 2b) ---
+  /** Live engagements per unit (explicit orders + auto-acquired targets). */
+  combat: Map<EntityId, CombatInfo>;
+  /** In-flight projectiles, fire order (deterministic). */
+  projectiles: Projectile[];
+  /** Defensive-building RoF cooldowns: next tick the building may fire. */
+  buildingCd: Map<EntityId, number>;
+  /** Monk faith + channel state (lazy, per living monk). */
+  monks: Map<EntityId, MonkInfo>;
+  /** Units walking to garrison after an explicit garrison command. */
+  garrisoning: Map<EntityId, GarrisonWalk>;
+  /** Garrison-healing accumulators per garrisoned unit (scaled). */
+  healAcc: Map<EntityId, number>;
+  /** Military corpses: ticks until the body is cleaned up (renderer plays 'dying'). */
+  corpses: Map<EntityId, number>;
+  /** Trebuchet pack/unpack transitions in progress. */
+  packTransitions: Map<EntityId, PackTransition>;
+  /** GDD market: ONE global drifting rate per commodity (gold per 100), shared by all. */
+  marketRates: { food: number; wood: number; stone: number };
+  /** Completed wonders counting down, by entity id. */
+  wonders: Map<EntityId, WonderTimer>;
+  /** Per-player earliest tick the next underAttack alert may fire (throttle). */
+  alertNext: number[];
+  /** Per-player Ballistics flag (projectiles lead moving targets). */
+  ballistics: boolean[];
+  /** Per-player extra unit/building defs force-enabled by enableUnit/enableBuilding effects. */
+  enabledUnits: Array<Set<string>>;
+  enabledBuildings: Array<Set<string>>;
 }
 
 export const tileIndex = (map: GameMap, x: number, y: number): number => y * map.width + x;
@@ -95,6 +230,48 @@ export function isTileWalkable(state: SimState, x: number, y: number): boolean {
 
 /** Integer sqrt of a non-negative int (Math.sqrt is IEEE-exact; floor keeps it integral). */
 export const isqrt = (v: number): number => Math.floor(Math.sqrt(v));
+
+/** Soft-body radius of a unit in fixed units (matches movement separation). */
+export const UNIT_RADIUS_FP = 64;
+
+/** Distance (fixed units) from a point to a size×size tile footprint's rectangle. */
+export function distToFootprintFp(px: Fixed, py: Fixed, tileX: number, tileY: number, size: number): number {
+  const dx = Math.max(tileX * FP - px, 0, px - (tileX + size) * FP);
+  const dy = Math.max(tileY * FP - py, 0, py - (tileY + size) * FP);
+  return isqrt(dx * dx + dy * dy);
+}
+
+/**
+ * Combat range between an attacker (unit or building) and a target: edge-to-edge in
+ * fixed units — collision radii for units, footprint rectangles for buildings.
+ */
+export function effDistFp(state: SimState, from: Entity, target: Entity): number {
+  const fromSize = from.kind === 'building' ? footSize(from) : 0;
+  if (target.kind === 'building' || target.kind === 'resource') {
+    const size = target.kind === 'building' ? footSize(target) : 1;
+    if (fromSize > 0) {
+      // building vs building (rare): center-to-rect minus half own footprint
+      const d = distToFootprintFp(from.x, from.y, target.tileX, target.tileY, size);
+      return Math.max(0, d - (fromSize * FP) / 2);
+    }
+    return Math.max(0, distToFootprintFp(from.x, from.y, target.tileX, target.tileY, size) - UNIT_RADIUS_FP);
+  }
+  const dx = from.x - target.x, dy = from.y - target.y;
+  const d = isqrt(dx * dx + dy * dy);
+  if (fromSize > 0) return Math.max(0, d - (fromSize * FP) / 2 - UNIT_RADIUS_FP);
+  return Math.max(0, d - 2 * UNIT_RADIUS_FP);
+}
+
+/** Footprint size for range math (mirrors entities.footprintSize for buildings). */
+const footSize = (e: Entity): number => gameData.buildings[e.defId]?.size ?? 1;
+
+/** Unit stands in the 1-tile ring around (or on) a size×size footprint at (tileX, tileY). */
+export function adjacentToFootprint(
+  e: { tileX: number; tileY: number }, tileX: number, tileY: number, size: number,
+): boolean {
+  return e.tileX >= tileX - 1 && e.tileX <= tileX + size &&
+    e.tileY >= tileY - 1 && e.tileY <= tileY + size;
+}
 
 /**
  * Facing octant from a tile-space delta. Screen mapping (see ASSET_CONTRACT.md):

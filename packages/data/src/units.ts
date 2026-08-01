@@ -244,6 +244,8 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 5, speed: 0.6, los: 3,
     classes: ['siege', 'ram'],
     garrisonCapacity: 6, // all rams hold 6 in the current AoE2 DE patch era this pack tracks
+    garrisonSpeedPerUnit: 0.05, // AoE2: each garrisoned infantryman adds +0.05 speed...
+    garrisonAttackPerUnit: [{ cls: 'building', amount: 10 }], // ...and +10 vs buildings
     icon: 'icon/batteringRam',
   },
   cappedRam: {
@@ -259,6 +261,8 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 5, speed: 0.6, los: 3,
     classes: ['siege', 'ram'],
     garrisonCapacity: 6,
+    garrisonSpeedPerUnit: 0.05,
+    garrisonAttackPerUnit: [{ cls: 'building', amount: 10 }],
     requiresTech: 'cappedRamUpgrade',
     icon: 'icon/cappedRam',
   },
@@ -275,6 +279,8 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 5, speed: 0.6, los: 3,
     classes: ['siege', 'ram'],
     garrisonCapacity: 6,
+    garrisonSpeedPerUnit: 0.05,
+    garrisonAttackPerUnit: [{ cls: 'building', amount: 10 }],
     requiresTech: 'siegeRamUpgrade',
     icon: 'icon/siegeRam',
   },
@@ -341,6 +347,8 @@ export const units: Record<string, UnitDef> = {
     range: 9, rof: 2, speed: 0.7, los: 11,
     classes: ['monk'],
     heals: true, converts: true,
+    healRange: 4, // AoE2: heals at range 4 (conversion uses `range` 9)
+    healRate: 1.5, // HP/s — a badly hurt knight takes on the order of a minute (AOE2_REFERENCE §3)
     icon: 'icon/monk',
   },
 
@@ -400,7 +408,9 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 0 }],
     range: 0, rof: 2, speed: 0.8, los: 2,
     classes: [],
+    pop: 0, // herdables never take population (AoE2)
     foodAmount: 100, huntable: true, herdable: true,
+    decayRate: 0.25, // carcass rot, food/second (AoE2 ~0.25)
     icon: 'icon/sheep',
   },
   deer: {
@@ -411,7 +421,9 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 0 }],
     range: 0, rof: 2, speed: 1.2, los: 3, // flees hunters
     classes: [],
+    pop: 0,
     foodAmount: 140, huntable: true,
+    decayRate: 0.25, // carcass rot, food/second (AoE2 ~0.25)
     icon: 'icon/deer',
   },
   wolf: {
@@ -422,6 +434,7 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 0 }],
     range: 0, rof: 2, speed: 1.2, los: 5, // hostile: attacks units that stray close
     classes: [],
+    pop: 0,
     icon: 'icon/wolf',
   },
 };

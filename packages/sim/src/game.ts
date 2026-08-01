@@ -20,7 +20,18 @@ import { applyCommands, checkEliminations } from './commands';
 import { tickProduction } from './production';
 import { tickPathfinding } from './path';
 import { tickMovement } from './movement';
-import { buildAgeIndex, rivalUnitOnFootprint, tickConstruction } from './construction';
+import { buildAgeIndex, hasBuildPrereqs, rivalUnitOnFootprint, tickConstruction } from './construction';
+import { tickRepair } from './repair';
+import { tickGathering } from './gather';
+import { tickAnimals } from './animals';
+import { tickFlee } from './flee';
+import { tickCombat } from './combat';
+import { tickProjectiles } from './projectiles';
+import { tickMonks } from './monks';
+import { tickGarrison } from './garrison';
+import { tickWonders } from './victory';
+import { MARKET_START_RATES } from './market';
+import { makeSimOps } from './ops';
 import { hashState } from './hash';
 
 /** AoE2 standard starting kit (see docs/AOE2_REFERENCE.md). */
@@ -112,6 +123,26 @@ export function createGame(config: GameConfig): Game {
     buildRetries: new Map(),
     modifiers: players.map((p) => buildModifierTable(p.setup.civ, p.age)),
     statsCache: new Map(),
+    buildingStatsCache: new Map(),
+    gather: new Map(),
+    fleeing: new Map(),
+    animalCd: new Map(),
+    decayAcc: new Map(),
+    repairs: new Map(),
+    combat: new Map(),
+    projectiles: [],
+    buildingCd: new Map(),
+    monks: new Map(),
+    garrisoning: new Map(),
+    healAcc: new Map(),
+    corpses: new Map(),
+    packTransitions: new Map(),
+    marketRates: { ...MARKET_START_RATES },
+    wonders: new Map(),
+    alertNext: players.map(() => 0),
+    ballistics: players.map(() => false),
+    enabledUnits: players.map(() => new Set<string>()),
+    enabledBuildings: players.map(() => new Set<string>()),
   };
 
   if (scenario) {
@@ -130,11 +161,22 @@ export function createGame(config: GameConfig): Game {
     if (state.finished) return [];
     const events: SimEvent[] = [];
     applyCommands(state, commands, events);
-    tickProduction(state, events);
-    tickPathfinding(state);
-    tickMovement(state);
-    tickConstruction(state, events); // after movement so same-tick arrivals start building
-    checkEliminations(state, events); // GDD conquest elimination — after all removals this tick
+    if (!state.finished) { // a resign in this batch may have ended the game: freeze the terminal state
+      tickProduction(state, events); // shared queue: training + research completion
+      tickPathfinding(state);
+      tickMovement(state);
+      tickCombat(state, events); // after movement: engage/fire from post-move positions
+      tickProjectiles(state, events); // in-flight shots land
+      tickMonks(state, events); // heal channels + conversions
+      tickConstruction(state, events); // after movement so same-tick arrivals start building
+      tickRepair(state, events);
+      tickGathering(state, events); // same-tick arrivals start gathering too
+      tickAnimals(state, events); // wander / wolf aggro / sheep claiming / carcass rot
+      tickGarrison(state, events); // explicit garrison entries + garrison healing
+      tickFlee(state); // damaged villagers reach + enter garrisons
+      tickWonders(state, events); // wonder countdown / victory
+      checkEliminations(state, events); // GDD conquest elimination — after all removals this tick
+    }
     state.tick++;
     return events;
   };
@@ -143,12 +185,17 @@ export function createGame(config: GameConfig): Game {
     get state(): GameState { return state; },
     advance,
     hash: () => hashState(state),
+    ops: makeSimOps(state),
     canPlace: (player, defId, tileX, tileY) => {
       const def = gameData.buildings[defId];
       if (!def) return false;
       if (player <= GAIA || player >= state.players.length) return false;
-      // construction age gate (TC: castle age per GDD, even though the def is 'dark')
-      if (buildAgeIndex(def) > AGES.indexOf(state.players[player].age)) return false;
+      // construction age gate (TC: castle age per GDD, even though the def is 'dark');
+      // an enableBuilding effect overrides age/civ/prereq gates (hasBuildPrereqs)
+      const enabled = state.enabledBuildings[player]?.has(defId) === true;
+      if (!enabled && buildAgeIndex(def) > AGES.indexOf(state.players[player].age)) return false;
+      // prerequisite buildings/techs (Farm needs a Mill, Stable a Barracks, ...)
+      if (!hasBuildPrereqs(state, player, def)) return false;
       for (let dy = 0; dy < def.size; dy++) {
         for (let dx = 0; dx < def.size; dx++) {
           const x = tileX + dx, y = tileY + dy;

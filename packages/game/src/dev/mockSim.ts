@@ -266,8 +266,25 @@ class MockGame implements Game {
         if (e && e.player === cmd.player && e.activity !== 'dying') this.kill(e, events);
         break;
       }
+      case 'resign': {
+        // enough of the GDD defeat flow for the HUD end screens to be testable
+        // standalone: mark defeated, destroy holdings, declare the survivors
+        const p = this.st.players[cmd.player];
+        if (!p || p.defeated) return;
+        p.defeated = true;
+        for (const e of [...this.st.entities.values()]) {
+          if (e.player === cmd.player && e.activity !== 'dying') this.kill(e, events);
+        }
+        events.push({ kind: 'playerDefeated', player: cmd.player });
+        const alive = this.st.players.filter((pl) => pl.id !== GAIA && !pl.defeated).map((pl) => pl.id);
+        if (alive.length <= 1) {
+          this.st.finished = true;
+          events.push({ kind: 'victory', winners: alive });
+        }
+        break;
+      }
       default:
-        // research/garrison/convert/heal/marketTrade/resign: not simulated in the mock
+        // research/garrison/convert/heal/marketTrade: not simulated in the mock
         break;
     }
   }

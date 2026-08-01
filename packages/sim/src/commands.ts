@@ -1,7 +1,5 @@
-// Command intake. Every kind in the Command union has a dispatch entry; wave-1 implements
-// move / attackMove / stop / train / cancelTrain / setRally / deleteEntity / resign, and
-// the rest are accepted as validated no-ops (TODO hooks filled by wave 2). Illegal
-// commands are dropped silently — the sim never throws on player/AI input.
+// Command intake. Every kind in the Command union dispatches to its system handler.
+// Illegal commands are dropped silently — the sim never throws on player/AI input.
 // Also home of defeat handling: resign, the per-tick GDD conquest elimination check
 // (no TC + no villagers + no production buildings = defeated), and victory detection.
 
@@ -14,6 +12,15 @@ import { orderMove } from './path';
 import { resolveUnitStats } from './stats';
 import { refundItem, refundQueue, TRAIN_QUEUE_CAP } from './production';
 import { handleBuild, refundFoundation } from './construction';
+import { handleGather } from './gather';
+import { handleRepair } from './repair';
+import { handleQueueReseed, handleReseedFarm } from './farms';
+import { handleAttack, handlePackCommand } from './combat';
+import { handleGarrison, handleUngarrison } from './garrison';
+import { handleConvert, handleHeal } from './monks';
+import { handleCancelResearch, handleResearch, isUnitEnabled, isUpgradedAway } from './research';
+import { handleMarketTrade } from './market';
+import { ejectGarrison } from './damage';
 
 type Handler<K extends Command['kind']> =
   (state: SimState, cmd: Extract<Command, { kind: K }>, events: SimEvent[]) => void;
@@ -43,20 +50,46 @@ function ownedBuilding(state: SimState, player: PlayerId, id: EntityId): Entity 
   return e;
 }
 
+/** An explicit order overrides every running reflex/engagement on the unit. */
+function clearTaskState(state: SimState, e: Entity): void {
+  state.fleeing.delete(e.id);
+  state.combat.delete(e.id);
+  state.garrisoning.delete(e.id);
+  state.buildRetries.delete(e.id);
+  e.targetId = undefined;
+  const monk = state.monks.get(e.id);
+  if (monk) {
+    monk.convertTargetId = undefined;
+    monk.healTargetId = undefined;
+    monk.channelTicks = 0;
+  }
+}
+
+/** Pack-capable siege (trebuchets) cannot walk while deployed or mid-transition. */
+function canWalk(state: SimState, e: Entity): boolean {
+  const def = gameData.units[e.defId];
+  if (!def?.pack) return true;
+  return e.packed === true && !state.packTransitions.has(e.id);
+}
+
 const handleMove: Handler<'move'> = (state, cmd) => {
-  const units = ownedUnits(state, cmd.player, cmd.units);
+  const units = ownedUnits(state, cmd.player, cmd.units).filter((id) =>
+    canWalk(state, state.entities.get(id)!));
   for (const id of units) {
     const e = state.entities.get(id)!;
     e.intent = undefined;
+    clearTaskState(state, e);
   }
   orderMove(state, units, cmd.x, cmd.y);
 };
 
 const handleAttackMove: Handler<'attackMove'> = (state, cmd) => {
-  const units = ownedUnits(state, cmd.player, cmd.units);
+  const units = ownedUnits(state, cmd.player, cmd.units).filter((id) =>
+    canWalk(state, state.entities.get(id)!));
   for (const id of units) {
     const e = state.entities.get(id)!;
-    e.intent = { kind: 'attackMove', x: cmd.x, y: cmd.y }; // wave 2: auto-engage en route
+    e.intent = { kind: 'attackMove', x: cmd.x, y: cmd.y }; // combat auto-engages en route
+    clearTaskState(state, e);
   }
   orderMove(state, units, cmd.x, cmd.y);
 };
@@ -65,8 +98,8 @@ const handleStop: Handler<'stop'> = (state, cmd) => {
   for (const id of ownedUnits(state, cmd.player, cmd.units)) {
     const e = state.entities.get(id)!;
     state.motion.delete(id);
+    clearTaskState(state, e);
     e.intent = undefined;
-    e.targetId = undefined;
     e.activity = 'idle';
   }
 };
@@ -85,18 +118,21 @@ const handleTrain: Handler<'train'> = (state, cmd) => {
   const player = state.players[cmd.player];
   const civ = gameData.civs[player.setup.civ];
 
-  // tech-tree cuts + rival unique units (castle lists both civs' uniques)
-  if (civ) {
-    if (civ.disabled.includes(cmd.defId)) return;
-    for (const otherCiv of Object.values(gameData.civs)) {
-      if (otherCiv.id === civ.id) continue;
-      if (cmd.defId === otherCiv.uniqueUnit) return;
-      if (unitDef.requiresTech !== undefined && unitDef.requiresTech === otherCiv.eliteUniqueTech) return;
+  // an enableUnit effect (scenario/civ hook) overrides the availability gates below
+  if (!isUnitEnabled(state, cmd.player, cmd.defId)) {
+    // tech-tree cuts + rival unique units (castle lists both civs' uniques)
+    if (civ) {
+      if (civ.disabled.includes(cmd.defId)) return;
+      for (const otherCiv of Object.values(gameData.civs)) {
+        if (otherCiv.id === civ.id) continue;
+        if (cmd.defId === otherCiv.uniqueUnit) return;
+        if (unitDef.requiresTech !== undefined && unitDef.requiresTech === otherCiv.eliteUniqueTech) return;
+      }
     }
+    if (AGES.indexOf(unitDef.age) > AGES.indexOf(player.age)) return;
+    if (unitDef.requiresTech && !player.researchedTechs.includes(unitDef.requiresTech)) return;
+    if (isUpgradedAway(state, cmd.player, cmd.defId)) return; // militia gone once MAA researched
   }
-
-  if (AGES.indexOf(unitDef.age) > AGES.indexOf(player.age)) return;
-  if (unitDef.requiresTech && !player.researchedTechs.includes(unitDef.requiresTech)) return;
 
   const stats = resolveUnitStats(state, cmd.player, cmd.defId);
   const { cost } = stats;
@@ -138,6 +174,8 @@ const handleDeleteEntity: Handler<'deleteEntity'> = (state, cmd, events) => {
     refundQueue(state, e);
     refundFoundation(state, e); // unbuilt fraction of a foundation comes back
   }
+  // deleting a ram ejects its passengers alive (buildings still kill theirs — GDD)
+  if (e.kind === 'unit' && e.garrison && e.garrison.length > 0) ejectGarrison(state, e);
   removeEntity(state, cmd.entityId);
   events.push({ kind: 'entityDied', id: e.id, defId: e.defId, player: e.player, x: e.x, y: e.y });
 };
@@ -204,36 +242,40 @@ export function checkVictory(state: SimState, events: SimEvent[]): void {
   }
 }
 
-// Wave-2 kinds: validated intake exists, effects land with their systems. Never crash.
-const todo = (): void => { /* TODO(wave 2) */ };
+// Every command kind now has a live handler (wave 2 complete). The `todo` marker is
+// kept so PENDING_COMMAND_KINDS stays a valid (now empty) contract for the HUD.
+const todo = (): void => { /* unreachable — retained for the PENDING contract */ };
 
 const handlers: { [K in Command['kind']]: Handler<K> } = {
   move: handleMove,
   attackMove: handleAttackMove,
-  attack: todo, // TODO(wave 2): combat targeting
-  gather: todo, // TODO(wave 2): gathering
+  attack: (state, cmd) => handleAttack(state, cmd),
+  gather: (state, cmd) => handleGather(state, cmd),
   build: handleBuild,
-  repair: todo, // TODO(wave 2): repair
+  repair: (state, cmd) => handleRepair(state, cmd),
   train: handleTrain,
   cancelTrain: handleCancelTrain,
-  research: todo, // TODO(wave 2): research + tech effects
-  cancelResearch: todo, // TODO(wave 2)
+  research: handleResearch,
+  cancelResearch: (state, cmd) => handleCancelResearch(state, cmd),
   setRally: handleSetRally,
   stop: handleStop,
-  garrison: todo, // TODO(wave 2): garrison
-  ungarrison: todo, // TODO(wave 2)
-  convert: todo, // TODO(wave 2): monks
-  heal: todo, // TODO(wave 2)
+  garrison: (state, cmd) => handleGarrison(state, cmd),
+  ungarrison: (state, cmd) => handleUngarrison(state, cmd),
+  convert: (state, cmd) => handleConvert(state, cmd),
+  heal: (state, cmd) => handleHeal(state, cmd),
   deleteEntity: handleDeleteEntity,
-  marketTrade: todo, // TODO(wave 2): market
+  marketTrade: handleMarketTrade,
+  reseedFarm: (state, cmd) => handleReseedFarm(state, cmd),
+  queueReseed: (state, cmd) => handleQueueReseed(state, cmd),
+  pack: (state, cmd) => handlePackCommand(state, cmd),
+  unpack: (state, cmd) => handlePackCommand(state, cmd),
   resign: handleResign,
 };
 
 /**
- * Command kinds whose effects have NOT landed yet (wave-2 systems): the intake
- * validates and accepts them, but they are no-ops. The HUD reads this so it never
- * confirms an order the sim will drop (no false-positive toasts / disabled verbs).
- * Derived from the handlers map — shrinks automatically as wave-2 handlers land.
+ * Command kinds whose effects have NOT landed yet: the intake validates and accepts
+ * them, but they are no-ops. The HUD reads this so it never confirms an order the sim
+ * will drop. Derived from the handlers map — EMPTY as of wave 2 (kept for the contract).
  */
 export const PENDING_COMMAND_KINDS: ReadonlySet<Command['kind']> = new Set(
   (Object.keys(handlers) as Array<Command['kind']>).filter(

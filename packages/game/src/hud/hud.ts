@@ -15,7 +15,13 @@ import { type Entity, type EntityId, type GameState, type PlayerId, type Resourc
 import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
 import type { IdleCategory } from '../selectionTools';
-import { buildMenuButtons, trainMenuButtons } from './cardModel';
+import {
+  ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, millAutoReseedButton,
+  researchMenuButtons, trainMenuButtons, unitVerbButtons, WAVE2_REASON,
+  type ArmedVerb, type PlayerCardView,
+} from './cardModel';
+import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
+import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { formatRatio } from './format';
 
 export interface HudHost {
@@ -26,16 +32,27 @@ export interface HudHost {
   deselect(): void;
   trainUnit(buildingId: EntityId, defId: string): void;
   cancelTrain(buildingId: EntityId, index: number): void;
+  researchTech(buildingId: EntityId, techId: string): void;
+  cancelResearch(buildingId: EntityId): void;
+  ungarrisonAll(buildingId: EntityId): void;
+  marketTrade(sell: ResourceType, buy: ResourceType, amount: number): void;
+  reseedFarm(farmId: EntityId): void;
+  /** Mill auto-reseed queue toggle (queueReseed command; state in PlayerState.autoReseed). */
+  setAutoReseed(enabled: boolean): void;
   startPlacement(defId: string): void;
   confirmPlacement(): void;
   cancelPlacement(): void;
   getPlacement(): { defId: string; valid: boolean; affordable: boolean } | null;
   stopSelection(): void;
-  toggleAttackMove(): void;
-  isAttackMoveArmed(): boolean;
+  /** Trebuchets: pack (fold to move) or unpack (deploy to fire) the selected trebs. */
+  packSelection(pack: boolean): void;
+  /** Toggle an armed "next tap = target" verb (attack-move / garrison / convert / heal). */
+  armVerb(verb: ArmedVerb): void;
+  getArmedVerb(): ArmedVerb | null;
   togglePause(): void;
   isPaused(): boolean;
   resumeGame(): void;
+  resign(): void;
   /** Idle-unit badges (GDD: touch answer to AoE2's `.` hotkey). */
   getIdleCounts(): Record<IdleCategory, number>;
   cycleIdle(cat: IdleCategory): void;
@@ -89,6 +106,18 @@ const HUD_CSS = `
 .bf-qitem canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
 .bf-tip { position:absolute; right:6px; bottom:200px; max-width:250px; padding:6px 9px; font-size:14px; color:#1A1208; background:#DABE8D; border:1px solid #B99A6B; border-radius:3px; display:none; pointer-events:none; }
+.bf-note { font-size:13px; color:#DABE8D; margin:5px 2px 0; min-height:0; }
+.bf-note:empty { display:none; }
+.bf-market { display:none; flex-direction:column; gap:4px; margin-top:6px; }
+.bf-market.show { display:flex; }
+.bf-mrow { display:flex; align-items:center; gap:6px; }
+.bf-mrow canvas { width:22px; height:22px; image-rendering:pixelated; }
+.bf-mbtn { position:relative; flex:1; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:"VT323",monospace; font-size:15px; padding:4px 2px; cursor:pointer; }
+.bf-mbtn.disabled { color:#8a8a8a; border-color:#5a5a5a; }
+.bf-garrison { display:none; margin-top:6px; }
+.bf-garrison.show { display:block; }
+.bf-goccrow { display:flex; gap:3px; flex-wrap:wrap; margin:4px 0 6px; }
+.bf-goccrow canvas { width:24px; height:24px; image-rendering:pixelated; border:1px solid #64492B; }
 .bf-toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); padding:6px 10px; display:none; align-items:center; gap:10px; font-size:14px; pointer-events:auto; }
 .bf-toast.show { display:flex; }
 .bf-pause { position:absolute; inset:0; background:rgba(10,8,5,0.72); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; pointer-events:auto; z-index:40; }
@@ -163,6 +192,12 @@ export class Hud {
   private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
   private lastCardKey = '';
   private queueProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId; index: number }> = [];
+  private researchProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId }> = [];
+  private noteRow!: HTMLDivElement;
+  private marketBox!: HTMLDivElement;
+  private garrisonBox!: HTMLDivElement;
+  private resignArmed = false;
+  private resignBtn!: HTMLButtonElement;
 
   /** The minimap panel mounts here (bottom-left). */
   readonly minimapSlot: HTMLDivElement;
@@ -214,6 +249,7 @@ export class Hud {
     }
     this.pauseBtn.textContent = this.host.isPaused() ? '▶' : 'II';
     this.pauseOverlay.classList.toggle('show', this.host.isPaused());
+    if (!this.host.isPaused() && this.resignArmed) this.resetResign();
     this.updateIdleButtons();
     this.updateGroupChips();
     this.updateSelectionPanel();
@@ -330,10 +366,19 @@ export class Hud {
     this.cardTitle.className = 'bf-cardtitle';
     this.cardGrid = document.createElement('div');
     this.cardGrid.className = 'bf-grid';
+    this.noteRow = document.createElement('div');
+    this.noteRow.className = 'bf-note bf-num'; // age-up requirement counters etc.
+    this.marketBox = document.createElement('div');
+    this.marketBox.className = 'bf-market';
+    this.garrisonBox = document.createElement('div');
+    this.garrisonBox.className = 'bf-garrison';
     this.queueRow = document.createElement('div');
     this.queueRow.className = 'bf-queue';
     this.card.appendChild(this.cardTitle);
     this.card.appendChild(this.cardGrid);
+    this.card.appendChild(this.noteRow);
+    this.card.appendChild(this.marketBox);
+    this.card.appendChild(this.garrisonBox);
     this.card.appendChild(this.queueRow);
     this.el.appendChild(this.card);
 
@@ -370,12 +415,35 @@ export class Hud {
     btn.style.fontSize = '18px';
     btn.textContent = 'Resume';
     btn.addEventListener('click', () => this.host.resumeGame());
+    // Resign (GDD: a human can resign at any time) — two taps to confirm,
+    // because a mis-tap here forfeits the whole match.
+    this.resignBtn = document.createElement('button');
+    this.resignBtn.className = 'bf-btn';
+    this.resignBtn.style.cssText = 'font-size:16px;color:#DABE8D;';
+    this.resignBtn.textContent = 'Resign';
+    this.resignBtn.addEventListener('click', () => {
+      if (!this.resignArmed) {
+        this.resignArmed = true;
+        this.resignBtn.textContent = 'Tap again to resign';
+        this.resignBtn.style.color = '#C05B4E';
+        return;
+      }
+      this.resetResign();
+      this.host.resign();
+    });
     this.pauseOverlay.appendChild(h);
     this.pauseOverlay.appendChild(btn);
+    this.pauseOverlay.appendChild(this.resignBtn);
     this.pauseOverlay.addEventListener('click', (e) => {
       if (e.target === this.pauseOverlay) this.host.resumeGame();
     });
     this.el.appendChild(this.pauseOverlay);
+  }
+
+  private resetResign(): void {
+    this.resignArmed = false;
+    this.resignBtn.textContent = 'Resign';
+    this.resignBtn.style.color = '#DABE8D';
   }
 
   /**
@@ -481,6 +549,31 @@ export class Hud {
     }
   }
 
+  /** PlayerCardView for the pure card model (cardModel.ts). */
+  private playerView(state: GameState): PlayerCardView | null {
+    const p = state.players[this.host.humanPlayer];
+    if (!p) return null;
+    return {
+      stockpile: p.stockpile,
+      age: p.age,
+      civ: p.setup.civ,
+      researchedTechs: p.researchedTechs,
+      pop: p.pop,
+      popCap: p.popCap,
+    };
+  }
+
+  /** Completed own building defIds (age-up requirement input). */
+  private completedBuildingDefIds(state: GameState): string[] {
+    const out: string[] = [];
+    for (const e of state.entities.values()) {
+      if (e.kind !== 'building' || e.player !== this.host.humanPlayer || e.hp <= 0) continue;
+      if ((e.buildProgress ?? 1000) < 1000) continue;
+      out.push(e.defId);
+    }
+    return out;
+  }
+
   private updateCard(state: GameState): void {
     const sel = this.host.getSelection().filter((e) => e.player === this.host.humanPlayer);
     const placement = this.host.getPlacement();
@@ -488,12 +581,20 @@ export class Hud {
 
     // signature so we only rebuild the DOM when contents change
     const resKey = player ? RESOURCES.map((r) => Math.floor((player.stockpile[r] ?? 0) / 25)).join(',') : '';
+    const popKey = player && player.popCap - player.pop <= 5 ? `${player.pop}/${player.popCap}` : 'ok';
     const key = [
       placement ? `place:${placement.defId}` : '',
-      sel.map((e) => `${e.id}:${e.defId}:${e.trainQueue?.length ?? ''}:${e.buildProgress ?? ''}`).join('|'),
-      this.host.isAttackMoveArmed() ? 'am' : '',
+      sel.map((e) =>
+        `${e.id}:${e.defId}:${e.trainQueue?.length ?? ''}:${e.buildProgress ?? ''}` +
+        `:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
+        `:${e.amountLeft !== undefined ? (e.amountLeft > 0 ? 'r' : 'x') : ''}`,
+      ).join('|'),
+      this.host.getArmedVerb() ?? '',
       player?.age ?? '',
       resKey,
+      popKey,
+      player?.researchedTechs.length ?? 0,
+      player?.autoReseed ? 'ar' : '',
     ].join('#');
     if (key !== this.lastCardKey) {
       this.lastCardKey = key;
@@ -508,85 +609,269 @@ export class Hud {
         q.el.style.width = `${Math.round(frac * 100)}%`;
       }
     }
+    // live research progress
+    for (const r of this.researchProgressEls) {
+      const b = state.entities.get(r.buildingId);
+      if (b?.research) {
+        const frac = 1 - b.research.ticksLeft / Math.max(1, b.research.totalTicks);
+        r.el.style.width = `${Math.round(frac * 100)}%`;
+      }
+    }
   }
 
   private rebuildCard(state: GameState, sel: Entity[], placementActive: boolean): void {
     this.cardGrid.replaceChildren();
     this.queueRow.replaceChildren();
+    this.noteRow.textContent = '';
+    this.marketBox.replaceChildren();
+    this.marketBox.classList.remove('show');
+    this.garrisonBox.replaceChildren();
+    this.garrisonBox.classList.remove('show');
     this.queueProgressEls = [];
+    this.researchProgressEls = [];
     this.tip.style.display = 'none';
     if (placementActive || sel.length === 0) {
       this.card.classList.remove('show');
       return;
     }
-    const player = state.players[this.host.humanPlayer];
-    if (!player) return;
+    const view = this.playerView(state);
+    if (!view) return;
 
     const buildings = sel.filter((e) => e.kind === 'building');
     const units = sel.filter((e) => e.kind === 'unit');
     const villagers = units.filter((e) => e.defId === 'villager');
-    const military = units.filter((e) => e.defId !== 'villager');
     let shown = false;
 
     if (buildings.length === 1 && units.length === 0) {
-      const b = buildings[0];
-      const def = gameData.buildings[b.defId];
-      const trainBtns = trainMenuButtons(player.stockpile, player.age, b.defId);
-      if ((b.buildProgress ?? 1000) >= 1000 && trainBtns.length > 0) {
-        this.cardTitle.textContent = `${def?.name ?? b.defId} — Train`;
-        for (const tb of trainBtns) {
-          const u = gameData.units[tb.id];
-          this.addButton(tb.icon, `${u.name}\n${costText(u.cost)} • ${u.trainTime}s`, tb.enabled, false, () => this.host.trainUnit(b.id, tb.id), tb.reason);
-        }
-        // queue chips
-        (b.trainQueue ?? []).forEach((item, i) => {
-          const u = gameData.units[item.defId];
-          const chip = document.createElement('div');
-          chip.className = 'bf-qitem';
-          chip.title = `${u?.name ?? item.defId} (tap to cancel)`;
-          chip.appendChild(this.host.assets.getIconCanvas(u?.icon ?? `icon/${item.defId}`));
-          const prog = document.createElement('div');
-          prog.className = 'bf-qprog';
-          chip.appendChild(prog);
-          chip.addEventListener('click', () => this.host.cancelTrain(b.id, i));
-          this.queueRow.appendChild(chip);
-          this.queueProgressEls.push({ el: prog, buildingId: b.id, index: i });
-        });
-        shown = true;
-      } else if ((b.buildProgress ?? 1000) < 1000) {
-        this.cardTitle.textContent = `${def?.name ?? b.defId} — under construction`;
-        shown = true;
-      }
+      shown = this.rebuildBuildingCard(state, buildings[0], view) || shown;
+    } else if (buildings.length > 1 && units.length === 0) {
+      const def = gameData.buildings[buildings[0].defId];
+      this.cardTitle.textContent = `${def?.name ?? buildings[0].defId} ×${buildings.length} — tap ground to rally`;
+      shown = true;
     }
 
     if (villagers.length > 0) {
       this.cardTitle.textContent = 'Build';
       // cardModel decides enabled/gray: only genuinely unavailable actions
       // (unaffordable, or a verb the sim would silently drop) render disabled.
-      for (const bb of buildMenuButtons(player.stockpile, player.age)) {
-        const bd = gameData.buildings[bb.id];
+      for (const bb of buildMenuButtons(view.stockpile, view.age)) {
         this.addButton(
           bb.icon,
-          `${bd.name}\n${costText(bd.cost)} • ${bd.buildTime}s`,
+          `${bb.name}\n${costText(bb.cost ?? {})} • ${bb.timeSeconds}s`,
           bb.enabled,
           false,
-          () => this.host.startPlacement(bd.id),
+          () => this.host.startPlacement(bb.id),
           bb.reason,
         );
       }
       shown = true;
     }
 
-    if (military.length > 0) {
+    if (units.length > 0) {
       if (villagers.length === 0) this.cardTitle.textContent = 'Commands';
-      this.addButton('icon/cmd/attackMove', 'Attack-move\nNext tap = attack-move there', true, this.host.isAttackMoveArmed(), () => this.host.toggleAttackMove());
-      this.addButton('icon/cmd/stop', 'Stop', true, false, () => this.host.stopSelection());
+      // attack-move / stop / garrison / convert / heal / pack (cardModel decides
+      // visibility per selection contents and wave-2 enabled-ness)
+      for (const vb of unitVerbButtons(units, this.host.getArmedVerb())) {
+        const onClick = vb.id === 'stop'
+          ? () => this.host.stopSelection()
+          : vb.id === 'pack' || vb.id === 'unpack'
+            ? () => this.host.packSelection(vb.id === 'pack')
+            : vb.verb !== undefined
+              ? () => this.host.armVerb(vb.verb!)
+              : () => undefined;
+        this.addButton(vb.icon, vb.tip, vb.enabled, vb.active ?? false, onClick, vb.reason);
+      }
       shown = true;
-    } else if (villagers.length > 0) {
-      this.addButton('icon/cmd/stop', 'Stop', true, false, () => this.host.stopSelection());
     }
 
     this.card.classList.toggle('show', shown);
+  }
+
+  /** Card for exactly one own building: train + research + specials. */
+  private rebuildBuildingCard(state: GameState, b: Entity, view: PlayerCardView): boolean {
+    const def = gameData.buildings[b.defId];
+    const name = def?.name ?? b.defId;
+    if ((b.buildProgress ?? 1000) < 1000) {
+      this.cardTitle.textContent = `${name} — under construction`;
+      return true;
+    }
+    let shown = false;
+    this.cardTitle.textContent = name;
+
+    // ---- train buttons
+    const trainBtns = trainMenuButtons(view, b.defId);
+    for (const tb of trainBtns) {
+      this.addButton(
+        tb.icon,
+        `${tb.name}\n${costText(tb.cost ?? {})} • ${tb.timeSeconds}s`,
+        tb.enabled, false,
+        () => this.host.trainUnit(b.id, tb.id),
+        tb.reason,
+      );
+      shown = true;
+    }
+
+    // ---- research buttons (blacksmith/university/monastery/castle uniques
+    // and unit-line upgrades at their production building)
+    const busy = !!b.research;
+    for (const rb of researchMenuButtons(view, b.defId, busy)) {
+      this.addButton(
+        rb.icon,
+        `${rb.name}\n${costText(rb.cost ?? {})} • ${rb.timeSeconds}s`,
+        rb.enabled, false,
+        () => this.host.researchTech(b.id, rb.id),
+        rb.reason,
+      );
+      shown = true;
+    }
+
+    // ---- age-up on the TC, with requirement feedback ('2 Feudal Age buildings needed')
+    if (b.defId === 'townCenter') {
+      const up = ageUpButton(view, this.completedBuildingDefIds(state), busy);
+      if (up) {
+        this.addButton(
+          up.icon,
+          `Advance to ${up.name}\n${costText(up.cost ?? {})} • ${up.timeSeconds}s`,
+          up.enabled, false,
+          () => this.host.researchTech(b.id, up.techId),
+          up.reason,
+        );
+        if (!up.requirementMet) this.noteRow.textContent = up.requirementText;
+        shown = true;
+      }
+    }
+
+    // ---- specials: farm reseed, mill auto-reseed, market trade panel
+    if (b.defId === 'farm') {
+      const fb = farmReseedButton(b, view.stockpile);
+      this.addButton(fb.icon, `${fb.tip}\n${costText(fb.cost ?? {})}`, fb.enabled, false, () => this.host.reseedFarm(b.id), fb.reason);
+      if ((b.amountLeft ?? 0) <= 0) this.noteRow.textContent = 'Fallow — out of food';
+      shown = true;
+    }
+    if (b.defId === 'mill') {
+      const on = state.players[this.host.humanPlayer]?.autoReseed ?? false;
+      const mb = millAutoReseedButton(on);
+      this.addButton(mb.icon, mb.tip, mb.enabled, mb.active ?? false, () => this.host.setAutoReseed(!on), mb.reason);
+      shown = true;
+    }
+    if (b.defId === 'market') {
+      this.rebuildMarketPanel(view);
+      shown = true;
+    }
+
+    // ---- garrisoned-building panel (occupant icons + ungarrison all)
+    const gp = garrisonPanel(b, (id) => state.entities.get(id));
+    if (gp && gp.count > 0) {
+      this.rebuildGarrisonPanel(b.id, gp.occupants, gp.count, gp.capacity, gp.ungarrisonEnabled, gp.reason);
+      shown = true;
+    }
+
+    // ---- train queue chips + research progress chip
+    (b.trainQueue ?? []).forEach((item, i) => {
+      const u = gameData.units[item.defId];
+      const chip = document.createElement('div');
+      chip.className = 'bf-qitem';
+      chip.title = `${u?.name ?? item.defId} (tap to cancel)`;
+      chip.appendChild(this.host.assets.getIconCanvas(u?.icon ?? `icon/${item.defId}`));
+      const prog = document.createElement('div');
+      prog.className = 'bf-qprog';
+      chip.appendChild(prog);
+      chip.addEventListener('click', () => this.host.cancelTrain(b.id, i));
+      this.queueRow.appendChild(chip);
+      this.queueProgressEls.push({ el: prog, buildingId: b.id, index: i });
+    });
+    if (b.research) {
+      const tech = gameData.techs[b.research.techId];
+      const chip = document.createElement('div');
+      chip.className = 'bf-qitem';
+      const cancelPending = PENDING_COMMAND_KINDS.has('cancelResearch');
+      chip.title = cancelPending
+        ? `Researching ${tech?.name ?? b.research.techId} (cancel ${WAVE2_REASON})`
+        : `Researching ${tech?.name ?? b.research.techId} (tap to cancel)`;
+      chip.appendChild(this.host.assets.getIconCanvas(tech?.icon ?? `icon/tech/${b.research.techId}`));
+      const prog = document.createElement('div');
+      prog.className = 'bf-qprog';
+      chip.appendChild(prog);
+      chip.addEventListener('click', () => {
+        if (cancelPending) this.showTip(`Cancel research ${WAVE2_REASON}`);
+        else this.host.cancelResearch(b.id);
+      });
+      this.queueRow.appendChild(chip);
+      this.researchProgressEls.push({ el: prog, buildingId: b.id });
+      shown = true;
+    }
+    return shown;
+  }
+
+  /** GDD market: buy/sell each resource ×100 with live rate + ~30% fee shown. */
+  private rebuildMarketPanel(view: PlayerCardView): void {
+    this.cardTitle.textContent = 'Market — Trade (30% fee)';
+    this.marketBox.classList.add('show');
+    const pendingReason = PENDING_COMMAND_KINDS.has('marketTrade')
+      ? `trading ${WAVE2_REASON}`
+      : null;
+    const stock: Partial<Record<TradeResource | 'gold', number>> = {
+      food: view.stockpile.food, wood: view.stockpile.wood,
+      stone: view.stockpile.stone, gold: view.stockpile.gold,
+    };
+    // live global rates from the sim (drift with every trade); base rates only for mocks
+    const rates = this.host.getState().marketRates;
+    for (const row of marketPanelRows(stock, pendingReason, rates ?? undefined)) {
+      const rowEl = document.createElement('div');
+      rowEl.className = 'bf-mrow';
+      rowEl.appendChild(this.host.assets.getIconCanvas(`icon/res/${row.res}`));
+      const sell = document.createElement('button');
+      sell.className = 'bf-mbtn' + (row.sellEnabled ? '' : ' disabled');
+      sell.textContent = `Sell ${TRADE_LOT} → +${row.sellGold}g`;
+      sell.addEventListener('click', () => {
+        if (row.sellEnabled) this.host.marketTrade(row.res, 'gold', TRADE_LOT);
+        else this.showTip(`Sell ${TRADE_LOT} ${row.res}\n(${row.sellReason ?? ''})`);
+      });
+      const buy = document.createElement('button');
+      buy.className = 'bf-mbtn' + (row.buyEnabled ? '' : ' disabled');
+      buy.textContent = `Buy ${TRADE_LOT} → −${row.buyGold}g`;
+      buy.addEventListener('click', () => {
+        if (row.buyEnabled) this.host.marketTrade('gold', row.res, TRADE_LOT);
+        else this.showTip(`Buy ${TRADE_LOT} ${row.res}\n(${row.buyReason ?? ''})`);
+      });
+      rowEl.appendChild(sell);
+      rowEl.appendChild(buy);
+      this.marketBox.appendChild(rowEl);
+    }
+    if (pendingReason) this.noteRow.textContent = 'Rates are estimates until the market sim lands';
+  }
+
+  private rebuildGarrisonPanel(
+    buildingId: EntityId,
+    occupants: Array<{ id: EntityId; icon: string }>,
+    count: number,
+    capacity: number,
+    ungarrisonEnabled: boolean,
+    reason?: string,
+  ): void {
+    this.garrisonBox.classList.add('show');
+    const label = document.createElement('div');
+    label.className = 'bf-note bf-num';
+    label.textContent = `Garrisoned ${formatRatio(count, capacity)}`;
+    const row = document.createElement('div');
+    row.className = 'bf-goccrow';
+    for (const occ of occupants) {
+      row.appendChild(this.host.assets.getIconCanvas(occ.icon));
+    }
+    const btn = document.createElement('button');
+    btn.className = 'bf-btn';
+    btn.textContent = 'Ungarrison all';
+    if (!ungarrisonEnabled) {
+      btn.classList.add('disabled');
+      btn.style.color = '#8a8a8a';
+    }
+    btn.addEventListener('click', () => {
+      if (ungarrisonEnabled) this.host.ungarrisonAll(buildingId);
+      else this.showTip(`Ungarrison\n(${reason ?? 'unavailable'})`);
+    });
+    this.garrisonBox.appendChild(label);
+    this.garrisonBox.appendChild(row);
+    this.garrisonBox.appendChild(btn);
   }
 
   /**

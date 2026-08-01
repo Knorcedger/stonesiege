@@ -1,9 +1,11 @@
 // World layer: y-sorted entity sprites with activity/facing/tick-driven
 // animation, interpolation between the last two sim ticks, selection rings,
 // health bars, building construct states, fog-based hiding with remembered
-// building ghosts, and projectile fx.
+// building ghosts, damage-taken blink, villager carry icons, garrison count
+// badges, and gather-target highlights. Event-driven fx (projectiles, impact
+// flashes, corpses, rubble, conversion beams) live in fx.ts.
 
-import { Container, Graphics, Sprite } from 'pixi.js';
+import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import {
   FP, GAIA, TICKS_PER_SECOND,
   type Entity, type EntityId, type GameState, type PlayerId, type SimEvent,
@@ -15,6 +17,7 @@ import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 
 const HIGHLIGHT = 0xf4eedd;
+const GATHER_HIGHLIGHT = 0xe6c04a;
 const OUTLINE = 0x1a1208;
 const HP_GREEN = 0x3e8c34;
 const HP_YELLOW = 0xd4a82a;
@@ -34,6 +37,13 @@ interface EntityView {
   lastRingKey: string;
   /** Root-local y of the sprite's first opaque row (trimmed visible top). */
   spriteTopPx: number;
+  /** Carry icon over laden villagers (entity.carrying). */
+  carry: Sprite | null;
+  lastCarryKey: string;
+  /** Garrison flag + count badge over occupied buildings. */
+  badge: Container | null;
+  badgeText: Text | null;
+  lastBadgeKey: string;
 }
 
 interface GhostRecord {
@@ -44,14 +54,6 @@ interface GhostRecord {
   wx: number;
   wy: number;
   age: string;
-}
-
-interface Projectile {
-  gfx: Graphics;
-  x0: number; y0: number; x1: number; y1: number;
-  startTick: number;
-  flightTicks: number;
-  arc: 'flat' | 'high';
 }
 
 export interface PickResult {
@@ -74,16 +76,16 @@ export class WorldLayer {
   private prevPos = new Map<EntityId, { x: number; y: number }>();
   private curPos = new Map<EntityId, { x: number; y: number }>();
   private frameCounts = new Map<string, number>();
-  private projectiles: Projectile[] = [];
-  private projLayer = new Container();
+  /** entityId -> tick until which the damage-taken red blink lasts. */
+  private damagedUntil = new Map<EntityId, number>();
+  /** Resource/target ids highlighted because selected villagers gather them. */
+  private gatherTargets = new Set<EntityId>();
 
   constructor(
     private assets: GameAssets,
     private humanPlayer: PlayerId,
   ) {
     this.container.sortableChildren = true;
-    this.projLayer.zIndex = 1_000_000;
-    this.container.addChild(this.projLayer);
   }
 
   /** Snapshot positions at each tick boundary (for interpolation). */
@@ -96,16 +98,9 @@ export class WorldLayer {
 
   onSimEvents(events: SimEvent[], tick: number): void {
     for (const ev of events) {
-      if (ev.kind === 'projectileFired') {
-        const a = tileToWorld(ev.x0 / FP, ev.y0 / FP);
-        const b = tileToWorld(ev.x1 / FP, ev.y1 / FP);
-        const gfx = new Graphics();
-        gfx.moveTo(-4, 0).lineTo(4, 0).stroke({ width: 2, color: 0xb08c5c });
-        this.projLayer.addChild(gfx);
-        this.projectiles.push({
-          gfx, x0: a.x, y0: a.y, x1: b.x, y1: b.y,
-          startTick: tick, flightTicks: Math.max(1, ev.flightTicks), arc: ev.arc,
-        });
+      if (ev.kind === 'attackImpact') {
+        // damage-taken red blink (~4 ticks); the impact flash itself is fx.ts
+        this.damagedUntil.set(ev.targetId, tick + 4);
       }
     }
   }
@@ -114,6 +109,7 @@ export class WorldLayer {
   update(state: GameState, alpha: number, tickFloat: number): void {
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const seen = new Set<EntityId>();
+    this.refreshGatherTargets(state);
 
     for (const e of state.entities.values()) {
       seen.add(e.id);
@@ -151,7 +147,19 @@ export class WorldLayer {
     }
     this.prunePositions(seen);
     this.updateGhosts(state, vis, seen);
-    this.updateProjectiles(tickFloat);
+  }
+
+  /** Targets of the currently selected villagers (GDD: gather target highlights). */
+  private refreshGatherTargets(state: GameState): void {
+    this.gatherTargets.clear();
+    for (const id of this.selection) {
+      const e = state.entities.get(id);
+      if (!e || e.kind !== 'unit' || e.player !== this.humanPlayer || e.defId !== 'villager') continue;
+      const target = e.intent?.kind === 'gather'
+        ? e.intent.targetId
+        : (e.activity === 'gathering' || e.activity === 'carrying') ? e.targetId : undefined;
+      if (target !== undefined) this.gatherTargets.add(target);
+    }
   }
 
   /** Interpolated world position of an entity. */
@@ -239,7 +247,11 @@ export class WorldLayer {
     const hpBar = new Graphics();
     root.addChild(ring, sprite, hpBar);
     this.container.addChild(root);
-    return { root, ring, sprite, hpBar, lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0 };
+    return {
+      root, ring, sprite, hpBar,
+      lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0,
+      carry: null, lastCarryKey: '', badge: null, badgeText: null, lastBadgeKey: '',
+    };
   }
 
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
@@ -273,9 +285,73 @@ export class WorldLayer {
       view.lastFrameKey = key;
     }
     view.sprite.alpha = sprAlpha;
+    // damage-taken red blink (attackImpact recorded in onSimEvents)
+    view.sprite.tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat ? 0xff8070 : 0xffffff;
 
     this.drawRing(e, view);
     this.drawHpBar(e, view);
+    this.updateCarryIcon(e, view);
+    this.updateGarrisonBadge(e, view);
+  }
+
+  /** Small resource icon over a laden villager (entity.carrying). */
+  private updateCarryIcon(e: Entity, view: EntityView): void {
+    const key = e.kind === 'unit' && e.carrying && e.activity !== 'dying' ? e.carrying.type : '';
+    if (key !== view.lastCarryKey) {
+      view.lastCarryKey = key;
+      if (!key) {
+        if (view.carry) view.carry.visible = false;
+      } else {
+        const frame = this.assets.tryResolve(`icon/res/${key}`);
+        if (frame) {
+          if (!view.carry) {
+            view.carry = new Sprite();
+            view.carry.anchor.set(0.5);
+            view.root.addChild(view.carry);
+          }
+          view.carry.texture = frame.texture;
+          const h = frame.texture.height || 1;
+          view.carry.scale.set(12 / h);
+          view.carry.visible = true;
+        }
+      }
+    }
+    if (view.carry?.visible) view.carry.position.set(9, Math.min(view.spriteTopPx, -18) - 4);
+  }
+
+  /** Garrison flag + occupant-count badge over occupied buildings. */
+  private updateGarrisonBadge(e: Entity, view: EntityView): void {
+    const count = e.kind === 'building' ? e.garrison?.length ?? 0 : 0;
+    const key = count > 0 ? String(count) : '';
+    if (key !== view.lastBadgeKey) {
+      view.lastBadgeKey = key;
+      if (!key) {
+        if (view.badge) view.badge.visible = false;
+      } else {
+        if (!view.badge) {
+          const badge = new Container();
+          const flag = new Graphics();
+          flag.moveTo(0, 0).lineTo(0, -14).stroke({ width: 1.5, color: OUTLINE });
+          flag.poly([0, -14, 10, -11, 0, -8]).fill(0xe6c04a).stroke({ width: 1, color: OUTLINE });
+          const text = new Text({
+            text: '',
+            style: {
+              fontFamily: 'VT323, monospace', fontSize: 12,
+              fill: 0xefddb5, stroke: { color: 0x1a1208, width: 2 },
+            },
+          });
+          text.anchor.set(0, 0.5);
+          text.position.set(2, 3);
+          badge.addChild(flag, text);
+          view.badge = badge;
+          view.badgeText = text;
+          view.root.addChild(badge);
+        }
+        view.badgeText!.text = key;
+        view.badge.visible = true;
+      }
+    }
+    if (view.badge?.visible) view.badge.position.set(-4, view.spriteTopPx - 4);
   }
 
   private frameNameFor(state: GameState, e: Entity, tickFloat: number, view: EntityView): { candidates: string[]; alpha: number } {
@@ -318,24 +394,27 @@ export class WorldLayer {
 
   private drawRing(e: Entity, view: EntityView): void {
     const selected = this.selection.has(e.id);
-    const key = selected ? `1:${e.kind}:${e.defId}` : '';
+    // gather-target highlight: amber ring on what the selected villagers work
+    const highlighted = !selected && this.gatherTargets.has(e.id);
+    const key = selected ? `1:${e.kind}:${e.defId}` : highlighted ? `h:${e.kind}:${e.defId}` : '';
     if (key === view.lastRingKey) return;
     view.lastRingKey = key;
     view.ring.clear();
-    if (!selected) return;
+    if (!selected && !highlighted) return;
+    const color = selected ? HIGHLIGHT : GATHER_HIGHLIGHT;
     if (e.kind === 'building') {
       const size = gameData.buildings[e.defId]?.size ?? 1;
       const hw = size * HALF_W;
       const hh = size * HALF_H;
       view.ring
         .moveTo(0, -hh).lineTo(hw, 0).lineTo(0, hh).lineTo(-hw, 0).closePath()
-        .stroke({ width: 1.5, color: HIGHLIGHT });
+        .stroke({ width: 1.5, color });
     } else {
       const cav = (gameData.units[e.defId]?.speed ?? 0) > 1.1;
       const rx = cav ? 14 : 10;
       const ry = cav ? 7 : 5;
       view.ring.ellipse(0, 1, rx, ry + 1).stroke({ width: 1, color: OUTLINE });
-      view.ring.ellipse(0, 0, rx, ry).stroke({ width: 1, color: HIGHLIGHT });
+      view.ring.ellipse(0, 0, rx, ry).stroke({ width: 1, color });
     }
   }
 
@@ -421,29 +500,12 @@ export class WorldLayer {
     }
   }
 
-  private updateProjectiles(tickFloat: number): void {
-    for (let i = this.projectiles.length - 1; i >= 0; i--) {
-      const p = this.projectiles[i];
-      const t = (tickFloat - p.startTick) / p.flightTicks;
-      if (t >= 1) {
-        p.gfx.destroy();
-        this.projectiles.splice(i, 1);
-        continue;
-      }
-      const x = p.x0 + (p.x1 - p.x0) * t;
-      const dist = Math.hypot(p.x1 - p.x0, p.y1 - p.y0);
-      const peak = p.arc === 'high' ? dist * 0.25 : dist * 0.08;
-      const y = p.y0 + (p.y1 - p.y0) * t - Math.sin(Math.PI * t) * peak;
-      p.gfx.position.set(x, y);
-      p.gfx.rotation = Math.atan2(p.y1 - p.y0, p.x1 - p.x0);
-    }
-  }
-
   private prunePositions(seen: Set<EntityId>): void {
     for (const id of this.curPos.keys()) {
       if (!seen.has(id)) {
         this.curPos.delete(id);
         this.prevPos.delete(id);
+        this.damagedUntil.delete(id);
       }
     }
   }
