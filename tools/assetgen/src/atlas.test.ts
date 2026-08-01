@@ -46,8 +46,12 @@ function expectFrames(atlas: AtlasJson, names: string[]): void {
   expect(missing, `missing frames: ${missing.slice(0, 20).join(', ')}`).toEqual([]);
 }
 
-const gaiaAnimals = Object.values(gameData.units).filter((u) => u.trainedAt.length === 0);
-const trainableUnits = Object.values(gameData.units).filter((u) => u.trainedAt.length > 0);
+// Sprite-aliased defs (campaign heroes: sprite = an existing rig like 'champion')
+// render through that rig's frames and by design have none of their own.
+const gaiaAnimals = Object.values(gameData.units)
+  .filter((u) => u.trainedAt.length === 0 && u.sprite === undefined);
+const trainableUnits = Object.values(gameData.units)
+  .filter((u) => u.trainedAt.length > 0 && u.sprite === undefined);
 
 describe('atlas meta (ASSET_CONTRACT)', () => {
   it('declares runtime-swap + palettes in every atlas', () => {

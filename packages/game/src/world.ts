@@ -12,10 +12,11 @@ import {
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from './assets';
-import { animForActivity, animFrameIndex, type AnimName } from './frames';
+import { animForActivity, animFrameIndex, unitRig, type AnimName } from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
+import { getSettings } from './settings';
 
 const HIGHLIGHT = 0xf4eedd;
 const GATHER_HIGHLIGHT = 0xe6c04a;
@@ -61,11 +62,6 @@ export interface PickResult {
   entity: Entity;
   dist: number;
 }
-
-const GAIA_ANIMAL = (defId: string): boolean => {
-  const def = gameData.units[defId];
-  return !!def && def.trainedAt.length === 0;
-};
 
 export class WorldLayer {
   readonly container = new Container();
@@ -403,14 +399,14 @@ export class WorldLayer {
     if (e.kind === 'building') {
       return buildingFrame(state, e);
     }
-    // unit (incl. gaia animals under obj/)
-    const prefix = GAIA_ANIMAL(e.defId) ? 'obj' : 'unit';
+    // unit (incl. gaia animals under obj/; heroes render via their `sprite` rig alias)
+    const { spriteId, prefix } = unitRig(e.defId);
     const anim = animForActivity(e.activity, e.defId === 'villager');
     if (anim !== view.lastAnim) {
       view.lastAnim = anim;
       view.animStartTick = tickFloat;
     }
-    const countKey = `${prefix}/${e.defId}/${anim}/0`;
+    const countKey = `${prefix}/${spriteId}/${anim}/0`;
     let count = this.frameCounts.get(countKey);
     if (count === undefined) {
       count = this.assets.frameCount(countKey);
@@ -418,20 +414,20 @@ export class WorldLayer {
     }
     if (count === 0) {
       // fall back to idle, then to a warning placeholder via resolveFrame
-      const idleKey = `${prefix}/${e.defId}/idle/0`;
+      const idleKey = `${prefix}/${spriteId}/idle/0`;
       let idleCount = this.frameCounts.get(idleKey);
       if (idleCount === undefined) {
         idleCount = this.assets.frameCount(idleKey);
         this.frameCounts.set(idleKey, idleCount);
       }
       if (idleCount > 0) {
-        return { candidates: [`${prefix}/${e.defId}/idle/${e.facing}/0`], alpha: 1 };
+        return { candidates: [`${prefix}/${spriteId}/idle/${e.facing}/0`], alpha: 1 };
       }
-      return { candidates: [`${prefix}/${e.defId}/${anim}/${e.facing}/0`], alpha: 1 };
+      return { candidates: [`${prefix}/${spriteId}/${anim}/${e.facing}/0`], alpha: 1 };
     }
     const ageSec = (tickFloat - view.animStartTick) / TICKS_PER_SECOND;
     const frame = animFrameIndex(anim, ageSec, count);
-    return { candidates: [`${prefix}/${e.defId}/${anim}/${e.facing}/${frame}`], alpha: 1 };
+    return { candidates: [`${prefix}/${spriteId}/${anim}/${e.facing}/${frame}`], alpha: 1 };
   }
 
   private drawRing(e: Entity, view: EntityView): void {
@@ -463,7 +459,9 @@ export class WorldLayer {
   private drawHpBar(e: Entity, view: EntityView): void {
     const selected = this.selection.has(e.id);
     const damaged = e.hp < e.maxHp;
-    const show = (selected || damaged) && e.activity !== 'dying' && e.kind !== 'resource';
+    // settings toggle: HP bars can be hidden entirely (selection ring remains)
+    const show = getSettings().showHpBars
+      && (selected || damaged) && e.activity !== 'dying' && e.kind !== 'resource';
     const frac = Math.max(0, Math.min(1, e.hp / Math.max(1, e.maxHp)));
     // Buildings anchor the bar to the sprite's trimmed visible top (roof/flag
     // apex) + a small gap — footprint math floated it over open grass because

@@ -59,6 +59,18 @@ class MinHeap {
     }
     return top;
   }
+
+  /** Verbatim heap layout for snapshots (restore preserves pop order exactly). */
+  snapshot(): { heapCost: number[]; heapTile: number[] } {
+    return { heapCost: [...this.cost], heapTile: [...this.tile] };
+  }
+
+  static restore(heapCost: readonly number[], heapTile: readonly number[]): MinHeap {
+    const h = new MinHeap();
+    h.cost = [...heapCost];
+    h.tile = [...heapTile];
+    return h;
+  }
 }
 
 export interface GroupSearch {
@@ -71,6 +83,55 @@ export interface GroupSearch {
   /** start tile -> unit ids still waiting on this search */
   waitingByTile: Map<number, EntityId[]>;
   waitingCount: number;
+}
+
+/**
+ * JSON-safe snapshot of one in-flight group search. The internals (dist/settled/parent/
+ * heap) are captured VERBATIM rather than re-derived: a partially expanded search saw
+ * the blocker grid as it was on EARLIER ticks (buildings placed / trees felled since
+ * then would make a from-scratch re-expansion diverge), so exact restore is the only
+ * provably desync-free option. serialize.ts RLE-compresses the big arrays.
+ */
+export interface GroupSearchSnapshot {
+  groupId: number;
+  goal: number;
+  dist: number[];
+  settled: number[];
+  parent: number[];
+  heapCost: number[];
+  heapTile: number[];
+  /** [start tile, waiting unit ids][] in insertion order. */
+  waiting: Array<[number, EntityId[]]>;
+}
+
+export function snapshotSearches(state: SimState): GroupSearchSnapshot[] {
+  return state.pathSearches.map((s) => ({
+    groupId: s.groupId,
+    goal: s.goal,
+    dist: Array.from(s.dist),
+    settled: Array.from(s.settled),
+    parent: Array.from(s.parent),
+    ...s.open.snapshot(),
+    waiting: [...s.waitingByTile].map(([tile, ids]) => [tile, [...ids]] as [number, EntityId[]]),
+  }));
+}
+
+/** Rebuild state.pathSearches from snapshots (waitingCount is the sum of waiting lists). */
+export function restoreSearches(state: SimState, snaps: GroupSearchSnapshot[]): void {
+  state.pathSearches = snaps.map((snap) => {
+    const search: GroupSearch = {
+      groupId: snap.groupId,
+      goal: snap.goal,
+      dist: Int32Array.from(snap.dist),
+      settled: Uint8Array.from(snap.settled),
+      parent: Int32Array.from(snap.parent),
+      open: MinHeap.restore(snap.heapCost, snap.heapTile),
+      waitingByTile: new Map(snap.waiting.map(([tile, ids]) => [tile, [...ids]])),
+      waitingCount: 0,
+    };
+    for (const ids of search.waitingByTile.values()) search.waitingCount += ids.length;
+    return search;
+  });
 }
 
 /** Nearest walkable tile to (tx, ty), spiraling outward. null if none within maxR. */

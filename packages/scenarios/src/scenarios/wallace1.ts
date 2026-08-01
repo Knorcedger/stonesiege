@@ -9,8 +9,7 @@
 // {58,28,16,18}. Small gold at (44,60); deer at {40,66,5,4} guarded by wolves; no stone.
 //
 // NOTE: `heroWallace` / `heroHeselrig` are the campaign hero defs specified in
-// docs/CAMPAIGN_WALLACE.md Appendix A ("still to add" to @bf/data). Until they land,
-// loadScenario(wallace1) against the default gameData reports them as unknown defs.
+// docs/CAMPAIGN_WALLACE.md Appendix A, canonical in @bf/data (units.ts hero section).
 
 import type { ScenarioDef } from '../schema';
 
@@ -195,13 +194,18 @@ export const wallace1: ScenarioDef = {
     { def: 'house', player: 2, x: 71, y: 29 },
     { def: 'house', player: 2, x: 59, y: 41 },
     { def: 'house', player: 2, x: 68, y: 42 },
+    // Guard detail: 3 militia + 1 archer — deliberately light for the first
+    // scenario, so a naive all-in band (7 kinsmen + Wallace, arriving ragged)
+    // wins the open fight at the court without veteran micro.
     { def: 'militia', player: 2, x: 64, y: 35 },
     { def: 'militia', player: 2, x: 64, y: 38 },
     { def: 'militia', player: 2, x: 67, y: 36 },
-    { def: 'militia', player: 2, x: 67, y: 39 },
     { def: 'archer', player: 2, x: 63, y: 36 },
-    { def: 'archer', player: 2, x: 63, y: 39 },
-    { def: 'heroHeselrig', player: 2, x: 65, y: 36, ref: 'heselrig' },
+    // Heselrig holds his court of judgement at the gallows cross on the south road
+    // (65,43) — deliberately OUTSIDE both the watch tower's arc (~8.75 tiles from
+    // (66.5,34.5)) and the TC's (~8.25 from (64,32)), so scenario 1's fight happens
+    // in the open. Chasing survivors INTO the town square is what the arrows punish.
+    { def: 'heroHeselrig', player: 2, x: 65, y: 43, ref: 'heselrig' },
   ],
   triggers: [
     {
@@ -248,9 +252,17 @@ export const wallace1: ScenarioDef = {
         { kind: 'objectiveAdd', id: 'obj-food', text: 'Stockpile 150 food' },
       ],
     },
+    // The eco chain (t05..t08) is strictly gated on its predecessor having fired:
+    // each objective is added by the previous trigger, and objectiveComplete on a
+    // never-added id is a latched no-op — an ungated trigger firing early would
+    // permanently strand its objective. Out-of-order play (e.g. training villagers
+    // before the lumber camp) just makes the whole chain cascade once it unlocks.
     {
       id: 't05-food',
-      conditions: [{ kind: 'resourcesAtLeast', player: 1, type: 'food', amount: 150 }],
+      conditions: [
+        { kind: 'triggerFired', triggerId: 't04-gather' },
+        { kind: 'resourcesAtLeast', player: 1, type: 'food', amount: 150 },
+      ],
       effects: [
         { kind: 'objectiveComplete', id: 'obj-food' },
         { kind: 'message', speaker: 'Wallace', text: 'Full bellies. Now roofs — kin are coming in from the hills.' },
@@ -259,7 +271,10 @@ export const wallace1: ScenarioDef = {
     },
     {
       id: 't06-houses',
-      conditions: [{ kind: 'ownedAtLeast', player: 1, defIds: ['house'], atLeast: 2 }],
+      conditions: [
+        { kind: 'triggerFired', triggerId: 't05-food' },
+        { kind: 'ownedAtLeast', player: 1, defIds: ['house'], atLeast: 2 },
+      ],
       effects: [
         { kind: 'objectiveComplete', id: 'obj-houses' },
         { kind: 'message', speaker: 'Narrator', text: 'Houses raise your population room. Build a Lumber Camp beside the western wood so the walk is short.' },
@@ -269,6 +284,7 @@ export const wallace1: ScenarioDef = {
     {
       id: 't07-wood',
       conditions: [
+        { kind: 'triggerFired', triggerId: 't06-houses' },
         { kind: 'ownedAtLeast', player: 1, defIds: ['lumberCamp'], atLeast: 1 },
         { kind: 'resourcesAtLeast', player: 1, type: 'wood', amount: 200 },
       ],
@@ -280,34 +296,56 @@ export const wallace1: ScenarioDef = {
     },
     {
       id: 't08-vils',
-      conditions: [{ kind: 'ownedAtLeast', player: 1, defIds: ['villager'], atLeast: 6 }],
+      conditions: [
+        // gate on t07-wood (mirrors t11 gating on t09): training to 6 villagers
+        // early must not skip the eco objectives or strand obj-vils un-added
+        { kind: 'triggerFired', triggerId: 't07-wood' },
+        { kind: 'ownedAtLeast', player: 1, defIds: ['villager'], atLeast: 6 },
+      ],
       effects: [
         { kind: 'objectiveComplete', id: 'obj-vils' },
         { kind: 'message', speaker: 'Narrator', text: 'Night falls over the glen. Word comes: Heselrig sits in judgement at Lanark tomorrow.' },
-        { kind: 'armTrigger', triggerId: 't09-muster' },
-      ],
-    },
-    {
-      id: 't09-muster',
-      armed: false,
-      conditions: [{ kind: 'always' }],
-      effects: [
         {
           kind: 'spawn',
           entities: [
-            // kinsmen with steel, at the glen mouth (36,58)
+            // seven kinsmen with steel, at the glen mouth (36,58) — a first-scenario
+            // band sized to survive the raid without veteran micro
             { def: 'militia', player: 1, x: 35, y: 57 },
             { def: 'militia', player: 1, x: 36, y: 57 },
             { def: 'militia', player: 1, x: 37, y: 57 },
             { def: 'militia', player: 1, x: 35, y: 58 },
             { def: 'militia', player: 1, x: 36, y: 58 },
+            { def: 'militia', player: 1, x: 37, y: 58 },
+            { def: 'militia', player: 1, x: 36, y: 59 },
           ],
         },
         { kind: 'playSting', sting: 'horn' },
+        { kind: 'message', speaker: 'Wallace', text: 'Kin from the hills, mustering at the glen mouth — and I will not send them against Lanark without me. We march together or not at all.' },
+        { kind: 'objectiveAdd', id: 'obj-muster', text: 'Walk Wallace to the glen mouth to muster the band' },
+        { kind: 'panCamera', x: 36, y: 58 },
+      ],
+    },
+    {
+      // The muster beat is GATED on Wallace physically standing with the kinsmen.
+      // Wallace (speed 0.96) outpaces militia (0.9), and after the scripted walks he
+      // can sit ~15 tiles closer to Lanark than the glen mouth: revealing Lanark and
+      // adding the kill objective while the band is split invites a select-all
+      // attack-move where Wallace arrives alone and tanks the whole court — and his
+      // death is instant defeat. The doc's intent ("arriving ragged" wins the open
+      // fight without micro) only holds if the band DEPARTS together, so the reveal,
+      // the objective, and the pan to Lanark all wait for the gather.
+      id: 't09-muster',
+      conditions: [
+        { kind: 'triggerFired', triggerId: 't08-vils' },
+        // glen mouth pocket around the kinsmen spawn cluster (35..37, 57..59)
+        { kind: 'entitiesInArea', player: 1, defIds: ['heroWallace'], area: { x: 34, y: 56, w: 6, h: 6 }, atLeast: 1 },
+      ],
+      effects: [
+        { kind: 'objectiveComplete', id: 'obj-muster' },
         { kind: 'message', speaker: 'Wallace', text: 'Kinsmen with steel. Lanark, then. The sheriff owes this shire a debt, and I mean to collect.' },
         { kind: 'objectiveAdd', id: 'obj-heselrig', text: 'Kill William Heselrig, Sheriff of Lanark' },
         { kind: 'revealArea', player: 1, area: { x: 58, y: 28, w: 16, h: 18 } },
-        { kind: 'panCamera', x: 65, y: 36 },
+        { kind: 'panCamera', x: 65, y: 43 },
       ],
     },
     {
@@ -318,6 +356,8 @@ export const wallace1: ScenarioDef = {
       ],
       effects: [
         { kind: 'message', speaker: 'Heselrig', text: "Brigands at the gate? Cut them down and hang what's left." },
+        // first sight of Lanark: tell a new player what the winning move is
+        { kind: 'message', speaker: 'Wallace', text: 'The sheriff, not the garrison! He holds his court on the south road — strike Heselrig down and away, before the tower archers find their marks.' },
         { kind: 'aiProfile', player: 2, profile: 'defender' },
         { kind: 'playSting', sting: 'alert' },
       ],

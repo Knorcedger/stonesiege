@@ -1,6 +1,7 @@
-// Perf smoke: 120×120 map, 100 units commanded across the map. Timing is measured
-// entirely OUTSIDE the sim (performance.now around advance) — the sim itself never
-// touches wall-clock time, so measurement cannot affect determinism.
+// Perf smoke: 120×120 map with 100 units, and the practice-options ceiling — 144×144
+// with 320 marching units plus a 60-defender brawl at the destination. Timing is
+// measured entirely OUTSIDE the sim (performance.now around advance) — the sim itself
+// never touches wall-clock time, so measurement cannot affect determinism.
 
 import { describe, expect, it } from 'vitest';
 import { createGame } from './game';
@@ -41,5 +42,54 @@ describe('performance smoke', () => {
     const units = entitiesOf(game.state.entities, 1, 'militia');
     const moved = units.filter((u) => u.tileX > 20).length;
     expect(moved).toBeGreaterThan(50);
+  });
+
+  it('holds the tick budget with 380 units on a 144x144 map (march + funnel + brawl, calibration-normalized)', () => {
+    const size = 144;
+    const map = grassMap(size, size);
+    const entities: ScenarioStart['entities'] = [];
+    // forest ridge with a narrow gap at the horde's latitude: 320 units funnel through
+    // 9 tiles of clearance — pathfinding + separation at their ugliest
+    for (let y = 8; y < 136; y++) {
+      if (y >= 58 && y <= 66) continue; // the gap
+      entities.push({ defId: 'tree', player: 0, tileX: 72, tileY: y });
+      entities.push({ defId: 'tree', player: 0, tileX: 73, tileY: y });
+    }
+    // 320 attackers in a 20×16 block west of the ridge
+    for (let i = 0; i < 320; i++) {
+      entities.push({ defId: 'militia', player: 1, tileX: 44 + (i % 20), tileY: 48 + Math.floor(i / 20) });
+    }
+    // 60 defenders holding the destination — the march ends in a full auto-engage brawl
+    for (let i = 0; i < 60; i++) {
+      entities.push({ defId: 'militia', player: 2, tileX: 84 + (i % 10), tileY: 56 + Math.floor(i / 10) });
+    }
+    const game = createGame(scenarioConfig(22, map, entities, [player(), player({ civ: 'english' })], 500));
+    const ids = entitiesOf(game.state.entities, 1, 'militia').map((e) => e.id);
+    expect(ids).toHaveLength(320);
+
+    game.advance([{ kind: 'attackMove', player: 1, units: ids, x: fp(89), y: fp(59) }]);
+
+    // CPU time, not wall time: vitest's forks pool runs each test file in its own
+    // PROCESS, so process.cpuUsage() isolates this sim's cost and is immune to the
+    // preemption/scheduling noise of sibling test files saturating every core (wall
+    // time inflated up to ~4x under full-suite load; CPU time stays representative).
+    const wall0 = performance.now();
+    const cpu0 = process.cpuUsage();
+    for (let t = 0; t < 700; t++) game.advance([]);
+    const cpu = process.cpuUsage(cpu0);
+    const wallAvg = (performance.now() - wall0) / 700;
+    const avg = (cpu.user + cpu.system) / 1000 / 700;
+    // eslint-disable-next-line no-console
+    console.log(`perf smoke 144: avg tick ${avg.toFixed(3)}ms CPU (${wallAvg.toFixed(3)}ms wall) over 700 ticks, 380 units`);
+    // Unloaded this measures ~2ms — inside the 4ms tick budget with 2x headroom; the
+    // pre-optimization sim (per-query id sorts in separation/acquisition) measured
+    // ~4.7ms, so the same 4ms budget as the 120 smoke catches that regression class.
+    expect(avg).toBeLessThanOrEqual(4);
+
+    // sanity: a real share of the horde made it through the funnel and blood was drawn
+    const attackers = entitiesOf(game.state.entities, 1, 'militia');
+    expect(attackers.filter((u) => u.tileX > 74).length).toBeGreaterThan(50);
+    const defenders = entitiesOf(game.state.entities, 2, 'militia').filter((u) => u.hp > 0);
+    expect(defenders.length).toBeLessThan(60); // deaths occurred (combat load was real)
   });
 });

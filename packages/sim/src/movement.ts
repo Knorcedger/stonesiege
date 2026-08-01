@@ -139,7 +139,9 @@ function separationPass(state: SimState): void {
   for (const e of state.entities.values()) {
     if (e.kind !== 'unit' || e.garrisonedIn !== undefined) continue;
     if (e.hp <= 0) continue; // carcasses are scenery, not soft bodies
-    state.unitsGrid.queryCircle(e.x, e.y, SEPARATION_DIST, neighbors);
+    // unsorted query is safe here: pushX/pushY are commutative integer sums over the
+    // neighbor SET, so enumeration order cannot affect the result (perf: see spatial.ts)
+    state.unitsGrid.queryCircleUnsorted(e.x, e.y, SEPARATION_DIST, neighbors);
     let pushX = 0, pushY = 0;
     for (let i = 0; i < neighbors.length; i++) {
       const oid = neighbors[i];

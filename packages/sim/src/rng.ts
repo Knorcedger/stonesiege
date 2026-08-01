@@ -41,4 +41,16 @@ export class SimRng {
   fork(streamId: number): SimRng {
     return new SimRng((this.nextU32() ^ Math.imul(streamId, 0x85ebca6b)) >>> 0);
   }
+
+  /** Current internal PRNG word, for snapshots. Restore with SimRng.fromState. */
+  getState(): number {
+    return this.s;
+  }
+
+  /** Rebuild an rng at an exact serialized state (no seed warm-up — byte-identical stream). */
+  static fromState(state: number): SimRng {
+    const rng = new SimRng(1);
+    rng.s = state >>> 0;
+    return rng;
+  }
 }

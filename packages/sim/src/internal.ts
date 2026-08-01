@@ -4,7 +4,7 @@
 import { gameData } from '@bf/data';
 import type { ClassValue, GatherTask } from '@bf/data';
 import { FP } from './types';
-import type { Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile, UnitIntent } from './types';
+import type { AgeId, Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile, UnitIntent } from './types';
 import type { SimRng } from './rng';
 import type { SpatialGrid } from './spatial';
 import type { PlayerModifierTable, ResolvedBuildingStats, ResolvedUnitStats } from './stats';
@@ -189,6 +189,8 @@ export interface SimState {
   conquest: boolean;
   /** Hard pop ceiling from GameConfig. */
   popCapLimit: number;
+  /** Scenario tech ceiling from GameConfig.maxAge: no researching INTO ages beyond it. */
+  maxAgeLimit?: AgeId;
   /** 1 = terrain passable (water is not), per tile. */
   walkTerrain: Uint8Array;
   /** Count of blocking occupants (buildings/resource objects) per tile. */

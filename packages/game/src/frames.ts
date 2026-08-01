@@ -47,6 +47,17 @@ export function placementGhostFrames(defId: string, age: string): string[] {
   return [`bld/${defId}/${age}/done`, `bld/${defId}/done`];
 }
 
+/**
+ * Atlas rig for a unit def. Hero defs carry a `sprite` alias onto an existing rig
+ * (heroWallace -> unit/champion/...); everything else rigs under its own id.
+ * Gaia animals (no production building) live under obj/ per ASSET_CONTRACT.
+ */
+export function unitRig(defId: string): { spriteId: string; prefix: 'unit' | 'obj' } {
+  const spriteId = gameData.units[defId]?.sprite ?? defId;
+  const def = gameData.units[spriteId];
+  return { spriteId, prefix: def && def.trainedAt.length === 0 ? 'obj' : 'unit' };
+}
+
 /** Insert the baked player-color token into a frame name: unit/villager/... -> unit/villager@p2/... */
 export function bakedColorName(name: string, colorIdx: number): string {
   const slash = name.indexOf('/');

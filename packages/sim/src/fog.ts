@@ -98,6 +98,18 @@ export function fogOnTileChange(state: SimState, e: Entity): void {
   s.cy = e.tileY;
 }
 
+/**
+ * Snapshot restore: rebuild every vision group's LOS counts (and its 'visible' marks)
+ * by re-applying the active stamp set. Precondition: all counts are zero and visibility
+ * holds only 0/1 (unexplored/explored). This is exact, not approximate: counts is BY
+ * CONSTRUCTION the sum of the circle masks of the stamps in state.visionStamps
+ * (stampAdd/stampRemove are paired precisely through that map), and visibility==2 iff
+ * counts>0 (stampAdd sets 2 on 0→1, stampRemove sets 1 on 1→0, nothing else writes 2).
+ */
+export function reapplyVisionStamps(state: SimState): void {
+  for (const s of state.visionStamps.values()) stampAdd(state, s.group, s.cx, s.cy, s.r);
+}
+
 /** Mark the whole map explored for every player (scenario revealAll). */
 export function revealAll(state: SimState): void {
   for (const g of state.vision) {

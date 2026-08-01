@@ -1,8 +1,12 @@
-// @bf/game entry: title screen -> practice game. Campaign is a v1 "coming
-// soon" (scenario loader + triggers land with @bf/scenarios integration).
+// @bf/game entry: menu flow (title -> play -> practice setup / campaign ->
+// scenario list -> briefing) -> game screen. Leaving a game reloads the page
+// (screens/nav.ts hints steer the next boot back to the right menu screen).
 
-import { showTitleScreen } from './screens/title';
+import { showMenu, type GameRequest } from './screens/menu';
+import { flowAtScenarioList } from './screens/flow';
+import { takeNavHint } from './screens/nav';
 import { hasSnapshot } from './persist';
+import type { RunGameOptions } from './game';
 
 export { resolveFrameName, facingFromDelta, animForActivity } from './frames';
 export { Camera, tileToWorld, worldToTile } from './camera';
@@ -11,11 +15,26 @@ export { Camera, tileToWorld, worldToTile } from './camera';
 export async function startApp(root: HTMLElement): Promise<void> {
   root.innerHTML = '';
   root.style.position = 'relative';
-  // Resume is offered when a backgrounded/killed match left a snapshot (GDD:
-  // a phone call at minute 90 never loses a game)
-  const choice = await showTitleScreen(root, { canResume: hasSnapshot() });
+
+  // Post-reload deep links: campaign results/defeat/retry navigation.
+  const hint = takeNavHint();
+  let request: GameRequest;
+  if (hint?.kind === 'startScenario') {
+    request = { mode: 'scenario', scenarioId: hint.scenarioId };
+  } else {
+    request = await showMenu(root, {
+      // Resume is offered when a backgrounded/killed match left a snapshot
+      // (GDD: a phone call at minute 90 never loses a game)
+      canResume: hasSnapshot(),
+      ...(hint?.kind === 'scenarioList' ? { flow: flowAtScenarioList(hint.campaignId) } : {}),
+    });
+  }
+
   const { runGame } = await import('./game');
-  await runGame(root, choice.mode === 'resume'
-    ? { resume: true }
-    : { difficulty: choice.difficulty });
+  const options: RunGameOptions = request.mode === 'resume'
+    ? { mode: 'resume' }
+    : request.mode === 'scenario'
+      ? { mode: 'scenario', scenarioId: request.scenarioId }
+      : { mode: 'practice', setup: request.setup };
+  await runGame(root, options);
 }

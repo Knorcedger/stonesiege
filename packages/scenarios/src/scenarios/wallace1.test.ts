@@ -71,7 +71,9 @@ describe('wallace-1 — loads clean', () => {
   it('places the named refs and both settlements', () => {
     const byRef = new Map(start.entities.filter((e) => e.ref !== undefined).map((e) => [e.ref, e]));
     expect(byRef.get('wallace')).toMatchObject({ defId: 'heroWallace', player: 1 });
-    expect(byRef.get('heselrig')).toMatchObject({ defId: 'heroHeselrig', player: 2, tileX: 65, tileY: 36 });
+    // Heselrig's court sits on the south road at (65,43) — outside both the watch
+    // tower's and the TC's arrow arcs, so the first scenario's fight is in the open
+    expect(byRef.get('heselrig')).toMatchObject({ defId: 'heroHeselrig', player: 2, tileX: 65, tileY: 43 });
     expect(byRef.get('lanark_tower')).toMatchObject({ defId: 'watchTower', player: 2, tileX: 66, tileY: 34 });
 
     const of = (player: number, defId: string) =>
@@ -80,13 +82,13 @@ describe('wallace-1 — loads clean', () => {
     expect(of(1, 'townCenter')).toBe(1);
     expect(of(1, 'heroWallace')).toBe(1);
     expect(of(1, 'villager')).toBe(3);
-    // player 2: hall (TC), tower, barracks, 6 houses, guard detail of 4 militia + 2 archers
+    // player 2: hall (TC), tower, barracks, 6 houses, guard detail of 3 militia + 1 archer
     expect(of(2, 'townCenter')).toBe(1);
     expect(of(2, 'watchTower')).toBe(1);
     expect(of(2, 'barracks')).toBe(1);
     expect(of(2, 'house')).toBe(6);
-    expect(of(2, 'militia')).toBe(4);
-    expect(of(2, 'archer')).toBe(2);
+    expect(of(2, 'militia')).toBe(3);
+    expect(of(2, 'archer')).toBe(1);
   });
 
   it('carries the briefing: history prose, 6 initial objectives, 4 hints', () => {
@@ -129,7 +131,7 @@ describe('wallace-1 — trigger graph static soundness', () => {
         if (fx.kind === 'objectiveComplete' || fx.kind === 'objectiveFail') resolved.add(fx.id);
       }
     }
-    expect(added.size).toBe(7); // 6 tutorial objectives + obj-heselrig
+    expect(added.size).toBe(8); // 6 tutorial objectives + obj-muster + obj-heselrig
     for (const id of added) {
       expect(resolved.has(id), `objective '${id}' is added but never resolved`).toBe(true);
     }
@@ -222,17 +224,28 @@ describe('wallace-1 — scripted playthrough', () => {
     expect(rt.objectiveState('obj-lumber')).toBe('complete');
     expect(rt.objectiveState('obj-vils')).toBe('open');
 
-    // six villagers -> nightfall -> muster (t08 arms t09, which fires the same tick)
+    // six villagers -> nightfall: the kinsmen spawn at the glen mouth, but the
+    // muster (and with it the Lanark reveal + kill objective) waits for Wallace
     owned('villager', 6);
     step();
     expect(rt.objectiveState('obj-vils')).toBe('complete');
-    expect(rt.hasFired('t09-muster')).toBe(true);
+    expect(rt.hasFired('t08-vils')).toBe(true);
     const spawns = ops.callsOf('spawn');
     expect(spawns).toHaveLength(1);
     const kin = spawns[0].args[0] as Array<{ defId: string; player: number }>;
-    expect(kin).toHaveLength(5);
+    expect(kin).toHaveLength(7);
     expect(kin.every((e) => e.defId === 'militia' && e.player === 1)).toBe(true);
+    expect(rt.objectiveState('obj-muster')).toBe('open');
+    expect(rt.hasFired('t09-muster')).toBe(false); // Lanark stays hidden until the band gathers
+    expect(ops.callsOf('revealArea')).toHaveLength(1); // only the ford reveal so far
+
+    // Wallace joins his kinsmen at the glen mouth {34,56,6,6}: the muster fires
+    inArea(34, 56, 1);
+    step();
+    expect(rt.hasFired('t09-muster')).toBe(true);
+    expect(rt.objectiveState('obj-muster')).toBe('complete');
     expect(rt.objectiveState('obj-heselrig')).toBe('open');
+    expect(ops.callsOf('revealArea')[1].args).toEqual([1, { x: 58, y: 28, w: 16, h: 18 }]);
 
     // the band approaches Lanark: the garrison wakes
     inArea(54, 26, 1);
@@ -250,9 +263,59 @@ describe('wallace-1 — scripted playthrough', () => {
 
     // every objective resolved complete, in add order
     expect(rt.objectiveIds()).toEqual([
-      'obj-move-1', 'obj-move-2', 'obj-food', 'obj-houses', 'obj-lumber', 'obj-vils', 'obj-heselrig',
+      'obj-move-1', 'obj-move-2', 'obj-food', 'obj-houses', 'obj-lumber', 'obj-vils', 'obj-muster', 'obj-heselrig',
     ]);
     for (const id of rt.objectiveIds()) expect(rt.objectiveState(id)).toBe('complete');
+  });
+
+  it('gates the eco chain: doing everything early cannot strand an objective', () => {
+    // A player who trains to 6 villagers, builds houses, banks 150 food and 200 wood
+    // BEFORE finishing the tutorial walks satisfies every eco condition from tick 0.
+    // Each of t05..t08 is gated on its predecessor, so nothing fires until the walks
+    // are done — and then the whole chain cascades in add-order with every objective
+    // added AND completed (nothing dangles, nightfall cannot pre-empt the eco arc).
+    const ops = new FakeOps();
+    ops.addEntity('wallace', { defId: 'heroWallace', player: 1 });
+    ops.addEntity('heselrig', { defId: 'heroHeselrig', player: 2 });
+    ops.addEntity('lanark_tower', { defId: 'watchTower', player: 2 });
+    const rt = new TriggerRuntime(wallace1, ops);
+    const step = () => { ops.now += 20; rt.tick([]); };
+    const owned = (defId: string, count: number) =>
+      ops.counts.unshift({ match: (q) => q.area === undefined && q.defIds?.includes(defId) === true, count });
+
+    // everything the eco chain checks is already true before the first walk
+    ops.stock.set(1, { food: 150, wood: 200 });
+    owned('house', 2);
+    owned('lumberCamp', 1);
+    owned('villager', 6);
+    step();
+    step();
+    for (const id of ['t05-food', 't06-houses', 't07-wood', 't08-vils', 't09-muster']) {
+      expect(rt.hasFired(id), `${id} must stay gated`).toBe(false);
+    }
+    expect(rt.objectiveIds()).toEqual(['obj-move-1']); // nothing else even added
+
+    // now do the two walks; t03 arms t04 and the whole chain cascades to nightfall
+    ops.counts.unshift({ match: (q) => q.area?.x === 30 && q.area?.y === 52, count: 1 });
+    step();
+    ops.counts.unshift({ match: (q) => q.area?.x === 48 && q.area?.y === 40, count: 1 });
+    step();
+    for (const id of ['t04-gather', 't05-food', 't06-houses', 't07-wood', 't08-vils']) {
+      expect(rt.hasFired(id), `${id} fires once the chain unlocks`).toBe(true);
+    }
+    // ...but the muster itself still waits for Wallace to stand at the glen mouth
+    // with his kinsmen (the reveal must never catch the band split)
+    expect(rt.hasFired('t09-muster')).toBe(false);
+    ops.counts.unshift({ match: (q) => q.area?.x === 34 && q.area?.y === 56, count: 1 });
+    step();
+    expect(rt.hasFired('t09-muster')).toBe(true);
+    expect(rt.objectiveIds()).toEqual([
+      'obj-move-1', 'obj-move-2', 'obj-food', 'obj-houses', 'obj-lumber', 'obj-vils', 'obj-muster', 'obj-heselrig',
+    ]);
+    for (const id of rt.objectiveIds()) {
+      if (id === 'obj-heselrig') expect(rt.objectiveState(id)).toBe('open');
+      else expect(rt.objectiveState(id), id).toBe('complete');
+    }
   });
 
   it('defeats immediately, at any point, if Wallace dies', () => {

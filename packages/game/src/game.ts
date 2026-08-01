@@ -1,14 +1,20 @@
 // Game screen orchestrator: Pixi app + layers (terrain/world/fog) + camera +
 // fixed-timestep sim loop + input + DOM HUD + minimap + building placement mode.
+// Runs both match kinds: practice skirmishes (1-3 bots, per-opponent
+// difficulty) and campaign scenarios (TriggerRuntime + objectives panel +
+// dialogue banners + camera pans + campaign victory/defeat flow).
 
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import {
-  FP, fp, TICKS_PER_SECOND,
-  type Command, type Entity, type EntityId, type GameState, type PlayerId, type SimEvent,
+  FP, TICKS_PER_SECOND,
+  type Command, type Entity, type EntityId, type GameConfig, type GameState,
+  type PlayerId, type SimEvent,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
-import { loadAssets, type GameAssets } from './assets';
+import { scenariosById, TriggerRuntime, type AiProfile, type Rect, type ScenarioMeta } from '@bf/scenarios';
+import { applyAiProfile, attackNow, createBot, type Bot } from '@bf/ai';
+import { loadAssets } from './assets';
 import { centroidTile, idleUnits, liveGroupIds, sameIdSet, type IdleCategory } from './selectionTools';
 import { placementGhostFrames } from './frames';
 import { Camera, tileToWorld, worldToTile } from './camera';
@@ -17,59 +23,219 @@ import { WorldLayer } from './world';
 import { FxLayer } from './fx';
 import { FogLayer } from './fog';
 import { SimLoop, TICK_MS } from './simloop';
-import { playHornSting } from './audio';
+import { AudioEngine } from './audio/engine';
+import { GameAudio } from './audio/events';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
 import { AGE_LABEL, type ArmedVerb } from './hud/cardModel';
 import { Minimap } from './hud/minimap';
 import { Overlays } from './hud/overlays';
+import { MessageBanner } from './hud/messages';
+import { ObjectivesPanel } from './hud/objectives';
 import { deriveMatchSummary, emptyTallies, formatMatchTime, recordDeath } from './hud/summary';
-import { createGame, practiceConfig } from './simBridge';
-import { createBot, type Bot, type BotDifficulty } from '@bf/ai';
 import {
-  clearSnapshot, loadSnapshot, replaySnapshot, saveSnapshot, SNAPSHOT_VERSION,
-  type CommandLog,
+  createGame, gameFromSerialized, practiceConfig, scenarioConfig,
+  DEFAULT_PRACTICE_SETUP, type PracticeSetup,
+} from './simBridge';
+import { makeScenarioOps, type ScenarioUiHooks } from './scenario/runtime';
+import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
+import { setNavHint } from './screens/nav';
+import {
+  clearSnapshot, loadSnapshot, replaySnapshot, saveSnapshot, scenarioFingerprint,
+  SNAPSHOT_VERSION, trySerialize, type CommandLog, type MatchSnapshot,
 } from './persist';
 
 const PLACE_GREEN = 0x3e8c34;
 const PLACE_RED = 0xb3261e;
 /** Autosave cadence while playing (ticks): 15 s — cheap next to hide/pagehide saves. */
 const AUTOSAVE_TICKS = 300;
+/** Trigger-driven camera pan duration (ms). */
+const PAN_MS = 750;
 
-export interface RunGameOptions {
-  /** Restore the persisted match snapshot instead of starting fresh. */
-  resume?: boolean;
-  /** Bot difficulty for a fresh practice match (GDD: Easy / Standard / Hard). */
-  difficulty?: BotDifficulty;
+export type RunGameOptions =
+  | { mode: 'resume' }
+  | { mode: 'practice'; setup: PracticeSetup }
+  | { mode: 'scenario'; scenarioId: string };
+
+/** Everything a match needs to boot (fresh or resumed). */
+interface MatchPlan {
+  mode: 'practice' | 'scenario';
+  config: GameConfig;
+  /** practice only */
+  setup: PracticeSetup | null;
+  /** scenario only */
+  meta: ScenarioMeta | null;
+  snapshot: MatchSnapshot | null;
 }
 
-export async function runGame(root: HTMLElement, options: RunGameOptions = {}): Promise<void> {
+/** Null = a resume was requested but nothing valid remains (caller returns to the title). */
+function resolvePlan(options: RunGameOptions): MatchPlan | null {
+  if (options.mode === 'resume') {
+    const snapshot = loadSnapshot();
+    if (snapshot?.mode === 'scenario') {
+      try {
+        const { config, meta } = scenarioConfig(snapshot.scenarioId, snapshot.seed);
+        return { mode: 'scenario', config, setup: null, meta, snapshot };
+      } catch {
+        // the authored scenario set changed under the save
+        return null;
+      }
+    }
+    if (snapshot?.mode === 'practice') {
+      return { mode: 'practice', config: snapshot.config, setup: snapshot.setup, meta: null, snapshot };
+    }
+    // nothing (valid) to resume — never boot a match the player did not ask for
+    return null;
+  }
+  if (options.mode === 'scenario') {
+    const { config, meta } = scenarioConfig(options.scenarioId);
+    return { mode: 'scenario', config, setup: null, meta, snapshot: null };
+  }
+  const setup = options.mode === 'practice' ? options.setup : DEFAULT_PRACTICE_SETUP;
+  return { mode: 'practice', config: practiceConfig(setup), setup, meta: null, snapshot: null };
+}
+
+export async function runGame(root: HTMLElement, options: RunGameOptions): Promise<void> {
   const loading = document.createElement('div');
   loading.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#DABE8D;font:18px "Pixelify Sans",monospace;background:#16100a;';
   loading.textContent = 'Mustering the banners…';
   root.appendChild(loading);
 
+  const plan = resolvePlan(options);
+  if (!plan) {
+    // Resume was requested but the snapshot is gone or stale (decodeSnapshot
+    // rejects fingerprint mismatches; the authored set may also have changed).
+    // Clear it and reboot to the title — the standard leave-a-game navigation —
+    // instead of dropping the player into an unrequested practice match.
+    clearSnapshot();
+    loading.remove();
+    window.location.reload();
+    return;
+  }
   const assets = await loadAssets();
-  const snapshot = options.resume ? loadSnapshot() : null;
+  const { config, snapshot } = plan;
   if (!snapshot) clearSnapshot(); // starting fresh abandons any stale match
-  const difficulty: BotDifficulty = snapshot?.difficulty ?? options.difficulty ?? 'standard';
-  const config = snapshot?.config ?? practiceConfig();
   assets.prepareMatchColors(config.players.map((p) => p.color));
-  const game = createGame(config);
+  // Practice fast-path resume: rebuild straight from the sim's serialized
+  // snapshot when one rode along (scenarios always log-replay instead — the
+  // TriggerRuntime's fired/objective state only reconstructs from the event
+  // stream). A rejected blob falls back to replay below.
+  const restored = snapshot && plan.mode === 'practice'
+    ? gameFromSerialized(snapshot.serialized)
+    : null;
+  const game = restored ?? createGame(config);
   const humanPlayer: PlayerId = (config.players.findIndex((p) => p.isHuman) + 1) as PlayerId;
+  const meta = plan.meta;
+  const scenarioDef = meta ? scenariosById[meta.id] : null;
 
-  // Resume: replay the recorded command log through the fresh engine — the
-  // deterministic sim rebuilds the exact snapshotted state (GDD suspend/resume).
+  // ------------------------------------------------------------------ audio
+  const audioEngine = new AudioEngine();
+  audioEngine.ambientOn();
+  // every button press anywhere in the match UI clicks (capture: HUD buttons
+  // stopPropagation freely)
+  root.addEventListener('pointerdown', (e) => {
+    if ((e.target as HTMLElement | null)?.closest?.('button')) audioEngine.play('uiTap');
+  }, { capture: true });
+
+  // ------------------------------------------------- bots (practice + scenario)
+  // Every non-human seat gets a controller that reads sim state and issues
+  // Commands through the same queue a human would. Practice: per-opponent
+  // difficulty from the setup. Scenario: each seat runs its authored aiProfile
+  // ('passive' garrisons stand down until a trigger changes the profile).
+  // Bot RNG seeds derive from config.seed, which the snapshot persists — a
+  // resumed match's bots roll the same internal dice.
+  const bots = new Map<PlayerId, Bot>();
+  if (plan.mode === 'practice' && plan.setup) {
+    let botIdx = 0;
+    config.players.forEach((p, i) => {
+      if (p.isHuman) return;
+      const difficulty = plan.setup!.opponents[botIdx++] ?? 'standard';
+      bots.set((i + 1) as PlayerId, createBot(game, (i + 1) as PlayerId, { difficulty, seed: config.seed }));
+    });
+  } else if (meta) {
+    meta.players.forEach((p, i) => {
+      if (p.isHuman) return;
+      bots.set((i + 1) as PlayerId, createBot(game, (i + 1) as PlayerId, {
+        profile: p.aiProfile ?? 'passive',
+        difficulty: 'standard',
+        seed: config.seed,
+      }));
+    });
+  }
+
+  // ---------------------------------------------- scenario trigger runtime
+  // UI targets are created after Pixi boots; during a resume-replay the
+  // runtime re-fires historical effects, so messages/pans/stings are muted
+  // and objective changes are buffered until the panel exists.
+  let replaying = false;
+  let objectivesPanel: ObjectivesPanel | null = null;
+  let messageBanner: MessageBanner | null = null;
+  const pendingObjectiveOps: Array<(panel: ObjectivesPanel) => void> = [];
+  const objectiveOp = (f: (panel: ObjectivesPanel) => void): void => {
+    if (objectivesPanel) f(objectivesPanel);
+    else pendingObjectiveOps.push(f);
+  };
+  let startCameraPan: (tileX: number, tileY: number) => void = () => undefined;
+
+  // Trigger effects `aiProfile` / `aiAttackNow` go straight to the bot. Both
+  // ALSO apply during resume-replay so the bot ends up in the profile the
+  // triggers last set (its historical commands come from the log; only its
+  // future behavior needs the right profile).
+  const setAiProfile = (player: number, profile: AiProfile): void => {
+    const bot = bots.get(player as PlayerId);
+    if (bot) applyAiProfile(bot, profile);
+  };
+  const aiAttackNow = (player: number, targetArea?: Rect): void => {
+    const bot = bots.get(player as PlayerId);
+    if (bot) attackNow(bot, targetArea);
+  };
+
+  const scenarioHooks: ScenarioUiHooks = {
+    message: (m) => {
+      if (!replaying) messageBanner?.push({ text: m.text, ...(m.speaker !== undefined ? { speaker: m.speaker } : {}) });
+    },
+    panCamera: (x, y) => {
+      if (!replaying) startCameraPan(x, y);
+    },
+    objectiveAdded: (id, text) => objectiveOp((panel) => panel.add(id, text)),
+    objectiveCompleted: (id) => objectiveOp((panel) => panel.complete(id)),
+    objectiveFailed: (id) => objectiveOp((panel) => panel.fail(id)),
+    playSting: (sting) => {
+      if (replaying) return;
+      audioEngine.play(sting === 'victory' ? 'hornVictory'
+        : sting === 'defeat' ? 'hornDefeat'
+          : sting === 'alert' ? 'hornAlert' : 'hornAge');
+    },
+    victory: () => {
+      if (!replaying) showEnd(true);
+    },
+    defeat: () => {
+      if (!replaying) showEnd(false);
+    },
+    setAiProfile,
+    aiAttackNow,
+  };
+  const triggers = scenarioDef ? new TriggerRuntime(scenarioDef, makeScenarioOps(game, scenarioHooks)) : null;
+
+  // ------------------------------------------------------------------ resume
+  // Restore the snapshotted state on the fresh engine. Fast path: the sim's
+  // serialize()/deserialize() API (landing in @bf/sim; no-op while absent).
+  // Otherwise: replay the recorded command log — the deterministic sim (and,
+  // for scenarios, the deterministic trigger runtime fed the same events)
+  // rebuilds the exact snapshotted state (GDD suspend/resume).
   const commandLog: CommandLog = snapshot?.log ?? [];
   const replayedDeaths: Array<Extract<SimEvent, { kind: 'entityDied' }>> = [];
-  if (snapshot) {
+  if (snapshot && !restored) {
     loading.textContent = 'Restoring match…';
     await new Promise((r) => requestAnimationFrame(() => r(null))); // let the text paint
+    replaying = true;
     replaySnapshot(game, snapshot, (events) => {
       for (const ev of events) {
         if (ev.kind === 'entityDied') replayedDeaths.push(ev);
       }
+      triggers?.tick(events);
     });
+    replaying = false;
   }
 
   const app = new Application();
@@ -106,13 +272,20 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
   const bandOverlay = new Graphics();
   app.stage.addChild(bandOverlay);
 
-  // center on the human TC (resumed matches may have lost it — any own entity then)
+  // start camera: scenario = authored tile; practice = human TC (resumed
+  // matches may have lost it — any own entity then)
   let centered = false;
-  for (const e of game.state.entities.values()) {
-    if (e.player === humanPlayer && e.defId === 'townCenter') {
-      camera.centerOnTile(e.x / FP, e.y / FP);
-      centered = true;
-      break;
+  if (meta && !snapshot) {
+    camera.centerOnTile(meta.startCamera.x, meta.startCamera.y);
+    centered = true;
+  }
+  if (!centered) {
+    for (const e of game.state.entities.values()) {
+      if (e.player === humanPlayer && e.defId === 'townCenter') {
+        camera.centerOnTile(e.x / FP, e.y / FP);
+        centered = true;
+        break;
+      }
     }
   }
   if (!centered) {
@@ -124,6 +297,20 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
     }
   }
   world.onTick(game.state); // initial position snapshot
+
+  const gameAudio = new GameAudio(audioEngine, camera, humanPlayer);
+
+  // ------------------------------------------- trigger-driven camera pans
+  // Eased tile-space glide to an authored point; any manual touch on the
+  // canvas cancels it (the player always wins the camera).
+  let panFx: { fx: number; fy: number; tx: number; ty: number; elapsed: number } | null = null;
+  startCameraPan = (tileX, tileY) => {
+    const from = worldToTile(camera.x, camera.y);
+    panFx = { fx: from.x, fy: from.y, tx: tileX, ty: tileY, elapsed: 0 };
+  };
+  app.canvas.addEventListener('pointerdown', () => {
+    panFx = null;
+  });
 
   // --------------------------------------------------------------- state
   let selection: EntityId[] = [];
@@ -195,16 +382,45 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
   };
 
   // --------------------------------------------------------------- sim events
+  const reloadTo = (hint: Parameters<typeof setNavHint>[0] | null): void => {
+    if (hint) setNavHint(hint);
+    window.location.reload();
+  };
+
   const showEnd = (victory: boolean): void => {
     if (endShown) return;
     endShown = true;
     clearSnapshot(); // a finished match must never be offered for resume
     deselect();
-    overlays.showEndScreen(
-      victory,
-      deriveMatchSummary(getState(), humanPlayer, tallies),
-      () => window.location.reload(), // full reboot back to the title screen
-    );
+    audioEngine.play(victory ? 'hornVictory' : 'hornDefeat');
+    const summary = deriveMatchSummary(getState(), humanPlayer, tallies);
+    if (meta) {
+      // campaign flow: victory unlocks the next scenario; defeat offers retry
+      const scenarioId = meta.id;
+      const campaignId = meta.campaign;
+      if (victory) saveProgress(completeScenario(loadProgress(), scenarioId));
+      overlays.showEndScreen(victory, summary, {
+        sub: victory ? `${meta.title} — complete` : meta.title,
+        buttons: victory
+          ? [
+            { label: 'Continue', onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
+            { label: 'Replay scenario', ghost: true, onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
+            { label: 'Continue watching', ghost: true, dismiss: true },
+          ]
+          : [
+            { label: 'Retry', onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
+            { label: 'Return to scenarios', ghost: true, onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
+            { label: 'Continue watching', ghost: true, dismiss: true },
+          ],
+      });
+    } else {
+      overlays.showEndScreen(victory, summary, {
+        buttons: [
+          { label: 'Return to Title', onClick: () => reloadTo(null) },
+          { label: 'Continue watching', ghost: true, dismiss: true },
+        ],
+      });
+    }
   };
 
   const handleSimEvents = (events: SimEvent[]): void => {
@@ -216,15 +432,13 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
           break;
         case 'ageAdvanced':
           if (ev.player === humanPlayer) {
-            overlays.showAgeBanner(AGE_LABEL[ev.age]);
-            playHornSting(); // GDD audio: horn sting on age-up
+            overlays.showAgeBanner(AGE_LABEL[ev.age]); // audio: GameAudio horn
           }
           break;
         case 'underAttack':
           if (ev.player === humanPlayer) {
             overlays.pulseUnderAttack();
-            minimap.ping(ev.x / FP, ev.y / FP);
-            playHornSting(); // GDD audio: horn sting on attack warning
+            minimap.ping(ev.x / FP, ev.y / FP); // audio: GameAudio horn
           }
           break;
         case 'researchComplete':
@@ -245,7 +459,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
         // wonder countdown stream (sim: started / once-per-second / cancelled)
         case 'wonderStarted':
         case 'wonderCountdown':
-          if (ev.kind === 'wonderStarted' && ev.player !== humanPlayer) playHornSting();
+          if (ev.kind === 'wonderStarted' && ev.player !== humanPlayer) audioEngine.play('hornAlert');
           wonderOwner = ev.player;
           overlays.setWonderBanner({
             owner: st.players[ev.player]?.setup.name ?? 'Enemy',
@@ -276,25 +490,18 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
   };
 
   // --------------------------------------------------------------- sim loop
-  // Bot opponents (GDD Practice): every non-human player gets a controller that
-  // reads sim state and issues Commands through the same queue a human would.
-  // During a resume their historical commands came from the log; from here on
-  // they play live again.
-  const bots: Bot[] = config.players
-    .map((p, i) => ({ setup: p, id: (i + 1) as PlayerId }))
-    .filter(({ setup }) => !setup.isHuman)
-    .map(({ id }) => createBot(game, id, difficulty));
-
   const loop = new SimLoop(game, {
     onTick: (events) => {
       const st = getState();
-      for (const bot of bots) {
-        for (const cmd of bot.tick()) loop.issue(cmd);
+      for (const bot of bots.values()) {
+        for (const cmd of bot.tick(events)) loop.issue(cmd);
       }
       world.onTick(st);
       world.onSimEvents(events, st.tick);
       fx.onSimEvents(st, events, st.tick);
       handleSimEvents(events);
+      gameAudio.onSimEvents(events, st);
+      triggers?.tick(events); // scenario triggers run right after the sim tick
       fog.update(st.players[humanPlayer]?.visibility ?? new Uint8Array(0));
     },
     // match-snapshot command log: every applied batch (human AND bots) is
@@ -307,12 +514,28 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
 
   // ------------------------------------------------------------- persistence
   // GDD: backgrounding auto-snapshots the match; periodic saves cover OS kills
-  // and dev-server reloads. Cleared the moment the match ends.
+  // and dev-server reloads. Cleared the moment the match ends. When @bf/sim's
+  // serialize() exists the blob rides along as a fast practice-resume path.
   let lastSavedTick = game.state.tick;
   const saveMatch = (): void => {
     const st = getState();
     if (endShown || st.finished) return;
-    saveSnapshot({ version: SNAPSHOT_VERSION, config, difficulty, tick: st.tick, log: commandLog });
+    const serialized = trySerialize(game);
+    const withBlob = serialized !== undefined ? { serialized } : {};
+    if (plan.mode === 'scenario' && meta) {
+      saveSnapshot({
+        version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId: meta.id,
+        // content stamp: the resume is only valid against identical authored
+        // def + game data ('' can never match, degrading to "no resume")
+        fingerprint: scenarioFingerprint(meta.id) ?? '',
+        seed: config.seed, tick: st.tick, log: commandLog, ...withBlob,
+      });
+    } else if (plan.setup) {
+      saveSnapshot({
+        version: SNAPSHOT_VERSION, mode: 'practice', config, setup: plan.setup,
+        tick: st.tick, log: commandLog, ...withBlob,
+      });
+    }
     lastSavedTick = st.tick;
   };
   const onVisibility = (): void => {
@@ -507,6 +730,8 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
     togglePause: () => loop.togglePause(),
     isPaused: () => loop.paused,
     resumeGame: () => loop.resume(),
+    // pause-overlay slider release: the player hears the level they just set
+    playUiSound: () => audioEngine.play('uiTap'),
     resign: () => {
       issue({ kind: 'resign', player: humanPlayer });
       loop.resume(); // the resign must actually process (defeat -> end screen)
@@ -514,7 +739,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
     // pause-overlay exit while spectating a finished match (the sim drops all
     // commands post-finish, so Resign is swapped for this) — same full reboot
     // the end screen's Return to Title performs
-    returnToTitle: () => window.location.reload(),
+    returnToTitle: () => reloadTo(meta ? { kind: 'scenarioList', campaignId: meta.campaign } : null),
     getIdleCounts,
     cycleIdle,
     getGroupCounts,
@@ -523,6 +748,12 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
   };
   const hud = new Hud(root, hudHost);
   const overlays = new Overlays(root);
+  if (meta) {
+    objectivesPanel = new ObjectivesPanel(root);
+    messageBanner = new MessageBanner(root);
+    for (const op of pendingObjectiveOps) op(objectivesPanel); // resume-replayed state
+    pendingObjectiveOps.length = 0;
+  }
 
   const minimap = new Minimap(
     hud.minimapSlot,
@@ -571,6 +802,36 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
   };
   const input = new InputController(app.canvas, bandOverlay, inputHost);
 
+  // --------------------------------------------------------- dev speed toggle
+  // ?dev=1: 1x/4x/16x sim speed for fast scenario playtesting. Extra speed =
+  // extra loop.update() calls per frame — more advance() steps through the
+  // SAME deterministic path; the command log and determinism are unaffected.
+  let simSpeed = 1;
+  if (new URLSearchParams(window.location.search).get('dev') === '1') {
+    const bar = document.createElement('div');
+    bar.style.cssText = 'position:absolute;left:8px;top:40px;z-index:60;display:flex;gap:4px;pointer-events:auto;';
+    const btns: HTMLButtonElement[] = [];
+    for (const s of [1, 4, 16]) {
+      const b = document.createElement('button');
+      b.textContent = `${s}×`;
+      b.style.cssText = 'font:12px "Pixelify Sans",monospace;padding:3px 8px;cursor:pointer;border-radius:3px;border:1px solid #64492B;background:#241809;color:#DABE8D;';
+      b.addEventListener('click', () => {
+        simSpeed = s;
+        for (const x of btns) {
+          x.style.background = '#241809';
+          x.style.color = '#DABE8D';
+        }
+        b.style.background = '#DABE8D';
+        b.style.color = '#1A1208';
+      });
+      btns.push(b);
+      bar.appendChild(b);
+    }
+    btns[0].style.background = '#DABE8D';
+    btns[0].style.color = '#1A1208';
+    root.appendChild(bar);
+  }
+
   // Dev-only QA handle: lets automated browser sessions locate entities on screen and
   // read sim state without poking at Pixi internals. Never present in production builds.
   if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
@@ -608,6 +869,8 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
       },
       /** Queue a raw command like the HUD would (QA bulk re-tasking only). */
       issue: (cmd: Command): void => issue(cmd),
+      setSpeed: (s: number): void => { simSpeed = Math.max(1, Math.min(64, Math.round(s))); },
+      objectives: () => objectivesPanel?.model.items() ?? [],
     };
   }
 
@@ -620,9 +883,23 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
     const now = performance.now();
     camera.setViewport(app.screen.width, app.screen.height);
 
-    loop.update(dt);
+    // dev speed: each extra pass is a normal accumulator update — the catchup
+    // clamp inside SimLoop still bounds each call to 5 ticks
+    for (let i = 0; i < simSpeed; i++) loop.update(dt);
     input.update(dt, now);
     camera.update(dt);
+
+    // trigger-driven camera pan (after input so a drag this frame cancels first)
+    if (panFx) {
+      panFx.elapsed += dt;
+      const t = Math.min(1, panFx.elapsed / PAN_MS);
+      const ease = t < 0.5 ? 2 * t * t : 1 - (-2 * t + 2) ** 2 / 2;
+      camera.centerOnTile(
+        panFx.fx + (panFx.tx - panFx.fx) * ease,
+        panFx.fy + (panFx.ty - panFx.fy) * ease,
+      );
+      if (t >= 1) panFx = null;
+    }
 
     const t = camera.getTransform();
     worldRoot.scale.set(t.zoom);
@@ -636,6 +913,9 @@ export async function runGame(root: HTMLElement, options: RunGameOptions = {}): 
     if (placement) refreshGhost();
     hud.update();
     minimap.update(now);
+    gameAudio.update(st, now);
+    objectivesPanel?.update();
+    messageBanner?.update(now);
     if (st.tick - lastSavedTick >= AUTOSAVE_TICKS) saveMatch();
   });
 }

@@ -61,6 +61,17 @@ describe('loadScenario — good fixture', () => {
     expect(meta.startCamera).toEqual({ x: 2, y: 1 });
   });
 
+  it('passes per-player popCap through to PlayerSetup (sim min-caps per seat)', () => {
+    const def = makeFixture();
+    def.players[0].popCap = 60;
+    // player 2 has no cap: PlayerSetup.popCap must stay absent, not default
+    delete def.players[1].popCap;
+    const { meta } = loadScenario(def);
+    expect(meta.playerSetups[0].popCap).toBe(60);
+    expect(meta.playerSetups[1].popCap).toBeUndefined();
+    expect(meta.popCap).toBe(200); // global ceiling = max across seats (uncapped -> 200)
+  });
+
   it('passes entity overrides (hp/facing/amountLeft) through to ScenarioStart', () => {
     const def = makeFixture();
     def.entities.push({ def: 'goldMine', player: 0, x: 5, y: 5, amountLeft: 300 });

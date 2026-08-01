@@ -25,6 +25,8 @@ import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
+import { CHIPS_HEIGHT_PX, CHIPS_NARROW_MAX_PX, CHIPS_TOP_NARROW_PX, CHIPS_TOP_PX } from './layout';
+import { buildSettingsControls } from '../settingsUi';
 
 export interface HudHost {
   assets: GameAssets;
@@ -60,6 +62,8 @@ export interface HudHost {
   isPaused(): boolean;
   resumeGame(): void;
   resign(): void;
+  /** Audible preview for the pause-overlay volume sliders (uiTap on release). */
+  playUiSound(): void;
   /** Back to the title screen — the pause overlay's exit while spectating a finished match. */
   returnToTitle(): void;
   /** Idle-unit badges (GDD: touch answer to AoE2's `.` hotkey). */
@@ -154,28 +158,35 @@ const HUD_CSS = `
 .bf-goccrow canvas { width:24px; height:24px; image-rendering:pixelated; border:1px solid #64492B; }
 .bf-toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); padding:6px 10px; display:none; align-items:center; gap:10px; font-size:14px; pointer-events:auto; }
 .bf-toast.show { display:flex; }
-.bf-pause { position:absolute; inset:0; background:rgba(10,8,5,0.72); display:none; align-items:center; justify-content:center; flex-direction:column; gap:14px; pointer-events:auto; z-index:40; }
+/* scrollable overlay + margin:auto box: the settings block can exceed short
+   (landscape-phone) viewports — flex centering alone would clip the top */
+.bf-pause { position:absolute; inset:0; background:rgba(10,8,5,0.72); display:none; overflow-y:auto; pointer-events:auto; z-index:40; }
 .bf-pause.show { display:flex; }
+.bf-pausebox { margin:auto; display:flex; align-items:center; flex-direction:column; gap:14px; padding:24px 16px; }
 .bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:42px; color:#E6C04A; margin:0; }
+/* in-match settings (same controls as the menu screen — see settingsUi.ts) */
+.bf-pausesettings { width:min(320px, 88vw); text-align:left; }
 .bf-place { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:8px 10px; display:none; gap:10px; pointer-events:auto; }
 .bf-place.show { display:flex; }
 /* top-center: the only HUD region that never collides with minimap (168px, bottom-left),
-   command card (bottom-right) or the placement bar (bottom-center) on phone widths */
-.bf-chips { position:absolute; left:50%; top:46px; transform:translateX(-50%); display:flex; gap:6px; pointer-events:auto; }
+   command card (bottom-right) or the placement bar (bottom-center) on phone widths.
+   Geometry comes from hud/layout.ts — the message banner and objectives panel
+   position themselves below/around the strip from the same constants. */
+.bf-chips { position:absolute; left:50%; top:${CHIPS_TOP_PX}px; transform:translateX(-50%); display:flex; gap:6px; pointer-events:auto; }
 .bf-chips.hide { display:none; }
-.bf-chip { position:relative; width:44px; height:44px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
+.bf-chip { position:relative; width:${CHIPS_HEIGHT_PX}px; height:${CHIPS_HEIGHT_PX}px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
 .bf-chip.empty { background:#3a2a18; color:#B99A6B; border-color:#64492B; box-shadow:none; }
 .bf-chipcount { position:absolute; right:3px; bottom:1px; font-size:14px; color:#64492B; }
 /* ---- narrow widths (portrait phones): compress the top bar. It may wrap to a
    second row, but every control — the pause button above all — stays on-screen
    and tappable. Group chips drop below the (possibly two-row) bar. ---- */
-@media (max-width: 720px) {
+@media (max-width: ${CHIPS_NARROW_MAX_PX}px) {
   .bf-top { flex-wrap:wrap; height:auto; min-height:34px; gap:2px 7px; padding:3px 8px; }
   .bf-res { font-size:14px; gap:2px; }
   .bf-res canvas { width:18px; height:18px; }
   .bf-poplabel { display:none; } /* numerals carry the meaning on phones */
   .bf-age { font-size:13px; letter-spacing:0; }
-  .bf-chips { top:84px; }
+  .bf-chips { top:${CHIPS_TOP_NARROW_PX}px; }
 }
 /* The 168px minimap and the 246px command card cannot share one <=480px row —
    shrink the minimap so the card's train/build buttons are never covered, and
@@ -453,6 +464,8 @@ export class Hud {
   private buildPauseOverlay(): void {
     this.pauseOverlay = document.createElement('div');
     this.pauseOverlay.className = 'bf-pause';
+    const box = document.createElement('div');
+    box.className = 'bf-pausebox';
     const h = document.createElement('h2');
     h.textContent = 'Paused';
     const btn = document.createElement('button');
@@ -460,6 +473,12 @@ export class Hud {
     btn.style.fontSize = '18px';
     btn.textContent = 'Resume';
     btn.addEventListener('click', () => this.host.resumeGame());
+    // In-match settings (shared builder with the menu screen): volume, camera
+    // speed and HP bars were otherwise only reachable by resigning the match.
+    // Slider release plays a uiTap so the player HEARS the level they set.
+    const settings = document.createElement('div');
+    settings.className = 'bf-pausesettings';
+    buildSettingsControls(settings, { onSliderRelease: () => this.host.playUiSound() });
     // Resign (GDD: a human can resign at any time) — two taps to confirm,
     // because a mis-tap here forfeits the whole match.
     this.resignBtn = document.createElement('button');
@@ -481,9 +500,8 @@ export class Hud {
       this.resetResign();
       this.host.resign();
     });
-    this.pauseOverlay.appendChild(h);
-    this.pauseOverlay.appendChild(btn);
-    this.pauseOverlay.appendChild(this.resignBtn);
+    box.append(h, btn, settings, this.resignBtn);
+    this.pauseOverlay.appendChild(box);
     this.pauseOverlay.addEventListener('click', (e) => {
       if (e.target === this.pauseOverlay) this.host.resumeGame();
     });

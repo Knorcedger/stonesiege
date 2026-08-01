@@ -25,10 +25,11 @@ import {
   createGestureState, stepGesture, flushGestures,
   type Gesture, type GestureState, type PointerEvt,
 } from './gestures';
+import { getSettings } from './settings';
 
 const PICK_SLOP_PX = 16;
 const PINCH_STEP = 1.3;
-const KEY_PAN_SPEED = 0.65; // screen px per ms
+const KEY_PAN_SPEED = 0.65; // screen px per ms (settings cameraSpeed multiplies)
 
 export interface InputHost {
   camera: Camera;
@@ -149,7 +150,8 @@ export class InputController {
     if (this.keysDown.has('ArrowUp')) dy += 1;
     if (this.keysDown.has('ArrowDown')) dy -= 1;
     if (dx !== 0 || dy !== 0) {
-      this.host.camera.panBy(dx * KEY_PAN_SPEED * dtMs, dy * KEY_PAN_SPEED * dtMs);
+      const speed = KEY_PAN_SPEED * getSettings().cameraSpeed;
+      this.host.camera.panBy(dx * speed * dtMs, dy * speed * dtMs);
     }
     for (const g of flushGestures(this.gestures, now)) this.onGesture(g);
   }

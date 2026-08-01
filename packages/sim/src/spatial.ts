@@ -52,6 +52,22 @@ export class SpatialGrid {
    * actual distance). Sorted ascending by id for determinism.
    */
   queryCircle(x: Fixed, y: Fixed, r: Fixed, out: EntityId[]): EntityId[] {
+    this.queryCircleUnsorted(x, y, r, out);
+    out.sort((a, b) => a - b);
+    return out;
+  }
+
+  /**
+   * queryCircle WITHOUT the id sort — a measured hotspot with 300+ units (the sort was
+   * >1/3 of total tick time in the 144×144 brawl smoke). The id SET returned is
+   * identical, only the enumeration order is unspecified (cell-array insertion order,
+   * which varies with movement history and differs after a snapshot restore). Callers
+   * MUST therefore be order-independent: commutative accumulation (movement
+   * separation), pure existence checks, or explicit best-candidate tie-breaks that
+   * never rely on scan order (combat acquisition tie-breaks on lowest id). Everything
+   * else uses the sorted query.
+   */
+  queryCircleUnsorted(x: Fixed, y: Fixed, r: Fixed, out: EntityId[]): EntityId[] {
     out.length = 0;
     const x0 = (x - r) >> CELL_SHIFT, x1 = (x + r) >> CELL_SHIFT;
     const y0 = (y - r) >> CELL_SHIFT, y1 = (y + r) >> CELL_SHIFT;
@@ -61,7 +77,6 @@ export class SpatialGrid {
         if (arr) for (let i = 0; i < arr.length; i++) out.push(arr[i]);
       }
     }
-    out.sort((a, b) => a - b);
     return out;
   }
 }

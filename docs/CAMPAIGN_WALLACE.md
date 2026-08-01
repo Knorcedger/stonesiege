@@ -115,7 +115,8 @@ Initial:
 6. `obj-vils` — Train villagers at the Town Center until you have 6.
 
 Hidden / late:
-7. `obj-heselrig` — Kill William Heselrig, Sheriff of Lanark. *(added at nightfall beat)*
+7. `obj-muster` — Walk Wallace to the glen mouth to muster the band. *(added at nightfall beat)*
+8. `obj-heselrig` — Kill William Heselrig, Sheriff of Lanark. *(added when the band musters)*
 
 ### Hints
 - Drag on empty ground to pan; pinch to zoom. Tap a unit, then tap the ground to move it.
@@ -135,7 +136,11 @@ Rolling green Lanarkshire; the Clyde as an impassable band along the east edge.
   the glen mouth (36, 58) NE to the lookout, then E to Lanark.
 - **Lanark town (NE-center)**: `{58, 28, 16, 18}` — dirt/road streets, 6 English houses, a
   Watch Tower at (66, 34), Barracks at (70, 38), Heselrig's hall (English Town Center) at
-  (62, 30). Guard detail: 4 militia + 2 archers. Heselrig stands in the square (65, 36).
+  (62, 30). Guard detail: 3 militia + 1 archer — deliberately light; this is the
+  first scenario's only fight. Heselrig holds his court of judgement at the gallows
+  cross on the south road (65, 43), deliberately OUTSIDE both the Watch Tower's and
+  the TC's arrow arcs, so the naive all-in raid fights in the open; chasing survivors
+  into the town square is what the arrows punish.
 - **Clyde**: water band, cols x 78–95, running full N–S (impassable; no crossing on this map).
 - **Small gold** (taste of things to come, not needed): 3 tiles at (44, 60).
 - No stone on this map.
@@ -150,7 +155,7 @@ Rolling green Lanarkshire; the Clyde as an impassable band along the east edge.
 
 ### Named entity refs
 - `wallace` — `heroWallace`, player 1, (22, 66).
-- `heselrig` — `heroHeselrig`, player 2, (65, 36).
+- `heselrig` — `heroHeselrig`, player 2, (65, 43).
 - `lanark_tower` — `watchTower`, player 2, (66, 34).
 - Player 1 starts with: TC, `wallace`, 3 villagers.
 
@@ -187,15 +192,24 @@ t04-gather [unarmed]
     - message (Narrator) "Tap a villager, then tap berries or a sheep to gather. Food is dropped off at the Town Center."
     - objectiveAdd obj-food "Stockpile 150 food"
 
+// The eco chain (t05..t08) is strictly gated on its predecessor having fired: each
+// objective is added by the previous trigger, and objectiveComplete on a never-added
+// id is a latched no-op — an ungated trigger firing early would permanently strand
+// its objective. Out-of-order play (e.g. training villagers before the lumber camp)
+// just makes the whole chain cascade once it unlocks.
 t05-food [armed]
-  conditions: resourcesAtLeast {player:1, type:'food', amount:150}
+  conditions:
+    - triggerFired t04-gather
+    - resourcesAtLeast {player:1, type:'food', amount:150}
   effects:
     - objectiveComplete obj-food
     - message (Wallace) "Full bellies. Now roofs — kin are coming in from the hills."
     - objectiveAdd obj-houses "Build two Houses"
 
 t06-houses [armed]
-  conditions: ownedAtLeast {player:1, defIds:['house'], atLeast:2}
+  conditions:
+    - triggerFired t05-food
+    - ownedAtLeast {player:1, defIds:['house'], atLeast:2}
   effects:
     - objectiveComplete obj-houses
     - message (Narrator) "Houses raise your population room. Build a Lumber Camp beside the western wood so the walk is short."
@@ -203,6 +217,7 @@ t06-houses [armed]
 
 t07-wood [armed]
   conditions:
+    - triggerFired t06-houses
     - ownedAtLeast {player:1, defIds:['lumberCamp'], atLeast:1}
     - resourcesAtLeast {player:1, type:'wood', amount:200}
   effects:
@@ -211,21 +226,36 @@ t07-wood [armed]
     - objectiveAdd obj-vils "Train villagers until you have 6"
 
 t08-vils [armed]
-  conditions: ownedAtLeast {player:1, defIds:['villager'], atLeast:6}
+  conditions:
+    - triggerFired t07-wood       // nightfall may not pre-empt the eco arc
+    - ownedAtLeast {player:1, defIds:['villager'], atLeast:6}
   effects:
     - objectiveComplete obj-vils
     - message (Narrator) "Night falls over the glen. Word comes: Heselrig sits in judgement at Lanark tomorrow."
-    - armTrigger t09-muster
-
-t09-muster [unarmed]
-  conditions: always
-  effects:
-    - spawn [5× militia, player 1, at {36,58} glen mouth]
+    - spawn [7× militia, player 1, at {36,58} glen mouth]
     - playSting horn
+    - message (Wallace) "Kin from the hills, mustering at the glen mouth — and I will not send them against Lanark without me. We march together or not at all."
+    - objectiveAdd obj-muster "Walk Wallace to the glen mouth to muster the band"
+    - panCamera (36, 58)
+
+// The muster is GATED on Wallace physically standing with the kinsmen. Wallace
+// (speed 0.96) outpaces militia (0.9), and after the scripted walks he can sit at
+// the ford lookout, ~15 tiles closer to Lanark than the glen mouth: revealing
+// Lanark while the band is split invites a select-all attack-move where Wallace
+// arrives alone, tanks the whole court detail, and — since his death is instant
+// defeat — can lose the tutorial to its own recommended action. "Arriving ragged"
+// only wins the open fight if the band DEPARTS together, so the reveal, the kill
+// objective, and the pan to Lanark all wait for the gather.
+t09-muster [armed]
+  conditions:
+    - triggerFired t08-vils
+    - entitiesInArea {player:1, defIds:['heroWallace'], area:{34,56,6,6}, atLeast:1}
+  effects:
+    - objectiveComplete obj-muster
     - message (Wallace) "Kinsmen with steel. Lanark, then. The sheriff owes this shire a debt, and I mean to collect."
     - objectiveAdd obj-heselrig "Kill William Heselrig, Sheriff of Lanark"
     - revealArea {player:1, area:{58,28,16,18}}
-    - panCamera (65, 36)
+    - panCamera (65, 43)
 
 t10-alarm [armed]
   conditions:
@@ -233,6 +263,7 @@ t10-alarm [armed]
     - entitiesInArea {player:1, area:{54,26,22,22}, atLeast:1}
   effects:
     - message (Heselrig) "Brigands at the gate? Cut them down and hang what's left."
+    - message (Wallace) "The sheriff, not the garrison! He holds his court on the south road — strike Heselrig down and away, before the tower archers find their marks."
     - aiProfile {player:2, profile:'defender'}
     - playSting alert
 
@@ -570,11 +601,27 @@ t04-wave-a [unarmed]                 // fires on first of t02/t03; fire-once def
     - aiAttackNow {player:2, targetArea:{54,44,10,8}}   // north bridgehead
     - message (Moray) "Steady. Let them cross. A blade in the water drowns same as a coward."
     - objectiveAdd obj-trap "On Moray's signal, destroy every English soldier north of the Forth"
-    - armTrigger t05-signal
+    - armTrigger t05a-signal-north
     - armTrigger t06-wave-b
 
-t05-signal [unarmed]
-  conditions: entitiesInArea {player:2, area:{0,0,120,56}, atLeast:12}   // north bank
+// Moray's signal must always precede the bridgehead fight. Two converging watchers arm
+// the fire-once payload (t05-signal): t05a fires when 8 of wave A's 12 stand on the
+// north bank (a live crossing peaks around 11 — a threshold of 12 could never be met
+// and the trap was sprung before it was announced); t05b, armed with wave B, is the
+// guarantee — the FIRST Englishman north after the knights ride triggers the signal
+// even if the player bled wave A at the bridge itself.
+t05a-signal-north [unarmed]          // armed by t04-wave-a
+  conditions: entitiesInArea {player:2, area:{0,0,120,56}, atLeast:8}    // north bank
+  effects:
+    - armTrigger t05-signal
+
+t05b-signal-crossed [unarmed]        // armed by t06-wave-b
+  conditions: entitiesInArea {player:2, area:{0,0,120,56}, atLeast:1}    // any English north
+  effects:
+    - armTrigger t05-signal
+
+t05-signal [unarmed]                 // converging arms from t05a/t05b; fire-once
+  conditions: always
   effects:
     - playSting horn
     - message (Moray) "NOW, Wallace! Take the bridgehead — not one of them recrosses that bridge!"
@@ -586,6 +633,7 @@ t06-wave-b [unarmed]
     - spawn [6× knight, 4× scout, player 2, {54,72,8,6}]
     - aiAttackNow {player:2, targetArea:{44,20,28,20}}  // push at the camp
     - message (Narrator) "Knights on the causeway. Horses die on spearpoints — form your line."
+    - armTrigger t05b-signal-crossed
     - armTrigger t07-wave-c
 
 t07-wave-c [unarmed]
@@ -625,7 +673,19 @@ t10-mopup-gate [unarmed]
   effects:
     - objectiveComplete obj-cressingham
     - message (Narrator) "Cressingham is down. The men remember every fine he levied — the treasurer pays his own arrears at last."
+    - message (Wallace) "Finish it! What is left of the host is being whipped up the causeway — hold the bridgehead and let the Forth take the rest."
+    - armTrigger t10b-mopup-drive
     - armTrigger t11-victory
+
+t10b-mopup-drive [unarmed] [loop]    // armed by t10-mopup-gate
+  conditions: timerSeconds 20
+  effects:
+    - aiAttackNow {player:2, targetArea:{54,44,10,8}}
+              // Every 20s of the mop-up, force-march every remaining host soldier —
+              // including stragglers idling on the south bank (e.g. by the SW castle)
+              // — at the north bridgehead. This squares t11's map-wide annihilation
+              // count with obj-trap's 'north of the Forth' text: no player ever combs
+              // the south bank; the stragglers come north to die.
 
 t11-victory [unarmed]
   conditions: ownedAtMost {player:2, defIds:['militia','manAtArms','spearman','archer',

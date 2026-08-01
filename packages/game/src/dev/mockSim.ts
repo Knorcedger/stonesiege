@@ -131,6 +131,11 @@ class MockGame implements Game {
     return (h ^ this.st.tick) >>> 0;
   }
 
+  /** Dev mock has no persistence: an unloadable stub (schemaVersion -1 is always rejected). */
+  serialize(): { schemaVersion: number } {
+    return { schemaVersion: -1 };
+  }
+
   canPlace(player: PlayerId, defId: string, tileX: number, tileY: number): boolean {
     const def = gameData.buildings[defId];
     if (!def) return false;

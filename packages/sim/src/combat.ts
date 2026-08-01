@@ -322,7 +322,10 @@ function tryAcquire(state: SimState, e: Entity, mode: 'units' | 'buildings'): Co
       if (d < bestD) { bestD = d; targetId = t.id; }
     }
   } else {
-    state.unitsGrid.queryCircle(e.x, e.y, losFp, queryBuf);
+    // unsorted query + explicit (distance, lowest id) tie-break: picks exactly the
+    // unit a sorted scan with `dd < bestD` would pick, without the per-scan id sort
+    // (a measured hotspot with 300+ auto-acquiring units — see spatial.ts)
+    state.unitsGrid.queryCircleUnsorted(e.x, e.y, losFp, queryBuf);
     for (const id of queryBuf) {
       if (id === e.id) continue;
       const t = state.entities.get(id);
@@ -333,7 +336,7 @@ function tryAcquire(state: SimState, e: Entity, mode: 'units' | 'buildings'): Co
       const dd = dx * dx + dy * dy;
       if (dd > losFp * losFp) continue;
       if (minRangeFp > 0 && effDistFp(state, e, t) < minRangeFp) continue;
-      if (dd < bestD) { bestD = dd; targetId = t.id; }
+      if (dd < bestD || (dd === bestD && t.id < targetId)) { bestD = dd; targetId = t.id; }
     }
   }
   if (targetId < 0) return undefined;

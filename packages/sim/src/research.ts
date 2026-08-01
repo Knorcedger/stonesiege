@@ -72,6 +72,12 @@ export function canResearch(state: SimState, player: PlayerId, techId: string): 
   }
   if (tech.requiresBuildingsOfCurrentAge !== undefined &&
     !hasAgeUpBuildings(state, player, tech.requiresBuildingsOfCurrentAge)) return false;
+  // scenario tech ceiling (GameConfig.maxAge): never research INTO an age beyond it
+  if (state.maxAgeLimit !== undefined) {
+    for (const fx of tech.effects) {
+      if (fx.kind === 'ageUp' && ageIdx(fx.to) > ageIdx(state.maxAgeLimit)) return false;
+    }
+  }
   return true;
 }
 
@@ -224,6 +230,8 @@ function transformEntities(state: SimState, player: PlayerId, from: string, to: 
 
 function ageUp(state: SimState, player: PlayerId, to: AgeId, events: SimEvent[]): void {
   const p = state.players[player];
+  // ceiling guard also here so indirect paths (freeTech chains) can never bypass intake
+  if (state.maxAgeLimit !== undefined && ageIdx(to) > ageIdx(state.maxAgeLimit)) return;
   if (ageIdx(to) <= ageIdx(p.age)) return;
   p.age = to;
   rebuildModifiers(state, player);

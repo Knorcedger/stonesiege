@@ -66,17 +66,17 @@ replays identically.
 - `changeOwner` is pre-filtered to live refs; `spawn` ref bookkeeping is engine-side.
 - After `victory()`/`defeat()`, `tick()` is a permanent no-op.
 
-## Known gaps / asks
+## Known gaps / asks — ALL CLOSED (wave 3)
 
-1. **Hero defs** (`heroWallace`, `heroHeselrig`, later `heroMoray` etc. —
-   docs/CAMPAIGN_WALLACE.md Appendix A) are not in `@bf/data` yet. Until they land, this
-   package ships placeholder defs in `src/heroes.ts`: load campaign scenarios with
-   `loadScenario(wallace1, campaignGameData)` (or `withCampaignHeroes(gameData)`). The
-   merge prefers `@bf/data` — the moment real hero defs land there, the placeholders are
-   inert and nothing here needs changing. Placeholder icons reuse existing atlas frames
-   (`icon/champion` etc.) so no missing-art references exist.
-2. **Per-player pop caps**: `ScenarioPlayer.popCap` exists per player, but `GameConfig`
-   takes one global `popCap`. `meta.popCap` is the max across players; per-player caps in
-   `meta.players[i].popCap` are ready whenever the sim supports them.
-3. `maxAge` (tech cap, e.g. no Feudal in wallace-1) is surfaced in `meta.maxAge`; the sim
-   needs to enforce it when age-up research lands in scenario play.
+1. **Hero defs** — CLOSED. `heroWallace` & co. (docs/CAMPAIGN_WALLACE.md Appendix A) are
+   canonical `@bf/data` units now (packages/data/src/units.ts). The placeholder defs in
+   `src/heroes.ts` are inert: the `campaignGameData` merge prefers `@bf/data`, so loading
+   with `loadScenario(def, campaignGameData)` keeps working unchanged.
+2. **Per-player pop caps** — CLOSED. The sim honors `PlayerSetup.popCap` (min'd with the
+   global `GameConfig.popCap` in `recomputePopCap`), and the loader now maps
+   `ScenarioPlayer.popCap` onto `meta.playerSetups[i].popCap`. `meta.popCap` remains the
+   max across players and should still be passed as the global `GameConfig.popCap`.
+3. **`maxAge` tech ceiling** — CLOSED. The sim enforces `GameConfig.maxAge` at research
+   intake AND inside ageUp (freeTech chains cannot bypass it). Pass `meta.maxAge` into
+   `GameConfig.maxAge` (the game's `scenarioConfig` in packages/game/src/simBridge.ts
+   already does).

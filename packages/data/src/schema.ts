@@ -72,6 +72,12 @@ export interface UnitDef {
     packedArmor?: ClassValue[];
   };
   icon: string; // atlas frame name
+  /**
+   * World-sprite atlas id to render with, when it differs from `id` (frame names are
+   * `unit/<sprite>/<anim>/<dir>/<frame>`). Campaign heroes alias an existing rig
+   * (e.g. heroWallace -> champion) until bespoke hero art exists. Render-only.
+   */
+  sprite?: string;
 }
 
 export interface BuildingDef {

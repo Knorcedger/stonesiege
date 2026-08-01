@@ -23,6 +23,28 @@ export function terrainPassable(terrainIndex: number): boolean {
   return terrainIndex !== T_WATER;
 }
 
+/**
+ * Practice map size presets (GDD practice options): tiles per side, square maps.
+ * The generator is size-agnostic — these are the supported/tested UI choices.
+ */
+export const MAP_SIZE_PRESETS = { small: 96, medium: 120, large: 144 } as const;
+export type MapSizePreset = keyof typeof MAP_SIZE_PRESETS;
+
+/**
+ * 1 = terrain passable per tile (water is not); blockers overlay separately.
+ * Pure function of the map — snapshot restore re-derives it instead of storing it.
+ * Resolves passability through terrainIds so scenario maps with custom index order work.
+ */
+export function buildWalkTerrain(map: GameMap): Uint8Array {
+  const walk = new Uint8Array(map.width * map.height);
+  const passableIndex = new Uint8Array(map.terrainIds.length);
+  for (let i = 0; i < map.terrainIds.length; i++) {
+    passableIndex[i] = map.terrainIds[i] === 'water' ? 0 : 1;
+  }
+  for (let i = 0; i < walk.length; i++) walk[i] = passableIndex[map.terrain[i]] ?? 1;
+  return walk;
+}
+
 export function makeEmptyMap(width: number, height: number): GameMap {
   return { width, height, terrain: new Uint8Array(width * height), terrainIds: TERRAIN_IDS };
 }

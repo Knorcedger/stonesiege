@@ -434,5 +434,5 @@ describe('wave-2 macro loop (scripted full game)', () => {
     expect(st.players[P2].defeated).toBe(true);
     expect(victoryTick).toBeGreaterThan(0);
     expect(victoryTick).toBeLessThanOrEqual(TICK_CAP);
-  }, 20000);
+  }, 120000); // ~2s isolated; generous because full-suite runs contend with the multi-minute AI sims
 });

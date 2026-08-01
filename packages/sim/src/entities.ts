@@ -184,7 +184,9 @@ export function recomputePopCap(state: SimState, playerId: number): void {
     if ((e.buildProgress ?? 1000) < 1000) continue;
     provided += gameData.buildings[e.defId]?.popProvided ?? 0;
   }
-  player.popCap = Math.min(provided, state.popCapLimit);
+  // effective ceiling: global GameConfig.popCap AND the optional per-player scenario cap
+  const ceiling = Math.min(state.popCapLimit, player.setup.popCap ?? state.popCapLimit);
+  player.popCap = Math.min(provided, ceiling);
 }
 
 /**

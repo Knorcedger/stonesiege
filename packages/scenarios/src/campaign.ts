@@ -1,6 +1,12 @@
 // The William Wallace campaign (docs/CAMPAIGN_WALLACE.md §8).
 
-import type { CampaignDef } from './schema';
+import type { CampaignDef, ScenarioDef } from './schema';
+import { wallace1 } from './scenarios/wallace1';
+import { wallace2 } from './scenarios/wallace2';
+import { wallace3 } from './scenarios/wallace3';
+import { wallace4 } from './scenarios/wallace4';
+import { wallace5 } from './scenarios/wallace5';
+import { wallace6 } from './scenarios/wallace6';
 
 export const wallaceCampaign: CampaignDef = {
   id: 'wallace',
@@ -16,20 +22,16 @@ export const wallaceCampaign: CampaignDef = {
   scenarioIds: ['wallace-1', 'wallace-2', 'wallace-3', 'wallace-4', 'wallace-5', 'wallace-6'],
 };
 
-export { wallace1 } from './scenarios/wallace1';
-// Scenarios 2–6 are fully designed in docs/CAMPAIGN_WALLACE.md but not yet authored:
-// export { wallace2 } from './scenarios/wallace2'; // 'The Justiciar Flees'
-// export { wallace3 } from './scenarios/wallace3'; // 'Stirling Bridge'
-// export { wallace4 } from './scenarios/wallace4'; // 'Harry the North'
-// export { wallace5 } from './scenarios/wallace5'; // 'Falkirk'
-// export { wallace6 } from './scenarios/wallace6'; // 'The Unbroken'
+export { wallace1, wallace2, wallace3, wallace4, wallace5, wallace6 };
 
-/** Authored ScenarioDefs by id (grows as scenarios land). */
-import type { ScenarioDef } from './schema';
-import { wallace1 } from './scenarios/wallace1';
-
+/** Authored ScenarioDefs by id, in campaign order. */
 export const scenariosById: Record<string, ScenarioDef> = {
   [wallace1.id]: wallace1,
+  [wallace2.id]: wallace2,
+  [wallace3.id]: wallace3,
+  [wallace4.id]: wallace4,
+  [wallace5.id]: wallace5,
+  [wallace6.id]: wallace6,
 };
 
 export const campaigns: Record<string, CampaignDef> = {

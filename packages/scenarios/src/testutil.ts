@@ -64,6 +64,34 @@ export function makeFixture(): ScenarioDef {
   };
 }
 
+/**
+ * Static trigger-graph checks beyond what the loader validates: every unarmed trigger is
+ * reachable via some armTrigger, and every objective ever added has a resolution effect
+ * (complete or fail) somewhere in the script. Returns human-readable issues; [] = sound.
+ */
+export function triggerGraphIssues(def: ScenarioDef): string[] {
+  const issues: string[] = [];
+  const armedBy = new Set<string>();
+  const added = new Set<string>();
+  const resolved = new Set<string>();
+  for (const t of def.triggers) {
+    for (const fx of t.effects) {
+      if (fx.kind === 'armTrigger') armedBy.add(fx.triggerId);
+      if (fx.kind === 'objectiveAdd') added.add(fx.id);
+      if (fx.kind === 'objectiveComplete' || fx.kind === 'objectiveFail') resolved.add(fx.id);
+    }
+  }
+  for (const t of def.triggers) {
+    if (t.armed === false && !armedBy.has(t.id)) {
+      issues.push(`unarmed trigger '${t.id}' is never armed`);
+    }
+  }
+  for (const id of added) {
+    if (!resolved.has(id)) issues.push(`objective '${id}' is added but never resolved`);
+  }
+  return issues;
+}
+
 export interface OpsCall { fn: string; args: unknown[] }
 
 /** Scripted world state + full call recording. Everything is mutable from the test. */

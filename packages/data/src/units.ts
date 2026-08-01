@@ -440,4 +440,41 @@ export const units: Record<string, UnitDef> = {
     pop: 0,
     icon: 'icon/wolf',
   },
+
+  // ------------------------------------------- campaign heroes (Wallace arc)
+  // docs/CAMPAIGN_WALLACE.md Appendix A. Modeled on their base units with boosted
+  // stats; never trainable (scenario-placed only) and immune to conversion. Stats
+  // intentionally match the former @bf/scenarios placeholders so authored campaign
+  // playthroughs do not drift. `sprite`/`icon` alias existing atlas rigs until
+  // bespoke hero art lands (heroWallace renders as a champion, etc.). Scenario hp
+  // overrides (Warenne 2000 / Edward 5000 / Valence 3000 as army-anchor bosses)
+  // stay in the scenario defs.
+  // ---- Scots ----
+  heroWallace: heroDef('heroWallace', 'William Wallace', 200, 14, 'champion'),
+  heroMoray: heroDef('heroMoray', 'Andrew Moray', 180, 12, 'knight'),
+  heroGraham: heroDef('heroGraham', 'Sir John de Graham', 160, 12, 'manAtArms'),
+  heroFraser: heroDef('heroFraser', 'Sir Simon Fraser', 160, 12, 'lightCavalry'),
+  // ---- English ----
+  // Heselrig is the scenario-1 boss: killable by Wallace plus a handful of militia.
+  heroHeselrig: heroDef('heroHeselrig', 'William Heselrig', 120, 9, 'manAtArms'),
+  heroCressingham: heroDef('heroCressingham', 'Hugh de Cressingham', 150, 8, 'manAtArms'),
+  heroWarenne: heroDef('heroWarenne', 'John de Warenne', 200, 12, 'knight'),
+  heroEdward: heroDef('heroEdward', 'Edward Longshanks', 250, 16, 'paladin'),
+  heroValence: heroDef('heroValence', 'Aymer de Valence', 200, 14, 'knight'),
 };
+
+/** Campaign hero scaffold: boosted infantry-class stats, unconvertible, untrainable. */
+function heroDef(id: string, name: string, hp: number, attack: number, sprite: string): UnitDef {
+  return {
+    id, name, age: 'dark',
+    trainedAt: [], cost: {}, trainTime: 0, // never trainable; scenario-placed only
+    hp,
+    attacks: [{ cls: 'melee', amount: attack }],
+    armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 1 }],
+    range: 0, rof: 2, speed: 0.96, los: 6,
+    classes: ['infantry', 'uniqueUnit'],
+    conversionResist: 100, // heroes cannot be converted
+    icon: `icon/${sprite}`,
+    sprite,
+  };
+}

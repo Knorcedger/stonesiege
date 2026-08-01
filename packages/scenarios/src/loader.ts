@@ -46,11 +46,14 @@ export interface ScenarioMeta {
   title: string;
   briefing: ScenarioDef['briefing'];
   players: ScenarioPlayer[];
-  /** ScenarioPlayer[] pre-mapped onto sim PlayerSetup (index + 1 = PlayerId). */
+  /** ScenarioPlayer[] pre-mapped onto sim PlayerSetup (index + 1 = PlayerId).
+   *  Per-player popCaps ride along (PlayerSetup.popCap) — the sim min's them
+   *  with the global GameConfig.popCap in recomputePopCap. */
   playerSetups: PlayerSetup[];
   startCamera: { x: number; y: number };
   maxAge?: AgeId;
-  /** Highest per-player popCap — GameConfig takes a single global cap in v1. */
+  /** Highest per-player popCap — the global GameConfig.popCap ceiling; the
+   *  per-player caps in playerSetups tighten it per seat. */
   popCap: number;
 }
 
@@ -380,6 +383,7 @@ export function loadScenario(def: ScenarioDef, data: GameData = gameData): Loade
     playerSetups: def.players.map((p) => ({
       name: p.name, civ: p.civ, team: p.team, isHuman: p.isHuman, color: p.color,
       startingResources: p.resources, startingAge: p.age,
+      ...(p.popCap !== undefined ? { popCap: p.popCap } : {}),
     })),
     startCamera: def.startCamera,
     ...(def.maxAge !== undefined ? { maxAge: def.maxAge } : {}),

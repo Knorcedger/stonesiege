@@ -20,7 +20,7 @@ import {
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from './assets';
-import { ANIM_FPS, animFrameIndex } from './frames';
+import { ANIM_FPS, animFrameIndex, unitRig } from './frames';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { tileToWorld } from './camera';
 import { projectileKindFor, type ProjectileKind } from './projectiles';
@@ -301,9 +301,9 @@ export class FxLayer {
       return;
     }
 
-    const prefix = (gameData.units[defId]?.trainedAt.length ?? 0) === 0 ? 'obj' : 'unit';
-    const dieFrames = this.assets.frameCount(`${prefix}/${defId}/die/0`);
-    const decayFrames = this.assets.frameCount(`${prefix}/${defId}/decay/0`);
+    const { spriteId, prefix } = unitRig(defId);
+    const dieFrames = this.assets.frameCount(`${prefix}/${spriteId}/die/0`);
+    const decayFrames = this.assets.frameCount(`${prefix}/${spriteId}/decay/0`);
     if (dieFrames === 0 && decayFrames === 0) {
       sprite.destroy();
       return; // nothing to show (missing atlas + no mock)
@@ -338,7 +338,7 @@ export class FxLayer {
         continue;
       }
 
-      const prefix = (gameData.units[c.defId]?.trainedAt.length ?? 0) === 0 ? 'obj' : 'unit';
+      const { spriteId, prefix } = unitRig(c.defId);
       if (c.phase === 'die') {
         const total = DIE_TICKS(c.dieFrames);
         if (age >= total) {
@@ -347,7 +347,7 @@ export class FxLayer {
           continue;
         }
         const idx = animFrameIndex('die', age / TICKS_PER_SECOND, c.dieFrames);
-        this.setCorpseFrame(c, `${prefix}/${c.defId}/die/${c.facing}/${idx}`);
+        this.setCorpseFrame(c, `${prefix}/${spriteId}/die/${c.facing}/${idx}`);
         continue;
       }
       // decay
@@ -358,7 +358,7 @@ export class FxLayer {
         continue;
       }
       const idx = animFrameIndex('decay', age / TICKS_PER_SECOND, c.decayFrames);
-      this.setCorpseFrame(c, `${prefix}/${c.defId}/decay/${c.facing}/${idx}`);
+      this.setCorpseFrame(c, `${prefix}/${spriteId}/decay/${c.facing}/${idx}`);
     }
   }
 

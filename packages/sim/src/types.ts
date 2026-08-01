@@ -121,8 +121,18 @@ export interface PlayerSetup {
   team: number; // players on same team are allied; 0 = FFA/no team
   isHuman: boolean;
   color: number; // player color index 0..7 (see ASSET_CONTRACT.md palette)
+  /**
+   * When present, the COMPLETE starting stockpile — unlisted resource types start
+   * at 0 (scenarios author exact kits; `{}` = destitute). When absent, the AoE2
+   * standard starting kit applies (200f/200w/100g/200s).
+   */
   startingResources?: Partial<Stockpile>;
   startingAge?: AgeId;
+  /**
+   * Per-player pop ceiling (scenario campaigns — OPS_NEEDED.md gap 2). Additive; the
+   * global GameConfig.popCap still applies on top (effective cap = min of the two).
+   */
+  popCap?: number;
 }
 
 export interface PlayerState {
@@ -215,6 +225,12 @@ export interface GameConfig {
   map: MapGenConfig | ScenarioStart;
   players: PlayerSetup[]; // index + 1 = PlayerId (0 is Gaia)
   popCap: number;
+  /**
+   * Scenario tech ceiling (OPS_NEEDED.md gap 3, loader meta.maxAge): researching INTO
+   * any age beyond this is blocked for every player (e.g. 'dark' = no Feudal in
+   * wallace-1). Omitted = no ceiling. startingAge above the ceiling is left untouched.
+   */
+  maxAge?: AgeId;
 }
 
 export interface GameState {
@@ -225,6 +241,13 @@ export interface GameState {
   /** Entity ids by scenario ref name (empty for practice games). */
   refs: ReadonlyMap<string, EntityId>;
   finished: boolean;
+  /**
+   * True when the GDD conquest rules (per-tick elimination check) decide this match —
+   * practice games; scenario defeat is trigger-scripted. Additive/optional so mock
+   * states stay valid; the SimState behind a real Game always carries it. Bots read
+   * it to know whether resigning-when-hopeless applies.
+   */
+  conquest?: boolean;
   /**
    * GDD market: the live GLOBAL exchange rates (gold per 100), shared by all players
    * and drifted by every trade. Additive/optional so mock states stay valid; the HUD
@@ -266,12 +289,26 @@ export interface SimOps {
   getCounts(query: SimOpsQuery): number;
 }
 
+/**
+ * Versioned, JSON-safe snapshot of COMPLETE sim state. Opaque to consumers: treat it
+ * as a black box for JSON.stringify/parse + createGameFromSnapshot. The full schema
+ * (GameSnapshotV1) lives in serialize.ts; schemaVersion mismatches are rejected on load.
+ */
+export interface GameSnapshot {
+  schemaVersion: number;
+}
+
 export interface Game {
   readonly state: GameState;
   /** Advance exactly one tick. Commands are validated (ownership, legality) and illegal ones dropped. */
   advance(commands: Command[]): SimEvent[];
   /** Cheap structural hash of sim state for determinism tests / desync detection. */
   hash(): number;
+  /**
+   * Complete JSON-safe snapshot of the sim (all deterministic state). Resuming via
+   * createGameFromSnapshot continues byte-identically to the original run.
+   */
+  serialize(): GameSnapshot;
   /** True if the building def can be placed with its footprint at tile (for UI preview + AI). */
   canPlace(player: PlayerId, defId: string, tileX: number, tileY: number): boolean;
   /** Walkability grid snapshot (for AI/debug). */

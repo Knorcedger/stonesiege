@@ -1,12 +1,14 @@
 // createGame + the tick pipeline. Both map modes: seeded 'practice-random' generation and
 // pre-resolved ScenarioStart. advance() applies commands, runs production, pathfinding,
 // movement (with local avoidance), then the conquest elimination check, and returns the
-// tick's events.
+// tick's events. createGameFromSnapshot resumes a Game.serialize() snapshot
+// byte-identically (state restore lives in serialize.ts; both paths share finalizeGame).
 
 import { gameData } from '@bf/data';
 import { AGES, GAIA } from './types';
 import type {
-  Command, Game, GameConfig, GameMap, GameState, PlayerState, ScenarioStart, SimEvent, Stockpile,
+  Command, Game, GameConfig, GameMap, GameSnapshot, GameState, PlayerState, ScenarioStart,
+  SimEvent, Stockpile,
 } from './types';
 import { SimRng } from './rng';
 import { isTileWalkable } from './internal';
@@ -15,7 +17,8 @@ import { SpatialGrid } from './spatial';
 import { spawnEntity } from './entities';
 import { buildModifierTable } from './stats';
 import { revealAll } from './fog';
-import { generatePracticeMap, makeEmptyMap } from './mapgen';
+import { buildWalkTerrain, generatePracticeMap, makeEmptyMap } from './mapgen';
+import { restoreSimState, serializeSimState } from './serialize';
 import { applyCommands, checkEliminations } from './commands';
 import { tickProduction } from './production';
 import { tickPathfinding } from './path';
@@ -40,17 +43,6 @@ const DEFAULT_STOCKPILE: Stockpile = { food: 200, wood: 200, gold: 100, stone: 2
 
 /** AGE_CHAIN_TECHS[i] advances INTO AGES[i + 1] (castleAge requiresTech feudalAge, ...). */
 const AGE_CHAIN_TECHS = ['feudalAge', 'castleAge', 'imperialAge'] as const;
-
-function buildWalkTerrain(map: GameMap): Uint8Array {
-  const walk = new Uint8Array(map.width * map.height);
-  // resolve passability through terrainIds so scenario maps with custom index order work
-  const passableIndex = new Uint8Array(map.terrainIds.length);
-  for (let i = 0; i < map.terrainIds.length; i++) {
-    passableIndex[i] = map.terrainIds[i] === 'water' ? 0 : 1;
-  }
-  for (let i = 0; i < walk.length; i++) walk[i] = passableIndex[map.terrain[i]] ?? 1;
-  return walk;
-}
 
 function makePlayers(config: GameConfig, map: GameMap): { players: PlayerState[]; vision: VisionGroup[]; visionGroupOf: number[] } {
   const tiles = map.width * map.height;
@@ -83,7 +75,12 @@ function makePlayers(config: GameConfig, map: GameMap): { players: PlayerState[]
     players.push({
       id,
       setup,
-      stockpile: { ...DEFAULT_STOCKPILE, ...setup.startingResources },
+      // A provided startingResources IS the complete kit (missing types = 0):
+      // scenarios author exact stockpiles ("resources: {}" = destitute), so the
+      // default kit must not bleed through. Absent = AoE2 standard start.
+      stockpile: setup.startingResources !== undefined
+        ? { food: 0, wood: 0, gold: 0, stone: 0, ...setup.startingResources }
+        : { ...DEFAULT_STOCKPILE },
       age: setup.startingAge ?? 'dark',
       pop: 0,
       popCap: 0,
@@ -114,6 +111,7 @@ export function createGame(config: GameConfig): Game {
     nextId: 1,
     conquest: !scenario, // practice = conquest; campaign defeat comes from triggers (GDD)
     popCapLimit: config.popCap,
+    ...(config.maxAge !== undefined ? { maxAgeLimit: config.maxAge } : {}),
     walkTerrain: buildWalkTerrain(map),
     blockers: new Uint16Array(map.width * map.height),
     unitsGrid: new SpatialGrid(),
@@ -178,6 +176,20 @@ export function createGame(config: GameConfig): Game {
     generatePracticeMap(state, rng.fork(1));
   }
 
+  return finalizeGame(state);
+}
+
+/**
+ * Resume a game from a Game.serialize() snapshot. The restored game continues
+ * byte-identically to the original run (proved by serialize.test.ts: 500 post-resume
+ * ticks hash equal every 100). Rejects snapshots with a mismatched schemaVersion.
+ */
+export function createGameFromSnapshot(snapshot: GameSnapshot): Game {
+  return finalizeGame(restoreSimState(snapshot));
+}
+
+/** Wrap a fully initialized SimState in the public Game surface (tick pipeline + ops). */
+function finalizeGame(state: SimState): Game {
   const advance = (commands: Command[]): SimEvent[] => {
     if (state.finished) return [];
     const events: SimEvent[] = [];
@@ -206,6 +218,7 @@ export function createGame(config: GameConfig): Game {
     get state(): GameState { return state; },
     advance,
     hash: () => hashState(state),
+    serialize: () => serializeSimState(state),
     ops: makeSimOps(state),
     canPlace: (player, defId, tileX, tileY) => {
       const def = gameData.buildings[defId];

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from './game';
+import { MAP_SIZE_PRESETS } from './mapgen';
 import type { Entity, Game } from './types';
 import { entitiesOf, grassMap, practiceConfig, player, tileDist } from './testutil';
 
@@ -209,6 +210,49 @@ describe('practice mapgen fairness', () => {
       expectNoSealedClusters(game, reach, `seed ${seed}`);
     }
   });
+});
+
+describe('practice map size presets (96/120/144) × 2-4 players', () => {
+  // the same fairness bundle across every supported size/player-count combination:
+  // complete starts, mutual TC reachability, and no forest-sealed resource cluster
+  for (const [label, size] of Object.entries(MAP_SIZE_PRESETS)) {
+    for (const playerCount of [2, 3, 4]) {
+      it(`${label} (${size}²), ${playerCount} players`, () => {
+        const players = Array.from({ length: playerCount }, (_, i) =>
+          player({ name: `P${i + 1}`, civ: i % 2 === 0 ? 'scots' : 'english', color: i }));
+        const game = createGame(practiceConfig(9000 + size + playerCount, players, size));
+        expect(game.state.map.width).toBe(size);
+        expect(game.state.map.height).toBe(size);
+
+        const tcs: Entity[] = [];
+        for (let p = 1; p <= playerCount; p++) {
+          const tcList = entitiesOf(game.state.entities, p, 'townCenter');
+          expect(tcList, `player ${p} TC`).toHaveLength(1);
+          const tc = tcList[0];
+          tcs.push(tc);
+          expect(entitiesOf(game.state.entities, p, 'villager'), `player ${p} villagers`).toHaveLength(3);
+          expect(entitiesOf(game.state.entities, p, 'scout'), `player ${p} scout`).toHaveLength(1);
+          expect(gaiaNear(game, 'sheep', tc, 15), `player ${p} sheep`).toBeGreaterThanOrEqual(4);
+          expect(gaiaNear(game, 'berryBush', tc, 40), `player ${p} berries`).toBeGreaterThanOrEqual(5);
+          expect(gaiaNear(game, 'goldMine', tc, 40), `player ${p} gold`).toBeGreaterThanOrEqual(6);
+          expect(gaiaNear(game, 'stoneMine', tc, 40), `player ${p} stone`).toBeGreaterThanOrEqual(4);
+        }
+
+        for (let i = 0; i < tcs.length; i++) {
+          for (let j = i + 1; j < tcs.length; j++) {
+            expect(tileDist(tcs[i], tcs[j]), `TC ${i} vs ${j} spacing`).toBeGreaterThanOrEqual(30);
+          }
+        }
+
+        const gates = tcs.map((tc) => gateOf(game, tc));
+        const reach = floodFrom(game, gates[0]);
+        for (let i = 1; i < gates.length; i++) {
+          expect(reach[gates[i].y * size + gates[i].x], `TC0 -> TC${i}`).toBe(1);
+        }
+        expectNoSealedClusters(game, reach, `${label} ${playerCount}p`);
+      });
+    }
+  }
 });
 
 describe('scenario starts', () => {

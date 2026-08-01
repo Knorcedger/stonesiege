@@ -137,11 +137,20 @@ export class Overlays {
     return this.endShown;
   }
 
-  /** Victory/defeat end screen. Shown once; Continue watching dismisses it. */
+  /**
+   * Victory/defeat end screen. Shown once. Buttons are caller-supplied so the
+   * practice flow (Return to Title / Continue watching) and the campaign flow
+   * (Continue / Retry / Return to scenarios) share one panel. A button with
+   * dismiss:true closes the overlay instead of leaving the game.
+   */
   showEndScreen(
     victory: boolean,
     summary: MatchSummary,
-    onReturnToTitle: () => void,
+    opts: {
+      title?: string;
+      sub?: string;
+      buttons: Array<{ label: string; ghost?: boolean; dismiss?: boolean; onClick?: () => void }>;
+    },
   ): void {
     if (this.endShown) return;
     this.endShown = true;
@@ -151,12 +160,12 @@ export class Overlays {
 
     const title = document.createElement('h2');
     title.className = `bf-end-title ${victory ? 'victory' : 'defeat'}`;
-    title.textContent = victory ? 'Victory!' : 'Defeat';
+    title.textContent = opts.title ?? (victory ? 'Victory!' : 'Defeat');
     const sub = document.createElement('p');
     sub.className = 'bf-end-sub';
-    sub.textContent = victory
+    sub.textContent = opts.sub ?? (victory
       ? 'Your banner flies over the field.'
-      : 'Your banner has fallen.';
+      : 'Your banner has fallen.');
     const time = document.createElement('p');
     time.className = 'bf-end-time';
     time.textContent = `Match time ${summary.timeText}`;
@@ -178,16 +187,17 @@ export class Overlays {
     row('Units lost', String(summary.tallies.unitsLost));
     row('Technologies', String(summary.techsResearched));
 
-    const returnBtn = document.createElement('button');
-    returnBtn.className = 'bf-end-btn';
-    returnBtn.textContent = 'Return to Title';
-    returnBtn.addEventListener('click', onReturnToTitle);
-    const watchBtn = document.createElement('button');
-    watchBtn.className = 'bf-end-btn ghost';
-    watchBtn.textContent = 'Continue watching';
-    watchBtn.addEventListener('click', () => this.endScreen.classList.remove('show'));
-
-    panel.append(title, sub, time, stats, returnBtn, watchBtn);
+    panel.append(title, sub, time, stats);
+    for (const b of opts.buttons) {
+      const btn = document.createElement('button');
+      btn.className = `bf-end-btn${b.ghost ? ' ghost' : ''}`;
+      btn.textContent = b.label;
+      btn.addEventListener('click', () => {
+        if (b.dismiss) this.endScreen.classList.remove('show');
+        b.onClick?.();
+      });
+      panel.appendChild(btn);
+    }
     this.endScreen.appendChild(panel);
     this.endScreen.classList.add('show');
   }
