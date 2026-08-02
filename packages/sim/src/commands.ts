@@ -26,7 +26,60 @@ type Handler<K extends Command['kind']> =
   (state: SimState, cmd: Extract<Command, { kind: K }>, events: SimEvent[]) => void;
 
 function validPlayer(state: SimState, player: PlayerId): boolean {
-  return player > GAIA && player < state.players.length && !state.players[player].defeated;
+  return (
+    Number.isInteger(player) &&
+    player > GAIA &&
+    player < state.players.length &&
+    !state.players[player].defeated
+  );
+}
+
+const NUMERIC_FIELDS = ['x', 'y', 'tileX', 'tileY', 'targetId', 'buildingId', 'entityId', 'farmId', 'index', 'amount'] as const;
+const RESOURCE_FIELDS = ['sell', 'buy'] as const;
+const RESOURCES = new Set(['food', 'wood', 'gold', 'stone']);
+const own = (table: object, key: unknown): boolean =>
+  typeof key === 'string' && Object.prototype.hasOwnProperty.call(table, key);
+
+/** Fields each kind's handler dereferences without its own presence check. */
+const REQUIRED: Record<Command['kind'], readonly string[]> = {
+  move: ['units', 'x', 'y'], attackMove: ['units', 'x', 'y'],
+  attack: ['units', 'targetId'], gather: ['units', 'targetId'], repair: ['units', 'targetId'],
+  garrison: ['units', 'targetId'], convert: ['units', 'targetId'], heal: ['units', 'targetId'],
+  build: ['units', 'defId', 'tileX', 'tileY'], stop: ['units'], pack: ['units'], unpack: ['units'],
+  train: ['buildingId', 'defId'], cancelTrain: ['buildingId', 'index'],
+  research: ['buildingId', 'techId'], cancelResearch: ['buildingId'],
+  setRally: ['buildingId', 'x', 'y'], ungarrison: ['buildingId'],
+  deleteEntity: ['entityId'], reseedFarm: ['farmId'], queueReseed: [],
+  marketTrade: ['sell', 'buy', 'amount'], resign: [],
+};
+
+/**
+ * Trust boundary for the command payload itself. The kind is already known-good;
+ * this rejects malformed field shapes so no handler receives a missing/non-iterable
+ * `units`, a prototype-chain def id (`__proto__`, `constructor`), or a NaN index.
+ * Enforces per-kind required fields, then validates every present field.
+ */
+function wellFormedCommand(kind: Command['kind'], cmd: Record<string, unknown>): boolean {
+  for (const f of REQUIRED[kind]) {
+    if (!(f in cmd)) return false;
+  }
+  if ('units' in cmd) {
+    const u = cmd.units;
+    if (!Array.isArray(u) || u.some((id) => !Number.isFinite(id))) return false;
+  }
+  // The sim is integer-only (positions are fixed-point ints): a float coord or
+  // index would land a non-integer into state and break the determinism/snapshot
+  // contract, so reject non-integers here, not merely non-finite values.
+  for (const f of NUMERIC_FIELDS) {
+    if (f in cmd && !Number.isInteger(cmd[f] as number)) return false;
+  }
+  // def ids must name a real def (own-property lookup blocks prototype pollution).
+  if ('defId' in cmd && !(own(gameData.units, cmd.defId) || own(gameData.buildings, cmd.defId))) return false;
+  if ('techId' in cmd && !own(gameData.techs, cmd.techId)) return false;
+  for (const f of RESOURCE_FIELDS) {
+    if (f in cmd && !RESOURCES.has(cmd[f] as string)) return false;
+  }
+  return true;
 }
 
 /** Owned, alive, non-garrisoned units of the player (silent filter, preserves order). */
@@ -289,8 +342,16 @@ export function applyCommands(state: SimState, commands: Command[], events: SimE
     // resigns in lockstep). Once finished, later commands must not mutate the
     // terminal state — otherwise the declared winner could end up "defeated".
     if (state.finished) return;
-    if (!validPlayer(state, cmd.player)) continue;
-    const handler = handlers[cmd.kind] as Handler<typeof cmd.kind>;
+    // Hostile/malformed intake must be dropped silently, never thrown on: the
+    // command stream can carry replay/network garbage, and advance() is a hard
+    // no-throw boundary. Reject non-objects, non-own-property kinds (guards
+    // prototype keys like __proto__/valueOf), and non-integer players.
+    if (cmd === null || typeof cmd !== 'object') continue;
+    const kind = (cmd as { kind?: unknown }).kind;
+    if (typeof kind !== 'string' || !Object.prototype.hasOwnProperty.call(handlers, kind)) continue;
+    if (!validPlayer(state, (cmd as Command).player)) continue;
+    if (!wellFormedCommand(kind as Command['kind'], cmd as Record<string, unknown>)) continue;
+    const handler = handlers[kind as Command['kind']] as Handler<Command['kind']>;
     handler(state, cmd as never, events);
   }
 }
