@@ -5,6 +5,7 @@
 import { describe, expect, it } from 'vitest';
 import type { Command, Game, SimEvent } from './types';
 import { createGame } from './game';
+import type { SimState } from './internal';
 import { entitiesOf, grassMap, player, scenarioConfig } from './testutil';
 
 const HUMAN = 1;
@@ -51,6 +52,28 @@ describe('repair', () => {
     const v = game.state.entities.get(vid)!;
     expect(v.intent).toBeUndefined();
     expect(v.activity).toBe('idle');
+  });
+
+  it('releases the whole repair crew when the Town Center reaches full HP', () => {
+    const game = createGame(scenarioConfig(55, grassMap(40, 40), [
+      { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 10, hp: 2399, ref: 'tc' },
+      { defId: 'villager', player: HUMAN, tileX: 13, tileY: 10, ref: 'v0' },
+      { defId: 'villager', player: HUMAN, tileX: 13, tileY: 12, ref: 'v1' },
+      { defId: 'villager', player: HUMAN, tileX: 3, tileY: 30, ref: 'v2' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const tcId = state.refs.get('tc')!;
+    const villagers = ['v0', 'v1', 'v2'].map((ref) => state.refs.get(ref)!);
+
+    game.advance([{ kind: 'repair', player: HUMAN, units: villagers, targetId: tcId }]);
+
+    expect(state.entities.get(tcId)!.hp).toBe(2400);
+    for (const id of villagers) {
+      const villager = state.entities.get(id)!;
+      expect(villager.intent).toBeUndefined();
+      expect(villager.activity).toBe('idle');
+      expect(state.motion.has(id)).toBe(false);
+    }
   });
 });
 

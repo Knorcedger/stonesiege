@@ -94,6 +94,26 @@ export function isFoodAnimal(e: Entity): boolean {
   return !!(def?.herdable || def?.huntable);
 }
 
+/** Targets that a selected villager can legally gather from right now. */
+export function isVillagerGatherTarget(e: Entity, human: PlayerId): boolean {
+  if (e.kind === 'resource') {
+    return gameData.resources[e.defId] !== undefined && (e.amountLeft ?? 0) > 0;
+  }
+  if (e.kind === 'building') {
+    return e.player === human
+      && e.hp > 0
+      && (e.buildProgress ?? 1000) >= 1000
+      && gameData.buildings[e.defId]?.providesFood !== undefined
+      && (e.amountLeft ?? 0) > 0;
+  }
+  const def = gameData.units[e.defId];
+  if (!def?.huntable) return false;
+  // Live prey must be neutral/owned. Once dead, the sim treats any remaining
+  // huntable carcass as food regardless of its former owner.
+  if (e.hp > 0) return e.player === GAIA || e.player === human;
+  return (e.amountLeft ?? 0) > 0;
+}
+
 /**
  * Decide what a plain tap does. `picks` is distance-ordered (nearest first).
  * GDD intent inference:
@@ -528,13 +548,9 @@ export class InputController {
     const st = this.host.getState();
 
     const enemy = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
-    // Gather targets: gaia resources/animals, plus OWN herdables/huntables when
-    // villagers are selected (captured sheep must be eatable — the sim's gather
-    // command already accepts own food animals).
-    const gaiaOrRes = picks.find((p) =>
-      p.kind === 'resource' ||
-      (p.player === GAIA && p.kind === 'unit') ||
-      (p.player === human && villagers.length > 0 && isFoodAnimal(p)));
+    // Gather targets include own completed farms (gatherable buildings), not just
+    // map resources and food animals. This mirrors classifyGatherTarget in the sim.
+    const gatherTarget = picks.find((p) => isVillagerGatherTarget(p, human));
     const ownBld = picks.find((p) => p.player === human && p.kind === 'building');
     const unitIds = units.map((e) => e.id);
     const undoStop = unitIds.length > 0
@@ -546,7 +562,7 @@ export class InputController {
     // building itself when none was set — the sim remaps a blocked center tile
     // to the nearest walkable one, i.e. the default spawn side).
     if (units.length === 0 && buildings.length > 0) {
-      const target = enemy ?? gaiaOrRes;
+      const target = enemy ?? gatherTarget;
       const prevRallies = buildings.map((b) => ({
         id: b.id,
         rally: b.rally ? { ...b.rally } : null,
@@ -601,26 +617,33 @@ export class InputController {
       }
       return;
     }
-    if (gaiaOrRes && villagers.length > 0) {
+    if (gatherTarget && villagers.length > 0) {
       if (can('gather')) {
         this.host.issueWithUndo(
-          { kind: 'gather', player: human, units: villagers.map((e) => e.id), targetId: gaiaOrRes.id },
+          { kind: 'gather', player: human, units: villagers.map((e) => e.id), targetId: gatherTarget.id },
           'Gather', undoStop,
         );
         if (military.length > 0) {
-          this.host.issue({ kind: 'move', player: human, units: military.map((e) => e.id), x: gaiaOrRes.x, y: gaiaOrRes.y });
+          this.host.issue({
+            kind: 'move', player: human, units: military.map((e) => e.id),
+            x: gatherTarget.x, y: gatherTarget.y,
+          });
         }
       } else {
-        moveTo(gaiaOrRes.x, gaiaOrRes.y, unitIds, 'Move (gathering lands in wave 2)');
+        moveTo(gatherTarget.x, gatherTarget.y, unitIds, 'Move (gathering lands in wave 2)');
       }
       return;
     }
-    if (gaiaOrRes && military.length > 0 && gaiaOrRes.kind === 'unit') {
+    if (gatherTarget && gatherTarget.player === GAIA
+      && military.length > 0 && gatherTarget.kind === 'unit') {
       // military ordered onto a gaia animal: hunt it
       if (can('attack')) {
-        this.host.issueWithUndo({ kind: 'attack', player: human, units: unitIds, targetId: gaiaOrRes.id }, 'Attack', undoStop);
+        this.host.issueWithUndo(
+          { kind: 'attack', player: human, units: unitIds, targetId: gatherTarget.id },
+          'Attack', undoStop,
+        );
       } else {
-        moveTo(gaiaOrRes.x, gaiaOrRes.y, unitIds, 'Move (hunting lands in wave 2)');
+        moveTo(gatherTarget.x, gatherTarget.y, unitIds, 'Move (hunting lands in wave 2)');
       }
       return;
     }

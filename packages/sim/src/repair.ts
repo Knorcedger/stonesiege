@@ -53,8 +53,12 @@ export function handleRepair(state: SimState, cmd: RepairCmd): void {
 
 function releaseRepairer(state: SimState, e: Entity): void {
   e.intent = undefined;
+  e.targetId = undefined;
+  state.motion.delete(e.id);
   state.buildRetries.delete(e.id);
-  if (e.activity === 'repairing') e.activity = 'idle';
+  // A site can finish while one member of a large crew is still approaching.
+  // Release both the hands already hammering and every walker still en route.
+  e.activity = 'idle';
 }
 
 function releaseAllOn(state: SimState, siteId: EntityId): void {

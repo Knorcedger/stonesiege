@@ -2,7 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { FP, GAIA, type Entity, type EntityId, type GameState, type PlayerId } from '@bf/sim/types';
-import { centroidTile, idleUnits, isIdleOwnUnit, liveGroupIds, sameIdSet } from './selectionTools';
+import {
+  centroidTile, idleUnits, isIdleOwnUnit, isTownBellSeeking, liveGroupIds, sameIdSet,
+} from './selectionTools';
 
 const HUMAN = 1 as PlayerId;
 
@@ -46,6 +48,19 @@ describe('isIdleOwnUnit', () => {
     expect(isIdleOwnUnit(ent({ activity: 'garrisoned', garrisonedIn: 99 as EntityId }), HUMAN)).toBe(false);
     // and a dead sheltering entry can never linger in the badge
     expect(isIdleOwnUnit(ent({ sheltering: true, hp: 0 }), HUMAN)).toBe(false);
+  });
+});
+
+describe('isTownBellSeeking', () => {
+  it('only matches a live own villager fleeing toward the selected Town Center', () => {
+    const tc = 99 as EntityId;
+    const seeking = ent({ activity: 'fleeing', targetId: tc });
+    expect(isTownBellSeeking(seeking, HUMAN, tc)).toBe(true);
+    expect(isTownBellSeeking({ ...seeking, targetId: 100 as EntityId }, HUMAN, tc)).toBe(false);
+    expect(isTownBellSeeking({ ...seeking, activity: 'moving' }, HUMAN, tc)).toBe(false);
+    expect(isTownBellSeeking({ ...seeking, player: 2 as PlayerId }, HUMAN, tc)).toBe(false);
+    expect(isTownBellSeeking({ ...seeking, hp: 0 }, HUMAN, tc)).toBe(false);
+    expect(isTownBellSeeking({ ...seeking, defId: 'militia' }, HUMAN, tc)).toBe(false);
   });
 });
 

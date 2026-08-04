@@ -15,7 +15,9 @@ import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { scenariosById, TriggerRuntime, type AiProfile, type Rect, type ScenarioMeta } from '@bf/scenarios';
 import { applyAiProfile, attackNow, createBot, type Bot } from '@bf/ai';
 import { loadAssets } from './assets';
-import { centroidTile, idleUnits, liveGroupIds, sameIdSet, type IdleCategory } from './selectionTools';
+import {
+  centroidTile, idleUnits, isTownBellSeeking, liveGroupIds, sameIdSet, type IdleCategory,
+} from './selectionTools';
 import { placementGhostFrames } from './frames';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
@@ -681,7 +683,9 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     },
     townBell: (buildingId) => {
       const b = getState().entities.get(buildingId);
-      const releasing = (b?.garrison ?? []).some((id) => getState().entities.get(id)?.sheltering === true);
+      const state = getState();
+      const releasing = (b?.garrison ?? []).some((id) => state.entities.get(id)?.sheltering === true)
+        || [...state.entities.values()].some((e) => isTownBellSeeking(e, humanPlayer, buildingId));
       issue({ kind: 'townBell', player: humanPlayer, buildingId });
       hud.showUndoToast(releasing ? 'Villagers returning to work' : 'Town Bell — villagers seeking shelter', null);
     },

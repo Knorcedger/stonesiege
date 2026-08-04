@@ -14,7 +14,7 @@
 import { type Entity, type EntityId, type GameState, type PlayerId, type ResourceType } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
-import type { IdleCategory } from '../selectionTools';
+import { isTownBellSeeking, type IdleCategory } from '../selectionTools';
 import {
   ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, hasActiveRally,
   millAutoReseedButton, queueChipModel, researchMenuButtons, trainMenuButtons,
@@ -124,8 +124,9 @@ const HUD_CSS = `
 .bf-selrow canvas { width:40px; height:40px; image-rendering:pixelated; border:1px solid #8A6414; }
 .bf-selname { font-size:15px; flex:1; }
 .bf-selhp { font-size:14px; color:#DABE8D; }
-.bf-selcarry { min-height:14px; font-size:14px; color:#E6C04A; }
-.bf-selcarry:empty { display:none; }
+.bf-selcarry { display:none; align-items:center; gap:5px; min-height:22px; font-size:16px; color:#E6C04A; }
+.bf-selcarry.show { display:flex; }
+.bf-selcarry canvas { width:22px; height:22px; border:0; image-rendering:pixelated; }
 .bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:14px/1.05 "VT323",monospace; }
 .bf-selstats:empty { display:none; }
 .bf-selstat strong { color:#E6C04A; font-weight:normal; }
@@ -237,6 +238,7 @@ export class Hud {
   private selName!: HTMLDivElement;
   private selHp!: HTMLDivElement;
   private selCarry!: HTMLDivElement;
+  private selCarryAmount!: HTMLSpanElement;
   private selStats!: HTMLDivElement;
   private card!: HTMLDivElement;
   private cardTitle!: HTMLDivElement;
@@ -431,6 +433,7 @@ export class Hud {
     this.selHp.className = 'bf-selhp bf-num';
     this.selCarry = document.createElement('div');
     this.selCarry.className = 'bf-selcarry bf-num';
+    this.selCarryAmount = document.createElement('span');
     col.appendChild(this.selName);
     col.appendChild(this.selHp);
     col.appendChild(this.selCarry);
@@ -642,9 +645,25 @@ export class Hud {
     this.selHp.textContent = first.kind === 'resource'
       ? `${first.amountLeft ?? 0} left`
       : `HP ${formatRatio(Math.max(0, first.hp), first.maxHp)}`;
-    this.selCarry.textContent = first.kind === 'unit' && first.carrying && first.carrying.amount > 0
-      ? `Carrying ${first.carrying.amount} ${first.carrying.type}`
-      : '';
+    const carrying = first.kind === 'unit' && first.carrying && first.carrying.amount > 0
+      ? first.carrying
+      : null;
+    if (carrying) {
+      if (this.selCarry.dataset.resource !== carrying.type) {
+        this.selCarry.dataset.resource = carrying.type;
+        this.selCarry.replaceChildren(
+          this.host.assets.getIconCanvas(`icon/res/${carrying.type}`),
+          this.selCarryAmount,
+        );
+      }
+      this.selCarryAmount.textContent = String(carrying.amount);
+      this.selCarry.classList.add('show');
+      setGameTooltip(this.selCarry, `Carrying ${carrying.amount} ${carrying.type}`);
+    } else {
+      this.selCarry.classList.remove('show');
+      this.selCarry.dataset.resource = '';
+      this.selCarry.replaceChildren();
+    }
     if (first.kind === 'unit') {
       const stats = this.host.getUnitStats(first.player, first.defId);
       if (stats) {
@@ -742,10 +761,12 @@ export class Hud {
       push(researchMenuButtons(view, b.defId, busy, queued));
       if (b.defId === 'townCenter') {
         const sheltered = (b.garrison ?? []).filter((id) => state.entities.get(id)?.sheltering).length;
+        const seeking = [...state.entities.values()].filter((e) =>
+          isTownBellSeeking(e, this.host.humanPlayer, b.id)).length;
         const outside = [...state.entities.values()].filter((e) => e.kind === 'unit'
           && e.player === this.host.humanPlayer && e.hp > 0 && e.garrisonedIn === undefined
           && !!gameData.units[e.defId]?.gather).length;
-        parts.push(`bell=${sheltered}/${outside}`);
+        parts.push(`bell=${sheltered + seeking}/${outside}`);
         const up = ageUpButton(view, this.completedBuildingDefIds(state), busy, queued);
         if (up) push([up]);
       }
@@ -948,11 +969,13 @@ export class Hud {
     if (b.defId === 'townCenter') {
       const occupants = b.garrison ?? [];
       const sheltered = occupants.filter((id) => state.entities.get(id)?.sheltering === true).length;
+      const seeking = [...state.entities.values()].filter((e) =>
+        isTownBellSeeking(e, this.host.humanPlayer, b.id)).length;
       const outsideVillagers = [...state.entities.values()].filter((e) => e.kind === 'unit'
         && e.player === this.host.humanPlayer && e.hp > 0 && e.garrisonedIn === undefined
         && !!gameData.units[e.defId]?.gather).length;
       const room = Math.max(0, (def?.garrisonCapacity ?? 0) - occupants.length);
-      const active = sheltered > 0;
+      const active = sheltered + seeking > 0;
       const enabled = active || (outsideVillagers > 0 && room > 0);
       const tip = active
         ? `Return to work\nRelease sheltered villagers and resume their previous jobs`

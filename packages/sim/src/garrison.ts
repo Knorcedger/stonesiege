@@ -91,7 +91,21 @@ export function handleTownBell(state: SimState, cmd: TownBellCmd): void {
   if (!host || host.kind !== 'building' || host.defId !== 'townCenter'
     || host.player !== cmd.player || host.hp <= 0 || (host.buildProgress ?? 1000) < 1000) return;
 
-  if ((host.garrison ?? []).some((id) => state.entities.get(id)?.sheltering === true)) {
+  const bellWalkers = [...state.fleeing.entries()].filter(([, f]) =>
+    f.buildingId === host.id && f.townBell === true);
+  if ((host.garrison ?? []).some((id) => state.entities.get(id)?.sheltering === true)
+    || bellWalkers.length > 0) {
+    // Turning the bell off also cancels villagers who have not reached the TC yet.
+    // Restore their previous jobs through the same handlers used after ungarrisoning.
+    for (const [id, f] of bellWalkers) {
+      state.fleeing.delete(id);
+      state.motion.delete(id);
+      const e = state.entities.get(id);
+      if (!e || e.hp <= 0 || e.garrisonedIn !== undefined) continue;
+      e.targetId = undefined;
+      e.activity = 'idle';
+      restoreWorkerIntent(state, cmd.player, id, f.savedIntent);
+    }
     handleUngarrison(state, { kind: 'ungarrison', player: cmd.player, buildingId: host.id });
     return;
   }
@@ -121,7 +135,12 @@ export function handleTownBell(state: SimState, cmd: TownBellCmd): void {
     state.buildRetries.delete(e.id);
     const monk = state.monks.get(e.id);
     if (monk) { monk.convertTargetId = undefined; monk.healTargetId = undefined; }
-    state.fleeing.set(e.id, { buildingId: host.id, retries: 0, savedIntent });
+    state.fleeing.set(e.id, {
+      buildingId: host.id, retries: 0, townBell: true, savedIntent,
+    });
+    // Public presentation marker: the HUD can show the bell as active while the
+    // internal FleeState remains the authoritative source for toggle behavior.
+    e.targetId = host.id;
   }
   if (villagers.length > 0) {
     orderMove(state, villagers.map((e) => e.id), host.x, host.y);
@@ -149,12 +168,21 @@ export function handleUngarrison(state: SimState, cmd: UngarrisonCmd): void {
     state.shelterIntents.delete(id);
     const e = state.entities.get(id);
     if (!e || e.hp <= 0 || e.garrisonedIn !== undefined) continue;
-    if (saved.kind === 'gather') {
-      handleGather(state, { kind: 'gather', player: cmd.player, units: [id], targetId: saved.targetId });
-    } else if (saved.kind === 'build' || saved.kind === 'repair') {
-      handleRepair(state, { kind: 'repair', player: cmd.player, units: [id], targetId: saved.targetId });
-    }
-    // combat intents are deliberately NOT restored — the bell returns villagers to WORK
+    restoreWorkerIntent(state, cmd.player, id, saved);
+  }
+}
+
+/** Re-dispatch a bell-interrupted job; combat is deliberately not restored. */
+function restoreWorkerIntent(
+  state: SimState,
+  player: number,
+  id: EntityId,
+  saved: Entity['intent'] | undefined,
+): void {
+  if (saved?.kind === 'gather') {
+    handleGather(state, { kind: 'gather', player, units: [id], targetId: saved.targetId });
+  } else if (saved?.kind === 'build' || saved?.kind === 'repair') {
+    handleRepair(state, { kind: 'repair', player, units: [id], targetId: saved.targetId });
   }
 }
 

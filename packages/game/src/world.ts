@@ -260,25 +260,13 @@ export class WorldLayer {
   pickAt(state: GameState, wx: number, wy: number, slop: number): PickResult[] {
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const results: PickResult[] = [];
-    const tile = worldToTile(wx, wy);
     for (const e of state.entities.values()) {
       const tv = this.tileVis(vis, state, e.tileX, e.tileY);
       const visible = e.player === this.humanPlayer || (e.kind === 'resource' ? tv >= 1 : tv === 2);
       // Garrisoned units sit at their host building's anchor but are not drawn —
       // they must never steal a tap aimed at the building itself.
       if (!visible || e.activity === 'dying' || e.garrisonedIn !== undefined) continue;
-      let d: number;
-      if (e.kind === 'building') {
-        const size = gameData.buildings[e.defId]?.size ?? 1;
-        const cx = e.x / FP;
-        const cy = e.y / FP;
-        const cheb = Math.max(Math.abs(tile.x - cx), Math.abs(tile.y - cy)) - size / 2;
-        d = cheb * HALF_W; // approx world px outside the footprint
-      } else {
-        const p = tileToWorld(e.x / FP, e.y / FP);
-        const bodyCy = p.y - (e.kind === 'unit' ? 12 : 8);
-        d = Math.hypot(wx - p.x, wy - bodyCy) - 12;
-      }
+      const d = entityPickDistance(e, wx, wy);
       if (d <= slop) results.push({ entity: e, dist: d });
     }
     results.sort((a, b) => a.dist - b.dist);
@@ -599,6 +587,25 @@ export class WorldLayer {
       }
     }
   }
+}
+
+/**
+ * Approximate distance from a pointer to an entity's selectable visual body.
+ * A building interior stays selectable, but never receives a huge negative score:
+ * a directly clicked unit standing on a farm/building must sort ahead of its host plot.
+ */
+export function entityPickDistance(e: Entity, wx: number, wy: number): number {
+  if (e.kind === 'building') {
+    const tile = worldToTile(wx, wy);
+    const size = gameData.buildings[e.defId]?.size ?? 1;
+    const cx = e.x / FP;
+    const cy = e.y / FP;
+    const cheb = Math.max(Math.abs(tile.x - cx), Math.abs(tile.y - cy)) - size / 2;
+    return Math.max(1, cheb * HALF_W); // approx world px outside the footprint
+  }
+  const p = tileToWorld(e.x / FP, e.y / FP);
+  const bodyCy = p.y - (e.kind === 'unit' ? 12 : 8);
+  return Math.hypot(wx - p.x, wy - bodyCy) - 12;
 }
 
 const TILE_W_SAFE = HALF_W * 2;

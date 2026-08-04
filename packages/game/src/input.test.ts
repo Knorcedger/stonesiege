@@ -8,7 +8,10 @@
 import { describe, expect, it } from 'vitest';
 import { GAIA, type Entity, type EntityId, type PlayerId } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
-import { edgePanVector, resolveDesktopPrimaryAction, resolveTapAction, type TapSelection } from './input';
+import {
+  edgePanVector, isVillagerGatherTarget, resolveDesktopPrimaryAction, resolveTapAction,
+  type TapSelection,
+} from './input';
 
 const HUMAN = 1 as PlayerId;
 const ENEMY = 2 as PlayerId;
@@ -123,6 +126,34 @@ describe('resolveTapAction — captured sheep are food, not a reselect (AoE2 ope
     const ownSheep = ent({ kind: 'unit', defId: 'sheep', player: HUMAN });
     const enemy = ent({ player: ENEMY });
     expect(resolveTapAction([ownSheep, enemy], VILL_SEL, HUMAN)).toEqual({ type: 'command' });
+  });
+});
+
+describe('villager gather targets', () => {
+  it('recognizes a live completed own farm as food', () => {
+    const farm = ent({
+      kind: 'building', defId: 'farm', player: HUMAN,
+      hp: 480, maxHp: 480, buildProgress: 1000, amountLeft: 175,
+    });
+    expect(isVillagerGatherTarget(farm, HUMAN)).toBe(true);
+    expect(isVillagerGatherTarget({ ...farm, amountLeft: 0 }, HUMAN)).toBe(false);
+    expect(isVillagerGatherTarget({ ...farm, buildProgress: 999 }, HUMAN)).toBe(false);
+    expect(isVillagerGatherTarget({ ...farm, player: ENEMY }, HUMAN)).toBe(false);
+  });
+
+  it('rejects non-food Gaia units instead of issuing a gather no-op', () => {
+    expect(isVillagerGatherTarget(ent({ defId: 'sheep', player: GAIA }), HUMAN)).toBe(true);
+    expect(isVillagerGatherTarget(ent({ defId: 'wolf', player: GAIA }), HUMAN)).toBe(false);
+  });
+
+  it('matches the sim rule for live enemy animals and edible carcasses', () => {
+    expect(isVillagerGatherTarget(ent({ defId: 'deer', player: ENEMY, hp: 5 }), HUMAN)).toBe(false);
+    expect(isVillagerGatherTarget(ent({
+      defId: 'deer', player: ENEMY, hp: 0, amountLeft: 40,
+    }), HUMAN)).toBe(true);
+    expect(isVillagerGatherTarget(ent({
+      defId: 'deer', player: GAIA, hp: 0, amountLeft: 0,
+    }), HUMAN)).toBe(false);
   });
 });
 

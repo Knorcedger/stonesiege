@@ -71,6 +71,8 @@ export interface GatherInfo {
 export interface FleeState {
   buildingId: EntityId;
   retries: number;
+  /** True when the Town Bell issued this flee, rather than an incoming attack. */
+  townBell?: boolean;
   /** The task the flee interrupted — restored by ungarrison (AoE2 return-to-work bell). */
   savedIntent?: UnitIntent;
 }

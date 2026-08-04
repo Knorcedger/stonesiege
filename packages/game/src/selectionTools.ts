@@ -7,6 +7,21 @@ import { gameData } from '@bf/data';
 
 export type IdleCategory = 'villager' | 'military';
 
+/** Public presentation marker for a villager currently answering a Town Bell. */
+export function isTownBellSeeking(
+  e: Entity,
+  player: PlayerId,
+  buildingId: EntityId,
+): boolean {
+  return e.kind === 'unit'
+    && e.player === player
+    && e.hp > 0
+    && e.garrisonedIn === undefined
+    && gameData.units[e.defId]?.gather !== undefined
+    && e.activity === 'fleeing'
+    && e.targetId === buildingId;
+}
+
 /**
  * A unit counts as idle when it stands with no activity (GDD: the `.` hotkey set).
  * SHELTERING units (villagers auto-garrisoned by the flee reflex) also count: they are

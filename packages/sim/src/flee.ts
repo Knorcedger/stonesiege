@@ -59,6 +59,7 @@ export function onUnitDamaged(state: SimState, victim: Entity): void {
 /** Put a unit inside a building (shared with the future full garrison system). */
 export function garrisonUnit(state: SimState, unit: Entity, building: Entity): void {
   state.motion.delete(unit.id);
+  unit.targetId = undefined;
   unit.garrisonedIn = building.id;
   (building.garrison ??= []).push(unit.id);
   unit.activity = 'garrisoned';
@@ -83,6 +84,8 @@ export function tickFlee(state: SimState): void {
     if (!b || garrisonRoom(state, b) <= 0) {
       // shelter destroyed or filled up mid-run: stop fleeing, stand
       state.fleeing.delete(id);
+      state.motion.delete(id);
+      e.targetId = undefined;
       if (e.activity === 'fleeing') e.activity = 'idle';
       continue;
     }
@@ -99,6 +102,7 @@ export function tickFlee(state: SimState): void {
     if (!state.motion.has(id)) {
       if (f.retries >= FLEE_RETRIES) {
         state.fleeing.delete(id);
+        e.targetId = undefined;
         if (e.activity === 'fleeing') e.activity = 'idle';
         continue;
       }

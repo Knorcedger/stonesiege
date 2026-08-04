@@ -116,6 +116,38 @@ describe('raid aftermath: sheltering + the return-to-work bell', () => {
     expect(game.state.entities.get(idleId)!.activity).toBe('idle');
   });
 
+  it('turning the bell off cancels villagers who are still walking to the Town Center', () => {
+    const game = createGame(scenarioConfig(49, grassMap(44, 44), [
+      { defId: 'townCenter', player: HUMAN, tileX: 20, tileY: 8, ref: 'tc' },
+      { defId: 'berryBush', player: 0, tileX: 4, tileY: 32, ref: 'bush' },
+      { defId: 'villager', player: HUMAN, tileX: 3, tileY: 32, ref: 'worker' },
+      { defId: 'villager', player: HUMAN, tileX: 6, tileY: 34, ref: 'idle' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const tcId = state.refs.get('tc')!;
+    const bushId = state.refs.get('bush')!;
+    const workerId = state.refs.get('worker')!;
+    const idleId = state.refs.get('idle')!;
+
+    game.advance([{ kind: 'gather', player: HUMAN, units: [workerId], targetId: bushId }]);
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    expect(state.entities.get(tcId)!.garrison ?? []).toHaveLength(0);
+    expect(state.fleeing.has(workerId)).toBe(true);
+    expect(state.fleeing.has(idleId)).toBe(true);
+    expect(state.fleeing.get(workerId)?.townBell).toBe(true);
+    expect(state.entities.get(workerId)!.targetId).toBe(tcId);
+
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+
+    expect(state.fleeing.has(workerId)).toBe(false);
+    expect(state.fleeing.has(idleId)).toBe(false);
+    expect(state.entities.get(workerId)!.intent).toEqual({ kind: 'gather', targetId: bushId });
+    expect(state.gather.has(workerId)).toBe(true);
+    expect(state.entities.get(workerId)!.targetId).not.toBe(tcId);
+    expect(state.entities.get(idleId)!.activity).toBe('idle');
+    expect(state.motion.has(idleId)).toBe(false);
+  });
+
   it('Town Bell retargets an already-fleeing villager without losing its saved job', () => {
     const game = createGame(scenarioConfig(48, grassMap(36, 36), [
       { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 8, ref: 'tc' },
@@ -129,8 +161,10 @@ describe('raid aftermath: sheltering + the return-to-work bell', () => {
     game.advance([{ kind: 'gather', player: HUMAN, units: [workerId], targetId: bushId }]);
     onUnitDamaged(state, game.state.entities.get(workerId)!);
     expect(state.fleeing.get(workerId)?.savedIntent).toEqual({ kind: 'gather', targetId: bushId });
+    expect(state.fleeing.get(workerId)?.townBell).toBeUndefined();
 
     game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    expect(state.fleeing.get(workerId)?.townBell).toBe(true);
     runUntilGarrisoned(game, workerId);
     expect(game.state.entities.get(workerId)!.garrisonedIn).toBe(tcId);
     expect(state.shelterIntents.get(workerId)).toEqual({ kind: 'gather', targetId: bushId });
