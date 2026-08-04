@@ -1,5 +1,6 @@
 // Combat core (GDD Combat). Explicit attack orders + per-category default behavior:
-//   - standard military auto-engages hostile players' units in LOS (staggered scans),
+//   - standard military auto-engages hostile players' units in its guard radius
+//     (infantry 4 tiles, cavalry 6, other classes use LOS; staggered scans),
 //     chases with a leash when auto-acquired, and walks back to its anchor after;
 //   - villagers/monks never auto-engage (villagers fight only on explicit command);
 //   - mangonels hold fire when a friendly stands in the blast (explicit orders override);
@@ -9,7 +10,7 @@
 // projectiles (projectiles.ts). Defensive buildings (TC/towers/castle) fire volleys:
 // arrowsBase + one arrow per garrisoned villager/foot-archer, capped at arrowsMax.
 
-import { gameData } from '@bf/data';
+import { gameData, unitAggroRange } from '@bf/data';
 import type { UnitDef } from '@bf/data';
 import { FP, GAIA, TICKS_PER_SECOND } from './types';
 import type { Command, Entity, EntityId, Fixed, SimEvent } from './types';
@@ -306,10 +307,10 @@ function autoMode(state: SimState, e: Entity, def: UnitDef): 'units' | 'building
   return 'units';
 }
 
-function tryAcquire(state: SimState, e: Entity, mode: 'units' | 'buildings'): CombatInfo | undefined {
+function tryAcquire(state: SimState, e: Entity, def: UnitDef, mode: 'units' | 'buildings'): CombatInfo | undefined {
   if ((state.tick + e.id) % ACQUIRE_STAGGER !== 0) return undefined;
   const stats = resolveUnitStats(state, e.player, e.defId);
-  const losFp = stats.los * FP;
+  const aggroFp = unitAggroRange(def, stats.los) * FP;
   const minRangeFp = stats.minRange * FP;
   let targetId = -1;
   let bestD = Infinity;
@@ -318,14 +319,14 @@ function tryAcquire(state: SimState, e: Entity, mode: 'units' | 'buildings'): Co
       if (t.kind !== 'building' || t.hp <= 0 || t.player === GAIA) continue;
       if (!isEnemy(state, e.player, t.player)) continue;
       const d = effDistFp(state, e, t);
-      if (d > losFp || d < minRangeFp) continue;
+      if (d > aggroFp || d < minRangeFp) continue;
       if (d < bestD) { bestD = d; targetId = t.id; }
     }
   } else {
     // unsorted query + explicit (distance, lowest id) tie-break: picks exactly the
     // unit a sorted scan with `dd < bestD` would pick, without the per-scan id sort
     // (a measured hotspot with 300+ auto-acquiring units — see spatial.ts)
-    state.unitsGrid.queryCircleUnsorted(e.x, e.y, losFp, queryBuf);
+    state.unitsGrid.queryCircleUnsorted(e.x, e.y, aggroFp, queryBuf);
     for (const id of queryBuf) {
       if (id === e.id) continue;
       const t = state.entities.get(id);
@@ -334,7 +335,7 @@ function tryAcquire(state: SimState, e: Entity, mode: 'units' | 'buildings'): Co
       if (!isEnemy(state, e.player, t.player)) continue;
       const dx = t.x - e.x, dy = t.y - e.y;
       const dd = dx * dx + dy * dy;
-      if (dd > losFp * losFp) continue;
+      if (dd > aggroFp * aggroFp) continue;
       if (minRangeFp > 0 && effDistFp(state, e, t) < minRangeFp) continue;
       if (dd < bestD || (dd === bestD && t.id < targetId)) { bestD = dd; targetId = t.id; }
     }
@@ -415,7 +416,7 @@ export function tickCombat(state: SimState, events: SimEvent[]): void {
     }
     if (!info) {
       const mode = autoMode(state, e, def);
-      if (mode) info = tryAcquire(state, e, mode);
+      if (mode) info = tryAcquire(state, e, def, mode);
     }
     if (info) stepCombat(state, e, def, info, events);
   }

@@ -8,7 +8,7 @@
 import { describe, expect, it } from 'vitest';
 import { GAIA, type Entity, type EntityId, type PlayerId } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
-import { resolveTapAction, type TapSelection } from './input';
+import { edgePanVector, resolveDesktopPrimaryAction, resolveTapAction, type TapSelection } from './input';
 
 const HUMAN = 1 as PlayerId;
 const ENEMY = 2 as PlayerId;
@@ -144,6 +144,30 @@ describe('resolveTapAction — no selection', () => {
   });
 });
 
+describe('resolveDesktopPrimaryAction — mouse-left is selection-only', () => {
+  it('clears the current selection when the pointer is on empty ground', () => {
+    expect(resolveDesktopPrimaryAction([], HUMAN)).toEqual({ type: 'deselect' });
+  });
+
+  it('selects the nearest own building even when friendly units are in the pick slop', () => {
+    const tc = ent({ kind: 'building', defId: 'townCenter', player: HUMAN });
+    const villager = ent({ kind: 'unit', defId: 'villager', player: HUMAN });
+    expect(resolveDesktopPrimaryAction([tc, villager], HUMAN)).toEqual({ type: 'select', id: tc.id });
+  });
+
+  it('replaces an army selection with the own unit directly under the pointer', () => {
+    const villager = ent({ kind: 'unit', defId: 'villager', player: HUMAN });
+    expect(resolveDesktopPrimaryAction([villager], HUMAN)).toEqual({ type: 'select', id: villager.id });
+  });
+
+  it('inspects visible enemies and resources instead of issuing an order', () => {
+    const enemy = ent({ player: ENEMY });
+    expect(resolveDesktopPrimaryAction([enemy], HUMAN)).toEqual({ type: 'inspect', id: enemy.id });
+    const gold = ent({ kind: 'resource', player: GAIA, defId: 'goldMine' });
+    expect(resolveDesktopPrimaryAction([gold], HUMAN)).toEqual({ type: 'inspect', id: gold.id });
+  });
+});
+
 describe('wave-2 gating contract', () => {
   // PENDING_COMMAND_KINDS shrinks as wave-2 sim systems land — asserting that a
   // specific verb IS pending would go stale mid-integration. The stable invariant
@@ -152,5 +176,22 @@ describe('wave-2 gating contract', () => {
     for (const k of ['move', 'attackMove', 'stop', 'train', 'cancelTrain', 'setRally', 'build', 'deleteEntity', 'resign'] as const) {
       expect(PENDING_COMMAND_KINDS.has(k)).toBe(false);
     }
+  });
+});
+
+describe('desktop edge scrolling', () => {
+  it('maps every canvas edge to the matching camera-pan direction', () => {
+    expect(edgePanVector(0, 300, 800, 600)).toEqual({ x: 1, y: 0 });
+    expect(edgePanVector(800, 300, 800, 600)).toEqual({ x: -1, y: 0 });
+    expect(edgePanVector(400, 0, 800, 600)).toEqual({ x: 0, y: 1 });
+    expect(edgePanVector(400, 600, 800, 600)).toEqual({ x: 0, y: -1 });
+    expect(edgePanVector(400, 300, 800, 600)).toEqual({ x: 0, y: 0 });
+  });
+
+  it('scrolls diagonally from a corner and ignores invalid viewports', () => {
+    expect(edgePanVector(3, 4, 800, 600)).toEqual({ x: 1, y: 1 });
+    expect(edgePanVector(-20, 300, 800, 600)).toEqual({ x: 1, y: 0 });
+    expect(edgePanVector(400, 640, 800, 600)).toEqual({ x: 0, y: -1 });
+    expect(edgePanVector(0, 0, 0, 0)).toEqual({ x: 0, y: 0 });
   });
 });

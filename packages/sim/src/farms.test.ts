@@ -3,7 +3,7 @@
 // wood cost, and the per-player auto-reseed queue toggle (queueReseed).
 
 import { describe, expect, it } from 'vitest';
-import type { Game, ScenarioStart, SimEvent } from './types';
+import { fp, type Game, type ScenarioStart, type SimEvent } from './types';
 import { createGame } from './game';
 import { grassMap, player, scenarioConfig } from './testutil';
 
@@ -24,6 +24,23 @@ function run(game: Game, ticks: number): SimEvent[] {
 }
 
 describe('farms', () => {
+  it('completed farms are traversable but still reserve their building footprint', () => {
+    const game = setup();
+    const vid = game.state.refs.get('v')!;
+    expect(game.isWalkable(10, 10)).toBe(true);
+    expect(game.canPlace(HUMAN, 'house', 10, 9)).toBe(false); // cannot stack a building on the plot
+
+    game.advance([{ kind: 'move', player: HUMAN, units: [vid], x: fp(15), y: fp(10) }]);
+    let crossedPlot = false;
+    for (let t = 0; t < 240; t++) {
+      game.advance([]);
+      const v = game.state.entities.get(vid)!;
+      if (v.tileX >= 10 && v.tileX <= 12 && v.tileY >= 9 && v.tileY <= 11) crossedPlot = true;
+    }
+    expect(crossedPlot).toBe(true);
+    expect(game.state.entities.get(vid)!.tileX).toBeGreaterThanOrEqual(14);
+  });
+
   it('a farmer works the farm at the reference rate (0.40/s → 10 food in ~500 ticks)', () => {
     const game = setup();
     const vid = game.state.refs.get('v')!;
@@ -154,6 +171,9 @@ describe('farms', () => {
     expect(v.intent).toEqual({ kind: 'gather', targetId: farmId }); // no idle handoff
     expect(v.activity).toBe('gathering');
     expect(game.state.entities.get(farmId)!.amountLeft).toBeLessThan(175); // farming it
+    for (let y = 10; y < 13; y++) {
+      for (let x = 10; x < 13; x++) expect(game.isWalkable(x, y)).toBe(true);
+    }
   });
 
   it('building a farm requires a completed mill (GDD prerequisite)', () => {

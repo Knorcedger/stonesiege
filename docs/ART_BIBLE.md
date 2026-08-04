@@ -623,7 +623,8 @@ Primitives assumed in `tools/assetgen` (all integer, all palette-indexed):
 - **Command icons** (`icon/cmd/<verb>`, same 40×40 chrome — contract-registered,
   §10.10): `attackMove` = sword over a ground arrow; `stop` = hollow octagon
   (`berryRed` rim); `garrison` = arrow into a doorway arch; `ungarrison` = arrow out
-  of the arch; `delete` = cracked shield (`stoneBase`, `outline` fracture);
+  of the arch; `townBell` = gold bell with clapper and ringing marks; `delete` =
+  cracked shield (`stoneBase`, `outline` fracture);
   `reseedFarm` = hand scattering `thatchLight` seed px over furrow lines; `pack` /
   `unpack` = folded trebuchet + down arrow / raised A-frame + up arrow; `heal` =
   open palm + `goldShine` spark; `convert` = sunburst disc with an orbit ring;
@@ -725,7 +726,7 @@ mirrored into ASSET_CONTRACT.md; the rest still need sign-off.
    index (`@p0`…`@p7`), never the color name; masked `obj/*` frames (owned sheep)
    emit `obj/<defId>@p<idx>/...` exactly like units.
 10. **Command-verb icons** [in contract]: `icon/cmd/<verb>` (§8.3) for
-    attack-move / stop / garrison / ungarrison / delete / farm re-seed /
+    attack-move / stop / garrison / ungarrison / town bell / delete / farm re-seed /
     trebuchet pack + unpack / heal / convert / rally.
 11. **Reduced animal frame counts** [in contract]: `obj/*` animals may use idle 1–2,
     walk 4, attack 4, die 3, decay 2 (§4.5); the §9.9 frame-count check applies the

@@ -6,6 +6,7 @@ import { FP, GAIA, type Entity, type GameState, type PlayerId } from '@bf/sim/ty
 import type { GameAssets } from '../assets';
 import type { Camera } from '../camera';
 import { worldToTile } from '../camera';
+import { setGameTooltip } from '../tooltip';
 
 const SIZE = 168;
 const TERRAIN_MINI_COLORS: Record<string, string> = {
@@ -17,6 +18,7 @@ const RES_COLORS: Record<string, string> = {
 };
 
 const PING_MS = 3000;
+const MOVE_MARKER_MS = 700;
 
 export class Minimap {
   readonly canvas: HTMLCanvasElement;
@@ -24,6 +26,7 @@ export class Minimap {
   private terrainBase: HTMLCanvasElement; // tile-space, 1px per tile
   private lastRefresh = 0;
   private pings: Array<{ tileX: number; tileY: number; at: number }> = [];
+  private moveMarkers: Array<{ tileX: number; tileY: number; at: number }> = [];
 
   constructor(
     slot: HTMLElement,
@@ -33,14 +36,16 @@ export class Minimap {
     private humanPlayer: PlayerId,
     private fogCanvas: HTMLCanvasElement,
     private onJump: (tileX: number, tileY: number) => void,
+    private onMove: (tileX: number, tileY: number) => boolean,
   ) {
     this.canvas = document.createElement('canvas');
     this.canvas.width = SIZE;
     this.canvas.height = SIZE;
     this.canvas.style.cssText =
       `width:${SIZE}px;height:${SIZE}px;display:block;background:#14100a;` +
-      'border:1px solid #1A1208;box-shadow:0 0 0 1px #8A6414, 0 0 0 3px #2C1F12;border-radius:3px;';
+      'border:1px solid #1A1208;box-shadow:0 0 0 1px #8A6414, 0 0 0 3px #2C1F12;border-radius:3px;cursor:pointer;';
     slot.appendChild(this.canvas);
+    setGameTooltip(this.canvas, 'Left-click: center camera\nRight-click: move selected units');
     this.ctx = this.canvas.getContext('2d')!;
 
     const state = this.getState();
@@ -56,9 +61,19 @@ export class Minimap {
       const sx = rect.width > 0 ? SIZE / rect.width : 1;
       const sy = rect.height > 0 ? SIZE / rect.height : 1;
       const t = this.pixelToTile((ev.clientX - rect.left) * sx, (ev.clientY - rect.top) * sy);
-      if (t) this.onJump(t.x, t.y);
+      if (t) {
+        if (ev.button === 2) {
+          if (this.onMove(t.x, t.y)) {
+            this.moveMarkers.push({ tileX: t.x, tileY: t.y, at: performance.now() });
+            this.redraw();
+          }
+        }
+        else if (ev.button === 0) this.onJump(t.x, t.y);
+      }
+      ev.preventDefault();
       ev.stopPropagation();
     });
+    this.canvas.addEventListener('contextmenu', (ev) => ev.preventDefault());
   }
 
   /** Rebake the terrain base (terrain rarely changes). */
@@ -77,7 +92,7 @@ export class Minimap {
   /** ~4 Hz refresh; call every frame with the elapsed clock. */
   update(nowMs: number): void {
     // active pings animate at full refresh so the alert reads as motion
-    const interval = this.pings.length > 0 ? 80 : 250;
+    const interval = this.pings.length > 0 || this.moveMarkers.length > 0 ? 50 : 250;
     if (nowMs - this.lastRefresh < interval) return;
     this.lastRefresh = nowMs;
     this.redraw();
@@ -155,6 +170,31 @@ export class Minimap {
       ctx.beginPath();
       ctx.arc(px, py, 3 + cycle * 9, 0, Math.PI * 2);
       ctx.stroke();
+    }
+
+    // Right-click move confirmation: a compact descending chevron at the exact
+    // minimap destination. The full-sized counterpart is drawn in FxLayer.
+    this.moveMarkers = this.moveMarkers.filter((p) => now - p.at < MOVE_MARKER_MS);
+    for (const marker of this.moveMarkers) {
+      const t = (now - marker.at) / MOVE_MARKER_MS;
+      const px = m.a * marker.tileX + m.c * marker.tileY + m.e;
+      const py = m.b * marker.tileX + m.d * marker.tileY + m.f - (1 - t) * 5;
+      ctx.save();
+      ctx.globalAlpha = t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85;
+      ctx.fillStyle = '#8FD45E';
+      ctx.strokeStyle = '#1A1208';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(px - 5, py - 4);
+      ctx.lineTo(px, py + 2);
+      ctx.lineTo(px + 5, py - 4);
+      ctx.lineTo(px + 5, py);
+      ctx.lineTo(px, py + 6);
+      ctx.lineTo(px - 5, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      ctx.restore();
     }
 
     // camera view trapezoid

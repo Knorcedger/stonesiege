@@ -1,4 +1,5 @@
 export * from './schema';
+export * from './aggro';
 
 import type { GameData } from './schema';
 import { units } from './units';

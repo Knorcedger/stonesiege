@@ -16,7 +16,7 @@ import { luma } from './util.ts';
 import type { FrameDef } from './atlas.ts';
 
 export const CMD_VERBS = [
-  'attackMove', 'stop', 'garrison', 'ungarrison', 'delete', 'reseedFarm',
+  'attackMove', 'stop', 'garrison', 'ungarrison', 'townBell', 'delete', 'reseedFarm',
   'pack', 'unpack', 'heal', 'convert', 'rally',
 ] as const;
 
@@ -674,6 +674,19 @@ function cmdIcon(verb: string): Raster {
       r.fillRect(19, dirIn ? 26 : 20, 2, 8, P.goldShine);
       if (dirIn) r.fillPoly([[20, 21], [16, 27], [24, 27]], P.goldShine);
       else r.fillPoly([[20, 36], [16, 30], [24, 30]], P.goldShine);
+      break;
+    }
+    case 'townBell': {
+      // broad gold bell + clapper and sound waves: readable at 40px without text
+      r.fillRect(18, 8, 4, 3, P.goldDark);
+      r.fillPoly([[17, 10], [23, 10], [27, 16], [28, 27], [12, 27], [13, 16]], P.goldBase);
+      r.fillPoly([[17, 11], [19, 11], [17, 26], [13, 26], [14, 16]], P.goldShine);
+      r.fillRect(10, 27, 20, 3, P.goldDark);
+      r.fillEllipse(20, 32, 3, 2, P.goldShine);
+      r.line(8, 13, 5, 17, P.parchLight);
+      r.line(8, 20, 5, 17, P.parchLight);
+      r.line(32, 13, 35, 17, P.parchLight);
+      r.line(32, 20, 35, 17, P.parchLight);
       break;
     }
     case 'delete': {

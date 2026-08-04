@@ -9,6 +9,7 @@
 // - building rubble on destruction (bld/<defId>/rubble), farms excepted per
 //   ASSET_CONTRACT
 // - conversion beam + sparkles while a monk's activity is 'converting'
+// - a short descending ground arrow confirming move-order destinations
 //
 // Two containers: `ground` sorts under the entity layer (corpses/rubble),
 // `air` above it (projectiles, flashes, beams).
@@ -43,6 +44,12 @@ interface Flash {
   color: number;
 }
 
+interface MoveMarker {
+  gfx: Graphics;
+  startTick: number;
+  baseY: number;
+}
+
 interface Corpse {
   sprite: Sprite;
   defId: string;
@@ -74,6 +81,7 @@ const DECAY_TICKS = (frames: number): number =>
 const FADE_TICKS = 2 * TICKS_PER_SECOND;
 const RUBBLE_TICKS = 12 * TICKS_PER_SECOND;
 const ARROW_LINGER_TICKS = 30;
+const MOVE_MARKER_TICKS = 14;
 
 export class FxLayer {
   readonly ground = new Container();
@@ -81,6 +89,7 @@ export class FxLayer {
 
   private projectiles: Projectile[] = [];
   private flashes: Flash[] = [];
+  private moveMarkers: MoveMarker[] = [];
   private corpses: Corpse[] = [];
   private deferred = new Map<EntityId, DeferredDeath>();
   private beamGfx = new Graphics();
@@ -126,11 +135,32 @@ export class FxLayer {
     }
   }
 
+  /** Immediate renderer feedback for a player-issued move destination. */
+  showMoveMarker(x: number, y: number, tick: number): void {
+    const p = tileToWorld(x / FP, y / FP);
+    const gfx = new Graphics();
+    // Two downward chevrons read as a destination arrow at every zoom level;
+    // the small isometric diamond pins the exact ground point.
+    gfx
+      .poly([-7, -22, 0, -15, 7, -22, 7, -17, 0, -10, -7, -17])
+      .fill({ color: 0x8fd45e, alpha: 0.95 })
+      .stroke({ width: 1, color: 0x1a1208, alpha: 0.9 })
+      .poly([-5, -12, 0, -7, 5, -12, 5, -8, 0, -3, -5, -8])
+      .fill({ color: 0xe6c04a, alpha: 0.95 })
+      .stroke({ width: 1, color: 0x1a1208, alpha: 0.9 })
+      .poly([0, -2, 7, 1, 0, 4, -7, 1])
+      .stroke({ width: 1.5, color: 0x8fd45e, alpha: 0.9 });
+    gfx.position.set(p.x, p.y);
+    this.air.addChild(gfx);
+    this.moveMarkers.push({ gfx, startTick: tick, baseY: p.y });
+  }
+
   /** Per-frame. tickFloat = state.tick + alpha. */
   update(state: GameState, tickFloat: number): void {
     this.flushDeferred(state, tickFloat);
     this.updateProjectiles(tickFloat);
     this.updateFlashes(tickFloat);
+    this.updateMoveMarkers(tickFloat);
     this.updateCorpses(tickFloat);
     this.drawConversionBeams(state, tickFloat);
   }
@@ -230,6 +260,22 @@ export class FxLayer {
       }
       f.gfx.alpha = 1 - t;
       f.gfx.scale.set(0.6 + t * 0.9);
+    }
+  }
+
+  private updateMoveMarkers(tickFloat: number): void {
+    for (let i = this.moveMarkers.length - 1; i >= 0; i--) {
+      const marker = this.moveMarkers[i];
+      const t = Math.max(0, (tickFloat - marker.startTick) / MOVE_MARKER_TICKS);
+      if (t >= 1) {
+        marker.gfx.destroy();
+        this.moveMarkers.splice(i, 1);
+        continue;
+      }
+      marker.gfx.y = marker.baseY - (1 - t) * 8;
+      marker.gfx.alpha = t < 0.15 ? t / 0.15 : 1 - (t - 0.15) / 0.85;
+      const pulse = 0.9 + Math.sin(t * Math.PI) * 0.18;
+      marker.gfx.scale.set(pulse);
     }
   }
 

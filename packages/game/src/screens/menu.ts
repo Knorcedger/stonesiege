@@ -15,6 +15,7 @@ import {
 import { loadProgress, scenarioStatuses } from '../campaign/progress';
 import { savedMatchLabel } from '../persist';
 import { buildSettingsControls } from '../settingsUi';
+import { setGameTooltip } from '../tooltip';
 import { AudioEngine } from '../audio/engine';
 import {
   currentScreen, flowReducer, initialFlow,
@@ -301,7 +302,7 @@ export function showMenu(
       FALLBACK_PLAYER_RAMPS.forEach((ramp, i) => {
         const sw = el('button', `bf-color${i === practice.color ? ' on' : ''}`);
         sw.style.background = `linear-gradient(160deg, ${ramp[0]}, ${ramp[1]} 55%, ${ramp[2]})`;
-        sw.title = `Color ${i + 1}`;
+        setGameTooltip(sw, `Banner color ${i + 1}`);
         sw.addEventListener('click', () => { practice.color = i; render(); });
         colors.appendChild(sw);
       });

@@ -1,5 +1,6 @@
 // Construction: the build command pays the full cost up front, drops a blocking
-// foundation (buildProgress 0), and sends the ordered villagers to raise it.
+// foundation (buildProgress 0), clears units from its footprint at walking speed,
+// and sends the ordered villagers to raise it only after the site is empty.
 // Builders standing adjacent to the footprint accrue progress AoE2-style
 // (time with N builders = 3T / (N + 2), see docs/AOE2_REFERENCE.md); completion
 // recomputes pop caps and emits buildingComplete. Deleting a foundation refunds
@@ -11,8 +12,10 @@ import { AGES, FP, GAIA, TICKS_PER_SECOND } from './types';
 import type { AgeId, Command, Entity, EntityId, PlayerId, SimEvent, Stockpile } from './types';
 import type { SimState } from './internal';
 import { facingFromDelta, isTileWalkable } from './internal';
-import { findFreeAdjacentTile, recomputePopCap, spawnEntity } from './entities';
-import { fogOnTileChange } from './fog';
+import {
+  activateFoundationFootprint, recomputePopCap,
+  releaseCompletedFarmFootprint, spawnEntity,
+} from './entities';
 import { orderMove } from './path';
 
 /** buildRate is a float factor in the data (villager = 1); scale to integers for determinism. */
@@ -80,6 +83,23 @@ export function rivalUnitOnFootprint(
   return false;
 }
 
+/**
+ * Building footprints always reserve placement space. This explicit check matters
+ * for clearance-pending foundations and completed farms, which intentionally do not
+ * block unit movement and therefore are absent from the walkability blocker grid.
+ */
+export function buildingFootprintOverlaps(
+  state: SimState, tileX: number, tileY: number, size: number,
+): boolean {
+  for (const e of state.entities.values()) {
+    if (e.kind !== 'building' || e.hp <= 0) continue;
+    const otherSize = gameData.buildings[e.defId]?.size ?? 1;
+    if (tileX < e.tileX + otherSize && tileX + size > e.tileX
+      && tileY < e.tileY + otherSize && tileY + size > e.tileY) return true;
+  }
+  return false;
+}
+
 function pay(s: Stockpile, cost: { food?: number; wood?: number; gold?: number; stone?: number }): boolean {
   const food = cost.food ?? 0, wood = cost.wood ?? 0, gold = cost.gold ?? 0, stone = cost.stone ?? 0;
   if (s.food < food || s.wood < wood || s.gold < gold || s.stone < stone) return false;
@@ -87,27 +107,93 @@ function pay(s: Stockpile, cost: { food?: number; wood?: number; gold?: number; 
   return true;
 }
 
-/**
- * Units never block tiles, so a fresh footprint may trap bystanders: nudge them off.
- * Only the building player's own units and Gaia animals are nudged — rival units block
- * placement upstream (rivalUnitOnFootprint), and must never be moved by this command.
- */
-function nudgeUnitsOffFootprint(state: SimState, player: PlayerId, tileX: number, tileY: number, size: number): void {
-  const spot = findFreeAdjacentTile(state, tileX, tileY, size);
-  if (!spot) return; // fully enclosed site — leave them; tryStep still lets them walk out
-  for (const e of state.entities.values()) {
-    if (e.kind !== 'unit' || e.garrisonedIn !== undefined) continue;
-    if (e.player !== player && e.player !== GAIA) continue;
+function unitsOnFootprint(state: SimState, tileX: number, tileY: number, size: number): Entity[] {
+  const half = (size * FP) / 2;
+  const ids: EntityId[] = [];
+  const out: Entity[] = [];
+  // The spatial index only offers circle queries, so cover the square's corners
+  // with its circumradius and then apply the exact tile bounds below. Using only
+  // `half` misses corner occupants in 4x4+ footprints.
+  state.unitsGrid.queryCircle(
+    tileX * FP + half,
+    tileY * FP + half,
+    Math.ceil(half * Math.SQRT2),
+    ids,
+  );
+  for (const id of ids) {
+    const e = state.entities.get(id);
+    if (!e || e.kind !== 'unit' || e.hp <= 0 || e.garrisonedIn !== undefined) continue;
     if (e.tileX < tileX || e.tileX >= tileX + size || e.tileY < tileY || e.tileY >= tileY + size) continue;
-    e.x = spot.x * FP + FP / 2;
-    e.y = spot.y * FP + FP / 2;
-    const changed = e.tileX !== spot.x || e.tileY !== spot.y;
-    e.tileX = spot.x;
-    e.tileY = spot.y;
-    state.unitsGrid.move(e.id, e.x, e.y);
-    if (changed) fogOnTileChange(state, e);
-    state.motion.delete(e.id);
-    if (e.activity === 'moving') e.activity = 'idle';
+    out.push(e);
+  }
+  return out;
+}
+
+/** Deterministic free destinations around a footprint, nearest ring first. */
+function footprintRingTiles(
+  state: SimState, tileX: number, tileY: number, size: number, maxRing = 4,
+): Array<{ x: number; y: number }> {
+  const spots: Array<{ x: number; y: number }> = [];
+  for (let ring = 1; ring <= maxRing; ring++) {
+    const x0 = tileX - ring, y0 = tileY - ring;
+    const x1 = tileX + size - 1 + ring, y1 = tileY + size - 1 + ring;
+    // Same camera-facing order as normal building ejection, but keep every free
+    // tile so a crowd does not get compressed onto one point.
+    for (let x = x0; x <= x1; x++) if (isTileWalkable(state, x, y1)) spots.push({ x, y: y1 });
+    for (let y = y1 - 1; y >= y0; y--) if (isTileWalkable(state, x1, y)) spots.push({ x: x1, y });
+    for (let x = x1 - 1; x >= x0; x--) if (isTileWalkable(state, x, y0)) spots.push({ x, y: y0 });
+    for (let y = y0 + 1; y <= y1 - 1; y++) if (isTileWalkable(state, x0, y)) spots.push({ x: x0, y });
+    if (spots.length > 0) break;
+  }
+  return spots;
+}
+
+/** Walk occupants to distinct footprint-ring tiles; no position is rewritten. */
+function walkUnitsOffFootprint(
+  state: SimState,
+  units: Entity[],
+  tileX: number,
+  tileY: number,
+  size: number,
+  protectedBuildId: EntityId,
+): void {
+  const available = footprintRingTiles(state, tileX, tileY, size);
+  if (available.length === 0 || units.length === 0) return;
+  const assignments = new Map<string, { spot: { x: number; y: number }; ids: EntityId[] }>();
+  for (const e of units) {
+    // Leaving a newly reserved building site takes priority over combat/reflex paths.
+    state.combat.delete(e.id);
+    state.garrisoning.delete(e.id);
+    state.fleeing.delete(e.id);
+    e.targetId = undefined;
+    // Preserve the fresh construction task assigned to this site's builders, but
+    // cancel a bystander's old gather/build/repair job so it cannot immediately
+    // overwrite the clearance walk later in the same tick.
+    if (e.intent?.kind !== 'build' || e.intent.targetId !== protectedBuildId) {
+      e.intent = undefined;
+      state.gather.delete(e.id);
+      state.buildRetries.delete(e.id);
+    }
+
+    let best = 0;
+    let bestD = Infinity;
+    for (let i = 0; i < available.length; i++) {
+      const dx = available[i].x * FP + FP / 2 - e.x;
+      const dy = available[i].y * FP + FP / 2 - e.y;
+      const dd = dx * dx + dy * dy;
+      if (dd < bestD) { bestD = dd; best = i; }
+    }
+    const [spot] = available.splice(best, 1);
+    const key = `${spot.x},${spot.y}`;
+    const assignment = assignments.get(key);
+    if (assignment) assignment.ids.push(e.id);
+    else assignments.set(key, { spot, ids: [e.id] });
+    if (available.length === 0) available.push(...footprintRingTiles(state, tileX, tileY, size));
+  }
+  // One group search per occupied exit tile, rather than one full-map search per
+  // unit when a large army happens to overlap a Castle/TC placement.
+  for (const { spot, ids } of assignments.values()) {
+    orderMove(state, ids, spot.x * FP + FP / 2, spot.y * FP + FP / 2);
   }
 }
 
@@ -142,12 +228,15 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
     }
   }
   if (rivalUnitOnFootprint(state, cmd.player, cmd.tileX, cmd.tileY, def.size)) return;
+  if (buildingFootprintOverlaps(state, cmd.tileX, cmd.tileY, def.size)) return;
 
   if (!pay(player.stockpile, def.cost)) return;
 
-  nudgeUnitsOffFootprint(state, cmd.player, cmd.tileX, cmd.tileY, def.size);
+  const occupants = unitsOnFootprint(state, cmd.tileX, cmd.tileY, def.size)
+    .filter((e) => e.player === cmd.player || e.player === GAIA);
   const foundation = spawnEntity(state, {
     defId: cmd.defId, player: cmd.player, tileX: cmd.tileX, tileY: cmd.tileY, buildProgress: 0,
+    deferBlocking: occupants.length > 0,
   });
   if (!foundation) {
     player.stockpile.food += def.cost.food ?? 0;
@@ -177,12 +266,45 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
     state.gather.delete(b.id);
     state.fleeing.delete(b.id);
   }
-  // blocked center remaps to the nearest walkable tile — i.e. adjacent to the footprint
-  orderMove(state, builders.map((b) => b.id), foundation.x, foundation.y);
+  if (foundation.foundationPendingClearance) {
+    // Everyone physically exits first; builders outside the footprint wait on the
+    // same ring rather than entering the still-soft foundation and starting early.
+    const waiters = new Map(builders.map((b) => [b.id, b]));
+    for (const e of occupants) waiters.set(e.id, e);
+    walkUnitsOffFootprint(
+      state, [...waiters.values()], foundation.tileX, foundation.tileY, def.size, foundation.id,
+    );
+  } else {
+    // blocked center remaps to the nearest walkable tile — i.e. adjacent to the footprint
+    orderMove(state, builders.map((b) => b.id), foundation.x, foundation.y);
+  }
 }
 
 /** Per-tick: builders raise adjacent foundations; finished sites come online. */
 export function tickConstruction(state: SimState, events: SimEvent[]): void {
+  // 0) A placed foundation stays non-solid and at 0% until every unit has walked
+  // beyond its footprint. Only then block the tiles and invite its builders in.
+  for (const id of state.foundations.keys()) {
+    const site = state.entities.get(id);
+    if (!site?.foundationPendingClearance) continue;
+    const size = gameData.buildings[site.defId]?.size ?? 1;
+    const occupants = unitsOnFootprint(state, site.tileX, site.tileY, size);
+    if (occupants.length > 0) {
+      // A foundation may wait for a rival who enters later, but one player's
+      // construction command must never redirect another player's unit.
+      const stopped = occupants.filter((e) =>
+        (e.player === site.player || e.player === GAIA) && !state.motion.has(e.id));
+      walkUnitsOffFootprint(state, stopped, site.tileX, site.tileY, size, site.id);
+      continue;
+    }
+    activateFoundationFootprint(state, site);
+    const builders: EntityId[] = [];
+    for (const e of state.entities.values()) {
+      if (e.kind === 'unit' && e.intent?.kind === 'build' && e.intent.targetId === site.id) builders.push(e.id);
+    }
+    orderMove(state, builders, site.x, site.y);
+  }
+
   // 1) resolve builder intents -> scaled build-rate sum per foundation
   const ratesOf = new Map<EntityId, number>();
   for (const e of state.entities.values()) {
@@ -195,6 +317,7 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
       if (e.activity === 'building') e.activity = 'idle';
       continue;
     }
+    if (site.foundationPendingClearance) continue;
     const size = gameData.buildings[site.defId]?.size ?? 1;
     const adjacent =
       e.tileX >= site.tileX - 1 && e.tileX <= site.tileX + size &&
@@ -231,6 +354,9 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
     if (n === 0) continue;
     info.acc += n + 2 * RATE_SCALE; // AoE2: rate with N builders ~ (N + 2) / 3T
     if (info.acc >= info.accNeeded) {
+      // Farms stop blocking movement at the instant construction completes.
+      // Subtract while buildProgress is still <1000 so footprintSize is 3 here.
+      releaseCompletedFarmFootprint(state, site);
       site.buildProgress = 1000;
       state.foundations.delete(id);
       recomputePopCap(state, site.player);

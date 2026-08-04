@@ -6,7 +6,7 @@
 
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import {
-  FP, TICKS_PER_SECOND,
+  FP, TICKS_PER_SECOND, fp,
   type Command, type Entity, type EntityId, type GameConfig, type GameState,
   type PlayerId, type SimEvent,
 } from '@bf/sim/types';
@@ -34,7 +34,7 @@ import { MessageBanner } from './hud/messages';
 import { ObjectivesPanel } from './hud/objectives';
 import { deriveMatchSummary, emptyTallies, formatMatchTime, recordDeath } from './hud/summary';
 import {
-  createGame, gameFromSerialized, practiceConfig, scenarioConfig,
+  createGame, gameFromSerialized, practiceConfig, scenarioConfig, unitDisplayStats,
   DEFAULT_PRACTICE_SETUP, type PracticeSetup,
 } from './simBridge';
 import { makeScenarioOps, type ScenarioUiHooks } from './scenario/runtime';
@@ -257,7 +257,11 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
 
   const worldRoot = new Container();
   const terrain = new TerrainLayer(app.renderer, assets, game.state.map);
-  const world = new WorldLayer(assets, humanPlayer);
+  const world = new WorldLayer(
+    assets,
+    humanPlayer,
+    (defId) => unitDisplayStats(game, humanPlayer, defId)?.los ?? gameData.units[defId]?.los ?? 0,
+  );
   const fx = new FxLayer(assets);
   const fog = new FogLayer(game.state.map);
   const ghostLayer = new Container();
@@ -547,6 +551,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   const issue = (cmd: Command): void => loop.issue(cmd);
   const issueWithUndo = (cmd: Command, label: string, undo: (() => void) | null): void => {
     loop.issue(cmd);
+    if (cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
     hud.showUndoToast(label, undo);
   };
 
@@ -652,6 +657,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     humanPlayer,
     getState,
     getSelection: liveSelection,
+    getUnitStats: (player, defId) => unitDisplayStats(game, player, defId),
     deselect,
     trainUnit: (buildingId, defId) => {
       issue({ kind: 'train', player: humanPlayer, buildingId, defId });
@@ -672,6 +678,12 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     ungarrisonAll: (buildingId) => {
       issue({ kind: 'ungarrison', player: humanPlayer, buildingId });
       hud.showUndoToast('Ungarrisoning', null);
+    },
+    townBell: (buildingId) => {
+      const b = getState().entities.get(buildingId);
+      const releasing = (b?.garrison ?? []).some((id) => getState().entities.get(id)?.sheltering === true);
+      issue({ kind: 'townBell', player: humanPlayer, buildingId });
+      hud.showUndoToast(releasing ? 'Villagers returning to work' : 'Town Bell — villagers seeking shelter', null);
     },
     // GDD: "tap the flag control to clear". The sim has no unset command, so
     // clearing rallies back onto the building's own center (no targetId) — the
@@ -763,6 +775,19 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     humanPlayer,
     fog.fogCanvas,
     (tx, ty) => camera.centerOnTile(tx, ty),
+    (tx, ty) => {
+      const units = liveSelection()
+        .filter((e) => e.kind === 'unit' && e.player === humanPlayer)
+        .map((e) => e.id);
+      if (units.length === 0) return false;
+      const undo = (): void => issue({ kind: 'stop', player: humanPlayer, units });
+      issueWithUndo(
+        { kind: 'move', player: humanPlayer, units, x: fp(tx), y: fp(ty) },
+        'Move',
+        undo,
+      );
+      return true;
+    },
   );
 
   // --------------------------------------------------------------- input
@@ -784,6 +809,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
       placement.tileY = Math.round(tileY - size / 2);
       refreshGhost();
     },
+    confirmPlacement,
     placementHitTest: (wx, wy) => {
       if (!placement) return false;
       const size = gameData.buildings[placement.defId]?.size ?? 1;

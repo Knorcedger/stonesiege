@@ -10,6 +10,7 @@ import type { Game, SimEvent } from './types';
 import { createGame } from './game';
 import type { SimState } from './internal';
 import { removeEntity } from './entities';
+import { onUnitDamaged } from './flee';
 import { grassMap, player, scenarioConfig } from './testutil';
 
 const HUMAN = 1;
@@ -86,6 +87,58 @@ describe('raid aftermath: sheltering + the return-to-work bell', () => {
       game.advance([]);
     }
   }
+
+  it('Town Bell shelters the nearest villagers and toggles them back to their jobs', () => {
+    const game = createGame(scenarioConfig(47, grassMap(36, 36), [
+      { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 8, ref: 'tc' },
+      { defId: 'berryBush', player: 0, tileX: 10, tileY: 12, ref: 'bush' },
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 12, ref: 'worker' },
+      { defId: 'villager', player: HUMAN, tileX: 12, tileY: 13, ref: 'idle' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const tcId = game.state.refs.get('tc')!;
+    const workerId = game.state.refs.get('worker')!;
+    const idleId = game.state.refs.get('idle')!;
+    const bushId = game.state.refs.get('bush')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units: [workerId], targetId: bushId }]);
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+
+    for (let t = 0; t < 500 && game.state.entities.get(tcId)!.garrison?.length !== 2; t++) game.advance([]);
+    expect(game.state.entities.get(tcId)!.garrison).toHaveLength(2);
+    expect(game.state.entities.get(workerId)!.sheltering).toBe(true);
+    expect(game.state.entities.get(idleId)!.sheltering).toBe(true);
+    expect(state.shelterIntents.get(workerId)).toEqual({ kind: 'gather', targetId: bushId });
+
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    expect(game.state.entities.get(tcId)!.garrison).toHaveLength(0);
+    expect(game.state.entities.get(workerId)!.intent).toEqual({ kind: 'gather', targetId: bushId });
+    expect(state.gather.has(workerId)).toBe(true);
+    expect(game.state.entities.get(idleId)!.activity).toBe('idle');
+  });
+
+  it('Town Bell retargets an already-fleeing villager without losing its saved job', () => {
+    const game = createGame(scenarioConfig(48, grassMap(36, 36), [
+      { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 8, ref: 'tc' },
+      { defId: 'berryBush', player: 0, tileX: 10, tileY: 12, ref: 'bush' },
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 12, ref: 'worker' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const tcId = game.state.refs.get('tc')!;
+    const workerId = game.state.refs.get('worker')!;
+    const bushId = game.state.refs.get('bush')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units: [workerId], targetId: bushId }]);
+    onUnitDamaged(state, game.state.entities.get(workerId)!);
+    expect(state.fleeing.get(workerId)?.savedIntent).toEqual({ kind: 'gather', targetId: bushId });
+
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    runUntilGarrisoned(game, workerId);
+    expect(game.state.entities.get(workerId)!.garrisonedIn).toBe(tcId);
+    expect(state.shelterIntents.get(workerId)).toEqual({ kind: 'gather', targetId: bushId });
+
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    expect(game.state.entities.get(workerId)!.intent).toEqual({ kind: 'gather', targetId: bushId });
+    expect(state.gather.has(workerId)).toBe(true);
+  });
 
   it('a flee-garrisoned gatherer is sheltering; ungarrison resumes the gather task', () => {
     const game = createGame(scenarioConfig(44, grassMap(30, 30), [

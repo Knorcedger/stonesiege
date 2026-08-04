@@ -8,7 +8,8 @@
 // - walkTerrain: buildWalkTerrain(map) — pure function of terrain.
 // - blockers: the per-tile sum of live entity footprints. Every runtime mutation goes
 //   through addBlockers(±footprintSize) in entities.ts, so re-adding each stored
-//   entity's CURRENT footprint reproduces the grid exactly (stumps count 0, units 0).
+//   entity's CURRENT footprint reproduces the grid exactly (stumps, units, and
+//   clearance-pending foundations and completed farms count 0).
 // - unitsGrid: rebuilt by inserting every live, non-garrisoned unit. Within-cell array
 //   order differs from the original run but is unobservable: queryCircle sorts results
 //   by entity id (spatial.ts) before anyone iterates them.
@@ -156,6 +157,20 @@ export interface GameSnapshotV1 extends GameSnapshot {
 
 const pairsOf = <V>(m: ReadonlyMap<number, V>): Array<[number, V]> => [...m];
 
+/** Keep optional GatherInfo fields in a stable position across save/restore cycles. */
+const gatherPairs = (m: ReadonlyMap<number, GatherInfo>): Array<[number, GatherInfo]> =>
+  [...m].map(([id, g]) => [id, {
+    acc: g.acc,
+    retries: g.retries,
+    depositing: g.depositing,
+    ...(g.dropoffId !== undefined ? { dropoffId: g.dropoffId } : {}),
+    nextAttackTick: g.nextAttackTick,
+    task: g.task,
+    lastX: g.lastX,
+    lastY: g.lastY,
+    finishAfterDeposit: g.finishAfterDeposit,
+  }]);
+
 export function serializeSimState(state: SimState): GameSnapshot {
   const snap: GameSnapshotV1 = {
     schemaVersion: 1,
@@ -208,7 +223,7 @@ export function serializeSimState(state: SimState): GameSnapshot {
     ballistics: [...state.ballistics],
     enabledUnits: state.enabledUnits.map((s) => [...s]),
     enabledBuildings: state.enabledBuildings.map((s) => [...s]),
-    gather: pairsOf(state.gather),
+    gather: gatherPairs(state.gather),
     fleeing: pairsOf(state.fleeing),
     shelterIntents: pairsOf(state.shelterIntents),
     animalCd: pairsOf(state.animalCd),

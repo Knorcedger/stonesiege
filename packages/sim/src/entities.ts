@@ -18,7 +18,12 @@ export function defKind(defId: string): EntityKind | null {
 }
 
 export function footprintSize(e: Entity): number {
-  if (e.kind === 'building') return gameData.buildings[e.defId]?.size ?? 1;
+  if (e.kind === 'building') {
+    if (e.foundationPendingClearance) return 0;
+    // A completed farm is cultivated ground, not a wall: units may traverse it.
+    if (e.defId === 'farm' && (e.buildProgress ?? 1000) >= 1000) return 0;
+    return gameData.buildings[e.defId]?.size ?? 1;
+  }
   if (e.kind === 'resource') return e.stump ? 0 : 1; // stumps no longer block
   return 0; // units don't block tiles
 }
@@ -46,6 +51,8 @@ export interface SpawnInit {
   countsPop?: boolean;
   /** Buildings only: 0 spawns a foundation (construction raises it); default 1000 = complete. */
   buildProgress?: number;
+  /** Spawn a visible foundation without movement blockers until its occupied site clears. */
+  deferBlocking?: boolean;
 }
 
 export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
@@ -82,6 +89,7 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
       hp: init.hp ?? def.hp, maxHp: def.hp,
       activity: 'idle',
       buildProgress: init.buildProgress ?? 1000, // scenario/mapgen buildings arrive complete
+      ...(init.deferBlocking ? { foundationPendingClearance: true } : {}),
     };
     if (def.trains && def.trains.length > 0) e.trainQueue = [];
     if (def.providesFood !== undefined) {
@@ -112,6 +120,20 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
   if (kind === 'building') recomputePopCap(state, init.player);
   if (init.ref) state.refs.set(init.ref, id);
   return e;
+}
+
+/** Make a clearance-pending foundation solid once every unit has walked outside. */
+export function activateFoundationFootprint(state: SimState, e: Entity): void {
+  if (e.kind !== 'building' || !e.foundationPendingClearance) return;
+  e.foundationPendingClearance = undefined;
+  addBlockers(state, e, 1);
+}
+
+/** Remove the temporary construction blocker before a farm becomes traversable terrain. */
+export function releaseCompletedFarmFootprint(state: SimState, e: Entity): void {
+  if (e.kind !== 'building' || e.defId !== 'farm' || e.foundationPendingClearance
+    || (e.buildProgress ?? 1000) >= 1000) return;
+  addBlockers(state, e, -1);
 }
 
 /**

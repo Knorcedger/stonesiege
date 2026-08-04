@@ -20,6 +20,7 @@ import { handleRepair } from './repair';
 const GARRISON_RETRIES = 4;
 
 type GarrisonCmd = Extract<Command, { kind: 'garrison' }>;
+type TownBellCmd = Extract<Command, { kind: 'townBell' }>;
 type UngarrisonCmd = Extract<Command, { kind: 'ungarrison' }>;
 
 function hostCapacity(host: Entity): number {
@@ -78,6 +79,54 @@ export function handleGarrison(state: SimState, cmd: GarrisonCmd): void {
     movers.push(id);
   }
   if (movers.length > 0) orderMove(state, movers, host.x, host.y);
+}
+
+/**
+ * AoE-style Town Bell. The nearest villagers fill the selected TC, using the
+ * flee path so their gather/build/repair intent is preserved. Ringing while any
+ * bell-sheltered villagers are inside releases the garrison and resumes work.
+ */
+export function handleTownBell(state: SimState, cmd: TownBellCmd): void {
+  const host = state.entities.get(cmd.buildingId);
+  if (!host || host.kind !== 'building' || host.defId !== 'townCenter'
+    || host.player !== cmd.player || host.hp <= 0 || (host.buildProgress ?? 1000) < 1000) return;
+
+  if ((host.garrison ?? []).some((id) => state.entities.get(id)?.sheltering === true)) {
+    handleUngarrison(state, { kind: 'ungarrison', player: cmd.player, buildingId: host.id });
+    return;
+  }
+
+  const room = hostRoom(host);
+  if (room <= 0) return;
+  const villagers = [...state.entities.values()]
+    .filter((e) => e.kind === 'unit' && e.player === cmd.player && e.hp > 0
+      && e.garrisonedIn === undefined && !!gameData.units[e.defId]?.gather)
+    .sort((a, b) => {
+      const adx = a.x - host.x, ady = a.y - host.y;
+      const bdx = b.x - host.x, bdy = b.y - host.y;
+      return adx * adx + ady * ady - (bdx * bdx + bdy * bdy) || a.id - b.id;
+    })
+    .slice(0, room);
+
+  for (const e of villagers) {
+    // A raid-fleeing villager already moved its task into FleeInfo. Ringing the
+    // bell while it is en route must retarget the shelter without erasing that job.
+    const savedIntent = state.fleeing.get(e.id)?.savedIntent ?? e.intent;
+    e.intent = undefined;
+    e.targetId = undefined;
+    state.gather.delete(e.id);
+    state.fleeing.delete(e.id);
+    state.combat.delete(e.id);
+    state.garrisoning.delete(e.id);
+    state.buildRetries.delete(e.id);
+    const monk = state.monks.get(e.id);
+    if (monk) { monk.convertTargetId = undefined; monk.healTargetId = undefined; }
+    state.fleeing.set(e.id, { buildingId: host.id, retries: 0, savedIntent });
+  }
+  if (villagers.length > 0) {
+    orderMove(state, villagers.map((e) => e.id), host.x, host.y);
+    for (const e of villagers) e.activity = 'fleeing';
+  }
 }
 
 /**

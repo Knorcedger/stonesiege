@@ -1,8 +1,8 @@
 // Command-validation invariant (types.ts: "Commands are validated (ownership, legality)"):
 // one player's command must never move another player's units or cancel their orders.
 // Enforced AoE2-style: handleBuild (and Game.canPlace) reject placement when a rival's
-// unit stands on the footprint (rivalUnitOnFootprint), and nudgeUnitsOffFootprint only
-// ever moves the building player's own units and Gaia animals — so a 25-wood house drop
+// unit stands on the footprint (rivalUnitOnFootprint), and clearance walking only ever
+// redirects the building player's own units and Gaia animals — so a 25-wood house drop
 // can never teleport an enemy unit or cancel its march.
 
 import { describe, expect, it } from 'vitest';

@@ -111,6 +111,28 @@ describe('melee matchups (exact AoE2 formula)', () => {
 });
 
 describe('auto-engage defaults (GDD per-category behavior)', () => {
+  it('uses a smaller infantry guard radius than cavalry (4 vs 6 tiles)', () => {
+    const infantryGame = createGame(scenarioConfig(112, grassMap(30, 30), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'soldier' },
+      { defId: 'villager', player: P2, tileX: 15, tileY: 10, ref: 'enemy' },
+    ], [player(), player({ civ: 'english' })]));
+    const infantry = infantryGame.state.refs.get('soldier')!;
+    const infantryEnemy = infantryGame.state.refs.get('enemy')!;
+    run(infantryGame, 120);
+    expect((infantryGame.state as unknown as SimState).combat.has(infantry)).toBe(false);
+    expect(infantryGame.state.entities.get(infantryEnemy)!.hp).toBe(25);
+
+    const cavalryGame = createGame(scenarioConfig(113, grassMap(30, 30), [
+      { defId: 'knight', player: P1, tileX: 10, tileY: 10, ref: 'soldier' },
+      { defId: 'villager', player: P2, tileX: 15, tileY: 10, ref: 'enemy' },
+    ], [player(), player({ civ: 'english' })]));
+    const cavalry = cavalryGame.state.refs.get('soldier')!;
+    const cavalryEnemy = cavalryGame.state.refs.get('enemy')!;
+    run(cavalryGame, 120);
+    expect((cavalryGame.state as unknown as SimState).combat.has(cavalry)).toBe(true);
+    expect(cavalryGame.state.entities.get(cavalryEnemy)!.hp).toBeLessThan(25);
+  });
+
   it('idle militia chases an enemy, leashes at ~12 tiles, and returns to its anchor', () => {
     const game = createGame(scenarioConfig(104, grassMap(40, 30), [
       { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'm' },
@@ -344,6 +366,32 @@ describe('rams (anti-building siege + garrison rules)', () => {
 });
 
 describe('defensive buildings (arrows, garrison scaling, min/max range)', () => {
+  it('Town Bell villagers make a Town Center fire a stronger volley', () => {
+    const game = createGame(scenarioConfig(120, grassMap(30, 30), [
+      { defId: 'townCenter', player: P1, tileX: 10, tileY: 10, ref: 'tc' },
+      { defId: 'villager', player: P1, tileX: 9, tileY: 10 },
+      { defId: 'villager', player: P1, tileX: 9, tileY: 11 },
+      { defId: 'villager', player: P1, tileX: 9, tileY: 12 },
+      { defId: 'knight', player: P2, tileX: 17, tileY: 11 },
+    ], [player(), player({ civ: 'english' })]));
+    const tc = game.state.refs.get('tc')!;
+    const evs: Timed[] = [];
+    const tick0 = game.state.tick;
+    for (const ev of game.advance([{ kind: 'townBell', player: P1, buildingId: tc }])) {
+      evs.push({ tick: tick0, ev });
+    }
+    run(game, 160, evs);
+
+    expect(game.state.entities.get(tc)!.garrison).toHaveLength(3);
+    const volleys = new Map<number, number>();
+    for (const e of evs) {
+      if (e.ev.kind === 'projectileFired' && e.ev.fromId === tc) {
+        volleys.set(e.tick, (volleys.get(e.tick) ?? 0) + 1);
+      }
+    }
+    expect([...volleys.values()]).toContain(4); // 1 base + one per sheltered villager
+  });
+
   it('tower fires 1 arrow empty, 4 with 3 villagers garrisoned; 4 damage vs militia', () => {
     const game = createGame(scenarioConfig(114, grassMap(30, 30), [
       { defId: 'watchTower', player: P1, tileX: 10, tileY: 10, ref: 'tower' },

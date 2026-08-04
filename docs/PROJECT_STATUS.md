@@ -1,6 +1,6 @@
 # Bannerfall — Project Plan & Status
 
-_Last updated: 2026-08-02_
+_Last updated: 2026-08-04_
 
 **Bannerfall** is an original mobile RTS that recreates the feel and depth of Age of Empires II
 (economy → ages → armies → castles, counter-based combat, story campaigns). All art, text, and
@@ -41,9 +41,14 @@ input, HUD, menus, audio) · `ai` (bots) · `scenarios` (campaign maps + trigger
 | QA-until-dry | ⏳ Blocked | Critics hit the usage limit; **did not actually run** (see below) |
 | Capacitor packaging (iOS/Android) | ⬜ Staged | Workflow written, not yet run |
 
-**Health right now:** typecheck clean · **522 tests passing** (11 skipped, opt-in heavy sweeps) ·
-deterministic sim well under its per-tick budget · zero console errors in the last full-loop
-browser playthrough. Latest commit: command-intake hardening (see QA section).
+**Health right now:** typecheck clean · production build clean · **541 tests passing**
+(11 skipped, opt-in heavy sweeps) · deterministic sim well under its per-tick budget · zero
+console errors in the last full-loop browser playthrough. The current stabilization pass covers
+selection/build placement, custom tooltips and unit stats, guard-radius feedback, Town Bell
+sheltering/firepower, walkable completed farms, occupied-foundation clearance, friendly-unit
+flow, passive-building details/deletion, and an elapsed match clock.
+The desktop pass also adds move-order arrows, four-edge camera scrolling, minimap right-click
+movement, visible villager carry amounts, and the missing tree-to-stump visual transition.
 
 ---
 

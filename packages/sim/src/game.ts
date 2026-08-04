@@ -23,7 +23,9 @@ import { applyCommands, checkEliminations } from './commands';
 import { tickProduction } from './production';
 import { tickPathfinding } from './path';
 import { tickMovement } from './movement';
-import { buildAgeIndex, hasBuildPrereqs, rivalUnitOnFootprint, tickConstruction } from './construction';
+import {
+  buildingFootprintOverlaps, buildAgeIndex, hasBuildPrereqs, rivalUnitOnFootprint, tickConstruction,
+} from './construction';
 import { rebuildModifiers } from './research';
 import { tickRepair } from './repair';
 import { tickGathering } from './gather';
@@ -238,6 +240,7 @@ function finalizeGame(state: SimState): Game {
       }
       // rival units on the footprint block placement (own + Gaia units are nudged off)
       if (rivalUnitOnFootprint(state, player, tileX, tileY, def.size)) return false;
+      if (buildingFootprintOverlaps(state, tileX, tileY, def.size)) return false;
       return true;
     },
     isWalkable: (tileX, tileY) => isTileWalkable(state, tileX, tileY),

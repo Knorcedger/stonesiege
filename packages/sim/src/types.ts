@@ -95,6 +95,12 @@ export interface Entity {
   intent?: UnitIntent;
   // buildings
   buildProgress?: number; // 0..1000 (integer); < 1000 = foundation/under construction
+  /**
+   * A newly placed foundation whose footprint still contains friendly/Gaia units.
+   * It is visible and reserves the site, but does not block movement or gain build
+   * progress until those units have physically walked outside the footprint.
+   */
+  foundationPendingClearance?: boolean;
   trainQueue?: TrainQueueItem[];
   research?: ResearchState;
   rally?: { x: Fixed; y: Fixed; targetId?: EntityId };
@@ -168,6 +174,8 @@ export type Command =
   | { kind: 'setRally'; player: PlayerId; buildingId: EntityId; x: Fixed; y: Fixed; targetId?: EntityId }
   | { kind: 'stop'; player: PlayerId; units: EntityId[] }
   | { kind: 'garrison'; player: PlayerId; units: EntityId[]; targetId: EntityId }
+  /** Toggle the TC bell: shelter nearby villagers, or release them back to work. */
+  | { kind: 'townBell'; player: PlayerId; buildingId: EntityId }
   | { kind: 'ungarrison'; player: PlayerId; buildingId: EntityId }
   | { kind: 'convert'; player: PlayerId; units: EntityId[]; targetId: EntityId } // monks
   | { kind: 'heal'; player: PlayerId; units: EntityId[]; targetId: EntityId }

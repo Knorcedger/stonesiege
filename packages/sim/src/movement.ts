@@ -142,12 +142,18 @@ function separationPass(state: SimState): void {
     // unsorted query is safe here: pushX/pushY are commutative integer sums over the
     // neighbor SET, so enumeration order cannot affect the result (perf: see spatial.ts)
     state.unitsGrid.queryCircleUnsorted(e.x, e.y, SEPARATION_DIST, neighbors);
+    const eMoving = state.motion.has(e.id);
     let pushX = 0, pushY = 0;
     for (let i = 0; i < neighbors.length; i++) {
       const oid = neighbors[i];
       if (oid === e.id) continue;
       const o = state.entities.get(oid);
       if (!o) continue;
+      // Friendly traffic is non-blocking while either participant is walking.
+      // This prevents one mover from shoving an entire friendly queue forward and
+      // being pushed back every tick. Once both stop, separation resumes and gently
+      // fans out any overlap left by the pass-through.
+      if (e.player === o.player && (eMoving || state.motion.has(o.id))) continue;
       const dx = e.x - o.x, dy = e.y - o.y;
       const distSq = dx * dx + dy * dy;
       if (distSq >= SEPARATION_DIST * SEPARATION_DIST) continue;

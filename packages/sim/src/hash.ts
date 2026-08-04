@@ -47,6 +47,7 @@ function mixEntity(h: number, e: Entity): number {
   h = mix(h, e.hp);
   h = mix(h, ACTIVITY_INDEX[e.activity] ?? 0);
   if (e.buildProgress !== undefined) h = mix(h, e.buildProgress);
+  if (e.foundationPendingClearance) h = mix(h, 17);
   if (e.amountLeft !== undefined) h = mix(h, e.amountLeft);
   if (e.stump) h = mix(h, 1);
   if (e.packed !== undefined) h = mix(h, e.packed ? 3 : 2);

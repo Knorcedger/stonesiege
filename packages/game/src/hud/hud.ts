@@ -27,12 +27,17 @@ import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
 import { CHIPS_HEIGHT_PX, CHIPS_NARROW_MAX_PX, CHIPS_TOP_NARROW_PX, CHIPS_TOP_PX } from './layout';
 import { buildSettingsControls } from '../settingsUi';
+import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
+import type { UnitDisplayStats } from '../simBridge';
+import { formatMatchTime } from './summary';
 
 export interface HudHost {
   assets: GameAssets;
   humanPlayer: PlayerId;
   getState(): GameState;
   getSelection(): Entity[];
+  /** Fully resolved for the selected unit owner's civ and researched technologies. */
+  getUnitStats(player: PlayerId, defId: string): UnitDisplayStats | null;
   deselect(): void;
   trainUnit(buildingId: EntityId, defId: string): void;
   cancelTrain(buildingId: EntityId, index: number): void;
@@ -40,6 +45,8 @@ export interface HudHost {
   cancelResearch(buildingId: EntityId): void;
   /** Ungarrison every occupant of a building OR a ram (unit host). */
   ungarrisonAll(buildingId: EntityId): void;
+  /** Toggle the selected Town Center's emergency villager shelter. */
+  townBell(buildingId: EntityId): void;
   /** Clear a production building's rally (GDD: "tap the flag control to clear"). */
   clearRally(buildingId: EntityId): void;
   /** Delete an own building (deleteEntity command — refunds queue + unbuilt fraction). */
@@ -101,6 +108,7 @@ const HUD_CSS = `
 .bf-res { display:flex; align-items:center; gap:5px; font-size:16px; }
 .bf-res canvas { width:22px; height:22px; image-rendering:pixelated; }
 .bf-age { margin-left:auto; font-size:16px; color:#E6C04A; letter-spacing:1px; }
+.bf-time { min-width:42px; text-align:right; color:#DABE8D; font-size:18px; }
 .bf-btn { position:relative; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:inherit; font-size:14px; padding:3px 10px; cursor:pointer; }
 .bf-btn:active { transform:translate(1px,1px); }
 .bf-btn:disabled { color:#8a8a8a; border-color:#5a5a5a; cursor:default; }
@@ -116,6 +124,11 @@ const HUD_CSS = `
 .bf-selrow canvas { width:40px; height:40px; image-rendering:pixelated; border:1px solid #8A6414; }
 .bf-selname { font-size:15px; flex:1; }
 .bf-selhp { font-size:14px; color:#DABE8D; }
+.bf-selcarry { min-height:14px; font-size:14px; color:#E6C04A; }
+.bf-selcarry:empty { display:none; }
+.bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:14px/1.05 "VT323",monospace; }
+.bf-selstats:empty { display:none; }
+.bf-selstat strong { color:#E6C04A; font-weight:normal; }
 .bf-x { position:absolute; top:2px; right:2px; width:22px; height:22px; padding:0; line-height:18px; font-size:14px; }
 .bf-card { position:absolute; right:6px; bottom:6px; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-card.show { display:block; }
@@ -141,7 +154,6 @@ const HUD_CSS = `
 .bf-qitem { position:relative; box-sizing:border-box; flex-shrink:0; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px hard floor: cancel-a-unit mis-taps are costly */
 .bf-qitem canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
-.bf-tip { position:absolute; right:6px; bottom:200px; max-width:250px; padding:6px 9px; font-size:14px; color:#1A1208; background:#DABE8D; border:1px solid #B99A6B; border-radius:3px; display:none; pointer-events:none; }
 .bf-note { font-size:13px; color:#DABE8D; margin:5px 2px 0; min-height:0; }
 .bf-note:empty { display:none; }
 .bf-market { display:none; flex-direction:column; gap:6px; margin-top:6px; }
@@ -186,6 +198,7 @@ const HUD_CSS = `
   .bf-res canvas { width:18px; height:18px; }
   .bf-poplabel { display:none; } /* numerals carry the meaning on phones */
   .bf-age { font-size:13px; letter-spacing:0; }
+  .bf-time { min-width:36px; font-size:16px; }
   .bf-chips { top:${CHIPS_TOP_NARROW_PX}px; }
 }
 /* The 168px minimap and the 246px command card cannot share one <=480px row —
@@ -206,6 +219,10 @@ function costText(cost: Partial<Record<ResourceType, number>>): string {
   return parts.join(', ') || 'free';
 }
 
+function formatStat(value: number): string {
+  return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
 export class Hud {
   private root: HTMLElement;
   private host: HudHost;
@@ -213,16 +230,18 @@ export class Hud {
   private resSpans = new Map<ResourceType, HTMLSpanElement>();
   private popSpan!: HTMLSpanElement;
   private ageSpan!: HTMLSpanElement;
+  private timeSpan!: HTMLSpanElement;
   private pauseBtn!: HTMLButtonElement;
   private selPanel!: HTMLDivElement;
   private selIcon!: HTMLDivElement;
   private selName!: HTMLDivElement;
   private selHp!: HTMLDivElement;
+  private selCarry!: HTMLDivElement;
+  private selStats!: HTMLDivElement;
   private card!: HTMLDivElement;
   private cardTitle!: HTMLDivElement;
   private cardGrid!: HTMLDivElement;
   private queueRow!: HTMLDivElement;
-  private tip!: HTMLDivElement;
   private toast!: HTMLDivElement;
   private toastLabel!: HTMLSpanElement;
   private toastUndoBtn!: HTMLButtonElement;
@@ -277,6 +296,8 @@ export class Hud {
   }
 
   destroy(): void {
+    hideGameTooltip();
+    if (this.toastTimer) clearTimeout(this.toastTimer);
     this.el.remove();
   }
 
@@ -294,6 +315,8 @@ export class Hud {
       this.popSpan.textContent = formatRatio(p.pop, p.popCap);
       this.ageSpan.textContent = AGE_LABEL[p.age] ?? p.age;
     }
+    const elapsed = formatMatchTime(state.tick);
+    if (this.timeSpan.textContent !== elapsed) this.timeSpan.textContent = elapsed;
     this.pauseBtn.textContent = this.host.isPaused() ? '▶' : 'II';
     this.pauseOverlay.classList.toggle('show', this.host.isPaused());
     // "Continue watching" spectating: applyCommands drops everything once
@@ -355,6 +378,12 @@ export class Hud {
     this.ageSpan.className = 'bf-age';
     bar.appendChild(this.ageSpan);
 
+    this.timeSpan = document.createElement('span');
+    this.timeSpan.className = 'bf-time bf-num';
+    this.timeSpan.textContent = '0:00';
+    setGameTooltip(this.timeSpan, 'Elapsed game time');
+    bar.appendChild(this.timeSpan);
+
     this.pauseBtn = document.createElement('button');
     this.pauseBtn.className = 'bf-btn';
     this.pauseBtn.textContent = 'II';
@@ -366,7 +395,7 @@ export class Hud {
   private addIdleButton(bar: HTMLElement, cat: IdleCategory, icon: string, title: string): void {
     const btn = document.createElement('button');
     btn.className = 'bf-idle';
-    btn.title = title;
+    setGameTooltip(btn, title);
     btn.appendChild(this.host.assets.getIconCanvas(icon));
     const count = document.createElement('span');
     count.className = 'bf-idlecount';
@@ -400,14 +429,20 @@ export class Hud {
     this.selName.className = 'bf-selname';
     this.selHp = document.createElement('div');
     this.selHp.className = 'bf-selhp bf-num';
+    this.selCarry = document.createElement('div');
+    this.selCarry.className = 'bf-selcarry bf-num';
     col.appendChild(this.selName);
     col.appendChild(this.selHp);
+    col.appendChild(this.selCarry);
     row.appendChild(col);
     this.selPanel.appendChild(row);
+    this.selStats = document.createElement('div');
+    this.selStats.className = 'bf-selstats';
+    this.selPanel.appendChild(this.selStats);
     const x = document.createElement('button');
     x.className = 'bf-btn bf-x';
     x.textContent = '✕';
-    x.title = 'Deselect';
+    setGameTooltip(x, 'Deselect');
     x.addEventListener('click', () => this.host.deselect());
     this.selPanel.appendChild(x);
     this.el.appendChild(this.selPanel);
@@ -438,9 +473,6 @@ export class Hud {
     this.card.appendChild(this.utilRow);
     this.el.appendChild(this.card);
 
-    this.tip = document.createElement('div');
-    this.tip.className = 'bf-tip bf-num'; // cost/time numerals dominate tooltips
-    this.el.appendChild(this.tip);
   }
 
   private buildToast(): void {
@@ -568,9 +600,9 @@ export class Hud {
       chip.btn.classList.toggle('empty', n === 0);
       const text = n > 0 ? String(n) : '';
       if (chip.count.textContent !== text) chip.count.textContent = text;
-      chip.btn.title = n > 0
+      setGameTooltip(chip.btn, n > 0
         ? `Group ${i + 1} (${n}) — tap: select, tap again: center camera, long-press: overwrite`
-        : `Group ${i + 1} — long-press with a selection to save`;
+        : `Group ${i + 1} — long-press with a selection to save`);
     });
   }
 
@@ -610,6 +642,35 @@ export class Hud {
     this.selHp.textContent = first.kind === 'resource'
       ? `${first.amountLeft ?? 0} left`
       : `HP ${formatRatio(Math.max(0, first.hp), first.maxHp)}`;
+    this.selCarry.textContent = first.kind === 'unit' && first.carrying && first.carrying.amount > 0
+      ? `Carrying ${first.carrying.amount} ${first.carrying.type}`
+      : '';
+    if (first.kind === 'unit') {
+      const stats = this.host.getUnitStats(first.player, first.defId);
+      if (stats) {
+        const values: Array<[string, string]> = [
+          ['ATK', formatStat(stats.attack)],
+          ['ARM', `${formatStat(stats.meleeArmor)}/${formatStat(stats.pierceArmor)}`],
+          ['RNG', formatStat(stats.range)],
+          ['SPD', formatStat(stats.speed)],
+          ['LOS', formatStat(stats.los)],
+          ['ROF', `${formatStat(stats.rofSeconds)}s`],
+        ];
+        const key = values.flat().join('|');
+        if (this.selStats.dataset.key !== key) {
+          this.selStats.dataset.key = key;
+          this.selStats.innerHTML = values
+            .map(([label, value]) => `<span class="bf-selstat"><strong>${label}</strong> ${value}</span>`)
+            .join('');
+        }
+      } else {
+        delete this.selStats.dataset.key;
+        this.selStats.replaceChildren();
+      }
+    } else {
+      delete this.selStats.dataset.key;
+      this.selStats.replaceChildren();
+    }
     const iconName = def?.icon ?? `icon/${first.defId}`;
     if (this.selIcon.dataset.icon !== iconName) {
       this.selIcon.dataset.icon = iconName;
@@ -680,6 +741,11 @@ export class Hud {
       push(trainMenuButtons(view, b.defId));
       push(researchMenuButtons(view, b.defId, busy, queued));
       if (b.defId === 'townCenter') {
+        const sheltered = (b.garrison ?? []).filter((id) => state.entities.get(id)?.sheltering).length;
+        const outside = [...state.entities.values()].filter((e) => e.kind === 'unit'
+          && e.player === this.host.humanPlayer && e.hp > 0 && e.garrisonedIn === undefined
+          && !!gameData.units[e.defId]?.gather).length;
+        parts.push(`bell=${sheltered}/${outside}`);
         const up = ageUpButton(view, this.completedBuildingDefIds(state), busy, queued);
         if (up) push([up]);
       }
@@ -757,7 +823,7 @@ export class Hud {
     this.garrisonBox.replaceChildren();
     this.garrisonBox.classList.remove('show');
     this.queueProgressEls = [];
-    this.tip.style.display = 'none';
+    hideGameTooltip();
     if (placementActive || sel.length === 0) {
       this.card.classList.remove('show');
       return;
@@ -828,6 +894,12 @@ export class Hud {
   private rebuildBuildingCard(state: GameState, b: Entity, view: PlayerCardView): boolean {
     const def = gameData.buildings[b.defId];
     const name = def?.name ?? b.defId;
+    if (b.player !== this.host.humanPlayer) {
+      this.cardTitle.textContent = (b.buildProgress ?? 1000) < 1000
+        ? `${name} — under construction`
+        : name;
+      return true;
+    }
     if ((b.buildProgress ?? 1000) < 1000) {
       this.cardTitle.textContent = `${name} — under construction`;
       this.addDeleteButton(b); // a misplaced foundation must be cancellable
@@ -874,6 +946,21 @@ export class Hud {
 
     // ---- age-up on the TC, with requirement feedback ('2 Feudal Age buildings needed')
     if (b.defId === 'townCenter') {
+      const occupants = b.garrison ?? [];
+      const sheltered = occupants.filter((id) => state.entities.get(id)?.sheltering === true).length;
+      const outsideVillagers = [...state.entities.values()].filter((e) => e.kind === 'unit'
+        && e.player === this.host.humanPlayer && e.hp > 0 && e.garrisonedIn === undefined
+        && !!gameData.units[e.defId]?.gather).length;
+      const room = Math.max(0, (def?.garrisonCapacity ?? 0) - occupants.length);
+      const active = sheltered > 0;
+      const enabled = active || (outsideVillagers > 0 && room > 0);
+      const tip = active
+        ? `Return to work\nRelease sheltered villagers and resume their previous jobs`
+        : `Ring Town Bell\nShelter the nearest villagers\nEach villager adds an arrow to the Town Center volley`;
+      const reason = outsideVillagers === 0 ? 'no villagers outside' : 'Town Center is full';
+      this.addButton('icon/cmd/townBell', tip, enabled, active, () => this.host.townBell(b.id), reason);
+      shown = true;
+
       const up = ageUpButton(view, this.completedBuildingDefIds(state), busy, queuedTechs);
       if (up) {
         this.addButton(
@@ -909,7 +996,15 @@ export class Hud {
     // ---- garrisoned-building panel (occupant icons + ungarrison all)
     const gp = garrisonPanel(b, (id) => state.entities.get(id));
     if (gp && gp.count > 0) {
-      this.rebuildGarrisonPanel(b.id, gp.occupants, gp.count, gp.capacity, gp.ungarrisonEnabled, gp.reason);
+      const qualifying = (b.garrison ?? []).filter((id) => {
+        const u = state.entities.get(id);
+        const ud = u ? gameData.units[u.defId] : undefined;
+        return !!ud && (!!ud.gather || ud.classes.includes('archer'));
+      }).length;
+      const volley = def?.arrowsBase !== undefined
+        ? Math.min(def.arrowsMax ?? Infinity, def.arrowsBase + qualifying * (def.arrowsPerGarrison ?? 0))
+        : undefined;
+      this.rebuildGarrisonPanel(b.id, gp.occupants, gp.count, gp.capacity, gp.ungarrisonEnabled, gp.reason, volley);
       shown = true;
     }
 
@@ -919,9 +1014,9 @@ export class Hud {
       const model = queueChipModel(item);
       const chip = document.createElement('div');
       chip.className = 'bf-qitem';
-      chip.title = model.isTech
+      setGameTooltip(chip, model.isTech
         ? `Researching ${model.name} (tap to cancel)`
-        : `${model.name} (tap to cancel)`;
+        : `${model.name} (tap to cancel)`);
       chip.appendChild(this.host.assets.getIconCanvas(model.icon));
       const prog = document.createElement('div');
       prog.className = 'bf-qprog';
@@ -950,14 +1045,16 @@ export class Hud {
       btn.className = 'bf-btn';
       btn.style.cssText = 'margin-top:6px;margin-right:6px;';
       btn.textContent = 'Clear rally';
-      btn.title = 'Remove the rally flag — new units step out beside the building again';
+      setGameTooltip(btn, 'Remove the rally flag — new units step out beside the building again');
       btn.addEventListener('click', () => this.host.clearRally(b.id));
       this.utilRow.appendChild(btn);
       shown = true;
     }
 
     this.addDeleteButton(b);
-    return shown;
+    // Even passive buildings (House, wall segments, etc.) need a visible details
+    // card so their owner can inspect and delete them.
+    return true;
   }
 
   /**
@@ -966,6 +1063,7 @@ export class Hud {
    * takes two taps to confirm (same pattern as Resign).
    */
   private addDeleteButton(b: Entity): void {
+    if (b.player !== this.host.humanPlayer) return;
     const btn = document.createElement('button');
     btn.className = 'bf-btn';
     btn.style.cssText = 'margin-top:6px;color:#DABE8D;';
@@ -1006,15 +1104,17 @@ export class Hud {
       sell.textContent = `Sell ${TRADE_LOT} → +${row.sellGold}g`;
       sell.addEventListener('click', () => {
         if (row.sellEnabled) this.host.marketTrade(row.res, 'gold', TRADE_LOT);
-        else this.showTip(`Sell ${TRADE_LOT} ${row.res}\n(${row.sellReason ?? ''})`);
+        else this.showTip(`Sell ${TRADE_LOT} ${row.res}\n(${row.sellReason ?? ''})`, sell);
       });
+      setGameTooltip(sell, `Sell ${TRADE_LOT} ${row.res}\nReceive ${row.sellGold} gold`);
       const buy = document.createElement('button');
       buy.className = 'bf-mbtn' + (row.buyEnabled ? '' : ' disabled');
       buy.textContent = `Buy ${TRADE_LOT} → −${row.buyGold}g`;
       buy.addEventListener('click', () => {
         if (row.buyEnabled) this.host.marketTrade('gold', row.res, TRADE_LOT);
-        else this.showTip(`Buy ${TRADE_LOT} ${row.res}\n(${row.buyReason ?? ''})`);
+        else this.showTip(`Buy ${TRADE_LOT} ${row.res}\n(${row.buyReason ?? ''})`, buy);
       });
+      setGameTooltip(buy, `Buy ${TRADE_LOT} ${row.res}\nCosts ${row.buyGold} gold`);
       rowEl.appendChild(sell);
       rowEl.appendChild(buy);
       this.marketBox.appendChild(rowEl);
@@ -1029,11 +1129,13 @@ export class Hud {
     capacity: number,
     ungarrisonEnabled: boolean,
     reason?: string,
+    volleyArrows?: number,
   ): void {
     this.garrisonBox.classList.add('show');
     const label = document.createElement('div');
     label.className = 'bf-note bf-num';
-    label.textContent = `Garrisoned ${formatRatio(count, capacity)}`;
+    label.textContent = `Garrisoned ${formatRatio(count, capacity)}`
+      + (volleyArrows !== undefined ? ` · Volley ${volleyArrows} arrow${volleyArrows === 1 ? '' : 's'}` : '');
     const row = document.createElement('div');
     row.className = 'bf-goccrow';
     for (const occ of occupants) {
@@ -1048,8 +1150,9 @@ export class Hud {
     }
     btn.addEventListener('click', () => {
       if (ungarrisonEnabled) this.host.ungarrisonAll(buildingId);
-      else this.showTip(`Ungarrison\n(${reason ?? 'unavailable'})`);
+      else this.showTip(`Ungarrison\n(${reason ?? 'unavailable'})`, btn);
     });
+    setGameTooltip(btn, `Ungarrison all\nSend every occupant back outside`);
     this.garrisonBox.appendChild(label);
     this.garrisonBox.appendChild(row);
     this.garrisonBox.appendChild(btn);
@@ -1074,22 +1177,16 @@ export class Hud {
       btn.appendChild(span);
     }
     const fullTip = enabled ? tooltip : `${tooltip}\n(${disabledReason ?? 'not enough resources'})`;
+    setGameTooltip(btn, fullTip);
     btn.addEventListener('click', () => {
       if (enabled) onClick();
-      else this.showTip(fullTip);
+      else this.showTip(fullTip, btn);
     });
-    btn.addEventListener('pointerenter', () => this.showTip(fullTip));
-    btn.addEventListener('pointerleave', () => (this.tip.style.display = 'none'));
     this.cardGrid.appendChild(btn);
   }
 
-  private showTip(text: string): void {
-    this.tip.textContent = '';
-    text.split('\n').forEach((line, i) => {
-      if (i > 0) this.tip.appendChild(document.createElement('br'));
-      this.tip.appendChild(document.createTextNode(line));
-    });
-    this.tip.style.display = 'block';
+  private showTip(text: string, anchor: HTMLElement = this.card): void {
+    showGameTooltip(text, anchor);
   }
 
   private updatePlacementBar(): void {

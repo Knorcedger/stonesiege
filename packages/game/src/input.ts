@@ -1,15 +1,18 @@
 // Input controller: binds pointer/keyboard/wheel events, runs the gesture
 // reducer (gestures.ts) and maps gestures to game intents per GDD "Mobile UX":
-//  - tap = instant select; second tap in the double-tap window = select all of type on screen
+//  - touch tap = instant select / context command; second tap in the double-tap
+//    window = select all of type on screen
 //  - two-finger drag ALWAYS pans; one-finger drag pans too (touch); pinch = zoom steps
 //  - long-press then drag = band select; long-press released in place with a
 //    selection = alternate command (arms attack-move for the next tap)
 //  - tap with selection = context command with slop + snap priority
 //    (enemy > resource/Gaia > own building > ground) and a ~2 s undo toast
 //  - two-finger tap = deselect (or cancels placement mode)
-//  - building placement: taps/drags move the ghost; confirm/cancel live in the HUD
-// Desktop equivalents: left click select / left drag band, right-click context
-// command, wheel zoom, middle-drag pan, arrow keys pan, Esc cancel, P pause.
+//  - touch building placement: taps/drags move the ghost; confirm/cancel live in the HUD
+// Desktop equivalents: left click selects (empty ground clears), left drag
+// bands, right-click commands, wheel zoom, middle-drag pan, arrow keys pan,
+// Esc cancel, P pause. Desktop placement follows the mouse and commits on the
+// next valid left click. Hovering a selectable entity shows a pointer cursor.
 
 import type { Graphics } from 'pixi.js';
 import {
@@ -30,6 +33,18 @@ import { getSettings } from './settings';
 const PICK_SLOP_PX = 16;
 const PINCH_STEP = 1.3;
 const KEY_PAN_SPEED = 0.65; // screen px per ms (settings cameraSpeed multiplies)
+const EDGE_PAN_PX = 24;
+
+/** Classic RTS edge-scroll direction in Camera.panBy sign convention. */
+export function edgePanVector(
+  x: number, y: number, width: number, height: number,
+): { x: number; y: number } {
+  if (width <= 0 || height <= 0) return { x: 0, y: 0 };
+  return {
+    x: x <= EDGE_PAN_PX ? 1 : x >= width - EDGE_PAN_PX ? -1 : 0,
+    y: y <= EDGE_PAN_PX ? 1 : y >= height - EDGE_PAN_PX ? -1 : 0,
+  };
+}
 
 export interface InputHost {
   camera: Camera;
@@ -43,6 +58,7 @@ export interface InputHost {
   issueWithUndo(cmd: Command, label: string, undo: (() => void) | null): void;
   isPlacing(): boolean;
   setPlacementTile(tileX: number, tileY: number): void;
+  confirmPlacement(): void;
   placementHitTest(worldX: number, worldY: number): boolean;
   cancelPlacement(): void;
   isAttackMoveArmed(): boolean;
@@ -60,6 +76,7 @@ export type TapAction =
   | { type: 'select'; id: EntityId }
   | { type: 'command' }
   | { type: 'inspect'; id: EntityId }
+  | { type: 'deselect' }
   | { type: 'none' };
 
 /** What the current commandable selection contains (drives tap semantics). */
@@ -121,11 +138,28 @@ export function resolveTapAction(picks: Entity[], sel: TapSelection, human: Play
   return { type: 'none' };
 }
 
+/**
+ * Desktop primary-click semantics are deliberately selection-only. Orders live
+ * on right-click, so an existing army selection can never turn a left click on
+ * a building into a repair/rally command or a left click on ground into a move.
+ * `picks` is distance ordered; desktop precision should choose what is actually
+ * under the pointer rather than applying the wider touch snap priorities.
+ */
+export function resolveDesktopPrimaryAction(picks: Entity[], human: PlayerId): TapAction {
+  const nearest = picks[0];
+  if (!nearest) return { type: 'deselect' };
+  if (nearest.player === human && (nearest.kind === 'unit' || nearest.kind === 'building')) {
+    return { type: 'select', id: nearest.id };
+  }
+  return { type: 'inspect', id: nearest.id };
+}
+
 export class InputController {
   private gestures: GestureState = createGestureState();
   private dragMode: DragMode = 'none';
   private bandStartScreen: { x: number; y: number } | null = null;
   private keysDown = new Set<string>();
+  private edgePan = { x: 0, y: 0 };
   private disposers: Array<() => void> = [];
 
   constructor(
@@ -139,6 +173,8 @@ export class InputController {
   destroy(): void {
     for (const d of this.disposers) d();
     this.disposers = [];
+    this.edgePan = { x: 0, y: 0 };
+    this.el.style.cursor = 'default';
   }
 
   /** Per-frame: keyboard panning + time-based gesture transitions. */
@@ -149,6 +185,8 @@ export class InputController {
     if (this.keysDown.has('ArrowRight')) dx -= 1;
     if (this.keysDown.has('ArrowUp')) dy += 1;
     if (this.keysDown.has('ArrowDown')) dy -= 1;
+    dx = Math.max(-1, Math.min(1, dx + this.edgePan.x));
+    dy = Math.max(-1, Math.min(1, dy + this.edgePan.y));
     if (dx !== 0 || dy !== 0) {
       const speed = KEY_PAN_SPEED * getSettings().cameraSpeed;
       this.host.camera.panBy(dx * speed * dtMs, dy * speed * dtMs);
@@ -179,9 +217,41 @@ export class InputController {
       this.feed(toEvt(ev, 'down'));
       ev.preventDefault();
     };
-    const move = (ev: PointerEvent) => this.feed(toEvt(ev, 'move'));
-    const up = (ev: PointerEvent) => this.feed(toEvt(ev, 'up'));
+    const move = (ev: PointerEvent) => {
+      this.feed(toEvt(ev, 'move'));
+      if (ev.pointerType === 'mouse') {
+        const rect = el.getBoundingClientRect();
+        const sx = ev.clientX - rect.left;
+        const sy = ev.clientY - rect.top;
+        if (ev.buttons === 0) this.updateHoverCursor(sx, sy);
+      }
+    };
+    const up = (ev: PointerEvent) => {
+      this.feed(toEvt(ev, 'up'));
+      if (ev.pointerType === 'mouse') {
+        const rect = el.getBoundingClientRect();
+        this.updateHoverCursor(ev.clientX - rect.left, ev.clientY - rect.top);
+      }
+    };
     const cancel = (ev: PointerEvent) => this.feed(toEvt(ev, 'cancel'));
+    const leave = (ev: PointerEvent) => {
+      if (ev.pointerType === 'mouse') {
+        el.style.cursor = 'default';
+      }
+    };
+    // Window-level tracking deliberately survives canvas pointerleave: pushing the
+    // cursor just outside any game edge should keep scrolling in that direction.
+    const trackEdge = (ev: PointerEvent) => {
+      if (ev.pointerType !== 'mouse') return;
+      const rect = el.getBoundingClientRect();
+      this.edgePan = edgePanVector(
+        ev.clientX - rect.left,
+        ev.clientY - rect.top,
+        rect.width,
+        rect.height,
+      );
+    };
+    const blur = () => { this.edgePan = { x: 0, y: 0 }; };
     const ctxmenu = (ev: Event) => ev.preventDefault();
     const wheel = (ev: WheelEvent) => {
       const rect = el.getBoundingClientRect();
@@ -210,19 +280,25 @@ export class InputController {
     el.addEventListener('pointermove', move);
     el.addEventListener('pointerup', up);
     el.addEventListener('pointercancel', cancel);
+    el.addEventListener('pointerleave', leave);
     el.addEventListener('contextmenu', ctxmenu);
     el.addEventListener('wheel', wheel, { passive: false });
     window.addEventListener('keydown', keydown);
     window.addEventListener('keyup', keyup);
+    window.addEventListener('pointermove', trackEdge);
+    window.addEventListener('blur', blur);
     this.disposers.push(() => {
       el.removeEventListener('pointerdown', down);
       el.removeEventListener('pointermove', move);
       el.removeEventListener('pointerup', up);
       el.removeEventListener('pointercancel', cancel);
+      el.removeEventListener('pointerleave', leave);
       el.removeEventListener('contextmenu', ctxmenu);
       el.removeEventListener('wheel', wheel);
       window.removeEventListener('keydown', keydown);
       window.removeEventListener('keyup', keyup);
+      window.removeEventListener('pointermove', trackEdge);
+      window.removeEventListener('blur', blur);
     });
   }
 
@@ -239,10 +315,16 @@ export class InputController {
     switch (g.kind) {
       case 'tap':
         if (g.button === 2) this.contextCommandAt(g.x, g.y);
+        else if (g.ptype === 'mouse') this.handleDesktopPrimaryTap(g.x, g.y);
         else this.handleTap(g.x, g.y);
         break;
       case 'doubleTap':
-        this.handleDoubleTap(g.x, g.y);
+        if (this.host.isPlacing()) {
+          if (g.ptype === 'mouse') this.handleDesktopPrimaryTap(g.x, g.y);
+          else this.handleTap(g.x, g.y);
+          break;
+        }
+        this.handleDoubleTap(g.x, g.y, g.ptype);
         break;
       case 'longPress':
         break; // visual affordance only; band vs alt-menu resolves on drag/release
@@ -344,12 +426,44 @@ export class InputController {
       case 'command':
         this.contextCommand(w.x, w.y, picks, sel);
         break;
+      case 'deselect':
+        this.host.deselect();
+        break;
       case 'none':
         break;
     }
   }
 
-  private handleDoubleTap(sx: number, sy: number): void {
+  /** Mouse-left never issues an order: select the nearest entity or clear. */
+  private handleDesktopPrimaryTap(sx: number, sy: number): void {
+    if (this.host.isPlacing()) {
+      const w = this.host.camera.screenToWorld(sx, sy);
+      this.movePlacementToWorld(w.x, w.y);
+      this.host.confirmPlacement();
+      return;
+    }
+    const w = this.host.camera.screenToWorld(sx, sy);
+    const action = resolveDesktopPrimaryAction(this.pickAt(w.x, w.y), this.host.humanPlayer);
+    if (action.type === 'select' || action.type === 'inspect') {
+      this.host.setSelection([action.id]);
+    } else if (action.type === 'deselect') {
+      this.host.deselect();
+    }
+  }
+
+  private updateHoverCursor(sx: number, sy: number): void {
+    if (this.host.isPlacing()) {
+      const w = this.host.camera.screenToWorld(sx, sy);
+      this.movePlacementToWorld(w.x, w.y);
+      this.el.style.cursor = 'crosshair';
+      return;
+    }
+    const w = this.host.camera.screenToWorld(sx, sy);
+    const action = resolveDesktopPrimaryAction(this.pickAt(w.x, w.y), this.host.humanPlayer);
+    this.el.style.cursor = action.type === 'select' || action.type === 'inspect' ? 'pointer' : 'default';
+  }
+
+  private handleDoubleTap(sx: number, sy: number, ptype: 'mouse' | 'touch' | 'pen'): void {
     const w = this.host.camera.screenToWorld(sx, sy);
     const picks = this.pickAt(w.x, w.y);
     const own = picks.find((p) => p.player === this.host.humanPlayer && p.kind === 'unit');
@@ -366,7 +480,8 @@ export class InputController {
         this.host.showToast(`Selected all ${ownBld.defId} on screen (${Math.max(all.length, 1)})`);
         return;
       }
-      this.handleTap(sx, sy);
+      if (ptype === 'mouse') this.handleDesktopPrimaryTap(sx, sy);
+      else this.handleTap(sx, sy);
       return;
     }
     const view = this.host.camera.getWorldView();

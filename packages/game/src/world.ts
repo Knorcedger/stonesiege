@@ -10,7 +10,7 @@ import {
   FP, GAIA, TICKS_PER_SECOND,
   type Entity, type EntityId, type GameState, type PlayerId, type SimEvent,
 } from '@bf/sim/types';
-import { gameData } from '@bf/data';
+import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets } from './assets';
 import { animForActivity, animFrameIndex, unitRig, type AnimName } from './frames';
 import { hasActiveRally } from './hud/cardModel';
@@ -26,6 +26,9 @@ const HP_YELLOW = 0xd4a82a;
 const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
 const GHOST_TINT = 0x9aa4ad;
+const AGGRO_COLOR = 0xe9d6a5;
+const AGGRO_LINE_ALPHA = 0.24;
+const AGGRO_FILL_ALPHA = 0.025;
 
 interface EntityView {
   root: Container;
@@ -67,6 +70,9 @@ export class WorldLayer {
   readonly container = new Container();
   selection = new Set<EntityId>();
 
+  /** Faint ground circles for the selected military units' true auto-acquire radius. */
+  private aggroLayer = new Container();
+  private aggroViews = new Map<EntityId, { graphic: Graphics; range: number }>();
   private views = new Map<EntityId, EntityView>();
   private ghostViews = new Map<EntityId, Sprite>();
   private ghosts = new Map<EntityId, GhostRecord>();
@@ -84,10 +90,12 @@ export class WorldLayer {
   constructor(
     private assets: GameAssets,
     private humanPlayer: PlayerId,
+    private getUnitLos: (defId: string) => number = (defId) => gameData.units[defId]?.los ?? 0,
   ) {
     this.container.sortableChildren = true;
+    this.aggroLayer.zIndex = -1e9; // below every entity, above terrain
     this.rallyFlags.zIndex = 1e9; // markers float above every sprite
-    this.container.addChild(this.rallyFlags);
+    this.container.addChild(this.aggroLayer, this.rallyFlags);
   }
 
   /** Snapshot positions at each tick boundary (for interpolation). */
@@ -148,8 +156,47 @@ export class WorldLayer {
       }
     }
     this.prunePositions(seen);
+    this.updateAggroRanges(state, alpha);
     this.updateGhosts(state, vis, seen);
     this.updateRallyFlags(state);
+  }
+
+  /** Keep class-based aggro indicators attached to selected, auto-acquiring troops. */
+  private updateAggroRanges(state: GameState, alpha: number): void {
+    const active = new Set<EntityId>();
+    for (const id of this.selection) {
+      const e = state.entities.get(id);
+      if (!e || e.kind !== 'unit' || e.player !== this.humanPlayer || e.hp <= 0
+        || e.garrisonedIn !== undefined) continue;
+      const def = gameData.units[e.defId];
+      if (!def || def.attacks.length === 0 || def.gather || def.heals || def.converts
+        || def.garrisonCapacity !== undefined || def.pack !== undefined) continue;
+
+      active.add(id);
+      const range = unitAggroRange(def, this.getUnitLos(def.id));
+      let view = this.aggroViews.get(id);
+      if (!view || view.range !== range) {
+        view?.graphic.destroy();
+        const graphic = new Graphics();
+        // A tile-space circle projects to an axis-aligned ellipse in isometric world space.
+        const rx = range * HALF_W * Math.SQRT2;
+        const ry = range * HALF_H * Math.SQRT2;
+        graphic.ellipse(0, 0, rx, ry)
+          .fill({ color: AGGRO_COLOR, alpha: AGGRO_FILL_ALPHA })
+          .stroke({ width: 1, color: AGGRO_COLOR, alpha: AGGRO_LINE_ALPHA });
+        this.aggroLayer.addChild(graphic);
+        view = { graphic, range };
+        this.aggroViews.set(id, view);
+      }
+      const pos = this.entityWorldPos(e, alpha);
+      view.graphic.position.set(pos.x, pos.y);
+    }
+
+    for (const [id, view] of this.aggroViews) {
+      if (active.has(id)) continue;
+      view.graphic.destroy();
+      this.aggroViews.delete(id);
+    }
   }
 
   /**
@@ -565,7 +612,8 @@ export function buildingHpBarY(spriteTopPx: number): number {
   return Math.round(spriteTopPx) - 10;
 }
 
-function resourceFrameName(e: Entity): string {
+export function resourceFrameName(e: Entity): string {
+  if (e.stump) return 'obj/stump';
   const h = (Math.imul(e.id, 2654435761) >>> 0);
   switch (e.defId) {
     case 'tree': return `obj/tree/${h % 3}`;

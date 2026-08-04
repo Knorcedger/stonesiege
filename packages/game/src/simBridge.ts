@@ -5,13 +5,48 @@
 // INTEGRATOR: flip USE_MOCK to false to run the real @bf/sim engine (already
 // imported below). Nothing else in @bf/game needs to change.
 
-import type { Game, GameConfig, GameSnapshot, PlayerSetup } from '@bf/sim/types';
-import { createGame as createRealGame, createGameFromSnapshot } from '@bf/sim';
+import { TICKS_PER_SECOND, type Game, type GameConfig, type GameSnapshot, type PlayerSetup } from '@bf/sim/types';
+import { createGame as createRealGame, createGameFromSnapshot, resolveUnitStats } from '@bf/sim';
+import { gameData } from '@bf/data';
 import type { BotDifficulty } from '@bf/ai';
 import { campaignGameData, loadScenario, scenariosById, type ScenarioMeta } from '@bf/scenarios';
 import { createMockGame } from './dev/mockSim';
 
 export const USE_MOCK = false;
+
+/** Small, renderer-safe view of the player's fully researched unit stats. */
+export interface UnitDisplayStats {
+  attack: number;
+  meleeArmor: number;
+  pierceArmor: number;
+  range: number;
+  speed: number;
+  los: number;
+  rofSeconds: number;
+}
+
+/** Resolve live civ/technology modifiers without exposing SimState to the HUD. */
+export function unitDisplayStats(game: Game, player: number, defId: string): UnitDisplayStats | null {
+  const def = gameData.units[defId];
+  if (!def) return null;
+  const resolved = USE_MOCK ? {
+    attacks: def.attacks,
+    armor: def.armor,
+    range: def.range,
+    speed: def.speed,
+    los: def.los,
+    rofTicks: Math.round(def.rof * TICKS_PER_SECOND),
+  } : resolveUnitStats(game.state as never, player, defId);
+  return {
+    attack: resolved.attacks.find((v) => v.cls === 'melee' || v.cls === 'pierce')?.amount ?? 0,
+    meleeArmor: resolved.armor.find((v) => v.cls === 'melee')?.amount ?? 0,
+    pierceArmor: resolved.armor.find((v) => v.cls === 'pierce')?.amount ?? 0,
+    range: resolved.range,
+    speed: resolved.speed,
+    los: resolved.los,
+    rofSeconds: resolved.rofTicks / TICKS_PER_SECOND,
+  };
+}
 
 export function createGame(config: GameConfig): Game {
   if (USE_MOCK) {

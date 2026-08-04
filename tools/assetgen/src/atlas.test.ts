@@ -160,7 +160,8 @@ describe('icons atlas', () => {
     for (const res of ['food', 'wood', 'gold', 'stone']) wanted.push(`icon/res/${res}`, `icon/res/${res}/gray`);
     for (const verb of CMD_VERBS) wanted.push(`icon/cmd/${verb}`, `icon/cmd/${verb}/gray`);
     expect(CMD_VERBS).toContain('attackMove'); // contract's verb list is baked into CMD_VERBS
-    expect(CMD_VERBS.length).toBe(11);
+    expect(CMD_VERBS).toContain('townBell');
+    expect(CMD_VERBS.length).toBe(12);
     expectFrames(icons, wanted);
   });
 

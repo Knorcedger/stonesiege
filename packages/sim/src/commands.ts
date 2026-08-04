@@ -16,7 +16,7 @@ import { handleGather } from './gather';
 import { handleRepair } from './repair';
 import { handleQueueReseed, handleReseedFarm } from './farms';
 import { handleAttack, handlePackCommand } from './combat';
-import { handleGarrison, handleUngarrison } from './garrison';
+import { handleGarrison, handleTownBell, handleUngarrison } from './garrison';
 import { handleConvert, handleHeal } from './monks';
 import { handleCancelResearch, handleResearch, isUnitEnabled, isUpgradedAway } from './research';
 import { handleMarketTrade } from './market';
@@ -48,7 +48,7 @@ const REQUIRED: Record<Command['kind'], readonly string[]> = {
   build: ['units', 'defId', 'tileX', 'tileY'], stop: ['units'], pack: ['units'], unpack: ['units'],
   train: ['buildingId', 'defId'], cancelTrain: ['buildingId', 'index'],
   research: ['buildingId', 'techId'], cancelResearch: ['buildingId'],
-  setRally: ['buildingId', 'x', 'y'], ungarrison: ['buildingId'],
+  setRally: ['buildingId', 'x', 'y'], townBell: ['buildingId'], ungarrison: ['buildingId'],
   deleteEntity: ['entityId'], reseedFarm: ['farmId'], queueReseed: [],
   marketTrade: ['sell', 'buy', 'amount'], resign: [],
 };
@@ -313,6 +313,7 @@ const handlers: { [K in Command['kind']]: Handler<K> } = {
   setRally: handleSetRally,
   stop: handleStop,
   garrison: (state, cmd) => handleGarrison(state, cmd),
+  townBell: (state, cmd) => handleTownBell(state, cmd),
   ungarrison: (state, cmd) => handleUngarrison(state, cmd),
   convert: (state, cmd) => handleConvert(state, cmd),
   heal: (state, cmd) => handleHeal(state, cmd),

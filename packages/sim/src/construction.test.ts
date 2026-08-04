@@ -4,7 +4,8 @@
 import { describe, expect, it } from 'vitest';
 import { fp } from './types';
 import type { Command, Game, SimEvent } from './types';
-import { createGame } from './game';
+import { createGame, createGameFromSnapshot } from './game';
+import type { SimState } from './internal';
 import { entitiesOf, grassMap, player, scenarioConfig } from './testutil';
 
 const HUMAN = 1;
@@ -112,14 +113,78 @@ describe('construction', () => {
     expect(builder.activity).not.toBe('building');
   });
 
-  it('a bystander standing on the footprint is nudged off before the foundation lands', () => {
+  it('a bystander walks off the footprint while the builder waits at 0% (never teleports)', () => {
     const game = setup([{ x: 10, y: 10 }, { x: 12, y: 10 }]); // v1 stands ON the site
     const v0 = game.state.refs.get('v0')!;
+    const bystanderId = game.state.refs.get('v1')!;
+    const before = game.state.entities.get(bystanderId)!;
+    const beforeX = before.x, beforeY = before.y;
     run(game, 1, [{ kind: 'build', player: HUMAN, units: [v0], defId: 'house', tileX: 12, tileY: 10 }]);
-    const bystander = game.state.entities.get(game.state.refs.get('v1')!)!;
-    const inside =
-      bystander.tileX >= 12 && bystander.tileX <= 13 && bystander.tileY >= 10 && bystander.tileY <= 11;
-    expect(inside).toBe(false);
+    const house = entitiesOf(game.state.entities, HUMAN, 'house')[0];
+    const bystander = game.state.entities.get(bystanderId)!;
+    const firstDx = bystander.x - beforeX, firstDy = bystander.y - beforeY;
+    expect(firstDx * firstDx + firstDy * firstDy).toBeLessThanOrEqual(64 * 64);
+    expect(bystander.tileX).toBe(12); // still physically walking out, not snapped to the ring
+    expect(house.foundationPendingClearance).toBe(true);
+    expect(house.buildProgress).toBe(0); // builder waits
+    expect(game.isWalkable(12, 10)).toBe(true); // soft foundation lets the occupant escape
+
+    const inside = (): boolean => bystander.tileX >= 12 && bystander.tileX <= 13
+      && bystander.tileY >= 10 && bystander.tileY <= 11;
+    for (let t = 0; t < 120 && inside(); t++) {
+      const x = bystander.x, y = bystander.y;
+      game.advance([]);
+      const dx = bystander.x - x, dy = bystander.y - y;
+      expect(dx * dx + dy * dy).toBeLessThanOrEqual(64 * 64);
+      if (inside()) expect(house.buildProgress).toBe(0);
+    }
+    expect(inside()).toBe(false);
+    expect(house.foundationPendingClearance).toBeUndefined();
+    expect(game.isWalkable(12, 10)).toBe(false); // now the active foundation is solid
+    run(game, 3);
+    expect(house.buildProgress).toBeGreaterThan(0);
+  });
+
+  it('site clearance overrides a bystander task and spreads occupants across exit tiles', () => {
+    const game = createGame(scenarioConfig(8, grassMap(40, 40), [
+      { defId: 'villager', player: HUMAN, tileX: 10, tileY: 10, ref: 'builder' },
+      { defId: 'villager', player: HUMAN, tileX: 12, tileY: 10, ref: 'worker' },
+      { defId: 'villager', player: HUMAN, tileX: 13, tileY: 11, ref: 'idle' },
+      { defId: 'berryBush', player: 0, tileX: 18, tileY: 10, ref: 'bush' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const builder = game.state.refs.get('builder')!;
+    const worker = game.state.refs.get('worker')!;
+    const idle = game.state.refs.get('idle')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units: [worker], targetId: game.state.refs.get('bush')! }]);
+    expect(game.state.entities.get(worker)!.intent?.kind).toBe('gather');
+
+    game.advance([{ kind: 'build', player: HUMAN, units: [builder], defId: 'house', tileX: 12, tileY: 10 }]);
+
+    expect(game.state.entities.get(worker)!.intent).toBeUndefined();
+    expect(state.gather.has(worker)).toBe(false);
+    const workerMotion = state.motion.get(worker)!;
+    const idleMotion = state.motion.get(idle)!;
+    expect([workerMotion.targetX, workerMotion.targetY]).not.toEqual([idleMotion.targetX, idleMotion.targetY]);
+    expect(entitiesOf(game.state.entities, HUMAN, 'house')[0].foundationPendingClearance).toBe(true);
+  });
+
+  it('a clearance-pending foundation resumes identically after serialization', () => {
+    const game = setup([{ x: 10, y: 10 }, { x: 12, y: 10 }]);
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [game.state.refs.get('v0')!],
+      defId: 'house', tileX: 12, tileY: 10,
+    }]);
+    const originalHouse = entitiesOf(game.state.entities, HUMAN, 'house')[0];
+    expect(originalHouse.foundationPendingClearance).toBe(true);
+    const resumed = createGameFromSnapshot(game.serialize!());
+    expect(resumed.isWalkable(12, 10)).toBe(true);
+    expect(entitiesOf(resumed.state.entities, HUMAN, 'house')[0].foundationPendingClearance).toBe(true);
+    for (let t = 0; t < 80; t++) {
+      game.advance([]);
+      resumed.advance([]);
+      expect(resumed.hash()).toBe(game.hash());
+    }
   });
 
   it('a mid-map move command interrupts building (intent cleared by move)', () => {
@@ -151,7 +216,7 @@ describe('construction', () => {
     expect(enemy.tileY).toBe(11);
   });
 
-  it('gaia animals do not block placement and are nudged off like own units', () => {
+  it('gaia animals do not block placement and walk off like own units', () => {
     const game = createGame(scenarioConfig(9, grassMap(40, 40), [
       { defId: 'villager', player: 1, tileX: 10, tileY: 10, ref: 'v0' },
       { defId: 'sheep', player: 0, tileX: 12, tileY: 10, ref: 'sheep' },
@@ -159,10 +224,16 @@ describe('construction', () => {
     const vid = game.state.refs.get('v0')!;
 
     expect(game.canPlace(HUMAN, 'house', 12, 10)).toBe(true);
+    const sheepId = game.state.refs.get('sheep')!;
+    const sheep = game.state.entities.get(sheepId)!;
+    const beforeX = sheep.x, beforeY = sheep.y;
     run(game, 1, [{ kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 12, tileY: 10 }]);
 
     expect(entitiesOf(game.state.entities, HUMAN, 'house')).toHaveLength(1);
-    const sheep = game.state.entities.get(game.state.refs.get('sheep')!)!;
+    const dx = sheep.x - beforeX, dy = sheep.y - beforeY;
+    expect(dx * dx + dy * dy).toBeLessThanOrEqual(64 * 64);
+    expect(sheep.tileX).toBe(12); // no teleport on the command tick
+    run(game, 120);
     const inside = sheep.tileX >= 12 && sheep.tileX <= 13 && sheep.tileY >= 10 && sheep.tileY <= 11;
     expect(inside).toBe(false);
   });
@@ -200,5 +271,24 @@ describe('town center construction gate (GDD: extra TCs unlock in Castle Age)', 
     expect(tc.buildProgress).toBeLessThan(1000);
     expect(game.state.players[HUMAN].stockpile.wood).toBe(RICH.wood - 275);
     expect(game.state.players[HUMAN].stockpile.stone).toBe(RICH.stone - 100);
+  });
+
+  it('detects a unit in a 4x4 footprint corner before making the foundation solid', () => {
+    const game = createGame(scenarioConfig(12, grassMap(40, 40), [
+      { defId: 'villager', player: HUMAN, tileX: 8, tileY: 10, ref: 'builder' },
+      { defId: 'villager', player: HUMAN, tileX: 13, tileY: 13, ref: 'corner' },
+    ], [player({ startingResources: RICH, startingAge: 'castle' })]));
+    const corner = game.state.entities.get(game.state.refs.get('corner')!)!;
+
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [game.state.refs.get('builder')!],
+      defId: 'townCenter', tileX: 10, tileY: 10,
+    }]);
+
+    const tc = entitiesOf(game.state.entities, HUMAN, 'townCenter')[0];
+    expect(tc.foundationPendingClearance).toBe(true);
+    expect(tc.buildProgress).toBe(0);
+    expect(game.isWalkable(13, 13)).toBe(true);
+    expect(corner.tileX).toBe(13); // still walking rather than displaced
   });
 });

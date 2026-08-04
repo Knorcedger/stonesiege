@@ -38,7 +38,7 @@ The asset generator (`tools/assetgen`) emits Pixi spritesheet atlases into
   Ownable animals (captured sheep) carry the player-color mask and emit
   `obj/<defId>@p<idx>/...` variants exactly like units.
 - Icons (HUD command card, 40×40): `icon/<defId>`, `icon/tech/<techId>`, `icon/res/<resource>`,
-  `icon/cmd/<verb>` (command verbs: `attackMove`, `stop`, `garrison`, `ungarrison`, `delete`,
+  `icon/cmd/<verb>` (command verbs: `attackMove`, `stop`, `garrison`, `ungarrison`, `townBell`, `delete`,
   `reseedFarm`, `pack`, `unpack`, `heal`, `convert`, `rally`). Every icon also gets a
   grayscale companion `icon/<...>/gray` (disabled-button state; luma-mapped, no mask colors).
 - UI chrome under `ui/*` (panel slices, buttons, health bar, selection ring sized per footprint).

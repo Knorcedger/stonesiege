@@ -30,7 +30,10 @@ see Out of scope.)
   around a Mill/TC because of drop-off walk distance. Farms hold a finite amount of food and
   are re-seedable at full wood cost; the Mill provides a **reseed queue / auto-reseed toggle**
   that deducts wood as each farm expires, so late-game players never babysit 20 farms by hand).
-- Trees are map objects; chopping a tree eventually depletes it and clears the tile.
+  A completed farm remains reserved as a building plot but is walkable: villagers and armies
+  cross its rows instead of pathing around the whole 3×3 field.
+- Trees are map objects; chopping a tree replaces its canopy with a small non-blocking stump
+  and clears the tile.
 - Gold/stone mines are finite deposits. Depletion drives map control and aggression.
 - Villagers carry a small amount (≈10; hunters carry more) and walk to drop-off: **placement
   of camps matters**.
@@ -102,13 +105,19 @@ against Paladins), 2-tier scout line, 2-tier skirmisher line matching AoE2's two
   heal (in buildings — not inside rams). Capacities are per building/ram (numbers in
   `packages/data`); **only infantry may enter rams**. If a building is destroyed, everything
   garrisoned inside **dies with it** (evacuating a falling TC is real tension); if a ram is
-  destroyed, its garrisoned infantry are **ejected alive**.
+  destroyed, its garrisoned infantry are **ejected alive**. The Town Center's bell shelters the
+  nearest villagers up to capacity; every sheltered villager adds one volley arrow, and ringing
+  again releases them and resumes their interrupted gather/build/repair work.
 - Conversion: monks convert single enemy units at range — a per-interval chance between a
   minimum and maximum time. Damage does not interrupt it; killing the monk or breaking
   range/line of sight does. Success drains the monk's faith, which recharges slowly.
 - No formations UI in v1; group moves keep loose spacing. Stances: none in v1 (attack-move
   exists). In place of stances, default combat behavior is fixed **per category**:
-  - Standard military units auto-engage hostiles within LOS.
+  - Standard military units auto-engage hostiles within their visible guard radius. Selected
+    units show that radius as a faint ground circle: infantry guard 4 tiles, cavalry 6, and
+    other military classes use their LOS. Plain move orders still take priority.
+  - Same-player moving units do not shove one another into slow feedback chains. They may pass
+    through a friendly queue while idle units still spread apart locally after movement ends.
   - **Villagers never auto-engage.** Attacked villagers flee toward the nearest TC/tower and
     garrison if there's room (otherwise they keep their task); they fight only on an explicit
     command.
@@ -147,7 +156,8 @@ reference, then balanced by playtesting loops.
 - **Camera**: **two-finger drag always pans**, regardless of what is under the fingers — in a
   late-game 100-pop battle the viewport may contain zero empty terrain, and panning must never
   depend on finding some. One-finger drag on empty terrain also pans. Pinch to zoom (3 fixed
-  zoom steps, crisp pixel scaling).
+  zoom steps, crisp pixel scaling). On desktop, moving the pointer to any viewport edge scrolls
+  continuously in that direction.
 - **Selection**: tap a unit/building = select, applied **instantly on the first tap** (no
   double-tap wait penalizing the most common action); a second tap on the same unit within the
   double-tap window *expands* the selection to all of that type on screen. Band-select =
@@ -160,18 +170,26 @@ reference, then balanced by playtesting loops.
   inference uses a tap-slop radius with snap priority **enemy unit > resource/Gaia > own
   building > ground**, so fat fingers resolve toward the likeliest target. Every issued
   command shows a brief **undo toast** (~2 s) that reverts the order — the mis-tap safety net.
+  A move order also shows a short descending arrow at its exact ground destination.
 - Long-press (held in place, with a selection) = attack-move / alternate command menu;
   long-press-then-drag on ground = band-select (above).
 - **Rally points**: with a production building selected, tapping ground/resource/enemy sets
   its rally flag (see Buildings for behavior).
-- HUD: top resource + pop bar including an **idle-villager button** (badge shows the idle
+- HUD: top resource + pop bar with a top-right **elapsed match clock** (simulation time, so it
+  freezes while paused), plus an **idle-villager button** (badge shows the idle
   count; tapping cycles through idle villagers, centering the camera with the command card
   ready — the touch answer to AoE2's `.` hotkey) and an **idle-military** equivalent;
   bottom-left minimap (tap to jump; shows alerts and idle-military markers); bottom command
-  card (train/build/research grid with progress + queue).
-- **Building placement**: never single-tap-to-place. Placement mode spawns a draggable ghost
-  with green/red footprint preview; explicit **confirm/cancel buttons** commit or abort — a
-  mis-dropped Castle is far too expensive for one-tap placement.
+  card (train/build/research grid with progress + queue). Selecting any owned building,
+  including passive Houses and wall pieces, shows its details and delete control. A selected
+  villager shows the type and amount of resources currently carried. Desktop right-click on the
+  minimap sends selected units to that map position and uses the same destination arrow.
+- **Building placement**: placement mode immediately spawns a draggable ghost with green/red
+  footprint preview. Touch keeps explicit **confirm/cancel buttons** — a mis-dropped Castle is
+  far too expensive for one-tap placement — while desktop follows the pointer and commits on the
+  next valid left click. Committing over friendly or Gaia units never teleports them: the
+  foundation stays non-solid and at 0% while its occupants walk outside the footprint, then
+  becomes solid and its builders begin work.
 - **Control groups** via saved-selection chips (mobile answer to ctrl+1): with units selected,
   **long-press an empty chip to save** the group; long-press an occupied chip to overwrite it;
   tap a chip to reselect (tap again to center the camera on the group).

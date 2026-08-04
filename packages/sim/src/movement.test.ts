@@ -5,6 +5,33 @@ import type { Entity, ScenarioStart } from './types';
 import { entitiesOf, grassMap, player, scenarioConfig } from './testutil';
 
 describe('movement', () => {
+  it('a walking unit passes through a friendly crowd without pushing the whole line', () => {
+    const entities: ScenarioStart['entities'] = [
+      { defId: 'villager', player: 1, tileX: 4, tileY: 10, ref: 'walker' },
+    ];
+    for (let x = 7; x <= 15; x++) {
+      entities.push({ defId: 'villager', player: 1, tileX: x, tileY: 10, ref: `idle${x}` });
+    }
+    const game = createGame(scenarioConfig(9, grassMap(30, 24), entities, [player()]));
+    const walker = game.state.entities.get(game.state.refs.get('walker')!)!;
+    const idleBefore = [...game.state.entities.values()]
+      .filter((e) => e.kind === 'unit' && e.id !== walker.id)
+      .map((e) => ({ id: e.id, x: e.x, y: e.y }));
+
+    game.advance([{ kind: 'move', player: 1, units: [walker.id], x: fp(20) + FP / 2, y: fp(10) + FP / 2 }]);
+    let arrivedAt = -1;
+    for (let t = 0; t < 520; t++) {
+      game.advance([]);
+      if (walker.tileX >= 19) { arrivedAt = t; break; }
+    }
+    expect(arrivedAt, 'friendly traffic slowed the walker indefinitely').toBeGreaterThan(0);
+    expect(arrivedAt).toBeLessThan(500);
+    for (const before of idleBefore) {
+      const idle = game.state.entities.get(before.id)!;
+      expect({ x: idle.x, y: idle.y }, `idle friendly ${idle.id} was pushed`).toEqual({ x: before.x, y: before.y });
+    }
+  });
+
   it('a unit crosses the map around a forest wall, never entering blocked tiles', () => {
     const map = grassMap(40, 40);
     const entities: ScenarioStart['entities'] = [];
