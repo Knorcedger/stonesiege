@@ -133,7 +133,7 @@ describe('auto-engage defaults (GDD per-category behavior)', () => {
     expect(cavalryGame.state.entities.get(cavalryEnemy)!.hp).toBeLessThan(25);
   });
 
-  it('idle militia chases an enemy, leashes at ~12 tiles, and returns to its anchor', () => {
+  it('idle militia chases an enemy, leashes at ~12 tiles, and holds the battle endpoint', () => {
     const game = createGame(scenarioConfig(104, grassMap(40, 30), [
       { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'm' },
       { defId: 'scout', player: P2, tileX: 13, tileY: 10, ref: 's' },
@@ -149,7 +149,9 @@ describe('auto-engage defaults (GDD per-category behavior)', () => {
     expect(maxX).toBeGreaterThan(12); // it really chased
     expect(maxX).toBeLessThanOrEqual(23); // ...but the leash capped the pursuit
     const militia = game.state.entities.get(m)!;
-    expect(Math.abs(militia.tileX - 10)).toBeLessThanOrEqual(1); // walked home
+    expect(militia.tileX).toBeGreaterThan(12); // stays where the chase ended
+    expect(Math.abs(militia.tileX - maxX)).toBeLessThanOrEqual(1);
+    expect(militia.activity).toBe('idle');
     expect(militia.hp).toBe(40); // scout outran it — no blows traded
   });
 
@@ -240,6 +242,73 @@ describe('auto-engage defaults (GDD per-category behavior)', () => {
     run(game, 900, evs);
     expect(evs.some((e) => e.ev.kind === 'entityDied' && e.ev.id === bait)).toBe(true);
     expect(game.state.entities.get(k)!.tileX).toBeGreaterThanOrEqual(28); // resumed
+  });
+
+  it('attack-move clears an enemy building when no hostile unit is nearby', () => {
+    const game = createGame(scenarioConfig(128, grassMap(35, 25), [
+      { defId: 'manAtArms', player: P1, tileX: 5, tileY: 10, ref: 'soldier' },
+      { defId: 'house', player: P2, tileX: 14, tileY: 9, ref: 'house', hp: 120 },
+    ], [player(), player({ civ: 'english' })]));
+    const soldier = game.state.refs.get('soldier')!;
+    const house = game.state.refs.get('house')!;
+    game.advance([{ kind: 'attackMove', player: P1, units: [soldier], x: fp(15), y: fp(10) }]);
+    run(game, 840);
+    expect(game.state.entities.get(house)).toBeUndefined();
+  });
+});
+
+describe('explicit base assaults', () => {
+  it('can damage and destroy an enemy building while it is still half-built', () => {
+    const game = createGame(scenarioConfig(129, grassMap(30, 25), [
+      { defId: 'manAtArms', player: P1, tileX: 8, tileY: 10, ref: 'soldier' },
+      { defId: 'house', player: P2, tileX: 12, tileY: 9, ref: 'foundation' },
+    ], [player(), player({ civ: 'english' })]));
+    const soldier = game.state.refs.get('soldier')!;
+    const foundation = game.state.refs.get('foundation')!;
+    const building = game.state.entities.get(foundation)!;
+    building.buildProgress = 500;
+    building.hp = 45;
+    game.advance([{ kind: 'attack', player: P1, units: [soldier], targetId: foundation }]);
+    run(game, 500);
+    expect(game.state.entities.get(foundation)).toBeUndefined();
+  });
+
+  it('continues into a nearby enemy building after destroying the ordered target', () => {
+    const game = createGame(scenarioConfig(127, grassMap(40, 30), [
+      { defId: 'batteringRam', player: P1, tileX: 8, tileY: 10, ref: 'ram' },
+      { defId: 'house', player: P2, tileX: 12, tileY: 10, ref: 'first', hp: 100 },
+      { defId: 'house', player: P2, tileX: 16, tileY: 10, ref: 'second' },
+      { defId: 'house', player: P2, tileX: 34, tileY: 24, ref: 'far' },
+    ], [player(), player({ civ: 'english' })]));
+    const ram = game.state.refs.get('ram')!;
+    const first = game.state.refs.get('first')!;
+    const second = game.state.refs.get('second')!;
+    const far = game.state.refs.get('far')!;
+    game.advance([{ kind: 'attack', player: P1, units: [ram], targetId: first }]);
+    run(game, 900);
+
+    expect(game.state.entities.get(first)).toBeUndefined();
+    expect(game.state.entities.get(second)).toBeUndefined();
+    expect(game.state.entities.get(far)?.hp).toBe(game.state.entities.get(far)?.maxHp);
+  });
+
+  it('redirects overflow melee troops to nearby buildings instead of routing around a packed Town Center', () => {
+    const soldiers = Array.from({ length: 26 }, (_, i) => ({
+      defId: 'militia', player: P1, tileX: 3 + (i % 7), tileY: 3 + Math.floor(i / 7), ref: `m${i}`,
+    }));
+    const game = createGame(scenarioConfig(130, grassMap(45, 35), [
+      ...soldiers,
+      { defId: 'townCenter', player: P2, tileX: 20, tileY: 14, ref: 'tc' },
+      { defId: 'house', player: P2, tileX: 27, tileY: 15, ref: 'house' },
+    ], [player(), player({ civ: 'english' })]));
+    const ids = soldiers.map((_, i) => game.state.refs.get(`m${i}`)!);
+    const tc = game.state.refs.get('tc')!;
+    const house = game.state.refs.get('house')!;
+    game.advance([{ kind: 'attack', player: P1, units: ids, targetId: tc }]);
+
+    const targets = [...(game.state as SimState).combat.values()].map((c) => c.targetId);
+    expect(targets).toContain(tc);
+    expect(targets).toContain(house);
   });
 });
 

@@ -16,7 +16,7 @@ import { FP, type Entity, type EntityId } from '@bf/sim/types';
 import {
   ageUpButton, ageUpRequirement, buildMenuButtons, canAffordCost, civUnitCost,
   farmReseedButton, garrisonPanel, hasActiveRally, iconVariant, millAutoReseedButton,
-  queueChipModel, researchMenuButtons, trainMenuButtons, unitVerbButtons,
+  queueChipModel, queueStacks, researchMenuButtons, trainMenuButtons, unitVerbButtons,
   type PlayerCardView,
 } from './cardModel';
 
@@ -344,6 +344,21 @@ describe('queueChipModel (shared production queue chips)', () => {
       expect(chip.icon).toBe(unit.icon);
       expect(chip.name).toBe(unit.name);
     }
+  });
+});
+
+describe('queueStacks', () => {
+  it('collapses consecutive copies while preserving interleaved queue order', () => {
+    const item = (defId: string) => ({
+      defId, ticksLeft: 10, totalTicks: 10,
+      paid: { food: 0, wood: 0, gold: 0, stone: 0 }, started: false,
+    });
+    const stacks = queueStacks([
+      item('militia'), item('militia'), item('spearman'), item('militia'),
+    ]);
+    expect(stacks.map((s) => [s.item.defId, s.count, s.startIndex, s.endIndex])).toEqual([
+      ['militia', 2, 0, 1], ['spearman', 1, 2, 2], ['militia', 1, 3, 3],
+    ]);
   });
 });
 

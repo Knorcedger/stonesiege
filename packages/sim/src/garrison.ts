@@ -15,6 +15,7 @@ import { ejectGarrison } from './damage';
 import { orderMove } from './path';
 import { ACC_PER_UNIT, handleGather, RES_SCALE } from './gather';
 import { handleRepair } from './repair';
+import { cancelQueuedBuilds } from './construction';
 
 /** Give up entering after this many failed approaches. */
 const GARRISON_RETRIES = 4;
@@ -78,7 +79,10 @@ export function handleGarrison(state: SimState, cmd: GarrisonCmd): void {
     state.garrisoning.set(id, { targetId: host.id, retries: 0 });
     movers.push(id);
   }
-  if (movers.length > 0) orderMove(state, movers, host.x, host.y);
+  if (movers.length > 0) {
+    cancelQueuedBuilds(state, movers);
+    orderMove(state, movers, host.x, host.y);
+  }
 }
 
 /**
@@ -180,9 +184,9 @@ function restoreWorkerIntent(
   saved: Entity['intent'] | undefined,
 ): void {
   if (saved?.kind === 'gather') {
-    handleGather(state, { kind: 'gather', player, units: [id], targetId: saved.targetId });
+    handleGather(state, { kind: 'gather', player, units: [id], targetId: saved.targetId }, false);
   } else if (saved?.kind === 'build' || saved?.kind === 'repair') {
-    handleRepair(state, { kind: 'repair', player, units: [id], targetId: saved.targetId });
+    handleRepair(state, { kind: 'repair', player, units: [id], targetId: saved.targetId }, false);
   }
 }
 

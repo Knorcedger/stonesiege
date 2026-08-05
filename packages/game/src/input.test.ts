@@ -9,9 +9,11 @@ import { describe, expect, it } from 'vitest';
 import { GAIA, type Entity, type EntityId, type PlayerId } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import {
-  edgePanVector, isVillagerGatherTarget, resolveDesktopPrimaryAction, resolveTapAction,
+  edgePanVector, enemyContextTarget, isVillagerGatherTarget, isVillagerGatherTargetAt, keyboardPanVector,
+  resolveDesktopPrimaryAction, resolveTapAction,
   type TapSelection,
 } from './input';
+import { tileToWorld } from './camera';
 
 const HUMAN = 1 as PlayerId;
 const ENEMY = 2 as PlayerId;
@@ -155,6 +157,40 @@ describe('villager gather targets', () => {
       defId: 'deer', player: GAIA, hp: 0, amountLeft: 0,
     }), HUMAN)).toBe(false);
   });
+
+  it('does not let farm pick slop steal a move click just beyond the field', () => {
+    const farm = ent({
+      kind: 'building', defId: 'farm', player: HUMAN,
+      tileX: 10, tileY: 9, hp: 480, maxHp: 480, buildProgress: 1000, amountLeft: 175,
+    });
+    const inside = tileToWorld(11.5, 10.5);
+    const beyond = tileToWorld(13.1, 10.5);
+    expect(isVillagerGatherTargetAt(farm, HUMAN, inside.x, inside.y)).toBe(true);
+    expect(isVillagerGatherTargetAt(farm, HUMAN, beyond.x, beyond.y)).toBe(false);
+  });
+});
+
+describe('enemy foundation targeting', () => {
+  it('lets a directly clicked half-built building win over the builder standing on it', () => {
+    const foundation = ent({
+      kind: 'building', defId: 'house', player: ENEMY,
+      tileX: 10, tileY: 10, x: 11 * 256, y: 11 * 256,
+      hp: 40, maxHp: 750, buildProgress: 200,
+    });
+    const builder = ent({ kind: 'unit', defId: 'villager', player: ENEMY });
+    const center = tileToWorld(11, 11);
+    expect(enemyContextTarget([builder, foundation], HUMAN, center.x, center.y)?.id).toBe(foundation.id);
+  });
+
+  it('keeps normal nearest-enemy priority away from a foundation footprint', () => {
+    const unit = ent({ player: ENEMY });
+    const foundation = ent({
+      kind: 'building', defId: 'house', player: ENEMY,
+      tileX: 20, tileY: 20, buildProgress: 400,
+    });
+    const elsewhere = tileToWorld(2, 2);
+    expect(enemyContextTarget([unit, foundation], HUMAN, elsewhere.x, elsewhere.y)?.id).toBe(unit.id);
+  });
 });
 
 describe('resolveTapAction — no selection', () => {
@@ -224,5 +260,17 @@ describe('desktop edge scrolling', () => {
     expect(edgePanVector(-20, 300, 800, 600)).toEqual({ x: 1, y: 0 });
     expect(edgePanVector(400, 640, 800, 600)).toEqual({ x: 0, y: -1 });
     expect(edgePanVector(0, 0, 0, 0)).toEqual({ x: 0, y: 0 });
+  });
+});
+
+describe('keyboard camera scrolling', () => {
+  it('maps WASD exactly like the arrow keys and supports diagonals', () => {
+    expect(keyboardPanVector(new Set(['w']))).toEqual(keyboardPanVector(new Set(['ArrowUp'])));
+    expect(keyboardPanVector(new Set(['a']))).toEqual({ x: 1, y: 0 });
+    expect(keyboardPanVector(new Set(['s', 'd']))).toEqual({ x: -1, y: -1 });
+  });
+
+  it('cancels opposite directions instead of accelerating', () => {
+    expect(keyboardPanVector(new Set(['a', 'd', 'w', 's']))).toEqual({ x: 0, y: 0 });
   });
 });

@@ -65,6 +65,23 @@ describe('Camera', () => {
     expect(cam.zoom).toBe(3); // clamped high
   });
 
+  it('repeated wheel-in steps at maximum zoom are strict no-ops', () => {
+    const cam = makeCam();
+    cam.zoomStep(1, 100, 100);
+    cam.zoomStep(1, 700, 500);
+    const before = {
+      zoom: cam.zoom, x: cam.x, y: cam.y,
+      transform: cam.getTransform(), view: cam.getWorldView(),
+    };
+    for (let i = 0; i < 100; i++) {
+      expect(cam.zoomStep(1, i * 7, i * 5)).toBe(false);
+    }
+    expect({
+      zoom: cam.zoom, x: cam.x, y: cam.y,
+      transform: cam.getTransform(), view: cam.getWorldView(),
+    }).toEqual(before);
+  });
+
   it('clamps to map bounds', () => {
     const cam = makeCam();
     cam.panBy(1e9, 1e9); // fling far up-left of the map

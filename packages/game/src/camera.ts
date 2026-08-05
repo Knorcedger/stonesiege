@@ -109,10 +109,12 @@ export class Camera {
   }
 
   /** Step zoom by +-1 keeping the world point under (anchorSx, anchorSy) fixed. */
-  zoomStep(delta: number, anchorSx?: number, anchorSy?: number): void {
+  zoomStep(delta: number, anchorSx?: number, anchorSy?: number): boolean {
     const idx = ZOOM_STEPS.indexOf(this.zoom as 1 | 2 | 3);
     const next = ZOOM_STEPS[Math.max(0, Math.min(ZOOM_STEPS.length - 1, idx + delta))];
-    if (next === this.zoom) return;
+    // A wheel still emits events after reaching a limit. Make those events a
+    // strict camera no-op so no anchor/clamp/transform work can cause a flash.
+    if (next === this.zoom) return false;
     const ax = anchorSx ?? this.viewW / 2;
     const ay = anchorSy ?? this.viewH / 2;
     const before = this.screenToWorld(ax, ay);
@@ -121,6 +123,7 @@ export class Camera {
     this.x += before.x - after.x;
     this.y += before.y - after.y;
     this.clamp();
+    return true;
   }
 
   /** Advance inertia; call once per frame with elapsed ms. */

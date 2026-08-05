@@ -11,7 +11,7 @@ import { removeEntity } from './entities';
 import { orderMove } from './path';
 import { resolveUnitStats } from './stats';
 import { refundItem, refundQueue, TRAIN_QUEUE_CAP } from './production';
-import { handleBuild, refundFoundation } from './construction';
+import { cancelQueuedBuilds, handleBuild, refundFoundation } from './construction';
 import { handleGather } from './gather';
 import { handleRepair } from './repair';
 import { handleQueueReseed, handleReseedFarm } from './farms';
@@ -21,6 +21,7 @@ import { handleConvert, handleHeal } from './monks';
 import { handleCancelResearch, handleResearch, isUnitEnabled, isUpgradedAway } from './research';
 import { handleMarketTrade } from './market';
 import { ejectGarrison } from './damage';
+import { orderFormationMove } from './formations';
 
 type Handler<K extends Command['kind']> =
   (state: SimState, cmd: Extract<Command, { kind: K }>, events: SimEvent[]) => void;
@@ -65,8 +66,14 @@ function wellFormedCommand(kind: Command['kind'], cmd: Record<string, unknown>):
   }
   if ('units' in cmd) {
     const u = cmd.units;
-    if (!Array.isArray(u) || u.some((id) => !Number.isFinite(id))) return false;
+    if (!Array.isArray(u) || u.some((id) => !Number.isInteger(id))) return false;
   }
+  // TypeScript optional properties are commonly present with the value
+  // `undefined` when commands are assembled from UI state. Treat that exactly
+  // like an omitted field while still rejecting every other invalid value.
+  if ('queue' in cmd && cmd.queue !== undefined && typeof cmd.queue !== 'boolean') return false;
+  if ('formation' in cmd && cmd.formation !== undefined && cmd.formation !== 'line'
+    && cmd.formation !== 'rectangle' && cmd.formation !== 'wedge') return false;
   // The sim is integer-only (positions are fixed-point ints): a float coord or
   // index would land a non-integer into state and break the determinism/snapshot
   // contract, so reject non-integers here, not merely non-finite values.
@@ -128,27 +135,32 @@ function canWalk(state: SimState, e: Entity): boolean {
 const handleMove: Handler<'move'> = (state, cmd) => {
   const units = ownedUnits(state, cmd.player, cmd.units).filter((id) =>
     canWalk(state, state.entities.get(id)!));
+  cancelQueuedBuilds(state, units);
   for (const id of units) {
     const e = state.entities.get(id)!;
     e.intent = undefined;
     clearTaskState(state, e);
   }
-  orderMove(state, units, cmd.x, cmd.y);
+  orderFormationMove(state, units, cmd.x, cmd.y, cmd.formation);
 };
 
 const handleAttackMove: Handler<'attackMove'> = (state, cmd) => {
   const units = ownedUnits(state, cmd.player, cmd.units).filter((id) =>
     canWalk(state, state.entities.get(id)!));
+  cancelQueuedBuilds(state, units);
+  const destinations = orderFormationMove(state, units, cmd.x, cmd.y, cmd.formation);
   for (const id of units) {
     const e = state.entities.get(id)!;
-    e.intent = { kind: 'attackMove', x: cmd.x, y: cmd.y }; // combat auto-engages en route
+    const destination = destinations.get(id) ?? { x: cmd.x, y: cmd.y };
+    e.intent = { kind: 'attackMove', x: destination.x, y: destination.y }; // combat auto-engages en route
     clearTaskState(state, e);
   }
-  orderMove(state, units, cmd.x, cmd.y);
 };
 
 const handleStop: Handler<'stop'> = (state, cmd) => {
-  for (const id of ownedUnits(state, cmd.player, cmd.units)) {
+  const units = ownedUnits(state, cmd.player, cmd.units);
+  cancelQueuedBuilds(state, units);
+  for (const id of units) {
     const e = state.entities.get(id)!;
     state.motion.delete(id);
     clearTaskState(state, e);

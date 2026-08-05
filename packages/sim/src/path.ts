@@ -185,16 +185,62 @@ function serveTile(state: SimState, s: GroupSearch, tile: number): void {
   const waiting = s.waitingByTile.get(tile);
   if (!waiting) return;
   s.waitingByTile.delete(tile);
+  const rawPath: number[] = [];
+  let t = s.parent[tile];
+  while (t !== -1) { rawPath.push(t); t = s.parent[t]; }
+  const path = smoothTilePath(state, tile, rawPath);
   for (const id of waiting) {
     s.waitingCount--;
     const m = state.motion.get(id);
     if (!m || m.groupId !== s.groupId) continue; // unit got a newer order
-    const path: number[] = [];
-    let t = s.parent[tile];
-    while (t !== -1) { path.push(t); t = s.parent[t]; }
-    m.path = path; // may be empty: already on the goal tile — walk straight to target
+    m.path = [...path]; // may be empty: already on the goal tile — walk straight to target
     m.pathIndex = 0;
   }
+}
+
+/** True when a center-to-center segment crosses only walkable tiles and safe corners. */
+function clearTileLine(state: SimState, from: number, to: number): boolean {
+  const width = state.map.width;
+  let x = from % width, y = (from / width) | 0;
+  const tx = to % width, ty = (to / width) | 0;
+  const dx = Math.abs(tx - x), dy = Math.abs(ty - y);
+  const sx = x < tx ? 1 : -1, sy = y < ty ? 1 : -1;
+  let err = dx - dy;
+  while (x !== tx || y !== ty) {
+    const e2 = err * 2;
+    let nx = x, ny = y;
+    if (e2 > -dy) { err -= dy; nx += sx; }
+    if (e2 < dx) { err += dx; ny += sy; }
+    if (nx !== x && ny !== y
+      && (!isTileWalkable(state, nx, y) || !isTileWalkable(state, x, ny))) return false;
+    if (!isTileWalkable(state, nx, ny)) return false;
+    x = nx; y = ny;
+  }
+  return true;
+}
+
+/**
+ * Remove unnecessary grid-center bends from a valid path. The Dijkstra route is
+ * octile-shortest, but its deterministic tie-break can group all horizontal steps
+ * before all diagonal steps, making cavalry draw a sharp L on open ground. Greedy
+ * line-of-sight compression preserves obstacle/corner safety while producing the
+ * straight route the player intended.
+ */
+function smoothTilePath(state: SimState, start: number, raw: readonly number[]): number[] {
+  if (raw.length <= 1) return [...raw];
+  const out: number[] = [];
+  let anchor = start;
+  let firstCandidate = 0;
+  while (firstCandidate < raw.length) {
+    let chosen = firstCandidate;
+    for (let i = raw.length - 1; i > firstCandidate; i--) {
+      if (clearTileLine(state, anchor, raw[i])) { chosen = i; break; }
+    }
+    out.push(raw[chosen]);
+    anchor = raw[chosen];
+    firstCandidate = chosen + 1;
+  }
+  return out;
 }
 
 /**
@@ -354,4 +400,39 @@ export function orderMove(state: SimState, unitIds: EntityId[], x: number, y: nu
     moving.push(id);
   }
   requestGroupPath(state, tileIndex(state.map, goalTile.x, goalTile.y), moving);
+}
+
+/** One unit's assigned destination inside a formation. */
+export interface UnitMoveTarget { id: EntityId; x: number; y: number }
+
+/**
+ * Order units to distinct destinations, sharing searches whenever slots land on
+ * the same tile. This is the formation equivalent of orderMove: every slot is
+ * independently remapped off blocked terrain, so an arrangement cannot strand
+ * a flank inside a building or lake.
+ */
+export function orderMoveToTargets(state: SimState, targets: readonly UnitMoveTarget[]): void {
+  const groups = new Map<number, EntityId[]>();
+  for (const target of targets) {
+    const e = state.entities.get(target.id);
+    if (!e || e.kind !== 'unit') continue;
+    const tx = Math.floor(target.x / FP), ty = Math.floor(target.y / FP);
+    const goalTile = nearestWalkableTile(state, tx, ty)
+      ?? nearestWalkableTile(state, tx, ty, Math.max(state.map.width, state.map.height));
+    if (!goalTile) continue;
+    const remapped = goalTile.x !== tx || goalTile.y !== ty;
+    const targetX = remapped ? goalTile.x * FP + FP / 2 : target.x;
+    const targetY = remapped ? goalTile.y * FP + FP / 2 : target.y;
+    state.motion.set(target.id, {
+      targetX, targetY, path: null, pathIndex: 0,
+      groupId: -1, stuckTicks: 0, repaths: 0,
+      lastX: e.x, lastY: e.y,
+    });
+    e.activity = 'moving';
+    const goal = tileIndex(state.map, goalTile.x, goalTile.y);
+    const ids = groups.get(goal);
+    if (ids) ids.push(target.id);
+    else groups.set(goal, [target.id]);
+  }
+  for (const [goal, ids] of groups) requestGroupPath(state, goal, ids);
 }

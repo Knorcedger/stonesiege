@@ -7,7 +7,7 @@
 import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import {
   FP, TICKS_PER_SECOND, fp,
-  type Command, type Entity, type EntityId, type GameConfig, type GameState,
+  type Command, type Entity, type EntityId, type Formation, type GameConfig, type GameState,
   type PlayerId, type SimEvent,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
@@ -16,7 +16,8 @@ import { scenariosById, TriggerRuntime, type AiProfile, type Rect, type Scenario
 import { applyAiProfile, attackNow, createBot, type Bot } from '@bf/ai';
 import { loadAssets } from './assets';
 import {
-  centroidTile, idleUnits, isTownBellSeeking, liveGroupIds, sameIdSet, type IdleCategory,
+  centroidTile, idleUnits, isTownBellSeeking, liveGroupIds, nextOwnedCompletedBuilding,
+  sameIdSet, type IdleCategory,
 } from './selectionTools';
 import { placementGhostFrames } from './frames';
 import { Camera, tileToWorld, worldToTile } from './camera';
@@ -321,6 +322,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   // --------------------------------------------------------------- state
   let selection: EntityId[] = [];
   let armedVerb: ArmedVerb | null = null;
+  let formation: Formation = 'rectangle';
   let placement: { defId: string; tileX: number; tileY: number } | null = null;
   const tallies = emptyTallies();
   let housed = false;
@@ -358,6 +360,17 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     idleCursor[cat] = (idleCursor[cat] + 1) % list.length;
     setSelection([e.id]);
     camera.centerOnTile(e.x / FP, e.y / FP);
+  };
+  const focusBuilding = (defId: string): boolean => {
+    const current = liveSelection().length === 1 ? liveSelection()[0] : undefined;
+    const next = nextOwnedCompletedBuilding(
+      getState(), humanPlayer, defId,
+      current?.kind === 'building' && current.defId === defId ? current.id : undefined,
+    );
+    if (!next) return false;
+    setSelection([next.id]);
+    camera.centerOnTile(next.x / FP, next.y / FP);
+    return true;
   };
 
   // Control groups (GDD: saved-selection chips — long-press saves, tap reselects,
@@ -612,7 +625,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     placement = null;
     refreshGhost();
   };
-  const confirmPlacement = (): void => {
+  const confirmPlacement = (keepActive = false): void => {
     if (!placement) return;
     if (PENDING_COMMAND_KINDS.has('build')) {
       // sim would silently drop the build command — never confirm a no-op
@@ -627,7 +640,10 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     }
     const def = gameData.buildings[placement.defId];
     const { defId, tileX, tileY } = placement;
-    issue({ kind: 'build', player: humanPlayer, units: villagers, defId, tileX, tileY });
+    issue({
+      kind: 'build', player: humanPlayer, units: villagers, defId, tileX, tileY,
+      ...(keepActive ? { queue: true } : {}),
+    });
     // Real undo: delete the foundation this confirm created (the sim spawns it at
     // the next tick boundary, so the closure looks it up by footprint when tapped;
     // deleteEntity refunds the unbuilt fraction via refundFoundation).
@@ -640,11 +656,16 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
         }
       }
     };
-    if (def?.wall) {
+    if (def?.wall || keepActive) {
       // v1 wall flow: single-tile walls placed repeatedly — placement mode stays
-      // armed so a run of wall goes tap-confirm, tap-confirm (drag-placement is
-      // a wave-3 nicety; see GDD walls note). Undo removes the LAST segment.
-      hud.showUndoToast('Wall placed — keep tapping to extend, Cancel to stop', undoBuild);
+      // armed so a run of wall goes tap-confirm, tap-confirm. Holding Shift gives
+      // every other building the same repeat-placement flow.
+      hud.showUndoToast(
+        def?.wall
+          ? 'Wall placed — keep tapping to extend, Cancel to stop'
+          : `${def?.name ?? defId} placed — Shift-click to keep building, Esc to stop`,
+        undoBuild,
+      );
       refreshGhost();
       return;
     }
@@ -743,6 +764,8 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     },
     armVerb: (verb) => { armedVerb = armedVerb === verb ? null : verb; },
     getArmedVerb: () => armedVerb,
+    setFormation: (next) => { formation = next; },
+    getFormation: () => formation,
     togglePause: () => loop.togglePause(),
     isPaused: () => loop.paused,
     resumeGame: () => loop.resume(),
@@ -758,6 +781,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     returnToTitle: () => reloadTo(meta ? { kind: 'scenarioList', campaignId: meta.campaign } : null),
     getIdleCounts,
     cycleIdle,
+    focusBuilding,
     getGroupCounts,
     saveGroup,
     selectGroup,
@@ -827,6 +851,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     setAttackMoveArmed: (v) => { armedVerb = v ? 'attackMove' : null; },
     getArmedVerb: () => armedVerb,
     clearArmedVerb: () => { armedVerb = null; },
+    getFormation: () => formation,
     togglePause: () => loop.togglePause(),
     showToast: (label) => hud.showUndoToast(label, null),
   };

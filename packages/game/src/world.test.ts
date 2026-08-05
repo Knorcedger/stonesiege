@@ -1,7 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { FP, type Entity } from '@bf/sim/types';
+import { FP, type Entity, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
-import { entityPickDistance, resourceFrameName } from './world';
+import {
+  buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
+  ownedResearchProgress, resourceFrameName,
+} from './world';
+
+const HUMAN = 1 as PlayerId;
+const ENEMY = 2 as PlayerId;
 
 const resource = (patch: Partial<Entity> = {}): Entity => ({
   id: 7,
@@ -46,5 +52,37 @@ describe('entityPickDistance', () => {
     expect(entityPickDistance(villager, feet.x, bodyY))
       .toBeLessThan(entityPickDistance(farm, feet.x, bodyY));
     expect(entityPickDistance(farm, feet.x, bodyY)).toBe(1);
+  });
+});
+
+describe('ownedResearchProgress', () => {
+  const researching = resource({
+    kind: 'building', defId: 'townCenter', player: HUMAN,
+    hp: 2400, maxHp: 2400,
+    research: { techId: 'feudalAge', ticksLeft: 75, totalTicks: 100 },
+  });
+
+  it('returns active progress only to the building owner', () => {
+    expect(ownedResearchProgress(researching, HUMAN)).toBe(0.25);
+    expect(ownedResearchProgress(researching, ENEMY)).toBeNull();
+  });
+
+  it('does not expose a bar for units or idle buildings', () => {
+    expect(ownedResearchProgress(resource({ ...researching, kind: 'unit' }), HUMAN)).toBeNull();
+    expect(ownedResearchProgress(resource({ ...researching, research: undefined }), HUMAN)).toBeNull();
+  });
+});
+
+describe('defaultRallyTilePoint', () => {
+  it('puts a selected Barracks flag beyond the center of its south edge', () => {
+    const barracks = resource({ kind: 'building', defId: 'barracks', tileX: 10, tileY: 20 });
+    expect(defaultRallyTilePoint(barracks)).toEqual([11.5, 23.5]);
+  });
+});
+
+describe('buildingHpBarWidth', () => {
+  it('uses half of the previous near-full-footprint width', () => {
+    expect(buildingHpBarWidth(4)).toBe(124); // old Town Center bar: 248px
+    expect(buildingHpBarWidth(3)).toBe(92); // old Barracks/Farm bar: 184px
   });
 });

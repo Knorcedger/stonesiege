@@ -169,6 +169,9 @@ const gatherPairs = (m: ReadonlyMap<number, GatherInfo>): Array<[number, GatherI
     lastX: g.lastX,
     lastY: g.lastY,
     finishAfterDeposit: g.finishAfterDeposit,
+    ...(g.farmSpotIndex !== undefined ? { farmSpotIndex: g.farmSpotIndex } : {}),
+    ...(g.nextFarmMoveTick !== undefined ? { nextFarmMoveTick: g.nextFarmMoveTick } : {}),
+    ...(g.farmRepositioning !== undefined ? { farmRepositioning: g.farmRepositioning } : {}),
   }]);
 
 export function serializeSimState(state: SimState): GameSnapshot {

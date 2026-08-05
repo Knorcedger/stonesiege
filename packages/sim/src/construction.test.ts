@@ -42,12 +42,20 @@ describe('construction', () => {
     const house = entitiesOf(game.state.entities, HUMAN, 'house')[0];
     expect(house).toBeDefined();
     expect(house.buildProgress).toBeLessThan(1000);
+    expect(house.hp).toBeGreaterThan(0);
+    expect(house.hp).toBeLessThan(house.maxHp);
     expect(game.isWalkable(12, 10)).toBe(false); // foundation blocks its tiles
+
+    const earlyHp = house.hp;
+    run(game, 80);
+    expect(house.buildProgress).toBeGreaterThan(0);
+    expect(house.hp).toBeGreaterThan(earlyHp);
 
     // adjacent villager starts building immediately and completes in ~buildTime (25s = 500 ticks)
     const done = run(game, 520);
     expect(done.some((e) => e.kind === 'buildingComplete' && e.defId === 'house')).toBe(true);
     expect(house.buildProgress).toBe(1000);
+    expect(house.hp).toBe(house.maxHp);
     expect(game.state.players[HUMAN].popCap).toBe(5); // house comes online -> pop capacity
     const builder = game.state.entities.get(vid)!;
     expect(builder.activity).toBe('idle');
@@ -72,6 +80,97 @@ describe('construction', () => {
 
     // 3 builders: 3T/5 = 0.6T (+ a few approach ticks)
     expect(trioTicks).toBeLessThan(soloTicks * 0.75);
+  });
+
+  it('Shift-queued placements create every foundation and build them in sequence', () => {
+    const game = setup([{ x: 8, y: 10 }]);
+    const vid = game.state.refs.get('v0')!;
+    const placements: Command[] = [
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 10, tileY: 10, queue: true },
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 13, tileY: 10, queue: true },
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 16, tileY: 10, queue: true },
+    ];
+    const placed = game.advance(placements);
+    expect(placed.filter((e) => e.kind === 'buildingPlaced')).toHaveLength(3);
+    const initial = entitiesOf(game.state.entities, HUMAN, 'house').sort((a, b) => a.tileX - b.tileX);
+    expect(initial).toHaveLength(3);
+
+    run(game, 180);
+    expect(initial[0].buildProgress).toBeGreaterThan(0);
+    expect(initial[1].buildProgress).toBe(0);
+    expect(initial[2].buildProgress).toBe(0);
+
+    run(game, 1900);
+    const houses = entitiesOf(game.state.entities, HUMAN, 'house');
+    expect(houses.every((h) => h.buildProgress === 1000)).toBe(true);
+    expect(game.state.entities.get(vid)!.intent).toBeUndefined();
+  });
+
+  it('keeps a Shift-build queue when a rejected unit order is a no-op', () => {
+    const game = setup([{ x: 8, y: 10 }, { x: 8, y: 12 }]);
+    const vid = game.state.refs.get('v0')!;
+    const ownTarget = game.state.refs.get('v1')!;
+    game.advance([
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 10, tileY: 10, queue: true },
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 13, tileY: 10, queue: true },
+    ]);
+    const queued = entitiesOf(game.state.entities, HUMAN, 'house')
+      .find((house) => house.tileX === 13)!;
+    const state = game.state as SimState;
+    expect(state.foundations.get(queued.id)?.queuedBuilders).toEqual([vid]);
+
+    // Attacking an own unit is rejected. It must not erase unrelated queued work.
+    game.advance([{ kind: 'attack', player: HUMAN, units: [vid], targetId: ownTarget }]);
+
+    expect(state.foundations.get(queued.id)?.queuedBuilders).toEqual([vid]);
+  });
+
+  it('does not skip older queued sites when the active foundation is deleted in the same batch', () => {
+    const game = setup([{ x: 8, y: 10 }]);
+    const vid = game.state.refs.get('v0')!;
+    game.advance([
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 10, tileY: 10, queue: true },
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 13, tileY: 10, queue: true },
+    ]);
+    const houses = entitiesOf(game.state.entities, HUMAN, 'house');
+    const active = houses.find((house) => house.tileX === 10)!;
+    const olderQueued = houses.find((house) => house.tileX === 13)!;
+
+    game.advance([
+      { kind: 'deleteEntity', player: HUMAN, entityId: active.id },
+      { kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 16, tileY: 10, queue: true },
+    ]);
+
+    expect(game.state.entities.get(vid)!.intent).toEqual({ kind: 'build', targetId: olderQueued.id });
+    const newest = entitiesOf(game.state.entities, HUMAN, 'house').find((house) => house.tileX === 16)!;
+    expect((game.state as SimState).foundations.get(newest.id)?.queuedBuilders).toEqual([vid]);
+  });
+
+  it('keeps building the assigned foundation after the builder is nudged away', () => {
+    const game = setup([{ x: 10, y: 10 }]);
+    const state = game.state as SimState;
+    const vid = state.refs.get('v0')!;
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [vid], defId: 'house', tileX: 12, tileY: 10,
+    }]);
+    run(game, 20);
+    const builder = state.entities.get(vid)!;
+    const house = entitiesOf(state.entities, HUMAN, 'house')[0];
+
+    // Model a separation push beyond the site's adjacent ring.
+    builder.x = fp(9.5);
+    builder.y = fp(10.5);
+    builder.tileX = 9;
+    builder.tileY = 10;
+    state.unitsGrid.move(builder.id, builder.x, builder.y);
+    state.motion.delete(builder.id);
+
+    game.advance([]);
+    expect(builder.intent).toEqual({ kind: 'build', targetId: house.id });
+    expect(state.motion.has(builder.id)).toBe(true);
+    run(game, 700);
+    expect(house.buildProgress).toBe(1000);
+    expect(house.hp).toBe(house.maxHp);
   });
 
   it('rejects unaffordable, out-of-footprint, and builder-less commands without paying', () => {

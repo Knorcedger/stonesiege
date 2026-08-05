@@ -25,6 +25,7 @@ const HP_GREEN = 0x3e8c34;
 const HP_YELLOW = 0xd4a82a;
 const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
+const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
@@ -200,19 +201,26 @@ export class WorldLayer {
   }
 
   /**
-   * Rally flag markers (GDD Buildings: the rally is "shown as a flag") for
-   * SELECTED own production buildings with an active rally. A rally onto a
-   * target (berries, an enemy) tracks the target's live position.
+   * Rally flag markers for selected own production buildings. Even a building
+   * without a custom rally shows its default spawn-side flag, so selecting a
+   * Barracks always explains where its next soldier will go. Target rallies
+   * (berries, an enemy) track the target's live position.
    */
   private updateRallyFlags(state: GameState): void {
     const spots: Array<{ x: number; y: number }> = [];
     for (const id of this.selection) {
       const e = state.entities.get(id);
-      if (!e || e.player !== this.humanPlayer || !hasActiveRally(e)) continue;
-      const target = e.rally!.targetId !== undefined ? state.entities.get(e.rally!.targetId) : undefined;
+      const def = e?.kind === 'building' ? gameData.buildings[e.defId] : undefined;
+      if (!e || e.player !== this.humanPlayer || e.kind !== 'building'
+        || (e.buildProgress ?? 1000) < 1000 || (def?.trains?.length ?? 0) === 0) continue;
+      const active = hasActiveRally(e);
+      const target = active && e.rally?.targetId !== undefined
+        ? state.entities.get(e.rally.targetId) : undefined;
       const p = target
         ? tileToWorld(target.x / FP, target.y / FP)
-        : tileToWorld(e.rally!.x / FP, e.rally!.y / FP);
+        : active && e.rally
+          ? tileToWorld(e.rally.x / FP, e.rally.y / FP)
+          : tileToWorld(...defaultRallyTilePoint(e));
       spots.push({ x: Math.round(p.x), y: Math.round(p.y) });
     }
     const key = spots.map((s) => `${s.x},${s.y}`).join('|');
@@ -494,9 +502,12 @@ export class WorldLayer {
   private drawHpBar(e: Entity, view: EntityView): void {
     const selected = this.selection.has(e.id);
     const damaged = e.hp < e.maxHp;
-    // settings toggle: HP bars can be hidden entirely (selection ring remains)
-    const show = getSettings().showHpBars
-      && (selected || damaged) && e.activity !== 'dying' && e.kind !== 'resource';
+    const researchFrac = ownedResearchProgress(e, this.humanPlayer);
+    // Active research is strategic owner-only information and must stay visible
+    // even when the building is deselected. Keep its HP bar immediately above it
+    // so the two values cannot be mistaken for one another.
+    const showHp = e.activity !== 'dying' && e.kind !== 'resource'
+      && (researchFrac !== null || (getSettings().showHpBars && (selected || damaged)));
     const frac = Math.max(0, Math.min(1, e.hp / Math.max(1, e.maxHp)));
     // Buildings anchor the bar to the sprite's trimmed visible top (roof/flag
     // apex) + a small gap — footprint math floated it over open grass because
@@ -504,17 +515,29 @@ export class WorldLayer {
     // the bar follows construct-stage frame changes.
     const isB = e.kind === 'building';
     const yOff = isB ? buildingHpBarY(view.spriteTopPx) : -34;
-    const key = show ? `${frac.toFixed(2)}:${e.kind}:${e.defId}:${yOff}` : '';
+    const key = showHp
+      ? `${frac.toFixed(2)}:${researchFrac?.toFixed(3) ?? ''}:${e.kind}:${e.defId}:${yOff}`
+      : '';
     if (key === view.lastHpKey) return;
     view.lastHpKey = key;
     view.hpBar.clear();
-    if (!show) return;
+    if (!showHp) return;
     const size = isB ? gameData.buildings[e.defId]?.size ?? 1 : 0;
-    const w = isB ? size * TILE_W_SAFE - 8 : 26;
+    const w = isB ? buildingHpBarWidth(size) : 26;
     const color = frac > 0.5 ? HP_GREEN : frac > 0.25 ? HP_YELLOW : HP_RED;
     view.hpBar.rect(-w / 2 - 1, yOff - 1, w + 2, 6).fill(OUTLINE);
     view.hpBar.rect(-w / 2, yOff, w, 4).fill(HP_BG);
     if (frac > 0) view.hpBar.rect(-w / 2, yOff, Math.max(1, Math.round(w * frac)), 4).fill(color);
+    if (researchFrac !== null) {
+      const researchY = yOff + 7;
+      view.hpBar.rect(-w / 2 - 1, researchY - 1, w + 2, 6).fill(OUTLINE);
+      view.hpBar.rect(-w / 2, researchY, w, 4).fill(HP_BG);
+      if (researchFrac > 0) {
+        view.hpBar.rect(
+          -w / 2, researchY, Math.max(1, Math.round(w * researchFrac)), 4,
+        ).fill(RESEARCH_BLUE);
+      }
+    }
   }
 
   private rememberBuilding(state: GameState, e: Entity): void {
@@ -617,6 +640,24 @@ const TILE_W_SAFE = HALF_W * 2;
  */
 export function buildingHpBarY(spriteTopPx: number): number {
   return Math.round(spriteTopPx) - 10;
+}
+
+/** Compact building bars: exactly half the old near-full-footprint width. */
+export function buildingHpBarWidth(footprintSize: number): number {
+  return Math.round((footprintSize * TILE_W_SAFE - 8) / 2);
+}
+
+/** Owner-only fraction for an actively researching building's world progress bar. */
+export function ownedResearchProgress(e: Entity, humanPlayer: PlayerId): number | null {
+  if (e.kind !== 'building' || e.player !== humanPlayer || e.hp <= 0 || !e.research
+    || e.research.totalTicks <= 0) return null;
+  return Math.max(0, Math.min(1, 1 - e.research.ticksLeft / e.research.totalTicks));
+}
+
+/** Default rally marker: centered one half-tile beyond the building's south edge. */
+export function defaultRallyTilePoint(e: Entity): [number, number] {
+  const size = e.kind === 'building' ? gameData.buildings[e.defId]?.size ?? 1 : 1;
+  return [e.tileX + size / 2, e.tileY + size + 0.5];
 }
 
 export function resourceFrameName(e: Entity): string {

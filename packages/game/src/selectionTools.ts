@@ -7,6 +7,49 @@ import { gameData } from '@bf/data';
 
 export type IdleCategory = 'villager' | 'military';
 
+export interface SelectionTypeCount {
+  defId: string;
+  name: string;
+  icon: string;
+  count: number;
+}
+
+/** Stable per-type counts for honest mixed-selection labels and icon mosaics. */
+export function selectionTypeCounts(entities: readonly Entity[]): SelectionTypeCount[] {
+  const counts = new Map<string, SelectionTypeCount>();
+  for (const e of entities) {
+    const existing = counts.get(e.defId);
+    if (existing) {
+      existing.count++;
+      continue;
+    }
+    const def = gameData.units[e.defId] ?? gameData.buildings[e.defId] ?? gameData.resources[e.defId];
+    counts.set(e.defId, {
+      defId: e.defId,
+      name: def?.name ?? e.defId,
+      icon: def?.icon ?? `icon/${e.defId}`,
+      count: 1,
+    });
+  }
+  return [...counts.values()];
+}
+
+/** Next completed own building of a type, wrapping in stable entity order. */
+export function nextOwnedCompletedBuilding(
+  state: GameState,
+  player: PlayerId,
+  defId: string,
+  afterId?: EntityId,
+): Entity | null {
+  const buildings = [...state.entities.values()].filter((e) => e.kind === 'building'
+    && e.player === player && e.defId === defId && e.hp > 0
+    && (e.buildProgress ?? 1000) >= 1000);
+  if (buildings.length === 0) return null;
+  if (afterId === undefined) return buildings[0];
+  const index = buildings.findIndex((e) => e.id === afterId);
+  return buildings[index < 0 ? 0 : (index + 1) % buildings.length];
+}
+
 /** Public presentation marker for a villager currently answering a Town Bell. */
 export function isTownBellSeeking(
   e: Entity,

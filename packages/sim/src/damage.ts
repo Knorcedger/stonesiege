@@ -297,7 +297,7 @@ export function applyDamage(state: SimState, ctx: HitContext, target: Entity, da
   events.push({ kind: 'attackImpact', attackerId: ctx.attackerId, targetId: target.id, damage, melee: ctx.melee });
 
   // throttled town-bell alert for the defender
-  if (target.player > GAIA && ctx.attackerPlayer !== target.player) {
+  if (target.player > GAIA && isEnemy(state, target.player, ctx.attackerPlayer)) {
     const next = state.alertNext[target.player] ?? 0;
     if (state.tick >= next) {
       state.alertNext[target.player] = state.tick + ALERT_THROTTLE_TICKS;
@@ -317,7 +317,13 @@ export function applyDamage(state: SimState, ctx: HitContext, target: Entity, da
     if (!def.herdable) animalFlee(state, target, ctx.fromX, ctx.fromY);
     return;
   }
-  onUnitDamaged(state, target); // villagers run for garrison (GDD)
+  // Enemy raids alarm the surrounding settlement; a wildlife bite only sends
+  // the bitten villager running, so one wolf cannot park an entire economy.
+  onUnitDamaged(
+    state,
+    target,
+    ctx.attackerPlayer !== GAIA && isEnemy(state, target.player, ctx.attackerPlayer),
+  );
   retaliate(state, target, ctx.attackerId);
 }
 

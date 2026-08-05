@@ -1,7 +1,7 @@
 // Combat core (GDD Combat). Explicit attack orders + per-category default behavior:
 //   - standard military auto-engages hostile players' units in its guard radius
 //     (infantry 4 tiles, cavalry 6, other classes use LOS; staggered scans),
-//     chases with a leash when auto-acquired, and walks back to its anchor after;
+//     and chases with a leash when auto-acquired, then holds its battle position;
 //   - villagers/monks never auto-engage (villagers fight only on explicit command);
 //   - mangonels hold fire when a friendly stands in the blast (explicit orders override);
 //   - rams and trebuchets never auto-acquire; attack-move sends them at the nearest
@@ -20,6 +20,7 @@ import { resolveBuildingStats, resolveUnitStats } from './stats';
 import { orderMove } from './path';
 import { applyHit, isEnemy, tickCorpses, unitAttackDamage } from './damage';
 import { fireProjectile } from './projectiles';
+import { cancelQueuedBuilds } from './construction';
 
 /** Melee reach beyond the two collision radii (diagonal building adjacency included). */
 const MELEE_REACH_FP = 128;
@@ -29,6 +30,8 @@ const LEASH_FP = 12 * FP;
 const ACQUIRE_STAGGER = 3;
 /** Visual spread for secondary tower/castle arrows. */
 const ARROW_JITTER_FP = 32;
+/** Explicit building assaults chain through structures within the same local base. */
+const ASSAULT_CHAIN_RADIUS_FP = 12 * FP;
 
 const queryBuf: EntityId[] = [];
 
@@ -46,6 +49,7 @@ export function handleAttack(state: SimState, cmd: AttackCmd): void {
   const target = state.entities.get(cmd.targetId);
   if (!attackable(state, cmd.player, target)) return;
   const seen = new Set<EntityId>();
+  const attackers: EntityId[] = [];
   for (const id of cmd.units) {
     if (seen.has(id) || id === cmd.targetId) continue;
     seen.add(id);
@@ -54,6 +58,7 @@ export function handleAttack(state: SimState, cmd: AttackCmd): void {
     if (e.garrisonedIn !== undefined) continue;
     const def = gameData.units[e.defId];
     if (!def || def.attacks.length === 0) continue; // monks can't attack
+    attackers.push(id);
     e.intent = { kind: 'attackTarget', targetId: target.id };
     e.targetId = target.id;
     state.fleeing.delete(id);
@@ -64,8 +69,10 @@ export function handleAttack(state: SimState, cmd: AttackCmd): void {
     if (monk) { monk.convertTargetId = undefined; monk.healTargetId = undefined; }
     state.combat.set(id, {
       targetId: target.id, auto: false, nextAttackTick: 0, anchorX: e.x, anchorY: e.y,
+      ...(target.kind === 'building' ? { continueBuildings: true } : {}),
     });
   }
+  cancelQueuedBuilds(state, attackers);
 }
 
 /** pack/unpack (trebuchets): start the fold/unfold transition from the def's pack times. */
@@ -125,6 +132,10 @@ function buildingApproachPoint(state: SimState, e: Entity, info: CombatInfo, tar
   const reserved = new Set<number>();
   for (const [uid, ci] of state.combat) {
     if (uid === e.id || ci.targetId !== target.id || ci.slotX === undefined) continue;
+    const other = state.entities.get(uid);
+    // Ranged attackers do not consume a melee ring position: they stop at their
+    // own firing range, so counting their path reservation strands melee troops.
+    if (other && (gameData.units[other.defId]?.range ?? 0) > 0) continue;
     reserved.add(ci.slotY! * state.map.width + ci.slotX);
   }
   const taken = (tx: number, ty: number): boolean => {
@@ -163,6 +174,27 @@ function buildingApproachPoint(state: SimState, e: Entity, info: CombatInfo, tar
   return { x: bx * FP + FP / 2 + sx * (FP / 4), y: by * FP + FP / 2 + sy * (FP / 4) };
 }
 
+/** A nearby hostile structure with an open melee position for an overflow attacker. */
+function alternateAssaultBuilding(
+  state: SimState, e: Entity, info: CombatInfo, crowded: Entity,
+): { target: Entity; goal: { x: Fixed; y: Fixed } } | null {
+  const candidates: Array<{ target: Entity; dd: number }> = [];
+  for (const target of state.entities.values()) {
+    if (target.id === crowded.id || target.kind !== 'building' || target.hp <= 0 || target.player === GAIA) continue;
+    if (!isEnemy(state, e.player, target.player)) continue;
+    const bx = target.x - crowded.x, by = target.y - crowded.y;
+    if (bx * bx + by * by > ASSAULT_CHAIN_RADIUS_FP * ASSAULT_CHAIN_RADIUS_FP) continue;
+    const dx = target.x - e.x, dy = target.y - e.y;
+    candidates.push({ target, dd: dx * dx + dy * dy });
+  }
+  candidates.sort((a, b) => a.dd - b.dd || a.target.id - b.target.id);
+  for (const candidate of candidates) {
+    const goal = buildingApproachPoint(state, e, info, candidate.target);
+    if (goal) return { target: candidate.target, goal };
+  }
+  return null;
+}
+
 /**
  * (Re)aim the chase walk. Re-path when the target drifted > 1 tile from where the walk
  * was ordered, or when the walk ended while still out of range (with a short backoff so
@@ -180,12 +212,31 @@ function chase(state: SimState, e: Entity, info: CombatInfo, target: Entity): vo
   info.chaseX = target.x;
   info.chaseY = target.y;
   info.nextChaseTick = state.tick + CHASE_RETRY_TICKS;
-  const goal = target.kind === 'building' ? buildingApproachPoint(state, e, info, target) : null;
+  let goal = target.kind === 'building' ? buildingApproachPoint(state, e, info, target) : null;
+  // A packed melee ring must not send overflow troops on a huge walk around the
+  // town. Split those attackers onto another structure in the same base instead.
+  const melee = (gameData.units[e.defId]?.range ?? 0) <= 0;
+  if (!goal && melee && target.kind === 'building' && info.continueBuildings
+    && e.intent?.kind === 'attackTarget') {
+    const alternate = alternateAssaultBuilding(state, e, info, target);
+    if (alternate) {
+      info.targetId = alternate.target.id;
+      info.nextAttackTick = 0;
+      info.chaseX = alternate.target.x;
+      info.chaseY = alternate.target.y;
+      info.chaseFails = 0;
+      e.intent = { kind: 'attackTarget', targetId: alternate.target.id };
+      e.targetId = alternate.target.id;
+      goal = alternate.goal;
+      orderMove(state, [e.id], goal.x, goal.y);
+      return;
+    }
+  }
   orderMove(state, [e.id], goal?.x ?? target.x, goal?.y ?? target.y);
 }
 
-/** Drop the engagement: resume attack-move, or walk auto-acquirers back to anchor. */
-function disengage(state: SimState, e: Entity, info: CombatInfo): void {
+/** Drop the engagement: resume attack-move, otherwise hold the battle endpoint. */
+function disengage(state: SimState, e: Entity): void {
   state.combat.delete(e.id);
   e.targetId = undefined;
   if (e.intent?.kind === 'attackMove') {
@@ -193,12 +244,38 @@ function disengage(state: SimState, e: Entity, info: CombatInfo): void {
     return;
   }
   if (e.intent?.kind === 'attackTarget') e.intent = undefined;
-  if (info.auto && (e.x !== info.anchorX || e.y !== info.anchorY)) {
-    orderMove(state, [e.id], info.anchorX, info.anchorY);
-    return;
-  }
   state.motion.delete(e.id);
   e.activity = 'idle';
+}
+
+/** Continue an explicit building assault into the nearest structure in the local base. */
+function continueBuildingAssault(state: SimState, e: Entity, info: CombatInfo): boolean {
+  if (!info.continueBuildings || e.intent?.kind !== 'attackTarget') return false;
+  let next: Entity | null = null;
+  let bestD = Infinity;
+  for (const candidate of state.entities.values()) {
+    if (candidate.kind !== 'building' || candidate.hp <= 0 || candidate.player === GAIA) continue;
+    if (!isEnemy(state, e.player, candidate.player)) continue;
+    const dx = candidate.x - e.x, dy = candidate.y - e.y;
+    const dd = dx * dx + dy * dy;
+    if (dd > ASSAULT_CHAIN_RADIUS_FP * ASSAULT_CHAIN_RADIUS_FP) continue;
+    if (dd < bestD || (dd === bestD && candidate.id < (next?.id ?? Infinity))) {
+      bestD = dd;
+      next = candidate;
+    }
+  }
+  if (!next) return false;
+  info.targetId = next.id;
+  info.nextAttackTick = 0;
+  info.chaseX = undefined;
+  info.chaseY = undefined;
+  info.nextChaseTick = undefined;
+  info.chaseFails = undefined;
+  info.slotX = undefined;
+  info.slotY = undefined;
+  e.intent = { kind: 'attackTarget', targetId: next.id };
+  e.targetId = next.id;
+  return true;
 }
 
 /** Any friendly (own/allied) unit inside the blast a shot at `target` would make? */
@@ -219,12 +296,13 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
   if (!target || target.hp <= 0 ||
     (target.kind === 'unit' && target.garrisonedIn !== undefined) ||
     !isEnemy(state, e.player, target.player)) { // conversion flips this mid-fight
-    disengage(state, e, info);
+    if (continueBuildingAssault(state, e, info)) return;
+    disengage(state, e);
     return;
   }
   if (info.auto) {
     const dx = e.x - info.anchorX, dy = e.y - info.anchorY;
-    if (dx * dx + dy * dy > LEASH_FP * LEASH_FP) { disengage(state, e, info); return; }
+    if (dx * dx + dy * dy > LEASH_FP * LEASH_FP) { disengage(state, e); return; }
   }
   e.targetId = target.id;
 
@@ -265,7 +343,7 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
   } else if (dist > rangeFp) {
     // auto engagements that repeatedly fail to close (full melee ring, unreachable
     // target) drop the fight instead of standing under fire forever
-    if (info.auto && (info.chaseFails ?? 0) >= CHASE_GIVE_UP) { disengage(state, e, info); return; }
+    if (info.auto && (info.chaseFails ?? 0) >= CHASE_GIVE_UP) { disengage(state, e); return; }
     chase(state, e, info, target);
     return;
   }
@@ -296,7 +374,7 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
 }
 
 /** Auto-engage category: which targets a unit acquires on its own (GDD defaults). */
-function autoMode(state: SimState, e: Entity, def: UnitDef): 'units' | 'buildings' | null {
+function autoMode(state: SimState, e: Entity, def: UnitDef): 'units' | 'buildings' | 'unitsAndBuildings' | null {
   if (def.gather || def.heals || def.converts) return null; // villagers + monks: never
   if (state.fleeing.has(e.id) || state.garrisoning.has(e.id)) return null;
   if (e.intent && e.intent.kind !== 'attackMove') return null;
@@ -304,17 +382,24 @@ function autoMode(state: SimState, e: Entity, def: UnitDef): 'units' | 'building
   if (state.motion.has(e.id) && e.intent?.kind !== 'attackMove') return null;
   const siegeNoAuto = def.garrisonCapacity !== undefined || def.pack !== undefined; // rams/trebs
   if (siegeNoAuto) return e.intent?.kind === 'attackMove' ? 'buildings' : null;
-  return 'units';
+  // Attack-move clears structures only AFTER reaching its ordered destination.
+  // En route it still fights units, but does not peel off to raze a building that
+  // merely borders the route (campaign travel orders depend on that distinction).
+  return e.intent?.kind === 'attackMove' && !state.motion.has(e.id)
+    ? 'unitsAndBuildings' : 'units';
 }
 
-function tryAcquire(state: SimState, e: Entity, def: UnitDef, mode: 'units' | 'buildings'): CombatInfo | undefined {
+function tryAcquire(
+  state: SimState, e: Entity, def: UnitDef,
+  mode: 'units' | 'buildings' | 'unitsAndBuildings',
+): CombatInfo | undefined {
   if ((state.tick + e.id) % ACQUIRE_STAGGER !== 0) return undefined;
   const stats = resolveUnitStats(state, e.player, e.defId);
   const aggroFp = unitAggroRange(def, stats.los) * FP;
   const minRangeFp = stats.minRange * FP;
   let targetId = -1;
   let bestD = Infinity;
-  if (mode === 'buildings') {
+  const scanBuildings = (): void => {
     for (const t of state.entities.values()) {
       if (t.kind !== 'building' || t.hp <= 0 || t.player === GAIA) continue;
       if (!isEnemy(state, e.player, t.player)) continue;
@@ -322,6 +407,9 @@ function tryAcquire(state: SimState, e: Entity, def: UnitDef, mode: 'units' | 'b
       if (d > aggroFp || d < minRangeFp) continue;
       if (d < bestD) { bestD = d; targetId = t.id; }
     }
+  };
+  if (mode === 'buildings') {
+    scanBuildings();
   } else {
     // unsorted query + explicit (distance, lowest id) tie-break: picks exactly the
     // unit a sorted scan with `dd < bestD` would pick, without the per-scan id sort
@@ -339,6 +427,9 @@ function tryAcquire(state: SimState, e: Entity, def: UnitDef, mode: 'units' | 'b
       if (minRangeFp > 0 && effDistFp(state, e, t) < minRangeFp) continue;
       if (dd < bestD || (dd === bestD && t.id < targetId)) { bestD = dd; targetId = t.id; }
     }
+    // Unit targets always take priority. Only a clear local battlefield lets an
+    // attack-moving formation turn its weapons on structures.
+    if (targetId < 0 && mode === 'unitsAndBuildings') scanBuildings();
   }
   if (targetId < 0) return undefined;
   const info: CombatInfo = {

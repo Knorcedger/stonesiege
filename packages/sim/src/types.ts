@@ -38,6 +38,9 @@ export type UnitActivity =
   | 'idle' | 'moving' | 'attacking' | 'gathering' | 'building' | 'repairing'
   | 'carrying' | 'dying' | 'garrisoned' | 'healing' | 'converting' | 'fleeing';
 
+/** Player-selected arrangement for groups of three or more units. */
+export type Formation = 'line' | 'rectangle' | 'wedge';
+
 export interface TrainQueueItem {
   defId: string;
   ticksLeft: number;
@@ -161,11 +164,15 @@ export interface PlayerState {
 
 // ---------- commands (all player/AI intent) ----------
 export type Command =
-  | { kind: 'move'; player: PlayerId; units: EntityId[]; x: Fixed; y: Fixed }
-  | { kind: 'attackMove'; player: PlayerId; units: EntityId[]; x: Fixed; y: Fixed }
+  | { kind: 'move'; player: PlayerId; units: EntityId[]; x: Fixed; y: Fixed; formation?: Formation }
+  | { kind: 'attackMove'; player: PlayerId; units: EntityId[]; x: Fixed; y: Fixed; formation?: Formation }
   | { kind: 'attack'; player: PlayerId; units: EntityId[]; targetId: EntityId }
   | { kind: 'gather'; player: PlayerId; units: EntityId[]; targetId: EntityId }
-  | { kind: 'build'; player: PlayerId; units: EntityId[]; defId: string; tileX: number; tileY: number }
+  | {
+      kind: 'build'; player: PlayerId; units: EntityId[]; defId: string; tileX: number; tileY: number;
+      /** Shift-placement: place now, but builders already constructing finish their queue first. */
+      queue?: boolean;
+    }
   | { kind: 'repair'; player: PlayerId; units: EntityId[]; targetId: EntityId }
   | { kind: 'train'; player: PlayerId; buildingId: EntityId; defId: string }
   | { kind: 'cancelTrain'; player: PlayerId; buildingId: EntityId; index: number }

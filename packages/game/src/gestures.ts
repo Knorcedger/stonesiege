@@ -218,14 +218,19 @@ export function stepGesture(state: GestureState, evt: PointerEvt, cfg: GestureCo
       state.pointers.delete(evt.id);
 
       if (wasPhase === 'press' && !isCancel) {
-        // Tap (or double tap).
+        // Tap (or primary-button double tap). Secondary mouse clicks are repeated
+        // RTS commands, never selection gestures: collapsing two right-clicks into
+        // a button-less doubleTap made the input layer treat them as a left-click
+        // on ground and clear the active unit after rapid move orders.
         const lt = state.lastTap;
-        if (lt && evt.t - lt.t <= cfg.doubleTapMs && Math.hypot(p.x - lt.x, p.y - lt.y) <= cfg.doubleTapSlop) {
+        const canDoubleTap = p.button === 0;
+        if (canDoubleTap && lt && evt.t - lt.t <= cfg.doubleTapMs
+          && Math.hypot(p.x - lt.x, p.y - lt.y) <= cfg.doubleTapSlop) {
           out.push({ kind: 'doubleTap', x: p.x, y: p.y, ptype: p.ptype });
           state.lastTap = null;
         } else {
           out.push({ kind: 'tap', x: p.x, y: p.y, button: p.button, ptype: p.ptype });
-          state.lastTap = { x: p.x, y: p.y, t: evt.t };
+          state.lastTap = canDoubleTap ? { x: p.x, y: p.y, t: evt.t } : null;
         }
         state.phase = 'idle';
       } else if (wasPhase === 'drag') {

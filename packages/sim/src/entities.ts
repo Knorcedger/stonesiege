@@ -81,14 +81,17 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
     }
   } else if (kind === 'building') {
     const def = gameData.buildings[init.defId];
+    const buildProgress = init.buildProgress ?? 1000;
     e = {
       id, kind, defId: init.defId, player: init.player,
       x: init.tileX * FP + (def.size * FP) / 2, y: init.tileY * FP + (def.size * FP) / 2,
       tileX: init.tileX, tileY: init.tileY,
       facing: init.facing ?? 0,
-      hp: init.hp ?? def.hp, maxHp: def.hp,
+      // A foundation begins barely standing, then gains HP with its progress.
+      // Scenario-authored HP overrides remain exact.
+      hp: init.hp ?? (buildProgress < 1000 ? 1 : def.hp), maxHp: def.hp,
       activity: 'idle',
-      buildProgress: init.buildProgress ?? 1000, // scenario/mapgen buildings arrive complete
+      buildProgress, // scenario/mapgen buildings arrive complete
       ...(init.deferBlocking ? { foundationPendingClearance: true } : {}),
     };
     if (def.trains && def.trains.length > 0) e.trainQueue = [];

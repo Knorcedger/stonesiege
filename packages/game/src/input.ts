@@ -17,7 +17,7 @@
 import type { Graphics } from 'pixi.js';
 import {
   GAIA, fp,
-  type Command, type Entity, type EntityId, type GameState, type PlayerId,
+  type Command, type Entity, type EntityId, type Formation, type GameState, type PlayerId,
 } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { gameData } from '@bf/data';
@@ -46,6 +46,16 @@ export function edgePanVector(
   };
 }
 
+/** Arrow keys and WASD share the same camera-pan convention. */
+export function keyboardPanVector(keys: ReadonlySet<string>): { x: number; y: number } {
+  let x = 0, y = 0;
+  if (keys.has('ArrowLeft') || keys.has('a')) x += 1;
+  if (keys.has('ArrowRight') || keys.has('d')) x -= 1;
+  if (keys.has('ArrowUp') || keys.has('w')) y += 1;
+  if (keys.has('ArrowDown') || keys.has('s')) y -= 1;
+  return { x: Math.max(-1, Math.min(1, x)), y: Math.max(-1, Math.min(1, y)) };
+}
+
 export interface InputHost {
   camera: Camera;
   world: WorldLayer;
@@ -58,7 +68,7 @@ export interface InputHost {
   issueWithUndo(cmd: Command, label: string, undo: (() => void) | null): void;
   isPlacing(): boolean;
   setPlacementTile(tileX: number, tileY: number): void;
-  confirmPlacement(): void;
+  confirmPlacement(keepActive?: boolean): void;
   placementHitTest(worldX: number, worldY: number): boolean;
   cancelPlacement(): void;
   isAttackMoveArmed(): boolean;
@@ -66,6 +76,8 @@ export interface InputHost {
   /** Armed "next tap = target" verb (attack-move / garrison / convert / heal). */
   getArmedVerb(): ArmedVerb | null;
   clearArmedVerb(): void;
+  /** Current group arrangement selected in the command card. */
+  getFormation(): Formation;
   togglePause(): void;
   showToast(label: string): void;
 }
@@ -112,6 +124,48 @@ export function isVillagerGatherTarget(e: Entity, human: PlayerId): boolean {
   // huntable carcass as food regardless of its former owner.
   if (e.hp > 0) return e.player === GAIA || e.player === human;
   return (e.amountLeft ?? 0) > 0;
+}
+
+/**
+ * Building targets only snap when the pointer is actually on their footprint.
+ * Without this guard the generous pick slop around a 3x3 farm swallowed clicks
+ * just beyond the field, so villagers gathered instead of walking across it.
+ */
+export function isVillagerGatherTargetAt(
+  e: Entity,
+  human: PlayerId,
+  wx: number,
+  wy: number,
+): boolean {
+  if (!isVillagerGatherTarget(e, human)) return false;
+  if (e.kind !== 'building') return true;
+  const tile = worldToTile(wx, wy);
+  const size = gameData.buildings[e.defId]?.size ?? 1;
+  return tile.x >= e.tileX && tile.x < e.tileX + size
+    && tile.y >= e.tileY && tile.y < e.tileY + size;
+}
+
+function pointerInsideBuilding(e: Entity, wx: number, wy: number): boolean {
+  if (e.kind !== 'building') return false;
+  const tile = worldToTile(wx, wy);
+  const size = gameData.buildings[e.defId]?.size ?? 1;
+  return tile.x >= e.tileX && tile.x < e.tileX + size
+    && tile.y >= e.tileY && tile.y < e.tileY + size;
+}
+
+/**
+ * Pick the enemy for a context attack. A directly clicked enemy foundation wins
+ * over its builder: foundations are flat and the builder sprite otherwise hides
+ * the only practical way to order soldiers to destroy construction in progress.
+ */
+export function enemyContextTarget(
+  picks: readonly Entity[], human: PlayerId, wx: number, wy: number,
+): Entity | undefined {
+  const enemy = (e: Entity): boolean =>
+    e.player !== human && e.player !== GAIA && e.kind !== 'resource' && e.hp > 0;
+  return picks.find((e) => enemy(e) && e.kind === 'building'
+      && (e.buildProgress ?? 1000) < 1000 && pointerInsideBuilding(e, wx, wy))
+    ?? picks.find(enemy);
 }
 
 /**
@@ -199,12 +253,7 @@ export class InputController {
 
   /** Per-frame: keyboard panning + time-based gesture transitions. */
   update(dtMs: number, now: number): void {
-    let dx = 0;
-    let dy = 0;
-    if (this.keysDown.has('ArrowLeft')) dx += 1;
-    if (this.keysDown.has('ArrowRight')) dx -= 1;
-    if (this.keysDown.has('ArrowUp')) dy += 1;
-    if (this.keysDown.has('ArrowDown')) dy -= 1;
+    let { x: dx, y: dy } = keyboardPanVector(this.keysDown);
     dx = Math.max(-1, Math.min(1, dx + this.edgePan.x));
     dy = Math.max(-1, Math.min(1, dy + this.edgePan.y));
     if (dx !== 0 || dy !== 0) {
@@ -271,7 +320,10 @@ export class InputController {
         rect.height,
       );
     };
-    const blur = () => { this.edgePan = { x: 0, y: 0 }; };
+    const blur = () => {
+      this.edgePan = { x: 0, y: 0 };
+      this.keysDown.clear(); // never leave Shift/arrow repeat latched after tabbing away
+    };
     const ctxmenu = (ev: Event) => ev.preventDefault();
     const wheel = (ev: WheelEvent) => {
       const rect = el.getBoundingClientRect();
@@ -279,9 +331,17 @@ export class InputController {
       ev.preventDefault();
     };
     const keydown = (ev: KeyboardEvent) => {
+      const target = ev.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
+        || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
       if (ev.key.startsWith('Arrow')) {
         this.keysDown.add(ev.key);
         ev.preventDefault();
+      } else if (['w', 'a', 's', 'd'].includes(ev.key.toLowerCase())) {
+        this.keysDown.add(ev.key.toLowerCase());
+        ev.preventDefault();
+      } else if (ev.key === 'Shift') {
+        this.keysDown.add(ev.key);
       } else if (ev.key === 'Escape') {
         if (this.host.isPlacing()) this.host.cancelPlacement();
         else if (this.host.getArmedVerb() !== null) this.host.clearArmedVerb();
@@ -294,7 +354,10 @@ export class InputController {
         this.host.camera.zoomStep(-1);
       }
     };
-    const keyup = (ev: KeyboardEvent) => this.keysDown.delete(ev.key);
+    const keyup = (ev: KeyboardEvent) => {
+      this.keysDown.delete(ev.key);
+      this.keysDown.delete(ev.key.toLowerCase());
+    };
 
     el.addEventListener('pointerdown', down);
     el.addEventListener('pointermove', move);
@@ -459,7 +522,7 @@ export class InputController {
     if (this.host.isPlacing()) {
       const w = this.host.camera.screenToWorld(sx, sy);
       this.movePlacementToWorld(w.x, w.y);
-      this.host.confirmPlacement();
+      this.host.confirmPlacement(this.keysDown.has('Shift'));
       return;
     }
     const w = this.host.camera.screenToWorld(sx, sy);
@@ -547,10 +610,10 @@ export class InputController {
     const military = units.filter((e) => e.defId !== 'villager');
     const st = this.host.getState();
 
-    const enemy = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
+    const enemy = enemyContextTarget(picks, human, wx, wy);
     // Gather targets include own completed farms (gatherable buildings), not just
     // map resources and food animals. This mirrors classifyGatherTarget in the sim.
-    const gatherTarget = picks.find((p) => isVillagerGatherTarget(p, human));
+    const gatherTarget = picks.find((p) => isVillagerGatherTargetAt(p, human, wx, wy));
     const ownBld = picks.find((p) => p.player === human && p.kind === 'building');
     const unitIds = units.map((e) => e.id);
     const undoStop = unitIds.length > 0
@@ -593,6 +656,7 @@ export class InputController {
 
     const armedVerb = this.host.getArmedVerb();
     const armed = armedVerb === 'attackMove';
+    const formation = military.length >= 3 ? this.host.getFormation() : undefined;
     this.host.clearArmedVerb();
 
     // Wave-2 verbs the sim would silently drop are downgraded to an HONEST move
@@ -664,12 +728,12 @@ export class InputController {
     const clampY = Math.max(0, Math.min(st.map.height - 0.01, t.y));
     if (armed && military.length > 0) {
       this.host.issueWithUndo(
-        { kind: 'attackMove', player: human, units: unitIds, x: fp(clampX), y: fp(clampY) },
+        { kind: 'attackMove', player: human, units: unitIds, x: fp(clampX), y: fp(clampY), formation },
         'Attack-move', undoStop,
       );
     } else {
       this.host.issueWithUndo(
-        { kind: 'move', player: human, units: unitIds, x: fp(clampX), y: fp(clampY) },
+        { kind: 'move', player: human, units: unitIds, x: fp(clampX), y: fp(clampY), formation },
         'Move', undoStop,
       );
     }

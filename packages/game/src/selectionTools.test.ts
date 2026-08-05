@@ -3,7 +3,9 @@
 import { describe, expect, it } from 'vitest';
 import { FP, GAIA, type Entity, type EntityId, type GameState, type PlayerId } from '@bf/sim/types';
 import {
-  centroidTile, idleUnits, isIdleOwnUnit, isTownBellSeeking, liveGroupIds, sameIdSet,
+  centroidTile, idleUnits, isIdleOwnUnit, isTownBellSeeking, liveGroupIds,
+  nextOwnedCompletedBuilding, sameIdSet,
+  selectionTypeCounts,
 } from './selectionTools';
 
 const HUMAN = 1 as PlayerId;
@@ -85,6 +87,33 @@ describe('idleUnits', () => {
     expect(isIdleOwnUnit(deer, HUMAN)).toBe(false);
     expect(idleUnits(st, HUMAN, 'military').map((e) => e.id)).toEqual([scout.id]);
     expect(idleUnits(st, HUMAN, 'villager')).toEqual([]);
+  });
+});
+
+describe('selectionTypeCounts', () => {
+  it('reports the real composition of a mixed military selection', () => {
+    const counts = selectionTypeCounts([
+      ent({ defId: 'spearman' }), ent({ defId: 'manAtArms' }), ent({ defId: 'spearman' }),
+    ]);
+    expect(counts.map(({ defId, count }) => ({ defId, count }))).toEqual([
+      { defId: 'spearman', count: 2 },
+      { defId: 'manAtArms', count: 1 },
+    ]);
+    expect(counts.map((c) => c.name)).toEqual(['Spearman', 'Man-at-Arms']);
+  });
+});
+
+describe('nextOwnedCompletedBuilding', () => {
+  it('cycles completed own buildings and ignores foundations and enemies', () => {
+    const first = ent({ kind: 'building', defId: 'barracks', buildProgress: 1000 });
+    const foundation = ent({ kind: 'building', defId: 'barracks', buildProgress: 500 });
+    const enemy = ent({ kind: 'building', defId: 'barracks', player: 2 as PlayerId, buildProgress: 1000 });
+    const second = ent({ kind: 'building', defId: 'barracks', buildProgress: 1000 });
+    const st = stateWith([first, foundation, enemy, second]);
+    expect(nextOwnedCompletedBuilding(st, HUMAN, 'barracks')?.id).toBe(first.id);
+    expect(nextOwnedCompletedBuilding(st, HUMAN, 'barracks', first.id)?.id).toBe(second.id);
+    expect(nextOwnedCompletedBuilding(st, HUMAN, 'barracks', second.id)?.id).toBe(first.id);
+    expect(nextOwnedCompletedBuilding(st, HUMAN, 'townCenter')).toBeNull();
   });
 });
 

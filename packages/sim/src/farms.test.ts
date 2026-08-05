@@ -25,7 +25,10 @@ function run(game: Game, ticks: number): SimEvent[] {
 
 describe('farms', () => {
   it('completed farms are traversable but still reserve their building footprint', () => {
-    const game = setup();
+    const game = setup([
+      { defId: 'militia', player: HUMAN, tileX: 7, tileY: 10, ref: 'militia' },
+      { defId: 'scout', player: HUMAN, tileX: 7, tileY: 11, ref: 'scout' },
+    ]);
     const vid = game.state.refs.get('v')!;
     expect(game.isWalkable(10, 10)).toBe(true);
     expect(game.canPlace(HUMAN, 'house', 10, 9)).toBe(false); // cannot stack a building on the plot
@@ -39,6 +42,35 @@ describe('farms', () => {
     }
     expect(crossedPlot).toBe(true);
     expect(game.state.entities.get(vid)!.tileX).toBeGreaterThanOrEqual(14);
+
+    const movers = [game.state.refs.get('militia')!, game.state.refs.get('scout')!];
+    game.advance([{ kind: 'move', player: HUMAN, units: movers, x: fp(16), y: fp(10.5) }]);
+    const crossedCenter = new Set<number>();
+    for (let t = 0; t < 300; t++) {
+      game.advance([]);
+      for (const id of movers) {
+        const u = game.state.entities.get(id)!;
+        if (u.tileX === 11 && u.tileY >= 9 && u.tileY <= 11) crossedCenter.add(id);
+      }
+    }
+    expect(crossedCenter).toEqual(new Set(movers));
+  });
+
+  it('a farmer periodically changes work spots inside the completed farm', () => {
+    const game = setup();
+    const vid = game.state.refs.get('v')!;
+    const farmId = game.state.refs.get('farm')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units: [vid], targetId: farmId }]);
+
+    const spots = new Set<string>();
+    for (let t = 0; t < 18 * 20; t++) {
+      game.advance([]);
+      const v = game.state.entities.get(vid)!;
+      if (v.tileX >= 10 && v.tileX <= 12 && v.tileY >= 9 && v.tileY <= 11) {
+        spots.add(`${v.tileX},${v.tileY}`);
+      }
+    }
+    expect(spots.size).toBeGreaterThanOrEqual(2);
   });
 
   it('a farmer works the farm at the reference rate (0.40/s → 10 food in ~500 ticks)', () => {
@@ -63,6 +95,14 @@ describe('farms', () => {
     run(game, 150);
     const farming = units.filter((id) => game.state.entities.get(id)!.activity === 'gathering');
     expect(farming).toHaveLength(1);
+    const assigned = units.filter((id) => game.state.entities.get(id)!.intent?.kind === 'gather');
+    expect(assigned).toHaveLength(1);
+    const unassigned = units.find((id) => id !== assigned[0])!;
+    expect(game.state.entities.get(unassigned)!.carrying).toBeUndefined();
+
+    // The second worker never borrows the farm while its owner deposits food.
+    run(game, 700);
+    expect(game.state.entities.get(unassigned)!.carrying).toBeUndefined();
   });
 
   it('an exhausted farm goes fallow; the farmer banks the last load and WAITS at the plot', () => {
@@ -169,7 +209,8 @@ describe('farms', () => {
     const farmId = (complete as Extract<SimEvent, { kind: 'buildingComplete' }>).id;
     const v = game.state.entities.get(vid)!;
     expect(v.intent).toEqual({ kind: 'gather', targetId: farmId }); // no idle handoff
-    expect(v.activity).toBe('gathering');
+    // Farmers periodically walk to another work spot while continuing extraction.
+    expect(['gathering', 'moving']).toContain(v.activity);
     expect(game.state.entities.get(farmId)!.amountLeft).toBeLessThan(175); // farming it
     for (let y = 10; y < 13; y++) {
       for (let x = 10; x < 13; x++) expect(game.isWalkable(x, y)).toBe(true);

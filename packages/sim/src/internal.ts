@@ -45,6 +45,8 @@ export interface FoundationSite {
   acc: number; // scaled builder-tick accumulator (integer)
   accNeeded: number; // 3 * buildTimeTicks * RATE_SCALE
   paid: Stockpile;
+  /** Builders assigned by Shift-placement once their current foundation completes. */
+  queuedBuilders?: EntityId[];
 }
 
 /** Per-villager gathering bookkeeping (exists while the unit has a gather intent). */
@@ -65,6 +67,10 @@ export interface GatherInfo {
   lastY: number;
   /** Deposit what is carried, then go idle (nothing left to retarget). */
   finishAfterDeposit: boolean;
+  /** Deterministic visual variety: completed-farm workers periodically change work tile. */
+  farmSpotIndex?: number;
+  nextFarmMoveTick?: number;
+  farmRepositioning?: boolean;
 }
 
 /** A villager running for a garrison after taking damage (GDD villager-flee rule). */
@@ -86,10 +92,12 @@ export interface RepairSite {
 /** A unit's live engagement (explicit attack order or auto-acquired target). */
 export interface CombatInfo {
   targetId: EntityId;
-  /** Auto-acquired (LOS scan / retaliation): leash + return-to-anchor rules apply. */
+  /** Auto-acquired (LOS scan / retaliation): the chase leash applies. */
   auto: boolean;
+  /** Explicit building assault: continue into nearby hostile structures after a kill. */
+  continueBuildings?: boolean;
   nextAttackTick: number;
-  /** Where the unit stood when it auto-acquired — it returns here after disengaging. */
+  /** Where the unit stood when it auto-acquired — origin for the chase leash. */
   anchorX: Fixed;
   anchorY: Fixed;
   /**

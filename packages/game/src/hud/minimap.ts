@@ -39,6 +39,7 @@ export class Minimap {
     private onMove: (tileX: number, tileY: number) => boolean,
   ) {
     this.canvas = document.createElement('canvas');
+    this.canvas.className = 'bf-minimapcanvas';
     this.canvas.width = SIZE;
     this.canvas.height = SIZE;
     this.canvas.style.cssText =

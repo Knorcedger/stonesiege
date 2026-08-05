@@ -54,6 +54,9 @@ const MENU_CSS = `
 .bf-menu-btn.primary { font-size:22px; }
 .bf-menu-note { font-size:12px; color:#B99A6B; display:block; margin-top:2px; }
 .bf-menu-label { text-align:left; font-size:13px; color:#B99A6B; letter-spacing:1px; margin:14px 0 5px; }
+.bf-setup-box { margin:0 0 16px; padding:12px 14px 14px; text-align:left; background:#241809; border:1px solid #8A6414; border-radius:5px; box-shadow:0 0 0 1px #1A1208 inset; }
+.bf-setup-box .bf-menu-label:first-child { margin-top:0; color:#E6C04A; font-size:15px; }
+.bf-setup-help { margin:3px 0 8px; color:#B99A6B; font-size:12px; line-height:1.35; }
 .bf-seg { display:flex; gap:6px; }
 .bf-seg button { flex:1; padding:8px 0; font-family:inherit; font-size:14px; cursor:pointer;
   color:#DABE8D; background:#241809; border:1px solid #64492B; border-radius:4px; }
@@ -258,15 +261,20 @@ export function showMenu(
     const renderPracticeSetup = (): void => {
       panel.appendChild(el('h1', 'bf-menu-h', 'Practice'));
 
-      panel.appendChild(el('div', 'bf-menu-label', 'MAP SIZE'));
-      panel.appendChild(segmented(
+      const settings = el('div', 'bf-setup-box');
+      settings.append(
+        el('div', 'bf-menu-label', 'MATCH SETTINGS'),
+        el('div', 'bf-setup-help', 'Choose 1–3 computer opponents. Each opponent can use a different difficulty.'),
+        el('div', 'bf-menu-label', 'MAP SIZE'),
+      );
+      settings.appendChild(segmented(
         MAP_SIZES.map((m) => ({ id: m.id, label: `${m.label} ${MAP_SIZE_TILES[m.id]}²` })),
         practice.mapSize,
         (id) => { practice.mapSize = id; render(); },
       ));
 
-      panel.appendChild(el('div', 'bf-menu-label', 'OPPONENTS'));
-      panel.appendChild(segmented(
+      settings.appendChild(el('div', 'bf-menu-label', 'NUMBER OF OPPONENTS'));
+      settings.appendChild(segmented(
         [{ id: '1', label: '1' }, { id: '2', label: '2' }, { id: '3', label: '3' }],
         String(practice.opponents.length) as '1' | '2' | '3',
         (id) => {
@@ -277,12 +285,13 @@ export function showMenu(
         },
       ));
       practice.opponents.forEach((diff, i) => {
-        panel.appendChild(el('div', 'bf-menu-label', `OPPONENT ${i + 1} DIFFICULTY`));
-        panel.appendChild(segmented(DIFFICULTIES, diff, (id) => {
+        settings.appendChild(el('div', 'bf-menu-label', `OPPONENT ${i + 1} DIFFICULTY`));
+        settings.appendChild(segmented(DIFFICULTIES, diff, (id) => {
           practice.opponents[i] = id;
           render();
         }));
       });
+      panel.appendChild(settings);
 
       panel.appendChild(el('div', 'bf-menu-label', 'YOUR CIVILIZATION'));
       const civBox = el('div', 'bf-civ');

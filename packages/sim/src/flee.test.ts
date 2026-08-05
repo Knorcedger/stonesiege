@@ -6,11 +6,11 @@
 // each villager's pre-flee task.
 
 import { describe, expect, it } from 'vitest';
-import type { Game, SimEvent } from './types';
+import { TICKS_PER_SECOND, type Game, type SimEvent } from './types';
 import { createGame } from './game';
 import type { SimState } from './internal';
 import { removeEntity } from './entities';
-import { onUnitDamaged } from './flee';
+import { onUnitDamaged, RAID_SHELTER_RADIUS_TILES } from './flee';
 import { grassMap, player, scenarioConfig } from './testutil';
 
 const HUMAN = 1;
@@ -60,6 +60,42 @@ describe('villager flee + garrison entry', () => {
     expect(v.garrisonedIn).toBeUndefined();
     expect(v.intent).toEqual({ kind: 'gather', targetId: game.state.refs.get('bush')! }); // task kept
     expect((game.state as SimState).fleeing.size).toBe(0);
+  });
+
+  it('a raid alarms villagers across the nearby settlement, but not distant workers', () => {
+    const game = createGame(scenarioConfig(50, grassMap(48, 48), [
+      { defId: 'townCenter', player: HUMAN, tileX: 18, tileY: 14, ref: 'tc' },
+      { defId: 'villager', player: HUMAN, tileX: 15, tileY: 18, ref: 'struck' },
+      // On the opposite side of the TC and well beyond a tiny 3-tile reaction radius.
+      { defId: 'villager', player: HUMAN, tileX: 25, tileY: 15, ref: 'near' },
+      { defId: 'villager', player: HUMAN, tileX: 42, tileY: 42, ref: 'far' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const struck = state.refs.get('struck')!;
+    const near = state.refs.get('near')!;
+    const far = state.refs.get('far')!;
+
+    expect(RAID_SHELTER_RADIUS_TILES).toBe(12);
+    onUnitDamaged(state, state.entities.get(struck)!);
+
+    expect(state.fleeing.has(struck)).toBe(true);
+    expect(state.fleeing.has(near)).toBe(true);
+    expect(state.fleeing.has(far)).toBe(false);
+  });
+
+  it('a wildlife bite shelters only its victim instead of ringing a settlement-wide alarm', () => {
+    const game = createGame(scenarioConfig(52, grassMap(30, 30), [
+      { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 8, ref: 'tc' },
+      { defId: 'villager', player: HUMAN, tileX: 12, tileY: 13, ref: 'struck' },
+      { defId: 'villager', player: HUMAN, tileX: 13, tileY: 13, ref: 'neighbor' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const struck = state.refs.get('struck')!;
+    const neighbor = state.refs.get('neighbor')!;
+
+    onUnitDamaged(state, state.entities.get(struck)!, false);
+    expect(state.fleeing.has(struck)).toBe(true);
+    expect(state.fleeing.has(neighbor)).toBe(false);
   });
 
   it('a destroyed building kills the villagers garrisoned inside (GDD tension rule)', () => {
@@ -114,6 +150,24 @@ describe('raid aftermath: sheltering + the return-to-work bell', () => {
     expect(game.state.entities.get(workerId)!.intent).toEqual({ kind: 'gather', targetId: bushId });
     expect(state.gather.has(workerId)).toBe(true);
     expect(game.state.entities.get(idleId)!.activity).toBe('idle');
+  });
+
+  it('a damaged villager slowly heals while sheltered by the Town Bell', () => {
+    const game = createGame(scenarioConfig(51, grassMap(30, 30), [
+      { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 8, ref: 'tc' },
+      { defId: 'villager', player: HUMAN, tileX: 12, tileY: 13, ref: 'v' },
+    ], [player()]));
+    const tcId = game.state.refs.get('tc')!;
+    const vid = game.state.refs.get('v')!;
+    const villager = game.state.entities.get(vid)!;
+    villager.hp = 20;
+
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    runUntilGarrisoned(game, vid);
+    expect(villager.garrisonedIn).toBe(tcId);
+    const before = villager.hp;
+    run(game, 10 * TICKS_PER_SECOND);
+    expect(villager.hp).toBe(before + 1);
   });
 
   it('turning the bell off cancels villagers who are still walking to the Town Center', () => {
@@ -172,6 +226,30 @@ describe('raid aftermath: sheltering + the return-to-work bell', () => {
     game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
     expect(game.state.entities.get(workerId)!.intent).toEqual({ kind: 'gather', targetId: bushId });
     expect(state.gather.has(workerId)).toBe(true);
+  });
+
+  it('Town Bell return-to-work preserves a villager\'s Shift-build queue', () => {
+    const game = createGame(scenarioConfig(53, grassMap(36, 36), [
+      { defId: 'townCenter', player: HUMAN, tileX: 14, tileY: 8, ref: 'tc' },
+      { defId: 'villager', player: HUMAN, tileX: 12, tileY: 13, ref: 'builder' },
+    ], [player()]));
+    const state = game.state as SimState;
+    const tcId = state.refs.get('tc')!;
+    const builderId = state.refs.get('builder')!;
+    game.advance([
+      { kind: 'build', player: HUMAN, units: [builderId], defId: 'house', tileX: 9, tileY: 14, queue: true },
+      { kind: 'build', player: HUMAN, units: [builderId], defId: 'house', tileX: 12, tileY: 15, queue: true },
+    ]);
+    const queued = [...state.foundations.entries()]
+      .find(([, site]) => site.queuedBuilders?.includes(builderId));
+    expect(queued).toBeDefined();
+
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+    runUntilGarrisoned(game, builderId);
+    game.advance([{ kind: 'townBell', player: HUMAN, buildingId: tcId }]);
+
+    expect(state.entities.get(builderId)!.intent?.kind).toBe('build');
+    expect(state.foundations.get(queued![0])?.queuedBuilders).toEqual([builderId]);
   });
 
   it('a flee-garrisoned gatherer is sheltering; ungarrison resumes the gather task', () => {

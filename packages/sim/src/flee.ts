@@ -16,6 +16,8 @@ import { orderMove } from './path';
 
 /** Give up fleeing after this many failed approaches (then just stand and cope). */
 const FLEE_RETRIES = 4;
+/** A local raid alarm covers the whole settlement around the struck entity. */
+export const RAID_SHELTER_RADIUS_TILES = 12;
 
 function garrisonRoom(state: SimState, b: Entity): number {
   if (b.kind !== 'building' || b.hp <= 0) return 0;
@@ -26,34 +28,68 @@ function garrisonRoom(state: SimState, b: Entity): number {
   return def.garrisonCapacity - (b.garrison?.length ?? 0);
 }
 
+/** Room still available after accounting for villagers already running there. */
+function unreservedGarrisonRoom(state: SimState, b: Entity): number {
+  let reserved = 0;
+  for (const f of state.fleeing.values()) if (f.buildingId === b.id) reserved++;
+  return garrisonRoom(state, b) - reserved;
+}
+
+function nearestShelterWithRoom(state: SimState, villager: Entity): Entity | null {
+  let best: Entity | null = null;
+  let bestD = Infinity;
+  for (const b of state.entities.values()) {
+    if (b.player !== villager.player || unreservedGarrisonRoom(state, b) <= 0) continue;
+    const dx = b.x - villager.x, dy = b.y - villager.y;
+    const dd = dx * dx + dy * dy;
+    if (dd < bestD) { bestD = dd; best = b; }
+  }
+  return best;
+}
+
+function beginFlee(state: SimState, villager: Entity, shelter: Entity): void {
+  const savedIntent = villager.intent;
+  villager.intent = undefined;
+  state.gather.delete(villager.id);
+  state.buildRetries.delete(villager.id);
+  state.fleeing.set(villager.id, { buildingId: shelter.id, retries: 0, savedIntent });
+  orderMove(state, [villager.id], shelter.x, shelter.y);
+  villager.activity = 'fleeing';
+}
+
 /**
  * Damage hook for villagers (called by whatever dealt the hit — wolves today, the
  * combat system in a later wave). Non-villagers ignore it; villagers with no reachable
  * garrison keep their task, per the GDD.
  */
-export function onUnitDamaged(state: SimState, victim: Entity): void {
+export function onUnitDamaged(state: SimState, victim: Entity, alarmNearby = true): void {
   if (victim.kind !== 'unit' || victim.hp <= 0 || victim.player <= GAIA) return;
   if (victim.garrisonedIn !== undefined) return;
   if (!gameData.units[victim.defId]?.gather) return; // villagers only
-  if (state.fleeing.has(victim.id)) return; // already running
+  // Treat the hit as a local alarm, not something only the struck worker can
+  // perceive. Twelve tiles is roughly four times the old apparent working-side
+  // range and comfortably reaches villagers on the opposite side of a 4x4 TC.
+  const radius = RAID_SHELTER_RADIUS_TILES * FP;
+  const candidates = [...state.entities.values()]
+    .filter((e) => e.kind === 'unit' && e.player === victim.player && e.hp > 0
+      && e.garrisonedIn === undefined && !state.fleeing.has(e.id) && !state.garrisoning.has(e.id)
+      && !!gameData.units[e.defId]?.gather
+      && (alarmNearby || e.id === victim.id)
+      && (e.x - victim.x) ** 2 + (e.y - victim.y) ** 2 <= radius * radius)
+    .sort((a, b) => {
+      // The worker actually under fire gets first claim on shelter capacity.
+      if (a.id === victim.id) return -1;
+      if (b.id === victim.id) return 1;
+      const ad = (a.x - victim.x) ** 2 + (a.y - victim.y) ** 2;
+      const bd = (b.x - victim.x) ** 2 + (b.y - victim.y) ** 2;
+      return ad - bd || a.id - b.id;
+    });
 
-  let best: Entity | null = null;
-  let bestD = Infinity;
-  for (const b of state.entities.values()) {
-    if (b.player !== victim.player || garrisonRoom(state, b) <= 0) continue;
-    const dx = b.x - victim.x, dy = b.y - victim.y;
-    const dd = dx * dx + dy * dy;
-    if (dd < bestD) { bestD = dd; best = b; }
+  for (const villager of candidates) {
+    const shelter = nearestShelterWithRoom(state, villager);
+    if (!shelter) break; // no shelter: remaining villagers keep their jobs (GDD)
+    beginFlee(state, villager, shelter);
   }
-  if (!best) return; // no shelter: keep the current task (GDD)
-
-  const savedIntent = victim.intent; // remembered for the return-to-work bell
-  victim.intent = undefined; // abandon gather/build task
-  state.gather.delete(victim.id);
-  state.buildRetries.delete(victim.id);
-  state.fleeing.set(victim.id, { buildingId: best.id, retries: 0, savedIntent });
-  orderMove(state, [victim.id], best.x, best.y);
-  victim.activity = 'fleeing';
 }
 
 /** Put a unit inside a building (shared with the future full garrison system). */

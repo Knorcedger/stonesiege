@@ -163,6 +163,20 @@ describe('mouse buttons', () => {
     expect(out).toEqual([{ kind: 'tap', x: 10, y: 10, button: 2, ptype: 'mouse' }]);
   });
 
+  it('never collapses rapid right-click move orders into a selection double-click', () => {
+    const s = createGestureState();
+    const out: Gesture[] = [];
+    for (let i = 0; i < 20; i++) {
+      out.push(...run(s, [
+        mouse('down', 1, 100 + (i % 3), 100, i * 90, 2),
+        mouse('up', 1, 100 + (i % 3), 100, i * 90 + 30, 2),
+      ]));
+    }
+    expect(out).toHaveLength(20);
+    expect(out.every((g) => g.kind === 'tap' && g.button === 2)).toBe(true);
+    expect(out.some((g) => g.kind === 'doubleTap')).toBe(false);
+  });
+
   it('carries button + ptype through drag (left-drag band select on desktop)', () => {
     const s = createGestureState();
     const out = run(s, [

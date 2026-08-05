@@ -25,6 +25,7 @@ import type { GatherInfo, SimState } from './internal';
 import { removeEntity, stumpify } from './entities';
 import { resolveUnitStats } from './stats';
 import { orderMove } from './path';
+import { cancelQueuedBuilds } from './construction';
 import { applyHit, meleeDamage } from './damage';
 import { onFarmExhausted } from './farms';
 
@@ -33,8 +34,10 @@ export const RES_SCALE = 1000;
 /** Accumulator value worth one whole resource unit. */
 export const ACC_PER_UNIT = RES_SCALE * TICKS_PER_SECOND;
 
-/** Auto-continue: search radius (tiles, chebyshev) around the depleted node. */
+/** Normal auto-continue radius; forests get a wider radius below. */
 const RETARGET_RADIUS = 8;
+/** Lumberjacks remember the wider local forest instead of stopping at its first edge. */
+const WOOD_RETARGET_RADIUS = 16;
 /** Approach attempts for static targets (nodes, farms, drop-offs) before giving up. */
 const STATIC_RETRIES = 8;
 /** Live prey runs around — hunters persist much longer. */
@@ -45,6 +48,8 @@ const BUMP_STAGGER = 5;
 const TREE_SLOTS = 1;
 /** Mines/bushes/carcasses: one gatherer per adjacent tile of the node. */
 const NODE_SLOTS = 8;
+/** Farmers shift work spots every few seconds; extraction continues during the short walk. */
+const FARM_SHIFT_TICKS = 10 * TICKS_PER_SECOND;
 
 type GatherCmd = Extract<Command, { kind: 'gather' }>;
 
@@ -91,12 +96,19 @@ function freshInfo(task: GatherTask | null, target: Entity | null): GatherInfo {
 }
 
 /** gather command: task every selected worker onto the target and send them walking. */
-export function handleGather(state: SimState, cmd: GatherCmd): void {
+export function handleGather(state: SimState, cmd: GatherCmd, cancelBuildQueue = true): void {
   const target = state.entities.get(cmd.targetId);
   const view = classifyGatherTarget(state, target, cmd.player);
   if (!target || !view) return;
   const movers: EntityId[] = [];
   const seen = new Set<EntityId>();
+  // Farms are single-worker plots. Preserve an existing live claimant; if the
+  // plot is free, the first valid worker in this command claims it.
+  let farmClaimant = view.kind === 'farm'
+    ? [...state.entities.values()].find((e) => e.kind === 'unit' && e.player === cmd.player
+      && e.hp > 0 && e.garrisonedIn === undefined
+      && e.intent?.kind === 'gather' && e.intent.targetId === target.id)?.id
+    : undefined;
   for (const id of cmd.units) {
     if (seen.has(id)) continue;
     seen.add(id);
@@ -104,6 +116,10 @@ export function handleGather(state: SimState, cmd: GatherCmd): void {
     if (!e || e.kind !== 'unit' || e.player !== cmd.player || e.hp <= 0) continue;
     if (e.garrisonedIn !== undefined) continue;
     if (!gameData.units[e.defId]?.gather) continue; // workers only
+    if (view.kind === 'farm') {
+      if (farmClaimant !== undefined && farmClaimant !== e.id) continue;
+      farmClaimant = e.id;
+    }
     e.intent = { kind: 'gather', targetId: target.id };
     e.targetId = undefined;
     state.fleeing.delete(id);
@@ -113,7 +129,10 @@ export function handleGather(state: SimState, cmd: GatherCmd): void {
     state.gather.set(id, freshInfo(view.task, target));
     movers.push(id);
   }
-  if (movers.length > 0) orderMove(state, movers, target.x, target.y);
+  if (movers.length > 0) {
+    if (cancelBuildQueue) cancelQueuedBuilds(state, movers);
+    orderMove(state, movers, target.x, target.y);
+  }
 }
 
 /** Deplete a node: trees leave a stump and unblock their tile, everything else vanishes. */
@@ -170,18 +189,24 @@ function countGatherIntents(state: SimState, player: PlayerId, excludeId: Entity
 function findNearbyTarget(state: SimState, villager: Entity, task: GatherTask, cx: number, cy: number): Entity | null {
   if (task === 'farm') return null; // farmers wait at their fallow plot instead
   const intents = countGatherIntents(state, villager.player, villager.id);
-  let best: Entity | null = null;
-  let bestD = Infinity;
+  let bestFree: Entity | null = null;
+  let bestFreeD = Infinity;
+  let bestOccupied: Entity | null = null;
+  let bestOccupiedD = Infinity;
+  const radius = task === 'wood' ? WOOD_RETARGET_RADIUS : RETARGET_RADIUS;
   for (const t of state.entities.values()) {
     const view = classifyGatherTarget(state, t, villager.player);
     if (!view || view.task !== task) continue;
     const dx = t.tileX - cx, dy = t.tileY - cy;
-    if (Math.max(Math.abs(dx), Math.abs(dy)) > RETARGET_RADIUS) continue;
-    if (view.kind !== 'prey' && (intents.get(t.id) ?? 0) >= slotCapOf(view)) continue;
+    if (Math.max(Math.abs(dx), Math.abs(dy)) > radius) continue;
     const dd = dx * dx + dy * dy;
-    if (dd < bestD) { bestD = dd; best = t; }
+    const occupied = view.kind !== 'prey' && (intents.get(t.id) ?? 0) >= slotCapOf(view);
+    if (!occupied && dd < bestFreeD) { bestFreeD = dd; bestFree = t; }
+    if (occupied && dd < bestOccupiedD) { bestOccupiedD = dd; bestOccupied = t; }
   }
-  return best;
+  // Prefer an unclaimed tree, but if every nearby tree already has a lumberjack,
+  // queue on the nearest one instead of dropping the woodcutting job entirely.
+  return bestFree ?? bestOccupied;
 }
 
 /** Own, completed, currently-fallow farm (amountLeft 0) — its farmer waits beside it. */
@@ -207,6 +232,8 @@ function startDeposit(state: SimState, e: Entity, info: GatherInfo): void {
   info.depositing = true;
   info.dropoffId = drop.id;
   info.retries = 0;
+  info.farmRepositioning = undefined;
+  info.nextFarmMoveTick = undefined;
   orderMove(state, [e.id], drop.x, drop.y);
   e.activity = 'carrying';
 }
@@ -305,8 +332,27 @@ function approach(state: SimState, e: Entity, info: GatherInfo, target: Entity, 
   orderMove(state, [e.id], target.x, target.y);
 }
 
+/** Next deterministic point inside a completed farm's traversable footprint. */
+function nextFarmWorkPoint(
+  farm: Entity,
+  size: number,
+  info: GatherInfo,
+  villagerId: EntityId,
+): { x: number; y: number } {
+  const far = Math.max(0.5, size - 0.5);
+  const mid = size / 2;
+  const spots = [
+    [0.5, 0.5], [far, 0.5], [far, far], [0.5, far], [mid, mid],
+  ] as const;
+  const index = info.farmSpotIndex ?? (villagerId % spots.length);
+  const [dx, dy] = spots[index % spots.length];
+  info.farmSpotIndex = (index + 1) % spots.length;
+  return { x: (farm.tileX + dx) * FP, y: (farm.tileY + dy) * FP };
+}
+
 function stepWorker(
-  state: SimState, e: Entity, info: GatherInfo, slots: Map<EntityId, number>, events: SimEvent[],
+  state: SimState, e: Entity, info: GatherInfo, slots: Map<EntityId, number>,
+  farmClaims: Map<EntityId, EntityId>, events: SimEvent[],
 ): void {
   if (info.depositing) { stepDeposit(state, e, info, events); return; }
 
@@ -342,6 +388,21 @@ function stepWorker(
   info.task = view.task;
   info.lastX = target.tileX;
   info.lastY = target.tileY;
+  if (view.kind !== 'farm') {
+    info.farmRepositioning = undefined;
+    info.nextFarmMoveTick = undefined;
+  }
+
+  if (view.kind === 'farm') {
+    // Stable ownership across deposit trips: a queued legacy worker never
+    // starts harvesting merely because the real farmer is walking to the TC.
+    const claimant = farmClaims.get(target.id);
+    if (claimant !== e.id) {
+      state.motion.delete(e.id);
+      e.activity = 'idle';
+      return;
+    }
+  }
 
   const stats = resolveUnitStats(state, e.player, e.defId);
   const capacity = stats.carry[view.task] ?? Number.MAX_SAFE_INTEGER;
@@ -380,9 +441,28 @@ function stepWorker(
   }
   slots.set(target.id, used + 1);
 
-  state.motion.delete(e.id);
-  e.activity = 'gathering';
-  e.facing = facingFromDelta(target.x - e.x, target.y - e.y);
+  if (view.kind === 'farm') {
+    if (info.farmRepositioning && !state.motion.has(e.id)) {
+      info.farmRepositioning = undefined;
+      info.nextFarmMoveTick = state.tick + FARM_SHIFT_TICKS;
+    }
+    if (!info.farmRepositioning) {
+      info.nextFarmMoveTick ??= state.tick + FARM_SHIFT_TICKS;
+      if (state.tick >= info.nextFarmMoveTick) {
+        const spot = nextFarmWorkPoint(target, view.size, info, e.id);
+        info.farmRepositioning = true;
+        orderMove(state, [e.id], spot.x, spot.y);
+      }
+    }
+  }
+
+  // A farmer keeps producing during the brief visual reposition, preserving the
+  // reference gather rate. Other workers remain stationary at their work face.
+  if (!info.farmRepositioning) {
+    state.motion.delete(e.id);
+    e.activity = 'gathering';
+    e.facing = facingFromDelta(target.x - e.x, target.y - e.y);
+  }
   const rate = Math.round((stats.gather[view.task] ?? 0) * RES_SCALE);
   if (rate <= 0) { release(state, e); return; }
   if (e.carrying && e.carrying.type !== view.resourceType) e.carrying = undefined; // switched tasks: old load is lost
@@ -413,6 +493,14 @@ export function tickGathering(state: SimState, events: SimEvent[]): void {
   }
   // per-tick slot claims, first come (insertion order) first served — deterministic
   const slots = new Map<EntityId, number>();
+  const farmClaims = new Map<EntityId, EntityId>();
+  for (const e of state.entities.values()) {
+    if (e.kind !== 'unit' || e.hp <= 0 || e.garrisonedIn !== undefined
+      || e.intent?.kind !== 'gather') continue;
+    const target = state.entities.get(e.intent.targetId);
+    if (target?.kind === 'building' && gameData.buildings[target.defId]?.providesFood !== undefined
+      && !farmClaims.has(target.id)) farmClaims.set(target.id, e.id);
+  }
   for (const e of state.entities.values()) {
     if (e.kind !== 'unit' || e.hp <= 0 || e.garrisonedIn !== undefined) continue;
     if (e.intent?.kind !== 'gather') continue;
@@ -422,6 +510,6 @@ export function tickGathering(state: SimState, events: SimEvent[]): void {
       info = freshInfo(null, state.entities.get(e.intent.targetId) ?? null);
       state.gather.set(e.id, info);
     }
-    stepWorker(state, e, info, slots, events);
+    stepWorker(state, e, info, slots, farmClaims, events);
   }
 }

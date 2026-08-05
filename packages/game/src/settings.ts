@@ -1,4 +1,4 @@
-// Player settings: audio volumes, camera speed, HP-bar visibility. Loaded once
+// Player settings: audio volumes, camera speed, HP-bar visibility and help detail. Loaded once
 // at boot, cached in a module singleton (input/world/audio read it every frame),
 // persisted through the storage seam on every change.
 
@@ -12,6 +12,8 @@ export interface GameSettings {
   /** Keyboard/edge camera pan multiplier, 0.5..2. */
   cameraSpeed: number;
   showHpBars: boolean;
+  /** Rich upgrade effects and unit counter advice in the custom HUD tooltips. */
+  extendedTooltips: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -20,6 +22,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   ambientVolume: 0.6,
   cameraSpeed: 1,
   showHpBars: true,
+  extendedTooltips: true,
 };
 
 const STORAGE_KEY = 'bf.settings.v1';
@@ -40,6 +43,9 @@ export function decodeSettings(raw: string | null): GameSettings {
         ? Math.min(2, Math.max(0.5, s.cameraSpeed))
         : DEFAULT_SETTINGS.cameraSpeed,
       showHpBars: typeof s.showHpBars === 'boolean' ? s.showHpBars : DEFAULT_SETTINGS.showHpBars,
+      extendedTooltips: typeof s.extendedTooltips === 'boolean'
+        ? s.extendedTooltips
+        : DEFAULT_SETTINGS.extendedTooltips,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

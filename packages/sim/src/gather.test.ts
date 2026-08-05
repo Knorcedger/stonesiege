@@ -148,6 +148,20 @@ describe('depletion: stump + tile unblock + auto-continue', () => {
     expect(v.activity).toBe('gathering');
   });
 
+  it('continues into a tree elsewhere in the same local forest', () => {
+    const game = createGame(scenarioConfig(14, grassMap(36, 36), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v' },
+      { defId: 'tree', player: 0, tileX: 10, tileY: 10, ref: 't1', amountLeft: 1 },
+      { defId: 'tree', player: 0, tileX: 22, tileY: 10, ref: 't2' },
+    ], [player({ civ: 'english' })]));
+    const vid = game.state.refs.get('v')!;
+    const t2 = game.state.refs.get('t2')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units: [vid], targetId: game.state.refs.get('t1')! }]);
+
+    for (let t = 0; t < 500; t++) game.advance([]);
+    expect(game.state.entities.get(vid)!.intent).toEqual({ kind: 'gather', targetId: t2 });
+  });
+
   it('with nothing to retarget the villager banks the partial load and goes idle', () => {
     const game = createGame(scenarioConfig(9, grassMap(30, 30), [
       { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v' },
@@ -207,6 +221,24 @@ describe('AoE2 slot etiquette', () => {
     expect(targets.size).toBe(3);
     const gathering = units.filter((id) => game.state.entities.get(id)!.activity === 'gathering');
     expect(gathering).toHaveLength(3);
+  });
+
+  it('queues at an occupied live tree instead of abandoning woodcutting after depletion', () => {
+    const game = createGame(scenarioConfig(15, grassMap(30, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 9, ref: 'v0' },
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v1' },
+      { defId: 'tree', player: 0, tileX: 10, tileY: 10, ref: 't0', amountLeft: 1 },
+      { defId: 'tree', player: 0, tileX: 12, tileY: 10, ref: 't1' },
+      { defId: 'townCenter', player: HUMAN, tileX: 16, tileY: 7 },
+    ], [player({ civ: 'english' })]));
+    const units = ['v0', 'v1'].map((r) => game.state.refs.get(r)!);
+    const t1 = game.state.refs.get('t1')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units, targetId: game.state.refs.get('t0')! }]);
+    for (let t = 0; t < 180; t++) game.advance([]);
+
+    for (const id of units) {
+      expect(game.state.entities.get(id)!.intent).toEqual({ kind: 'gather', targetId: t1 });
+    }
   });
 
   it('mines support several gatherers at once', () => {

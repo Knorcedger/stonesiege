@@ -2,9 +2,33 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from './game';
 import { FP, fp } from './types';
 import type { Entity, ScenarioStart } from './types';
+import type { SimState } from './internal';
 import { entitiesOf, grassMap, player, scenarioConfig } from './testutil';
 
 describe('movement', () => {
+  it('a cavalry unit takes a straight diagonal route across open ground', () => {
+    const game = createGame(scenarioConfig(10, grassMap(35, 30), [
+      { defId: 'scout', player: 1, tileX: 3, tileY: 4, ref: 'horse' },
+    ], [player()]));
+    const horse = game.state.entities.get(game.state.refs.get('horse')!)!;
+    const targetX = fp(27) + FP / 2;
+    const targetY = fp(18) + FP / 2;
+    const startX = horse.x, startY = horse.y;
+    game.advance([{ kind: 'move', player: 1, units: [horse.id], x: targetX, y: targetY }]);
+
+    const motion = (game.state as SimState).motion.get(horse.id)!;
+    expect(motion.path?.length).toBe(1); // open terrain needs no grid-corner waypoint
+    let maxCrossTrack = 0;
+    for (let tick = 0; tick < 500 && horse.activity === 'moving'; tick++) {
+      game.advance([]);
+      const vx = targetX - startX, vy = targetY - startY;
+      const cross = Math.abs((horse.x - startX) * vy - (horse.y - startY) * vx);
+      maxCrossTrack = Math.max(maxCrossTrack, cross / Math.hypot(vx, vy));
+    }
+    expect(horse.activity).toBe('idle');
+    expect(maxCrossTrack).toBeLessThan(FP / 8);
+  });
+
   it('a walking unit passes through a friendly crowd without pushing the whole line', () => {
     const entities: ScenarioStart['entities'] = [
       { defId: 'villager', player: 1, tileX: 4, tileY: 10, ref: 'walker' },

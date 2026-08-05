@@ -439,6 +439,31 @@ export interface QueueChipModel {
   isTech: boolean;
 }
 
+export interface QueueStack {
+  item: TrainQueueItem;
+  startIndex: number;
+  endIndex: number;
+  count: number;
+}
+
+/** Consecutive identical queue entries collapse without losing production order. */
+export function queueStacks(items: readonly TrainQueueItem[]): QueueStack[] {
+  const out: QueueStack[] = [];
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    const previous = out[out.length - 1];
+    const same = previous && previous.item.defId === item.defId
+      && previous.item.techId === item.techId;
+    if (same) {
+      previous.endIndex = i;
+      previous.count++;
+    } else {
+      out.push({ item, startIndex: i, endIndex: i, count: 1 });
+    }
+  }
+  return out;
+}
+
 /**
  * Icon + name for one shared-production-queue chip. Research occupies the same
  * queue as units (sim: TrainQueueItem.techId set, defId mirrors the tech id) —

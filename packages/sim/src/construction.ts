@@ -20,10 +20,18 @@ import { orderMove } from './path';
 
 /** buildRate is a float factor in the data (villager = 1); scale to integers for determinism. */
 const RATE_SCALE = 10;
-/** Give up on a builder that repeatedly fails to reach the site. */
-const MAX_APPROACH_RETRIES = 3;
-
 type BuildCmd = Extract<Command, { kind: 'build' }>;
+
+/** Any explicit non-queued order cancels a villager's pending Shift-build chain. */
+export function cancelQueuedBuilds(state: SimState, builderIds: readonly EntityId[]): void {
+  if (builderIds.length === 0) return;
+  const cancelled = new Set(builderIds);
+  for (const site of state.foundations.values()) {
+    if (!site.queuedBuilders) continue;
+    site.queuedBuilders = site.queuedBuilders.filter((id) => !cancelled.has(id));
+    if (site.queuedBuilders.length === 0) site.queuedBuilders = undefined;
+  }
+}
 
 /**
  * GDD: "extra TCs unlock in Castle Age". The Town Center DEF is age 'dark' (one exists at
@@ -247,6 +255,19 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
   }
 
   const ticks = Math.max(1, Math.round(def.buildTime * TICKS_PER_SECOND));
+  // Shift-builds only queue builders who are already raising another live
+  // foundation. Everyone else starts this first placement immediately.
+  const queuedBuilders = cmd.queue
+    ? builders.filter((b) => {
+      const buildingNow = b.intent?.kind === 'build' && state.foundations.has(b.intent.targetId);
+      const alreadyQueued = [...state.foundations.values()]
+        .some((site) => site.queuedBuilders?.includes(b.id));
+      return buildingNow || alreadyQueued;
+    })
+    : [];
+  const queuedIds = new Set(queuedBuilders.map((b) => b.id));
+  const activeBuilders = builders.filter((b) => !queuedIds.has(b.id));
+  if (!cmd.queue) cancelQueuedBuilds(state, builders.map((b) => b.id));
   state.foundations.set(foundation.id, {
     acc: 0,
     accNeeded: 3 * ticks * RATE_SCALE,
@@ -254,10 +275,11 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
       food: def.cost.food ?? 0, wood: def.cost.wood ?? 0,
       gold: def.cost.gold ?? 0, stone: def.cost.stone ?? 0,
     },
+    ...(queuedBuilders.length > 0 ? { queuedBuilders: queuedBuilders.map((b) => b.id) } : {}),
   });
   events.push({ kind: 'buildingPlaced', id: foundation.id, defId: foundation.defId, player: foundation.player });
 
-  for (const b of builders) {
+  for (const b of activeBuilders) {
     b.intent = { kind: 'build', targetId: foundation.id };
     b.targetId = undefined;
     state.buildRetries.delete(b.id);
@@ -269,14 +291,14 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
   if (foundation.foundationPendingClearance) {
     // Everyone physically exits first; builders outside the footprint wait on the
     // same ring rather than entering the still-soft foundation and starting early.
-    const waiters = new Map(builders.map((b) => [b.id, b]));
+    const waiters = new Map(activeBuilders.map((b) => [b.id, b]));
     for (const e of occupants) waiters.set(e.id, e);
     walkUnitsOffFootprint(
       state, [...waiters.values()], foundation.tileX, foundation.tileY, def.size, foundation.id,
     );
   } else {
     // blocked center remaps to the nearest walkable tile — i.e. adjacent to the footprint
-    orderMove(state, builders.map((b) => b.id), foundation.x, foundation.y);
+    orderMove(state, activeBuilders.map((b) => b.id), foundation.x, foundation.y);
   }
 }
 
@@ -315,6 +337,7 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
       e.intent = undefined;
       state.buildRetries.delete(e.id);
       if (e.activity === 'building') e.activity = 'idle';
+      startNextQueuedFoundation(state, e);
       continue;
     }
     if (site.foundationPendingClearance) continue;
@@ -330,15 +353,14 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
       const rate = Math.max(1, Math.round((gameData.units[e.defId]?.buildRate ?? 1) * RATE_SCALE));
       ratesOf.set(site.id, (ratesOf.get(site.id) ?? 0) + rate);
     } else if (!state.motion.has(e.id)) {
-      // arrived short (spread arrival) or the path failed: re-approach a few times
-      const tries = state.buildRetries.get(e.id) ?? 0;
-      if (tries >= MAX_APPROACH_RETRIES) {
-        e.intent = undefined;
-        state.buildRetries.delete(e.id);
-        if (e.activity === 'building') e.activity = 'idle';
-        continue;
-      }
-      state.buildRetries.set(e.id, tries + 1);
+      // A friendly unit can gently displace a stationary builder. Re-approach
+      // without discarding the current site or skipping its Shift-build queue:
+      // only an explicit player order is allowed to replace that memory.
+      const retryAt = state.buildRetries.get(e.id) ?? 0;
+      if (state.tick < retryAt) continue;
+      // Permanently unreachable sites retain their order without starting a
+      // fresh full-map path search every simulation tick.
+      state.buildRetries.set(e.id, state.tick + TICKS_PER_SECOND);
       orderMove(state, [e.id], site.x, site.y);
     }
   }
@@ -353,11 +375,22 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
     const n = ratesOf.get(id) ?? 0;
     if (n === 0) continue;
     info.acc += n + 2 * RATE_SCALE; // AoE2: rate with N builders ~ (N + 2) / 3T
-    if (info.acc >= info.accNeeded) {
-      // Farms stop blocking movement at the instant construction completes.
-      // Subtract while buildProgress is still <1000 so footprintSize is 3 here.
+    const previousProgress = site.buildProgress ?? 0;
+    const nextProgress = info.acc >= info.accNeeded
+      ? 1000
+      : Math.min(999, Math.floor((info.acc * 1000) / info.accNeeded));
+    // Add the HP represented by newly finished construction. Damage already
+    // taken remains damage instead of being silently erased by the next tick.
+    const previousBuiltHp = Math.max(1, Math.floor((site.maxHp * previousProgress) / 1000));
+    const nextBuiltHp = Math.max(1, Math.floor((site.maxHp * nextProgress) / 1000));
+    if (nextProgress >= 1000) {
+      // Must run while buildProgress is still below 1000: that is how the
+      // footprint helper distinguishes a blocking foundation from finished soil.
       releaseCompletedFarmFootprint(state, site);
-      site.buildProgress = 1000;
+    }
+    site.hp = Math.min(site.maxHp, site.hp + Math.max(0, nextBuiltHp - previousBuiltHp));
+    site.buildProgress = nextProgress;
+    if (nextProgress >= 1000) {
       state.foundations.delete(id);
       recomputePopCap(state, site.player);
       events.push({ kind: 'buildingComplete', id: site.id, defId: site.defId, player: site.player });
@@ -369,6 +402,7 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
           e.intent = undefined;
           state.buildRetries.delete(e.id);
           if (e.activity === 'building') e.activity = 'idle';
+          if (startNextQueuedFoundation(state, e)) continue;
           if (farmable && gameData.units[e.defId]?.gather !== undefined) {
             farmable = false; // farms feed exactly one farmer — first builder takes it
             e.intent = { kind: 'gather', targetId: site.id }; // gather pass books it lazily
@@ -378,10 +412,26 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
           autoJoinNearbyFoundation(state, e);
         }
       }
-    } else {
-      site.buildProgress = Math.min(999, Math.floor((info.acc * 1000) / info.accNeeded));
     }
   }
+}
+
+/** Take the oldest still-live Shift-queued foundation assigned to this builder. */
+function startNextQueuedFoundation(state: SimState, builder: Entity): boolean {
+  for (const [id, info] of state.foundations) {
+    const index = info.queuedBuilders?.indexOf(builder.id) ?? -1;
+    if (index < 0) continue;
+    info.queuedBuilders!.splice(index, 1);
+    if (info.queuedBuilders!.length === 0) info.queuedBuilders = undefined;
+    const site = state.entities.get(id);
+    if (!site || site.hp <= 0 || (site.buildProgress ?? 1000) >= 1000) continue;
+    builder.intent = { kind: 'build', targetId: id };
+    builder.targetId = undefined;
+    state.buildRetries.delete(builder.id);
+    if (!site.foundationPendingClearance) orderMove(state, [builder.id], site.x, site.y);
+    return true;
+  }
+  return false;
 }
 
 /** Auto-join: how far (tiles) a finished builder looks for the next own foundation. */

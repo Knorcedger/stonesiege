@@ -11,6 +11,7 @@ import type { Command, Entity, EntityId, ResourceType, SimEvent } from './types'
 import { adjacentToFootprint, facingFromDelta } from './internal';
 import type { RepairSite, SimState } from './internal';
 import { orderMove } from './path';
+import { cancelQueuedBuilds } from './construction';
 
 /** Scale for HP + cost-debt accumulators. */
 const REPAIR_SCALE = 1000;
@@ -21,7 +22,7 @@ const RES_TYPES: readonly ResourceType[] = ['food', 'wood', 'gold', 'stone'];
 
 type RepairCmd = Extract<Command, { kind: 'repair' }>;
 
-export function handleRepair(state: SimState, cmd: RepairCmd): void {
+export function handleRepair(state: SimState, cmd: RepairCmd, cancelBuildQueue = true): void {
   const b = state.entities.get(cmd.targetId);
   if (!b || b.kind !== 'building' || b.player !== cmd.player || b.hp <= 0) return;
   // A tapped FOUNDATION resumes construction, it is not repaired (AoE2 tap semantics):
@@ -48,7 +49,10 @@ export function handleRepair(state: SimState, cmd: RepairCmd): void {
     state.garrisoning.delete(id);
     movers.push(id);
   }
-  if (movers.length > 0) orderMove(state, movers, b.x, b.y);
+  if (movers.length > 0) {
+    if (cancelBuildQueue) cancelQueuedBuilds(state, movers);
+    orderMove(state, movers, b.x, b.y);
+  }
 }
 
 function releaseRepairer(state: SimState, e: Entity): void {

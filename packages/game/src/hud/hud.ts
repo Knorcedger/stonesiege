@@ -11,13 +11,15 @@
 // Every tappable control has a ≥44px hit area (mobile-first): visually small
 // buttons get an invisible centered ::after hit-area expansion.
 
-import { type Entity, type EntityId, type GameState, type PlayerId, type ResourceType } from '@bf/sim/types';
+import {
+  type Entity, type EntityId, type Formation, type GameState, type PlayerId, type ResourceType,
+} from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
-import { isTownBellSeeking, type IdleCategory } from '../selectionTools';
+import { isTownBellSeeking, selectionTypeCounts, type IdleCategory } from '../selectionTools';
 import {
   ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, hasActiveRally,
-  millAutoReseedButton, queueChipModel, researchMenuButtons, trainMenuButtons,
+  millAutoReseedButton, queueChipModel, queueStacks, researchMenuButtons, trainMenuButtons,
   unitVerbButtons, WAVE2_REASON,
   type ArmedVerb, type CardButtonModel, type PlayerCardView,
 } from './cardModel';
@@ -30,6 +32,8 @@ import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
 import type { UnitDisplayStats } from '../simBridge';
 import { formatMatchTime } from './summary';
+import { getSettings, updateSettings } from '../settings';
+import { extendedTooltip, techExtendedTip, unitExtendedTip } from './helpText';
 
 export interface HudHost {
   assets: GameAssets;
@@ -65,6 +69,10 @@ export interface HudHost {
   /** Toggle an armed "next tap = target" verb (attack-move / garrison / convert / heal). */
   armVerb(verb: ArmedVerb): void;
   getArmedVerb(): ArmedVerb | null;
+  setFormation(formation: Formation): void;
+  getFormation(): Formation;
+  /** Select, center, and cycle a completed own building type. */
+  focusBuilding(defId: string): boolean;
   togglePause(): void;
   isPaused(): boolean;
   resumeGame(): void;
@@ -91,6 +99,12 @@ const AGE_LABEL: Record<string, string> = {
 const CARD_CELL = 44;
 const CARD_GAP = 4;
 const CARD_COLS = 5;
+/** Three five-button rows, excluding WASD so camera movement always wins. */
+export const COMMAND_HOTKEYS = ['q', 'e', 'r', 't', 'y', 'f', 'g', 'h', 'j', 'k', 'z', 'x', 'c', 'v', 'b'] as const;
+
+export function commandRepeatCount(shiftKey: boolean, shiftRepeat: number): number {
+  return shiftKey ? Math.max(1, shiftRepeat) : 1;
+}
 /**
  * Full production-queue block height (TRAIN_QUEUE_CAP chips wrapped at 5/row),
  * reserved up front for any building that can queue: the card is bottom-anchored,
@@ -112,16 +126,19 @@ const HUD_CSS = `
 .bf-btn { position:relative; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:inherit; font-size:14px; padding:3px 10px; cursor:pointer; }
 .bf-btn:active { transform:translate(1px,1px); }
 .bf-btn:disabled { color:#8a8a8a; border-color:#5a5a5a; cursor:default; }
+.bf-helpbtn { box-sizing:border-box; width:28px; height:28px; padding:0; font:bold 19px/26px "VT323",monospace; }
 /* ≥44px touch targets (mobile-first): invisible centered hit-area expansion keeps visuals small */
 .bf-btn::after, .bf-idle::after, .bf-mbtn::after { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,44px); height:max(100%,44px); }
 .bf-idle { position:relative; display:flex; align-items:center; gap:3px; background:#46331F; border:1px solid #8A6414; border-radius:3px; padding:1px 5px; cursor:pointer; pointer-events:auto; color:#EFDDB5; font-family:inherit; }
 .bf-idle canvas { width:22px; height:22px; image-rendering:pixelated; }
 .bf-idle:disabled { opacity:0.4; cursor:default; }
 .bf-idlecount { font-family:"VT323",monospace; font-size:18px; line-height:1; color:#E6C04A; min-width:11px; text-align:center; }
-.bf-selpanel { position:absolute; left:6px; bottom:172px; width:172px; padding:8px; pointer-events:auto; display:none; }
+.bf-selpanel { position:absolute; left:6px; bottom:224px; width:172px; padding:8px; pointer-events:auto; display:none; }
 .bf-selpanel.show { display:block; }
 .bf-selrow { display:flex; gap:8px; align-items:center; }
 .bf-selrow canvas { width:40px; height:40px; image-rendering:pixelated; border:1px solid #8A6414; }
+.bf-selicon.mixed { width:40px; height:40px; display:grid; grid-template-columns:repeat(2,19px); grid-auto-rows:19px; gap:2px; }
+.bf-selicon.mixed canvas { box-sizing:border-box; width:19px; height:19px; }
 .bf-selname { font-size:15px; flex:1; }
 .bf-selhp { font-size:14px; color:#DABE8D; }
 .bf-selcarry { display:none; align-items:center; gap:5px; min-height:22px; font-size:16px; color:#E6C04A; }
@@ -134,7 +151,12 @@ const HUD_CSS = `
 .bf-card { position:absolute; right:6px; bottom:6px; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-card.show { display:block; }
 .bf-cardtitle { font-size:13px; color:#C29422; margin:0 0 6px 2px; letter-spacing:1px; }
+.bf-cardtitle.with-icon { display:flex; align-items:center; gap:7px; min-height:34px; color:#E6C04A; }
+.bf-cardtitle.with-icon canvas { width:32px; height:32px; flex:0 0 32px; image-rendering:pixelated; border:1px solid #8A6414; background:#2C1F12; }
+.bf-cardtitle.with-icon .bf-buildingtitle { min-width:0; line-height:1.15; }
 .bf-grid { display:grid; grid-template-columns:repeat(5,44px); gap:4px; }
+.bf-cardsection { grid-column:1/-1; padding-top:3px; color:#E6C04A; font:14px/1 "VT323",monospace; letter-spacing:.5px; border-bottom:1px solid #64492B; }
+.bf-cardsection.hint { color:#DABE8D; border-bottom:0; padding-top:1px; }
 /* border-box: 44px means 44px INCLUDING border+padding, so buttons fill the grid's
    44px tracks exactly and the 4px gaps stay real (content-box made them 48px,
    overflowing the tracks and collapsing the gaps) */
@@ -144,17 +166,29 @@ const HUD_CSS = `
 .bf-cmdbtn:disabled, .bf-cmdbtn.disabled { border-color:#5a5a5a; opacity:0.9; }
 .bf-cmdbtn:disabled canvas, .bf-cmdbtn.disabled canvas { filter:grayscale(1) brightness(0.55); }
 .bf-cmdbtn.active { border-color:#E6C04A; box-shadow:0 0 0 1px #E6C04A; }
+.bf-formationicon { position:relative; display:block; width:40px; height:40px; pointer-events:none; }
+.bf-formationdot { position:absolute; width:5px; height:5px; border-radius:50%; background:#DABE8D; box-shadow:0 0 0 1px #1A1208; transform:translate(-50%,-50%); }
+.bf-cmdbtn.active .bf-formationdot { background:#E6C04A; }
+.bf-quicknav { display:flex; gap:4px; height:44px; }
+.bf-quickbtn { width:44px; height:44px; padding:1px; border:1px solid #8A6414; border-radius:3px; background:#2C1F12; cursor:pointer; pointer-events:auto; }
+.bf-quickbtn canvas { width:40px; height:40px; display:block; image-rendering:pixelated; }
+.bf-cmddir { position:absolute; right:1px; bottom:1px; min-width:25px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.92); border:1px solid #C29422; color:#F4EEDD; font:12px/12px "VT323",monospace; text-align:center; pointer-events:none; }
+.bf-cmddir.out { color:#9ED0FF; border-color:#6D9CC4; }
 /* non-blocking warning badge (housed): the order still queues — never grays the button */
 .bf-cmdbadge { position:absolute; top:0; right:2px; font-size:13px; line-height:1; color:#E6C04A; text-shadow:1px 1px 0 #1A1208, -1px 1px 0 #1A1208, 1px -1px 0 #1A1208, -1px -1px 0 #1A1208; pointer-events:none; }
+.bf-cmdkey { position:absolute; left:1px; top:1px; min-width:12px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.9); color:#E6C04A; border:1px solid #64492B; font:12px/12px "VT323",monospace; text-align:center; pointer-events:none; }
 /* wrap: TRAIN_QUEUE_CAP is 15 — 3 rows of 5 border-box 44px chips fit the 246px
    card. min-height is set from JS (QUEUE_BLOCK_PX) for buildings that can queue:
    the FULL block is reserved up front so chips appearing/completing never move
    the bottom-anchored card's train buttons under the player's thumb */
 .bf-queue { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
-.bf-queue:empty { margin-top:0; }
+.bf-queue:empty { margin-top:6px; } /* reserve spacing: first queued unit must not move the card */
+.bf-queuetitle { display:none; margin:7px 2px 0; padding-top:4px; border-top:1px solid #64492B; color:#E6C04A; font:14px/1 "VT323",monospace; }
+.bf-queuetitle.show { display:block; }
 .bf-qitem { position:relative; box-sizing:border-box; flex-shrink:0; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px hard floor: cancel-a-unit mis-taps are costly */
 .bf-qitem canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
+.bf-qcount { position:absolute; right:1px; bottom:3px; min-width:20px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.94); color:#F4EEDD; font:15px/14px "VT323",monospace; text-align:center; pointer-events:none; }
 .bf-note { font-size:13px; color:#DABE8D; margin:5px 2px 0; min-height:0; }
 .bf-note:empty { display:none; }
 .bf-market { display:none; flex-direction:column; gap:6px; margin-top:6px; }
@@ -179,6 +213,15 @@ const HUD_CSS = `
 .bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:42px; color:#E6C04A; margin:0; }
 /* in-match settings (same controls as the menu screen — see settingsUi.ts) */
 .bf-pausesettings { width:min(320px, 88vw); text-align:left; }
+.bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }
+.bf-help.show { display:flex; }
+.bf-helpbox { box-sizing:border-box; width:min(430px,calc(100vw - 24px)); margin:auto; padding:20px; }
+.bf-helphead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
+.bf-helphead h2 { margin:0; color:#E6C04A; font:32px/1 "Jacquard 12","Pixelify Sans",monospace; }
+.bf-helptext { color:#DABE8D; font:15px/1.35 "Pixelify Sans",monospace; }
+.bf-helptext strong { color:#E6C04A; font-weight:normal; }
+.bf-helptoggle { width:100%; min-height:44px; margin:12px 0; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left; }
+.bf-helpstate { color:#E6C04A; font:18px/1 "VT323",monospace; }
 .bf-place { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:8px 10px; display:none; gap:10px; pointer-events:auto; }
 .bf-place.show { display:flex; }
 /* top-center: the only HUD region that never collides with minimap (168px, bottom-left),
@@ -206,7 +249,7 @@ const HUD_CSS = `
    shrink the minimap so the card's train/build buttons are never covered, and
    lift the selection panel clear of the card's tallest layout (~190px). */
 @media (max-width: 480px) {
-  .bf-mini canvas { width:112px !important; height:112px !important; image-rendering:pixelated; }
+  .bf-mini > canvas { width:112px !important; height:112px !important; image-rendering:pixelated; }
   .bf-selpanel { bottom:200px; }
 }
 `;
@@ -233,6 +276,7 @@ export class Hud {
   private ageSpan!: HTMLSpanElement;
   private timeSpan!: HTMLSpanElement;
   private pauseBtn!: HTMLButtonElement;
+  private helpBtn!: HTMLButtonElement;
   private selPanel!: HTMLDivElement;
   private selIcon!: HTMLDivElement;
   private selName!: HTMLDivElement;
@@ -243,6 +287,7 @@ export class Hud {
   private card!: HTMLDivElement;
   private cardTitle!: HTMLDivElement;
   private cardGrid!: HTMLDivElement;
+  private queueTitle!: HTMLDivElement;
   private queueRow!: HTMLDivElement;
   private toast!: HTMLDivElement;
   private toastLabel!: HTMLSpanElement;
@@ -250,6 +295,7 @@ export class Hud {
   private toastTimer: ReturnType<typeof setTimeout> | null = null;
   private toastUndoFn: (() => void) | null = null;
   private pauseOverlay!: HTMLDivElement;
+  private helpOverlay!: HTMLDivElement;
   private placeBar!: HTMLDivElement;
   private placeConfirm!: HTMLButtonElement;
   private placeLabel!: HTMLSpanElement;
@@ -266,6 +312,9 @@ export class Hud {
   private resignBtn!: HTMLButtonElement;
   /** Spectating a finished match: Resign becomes Return to Title (sim drops all commands). */
   private matchFinished = false;
+  private commandHotkeys = new Map<string, HTMLButtonElement>();
+  private nextCommandHotkey = 0;
+  private hotkeyListener!: (event: KeyboardEvent) => void;
 
   /** The minimap panel mounts here (bottom-left). */
   readonly minimapSlot: HTMLDivElement;
@@ -288,18 +337,22 @@ export class Hud {
     this.buildCard();
     this.buildToast();
     this.buildPauseOverlay();
+    this.buildHelpOverlay();
     this.buildPlacementBar();
     this.buildGroupChips();
+    this.bindCommandHotkeys();
 
     this.minimapSlot = document.createElement('div');
     this.minimapSlot.className = 'bf-mini';
-    this.minimapSlot.style.cssText = 'position:absolute;left:6px;bottom:6px;pointer-events:auto;';
+    this.minimapSlot.style.cssText = 'position:absolute;left:6px;bottom:6px;display:flex;flex-direction:column;gap:4px;pointer-events:auto;';
     this.el.appendChild(this.minimapSlot);
+    this.buildQuickNavigation();
   }
 
   destroy(): void {
     hideGameTooltip();
     if (this.toastTimer) clearTimeout(this.toastTimer);
+    window.removeEventListener('keydown', this.hotkeyListener);
     this.el.remove();
   }
 
@@ -319,8 +372,6 @@ export class Hud {
     }
     const elapsed = formatMatchTime(state.tick);
     if (this.timeSpan.textContent !== elapsed) this.timeSpan.textContent = elapsed;
-    this.pauseBtn.textContent = this.host.isPaused() ? '▶' : 'II';
-    this.pauseOverlay.classList.toggle('show', this.host.isPaused());
     // "Continue watching" spectating: applyCommands drops everything once
     // state.finished, so Resign would silently no-op — swap it for the only
     // meaningful action so the player is never stranded without a way out.
@@ -328,6 +379,8 @@ export class Hud {
       this.matchFinished = state.finished;
       this.resetResign();
     }
+    this.pauseBtn.textContent = this.matchFinished ? 'MENU' : this.host.isPaused() ? '▶' : 'II';
+    this.pauseOverlay.classList.toggle('show', this.host.isPaused());
     if (!this.host.isPaused() && this.resignArmed) this.resetResign();
     this.updateIdleButtons();
     this.updateGroupChips();
@@ -386,10 +439,25 @@ export class Hud {
     setGameTooltip(this.timeSpan, 'Elapsed game time');
     bar.appendChild(this.timeSpan);
 
+    this.helpBtn = document.createElement('button');
+    this.helpBtn.className = 'bf-btn bf-helpbtn';
+    this.helpBtn.textContent = '?';
+    this.helpBtn.setAttribute('aria-expanded', 'false');
+    setGameTooltip(this.helpBtn, 'Help and tooltip settings');
+    this.helpBtn.addEventListener('click', () => {
+      hideGameTooltip();
+      this.helpOverlay.classList.add('show');
+      this.helpBtn.setAttribute('aria-expanded', 'true');
+    });
+    bar.appendChild(this.helpBtn);
+
     this.pauseBtn = document.createElement('button');
     this.pauseBtn.className = 'bf-btn';
     this.pauseBtn.textContent = 'II';
-    this.pauseBtn.addEventListener('click', () => this.host.togglePause());
+    this.pauseBtn.addEventListener('click', () => {
+      if (this.matchFinished) this.host.returnToTitle();
+      else this.host.togglePause();
+    });
     bar.appendChild(this.pauseBtn);
     this.el.appendChild(bar);
   }
@@ -408,6 +476,25 @@ export class Hud {
     this.idleBtns.set(cat, { btn, count });
   }
 
+  private buildQuickNavigation(): void {
+    const nav = document.createElement('div');
+    nav.className = 'bf-quicknav';
+    const add = (defId: 'townCenter' | 'barracks'): void => {
+      const def = gameData.buildings[defId];
+      const btn = document.createElement('button');
+      btn.className = 'bf-quickbtn';
+      btn.appendChild(this.host.assets.getIconCanvas(def?.icon ?? `icon/${defId}`));
+      setGameTooltip(btn, `Focus ${def?.name ?? defId}\nTap again to cycle`);
+      btn.addEventListener('click', () => {
+        if (!this.host.focusBuilding(defId)) this.showTip(`No completed ${def?.name ?? defId}`, btn);
+      });
+      nav.appendChild(btn);
+    };
+    add('townCenter');
+    add('barracks');
+    this.minimapSlot.appendChild(nav);
+  }
+
   private updateIdleButtons(): void {
     const counts = this.host.getIdleCounts();
     for (const [cat, ui] of this.idleBtns) {
@@ -424,6 +511,7 @@ export class Hud {
     const row = document.createElement('div');
     row.className = 'bf-selrow';
     this.selIcon = document.createElement('div');
+    this.selIcon.className = 'bf-selicon';
     row.appendChild(this.selIcon);
     const col = document.createElement('div');
     col.style.flex = '1';
@@ -464,6 +552,8 @@ export class Hud {
     this.marketBox.className = 'bf-market';
     this.garrisonBox = document.createElement('div');
     this.garrisonBox.className = 'bf-garrison';
+    this.queueTitle = document.createElement('div');
+    this.queueTitle.className = 'bf-queuetitle';
     this.queueRow = document.createElement('div');
     this.queueRow.className = 'bf-queue';
     this.utilRow = document.createElement('div'); // delete-building etc.
@@ -472,6 +562,7 @@ export class Hud {
     this.card.appendChild(this.noteRow);
     this.card.appendChild(this.marketBox);
     this.card.appendChild(this.garrisonBox);
+    this.card.appendChild(this.queueTitle);
     this.card.appendChild(this.queueRow);
     this.card.appendChild(this.utilRow);
     this.el.appendChild(this.card);
@@ -541,6 +632,93 @@ export class Hud {
       if (e.target === this.pauseOverlay) this.host.resumeGame();
     });
     this.el.appendChild(this.pauseOverlay);
+  }
+
+  private buildHelpOverlay(): void {
+    this.helpOverlay = document.createElement('div');
+    this.helpOverlay.className = 'bf-help';
+    this.helpOverlay.setAttribute('role', 'dialog');
+    this.helpOverlay.setAttribute('aria-modal', 'true');
+    this.helpOverlay.setAttribute('aria-label', 'Help and tooltip settings');
+    const box = document.createElement('div');
+    box.className = 'bf-panel bf-helpbox';
+    const head = document.createElement('div');
+    head.className = 'bf-helphead';
+    const h = document.createElement('h2');
+    h.textContent = 'Help & tips';
+    const close = document.createElement('button');
+    close.className = 'bf-btn';
+    close.textContent = 'Close';
+    const closeHelp = (): void => {
+      this.helpOverlay.classList.remove('show');
+      this.helpBtn.setAttribute('aria-expanded', 'false');
+    };
+    close.addEventListener('click', closeHelp);
+    head.append(h, close);
+
+    const intro = document.createElement('div');
+    intro.className = 'bf-helptext';
+    intro.innerHTML = '<strong>Hover or focus any command icon</strong> to learn its cost and purpose. Extended tips add exact upgrade effects, unit roles, and combat counters.';
+
+    const toggle = document.createElement('button');
+    toggle.className = 'bf-btn bf-helptoggle';
+    toggle.setAttribute('role', 'switch');
+    const toggleLabel = document.createElement('span');
+    toggleLabel.textContent = 'Extended tooltips';
+    const toggleState = document.createElement('span');
+    toggleState.className = 'bf-helpstate';
+    const refreshToggle = (): void => {
+      const enabled = getSettings().extendedTooltips;
+      toggleState.textContent = enabled ? 'ON' : 'OFF';
+      toggle.setAttribute('aria-checked', String(enabled));
+    };
+    toggle.addEventListener('click', () => {
+      updateSettings({ extendedTooltips: !getSettings().extendedTooltips });
+      refreshToggle();
+      this.lastCardKey = ''; // rebuild live command tips on the next HUD update
+      hideGameTooltip();
+    });
+    toggle.append(toggleLabel, toggleState);
+    refreshToggle();
+
+    const examples = document.createElement('div');
+    examples.className = 'bf-helptext';
+    examples.innerHTML = '<strong>Examples</strong><br>Wheelbarrow makes villagers move faster and carry more.<br>Spearmen counter cavalry; archers and skirmishers counter spearmen.';
+
+    box.append(head, intro, toggle, examples);
+    this.helpOverlay.appendChild(box);
+    this.helpOverlay.addEventListener('click', (e) => {
+      if (e.target === this.helpOverlay) closeHelp();
+    });
+    this.el.appendChild(this.helpOverlay);
+  }
+
+  private bindCommandHotkeys(): void {
+    this.hotkeyListener = (event: KeyboardEvent): void => {
+      if (this.helpOverlay.classList.contains('show')) {
+        if (event.key === 'Escape') {
+          event.preventDefault();
+          this.helpOverlay.classList.remove('show');
+          this.helpBtn.setAttribute('aria-expanded', 'false');
+          this.helpBtn.focus();
+        }
+        // Help is modal: keep camera/pause/command listeners behind it dormant.
+        event.stopImmediatePropagation();
+        return;
+      }
+      if (event.ctrlKey || event.metaKey || event.altKey || this.host.isPaused()
+        || this.host.getPlacement() !== null
+        || !this.card.classList.contains('show')) return;
+      const target = event.target;
+      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) return;
+      const btn = this.commandHotkeys.get(event.key.toLowerCase());
+      if (!btn) return;
+      event.preventDefault();
+      btn.dispatchEvent(new MouseEvent('click', {
+        bubbles: true, cancelable: true, shiftKey: event.shiftKey,
+      }));
+    };
+    window.addEventListener('keydown', this.hotkeyListener);
   }
 
   private resetResign(): void {
@@ -637,15 +815,41 @@ export class Hud {
       this.selPanel.classList.remove('show');
       return;
     }
-    this.selPanel.classList.add('show');
     const first = sel[0];
+    // A selected own building's name/health now lives with its actions in the
+    // bottom-right card. Avoid duplicating half its details above the minimap.
+    if (sel.length === 1 && first.kind === 'building' && first.player === this.host.humanPlayer) {
+      this.selPanel.classList.remove('show');
+      return;
+    }
+    this.selPanel.classList.add('show');
     const def = gameData.units[first.defId] ?? gameData.buildings[first.defId] ?? gameData.resources[first.defId];
     const name = def?.name ?? first.defId;
-    this.selName.textContent = sel.length > 1 ? `${name} ×${sel.length}` : name;
-    this.selHp.textContent = first.kind === 'resource'
-      ? `${first.amountLeft ?? 0} left`
-      : `HP ${formatRatio(Math.max(0, first.hp), first.maxHp)}`;
-    const carrying = first.kind === 'unit' && first.carrying && first.carrying.amount > 0
+    const typeCounts = selectionTypeCounts(sel);
+    const mixed = sel.length > 1 && typeCounts.length > 1;
+    if (mixed) {
+      const allUnits = sel.every((e) => e.kind === 'unit');
+      const allBuildings = sel.every((e) => e.kind === 'building');
+      this.selName.textContent = `${allUnits ? 'Mixed units' : allBuildings ? 'Mixed buildings' : 'Mixed selection'} ×${sel.length}`;
+    } else {
+      this.selName.textContent = sel.length > 1 ? `${name} ×${sel.length}` : name;
+    }
+    const selectedUnitHelp = !mixed && first.kind === 'unit'
+      ? unitExtendedTip(gameData.units[first.defId]) : '';
+    setGameTooltip(
+      this.selName,
+      extendedTooltip(this.selName.textContent ?? name, selectedUnitHelp, getSettings().extendedTooltips),
+    );
+    if (sel.length > 1 && sel.every((e) => e.kind !== 'resource')) {
+      const hp = sel.reduce((sum, e) => sum + Math.max(0, e.hp), 0);
+      const maxHp = sel.reduce((sum, e) => sum + e.maxHp, 0);
+      this.selHp.textContent = `HP ${formatRatio(hp, maxHp)}`;
+    } else {
+      this.selHp.textContent = first.kind === 'resource'
+        ? `${first.amountLeft ?? 0} left`
+        : `HP ${formatRatio(Math.max(0, first.hp), first.maxHp)}`;
+    }
+    const carrying = sel.length === 1 && first.kind === 'unit' && first.carrying && first.carrying.amount > 0
       ? first.carrying
       : null;
     if (carrying) {
@@ -664,7 +868,21 @@ export class Hud {
       this.selCarry.dataset.resource = '';
       this.selCarry.replaceChildren();
     }
-    if (first.kind === 'unit') {
+    if (mixed) {
+      const key = typeCounts.map((t) => `${t.defId}:${t.count}`).join('|');
+      if (this.selStats.dataset.key !== key) {
+        this.selStats.dataset.key = key;
+        this.selStats.replaceChildren(...typeCounts.map((type) => {
+          const item = document.createElement('span');
+          item.className = 'bf-selstat';
+          item.textContent = `${type.name} `;
+          const count = document.createElement('strong');
+          count.textContent = `×${type.count}`;
+          item.appendChild(count);
+          return item;
+        }));
+      }
+    } else if (first.kind === 'unit') {
       const stats = this.host.getUnitStats(first.player, first.defId);
       if (stats) {
         const values: Array<[string, string]> = [
@@ -690,10 +908,20 @@ export class Hud {
       delete this.selStats.dataset.key;
       this.selStats.replaceChildren();
     }
-    const iconName = def?.icon ?? `icon/${first.defId}`;
-    if (this.selIcon.dataset.icon !== iconName) {
-      this.selIcon.dataset.icon = iconName;
-      this.selIcon.replaceChildren(this.host.assets.getIconCanvas(iconName));
+    if (mixed) {
+      const iconKey = typeCounts.map((t) => t.icon).join('|');
+      if (this.selIcon.dataset.icon !== iconKey) {
+        this.selIcon.dataset.icon = iconKey;
+        this.selIcon.replaceChildren(...typeCounts.slice(0, 4).map((t) => this.host.assets.getIconCanvas(t.icon)));
+      }
+      this.selIcon.classList.add('mixed');
+    } else {
+      const iconName = def?.icon ?? `icon/${first.defId}`;
+      if (this.selIcon.dataset.icon !== iconName) {
+        this.selIcon.dataset.icon = iconName;
+        this.selIcon.replaceChildren(this.host.assets.getIconCanvas(iconName));
+      }
+      this.selIcon.classList.remove('mixed');
     }
   }
 
@@ -800,12 +1028,13 @@ export class Hud {
     const key = [
       placement ? `place:${placement.defId}` : '',
       sel.map((e) =>
-        `${e.id}:${e.defId}:${e.trainQueue?.length ?? ''}:${e.trainQueue?.[0]?.started ?? ''}` +
-        `:${e.buildProgress ?? ''}:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
+        `${e.id}:${e.defId}:${e.trainQueue?.map((q) => q.techId ?? q.defId).join(',') ?? ''}:${e.trainQueue?.[0]?.started ?? ''}` +
+        `:${e.hp}/${e.maxHp}:${e.buildProgress ?? ''}:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
         `:${e.rally ? `${e.rally.x},${e.rally.y},${e.rally.targetId ?? ''}` : ''}` +
         `:${e.amountLeft !== undefined ? (e.amountLeft > 0 ? 'r' : 'x') : ''}`,
       ).join('|'),
       this.host.getArmedVerb() ?? '',
+      this.host.getFormation(),
       player?.age ?? '',
       // exact per-button enabled/reason/badge bits — the old floor(stockpile/25)
       // buckets went stale at every affordability boundary that is not a
@@ -815,6 +1044,7 @@ export class Hud {
       popKey,
       player?.researchedTechs.length ?? 0,
       player?.autoReseed ? 'ar' : '',
+      getSettings().extendedTooltips ? 'help+' : 'help-',
       // research buttons gray out when their tech queues at ANY own building
       sel.length === 1 && sel[0].kind === 'building' ? this.queuedTechIds(state).join(',') : '',
     ].join('#');
@@ -834,9 +1064,14 @@ export class Hud {
   }
 
   private rebuildCard(state: GameState, sel: Entity[], placementActive: boolean): void {
+    this.commandHotkeys.clear();
+    this.nextCommandHotkey = 0;
     this.cardGrid.replaceChildren();
+    this.cardTitle.classList.remove('with-icon');
     this.queueRow.replaceChildren();
     this.queueRow.style.minHeight = '0px'; // production buildings re-reserve below
+    this.queueTitle.textContent = '';
+    this.queueTitle.classList.remove('show');
     this.utilRow.replaceChildren();
     this.noteRow.textContent = '';
     this.marketBox.replaceChildren();
@@ -897,6 +1132,17 @@ export class Hud {
               : () => undefined;
         this.addButton(vb.icon, vb.tip, vb.enabled, vb.active ?? false, onClick, vb.reason);
       }
+      const soldiers = units.filter((e) => {
+        const def = gameData.units[e.defId];
+        return e.defId !== 'villager' && !!def && !def.herdable && !def.huntable
+          && def.attacks.length > 0;
+      });
+      if (soldiers.length >= 3) {
+        this.addCardSection('Formation');
+        for (const formation of ['line', 'rectangle', 'wedge'] as const) {
+          this.addFormationButton(formation, this.host.getFormation() === formation);
+        }
+      }
       // A single selected ram (unit garrison host) gets the same garrison panel
       // as buildings — without it, garrisoned infantry had no UI exit at all.
       if (sel.length === 1 && units.length === 1) {
@@ -915,6 +1161,7 @@ export class Hud {
   private rebuildBuildingCard(state: GameState, b: Entity, view: PlayerCardView): boolean {
     const def = gameData.buildings[b.defId];
     const name = def?.name ?? b.defId;
+    const health = `HP ${formatRatio(Math.max(0, b.hp), b.maxHp)}`;
     if (b.player !== this.host.humanPlayer) {
       this.cardTitle.textContent = (b.buildProgress ?? 1000) < 1000
         ? `${name} — under construction`
@@ -922,29 +1169,41 @@ export class Hud {
       return true;
     }
     if ((b.buildProgress ?? 1000) < 1000) {
-      this.cardTitle.textContent = `${name} — under construction`;
+      this.setBuildingCardTitle(
+        def?.icon ?? `icon/${b.defId}`,
+        `${name} · ${health} · ${Math.floor((b.buildProgress ?? 0) / 10)}% built`,
+      );
       this.addDeleteButton(b); // a misplaced foundation must be cancellable
       return true;
     }
     let shown = false;
-    this.cardTitle.textContent = name;
+    this.setBuildingCardTitle(def?.icon ?? `icon/${b.defId}`, `${name} · ${health}`);
     // reserve the FULL queue block whenever this building can queue at all, so
     // chips appearing (or completing) never displace the buttons above them
-    if ((def?.trains?.length ?? 0) > 0 || (def?.researches?.length ?? 0) > 0) {
+    const hasProduction = (def?.trains?.length ?? 0) > 0 || (def?.researches?.length ?? 0) > 0;
+    if (hasProduction) {
       this.queueRow.style.minHeight = QUEUE_BLOCK_PX;
+      const count = b.trainQueue?.length ?? 0;
+      this.queueTitle.textContent = `Production queue · ${count > 0 ? `${count}/${TRAIN_QUEUE_CAP}` : 'empty'}`;
+      this.queueTitle.classList.add('show');
     }
 
     // ---- train buttons (housed renders as a non-blocking badge — queueing
     // while housed is AoE2-correct, the sim stalls the item at the front)
     const trainBtns = trainMenuButtons(view, b.defId);
+    if (trainBtns.length > 0) this.addCardSection('Train units');
     for (const tb of trainBtns) {
+      const baseTip = `${tb.name}\n${costText(tb.cost ?? {})} • ${tb.timeSeconds}s${tb.badge ? `\n${tb.badge.note}` : ''}`
+        + '\nShift-click: queue 5';
       this.addButton(
         tb.icon,
-        `${tb.name}\n${costText(tb.cost ?? {})} • ${tb.timeSeconds}s${tb.badge ? `\n${tb.badge.note}` : ''}`,
+        extendedTooltip(baseTip, unitExtendedTip(gameData.units[tb.id]), getSettings().extendedTooltips),
         tb.enabled, false,
         () => this.host.trainUnit(b.id, tb.id),
         tb.reason,
         tb.badge?.glyph,
+        undefined,
+        5,
       );
       shown = true;
     }
@@ -954,19 +1213,38 @@ export class Hud {
     const busy = !!b.research;
     // player-wide queued techs (the sim's alreadyQueued gate spans ALL buildings)
     const queuedTechs = this.queuedTechIds(state);
-    for (const rb of researchMenuButtons(view, b.defId, busy, queuedTechs)) {
+    const researchBtns = researchMenuButtons(view, b.defId, busy, queuedTechs);
+    const up = b.defId === 'townCenter'
+      ? ageUpButton(view, this.completedBuildingDefIds(state), busy, queuedTechs)
+      : null;
+    if (researchBtns.length > 0 || up) this.addCardSection('Research upgrades');
+    for (const rb of researchBtns) {
+      const baseTip = `${rb.name}\n${costText(rb.cost ?? {})} • ${rb.timeSeconds}s`;
       this.addButton(
         rb.icon,
-        `${rb.name}\n${costText(rb.cost ?? {})} • ${rb.timeSeconds}s`,
+        extendedTooltip(baseTip, techExtendedTip(gameData.techs[rb.id]), getSettings().extendedTooltips),
         rb.enabled, false,
         () => this.host.researchTech(b.id, rb.id),
         rb.reason,
       );
       shown = true;
     }
+    if (up) {
+      const baseTip = `Advance to ${up.name}\n${costText(up.cost ?? {})} • ${up.timeSeconds}s`;
+      this.addButton(
+        up.icon,
+        extendedTooltip(baseTip, techExtendedTip(gameData.techs[up.techId]), getSettings().extendedTooltips),
+        up.enabled, false,
+        () => this.host.researchTech(b.id, up.techId),
+        up.reason,
+      );
+      if (!up.requirementMet) this.noteRow.textContent = up.requirementText;
+      shown = true;
+    }
 
     // ---- age-up on the TC, with requirement feedback ('2 Feudal Age buildings needed')
     if (b.defId === 'townCenter') {
+      this.addCardSection('Town Center actions');
       const occupants = b.garrison ?? [];
       const sheltered = occupants.filter((id) => state.entities.get(id)?.sheltering === true).length;
       const seeking = [...state.entities.values()].filter((e) =>
@@ -978,24 +1256,18 @@ export class Hud {
       const active = sheltered + seeking > 0;
       const enabled = active || (outsideVillagers > 0 && room > 0);
       const tip = active
-        ? `Return to work\nRelease sheltered villagers and resume their previous jobs`
-        : `Ring Town Bell\nShelter the nearest villagers\nEach villager adds an arrow to the Town Center volley`;
+        ? `↑ Send villagers OUT\nReturn sheltered villagers to their previous jobs`
+        : `↓ Call villagers IN\nShelter the nearest villagers\nEach villager adds an arrow to the Town Center volley`;
       const reason = outsideVillagers === 0 ? 'no villagers outside' : 'Town Center is full';
-      this.addButton('icon/cmd/townBell', tip, enabled, active, () => this.host.townBell(b.id), reason);
+      this.addButton(
+        'icon/cmd/townBell', tip, enabled, active,
+        () => this.host.townBell(b.id), reason, undefined, active ? 'out' : 'in',
+      );
       shown = true;
+    }
 
-      const up = ageUpButton(view, this.completedBuildingDefIds(state), busy, queuedTechs);
-      if (up) {
-        this.addButton(
-          up.icon,
-          `Advance to ${up.name}\n${costText(up.cost ?? {})} • ${up.timeSeconds}s`,
-          up.enabled, false,
-          () => this.host.researchTech(b.id, up.techId),
-          up.reason,
-        );
-        if (!up.requirementMet) this.noteRow.textContent = up.requirementText;
-        shown = true;
-      }
+    if ((def?.trains?.length ?? 0) > 0) {
+      this.addCardSection('Rally flag · tap / right-click ground to move', true);
     }
 
     // ---- specials: farm reseed, mill auto-reseed, market trade panel
@@ -1027,28 +1299,43 @@ export class Hud {
       const volley = def?.arrowsBase !== undefined
         ? Math.min(def.arrowsMax ?? Infinity, def.arrowsBase + qualifying * (def.arrowsPerGarrison ?? 0))
         : undefined;
-      this.rebuildGarrisonPanel(b.id, gp.occupants, gp.count, gp.capacity, gp.ungarrisonEnabled, gp.reason, volley);
+      this.rebuildGarrisonPanel(
+        b.id, gp.occupants, gp.count, gp.capacity, gp.ungarrisonEnabled, gp.reason,
+        volley, def?.garrisonHealRate,
+      );
       shown = true;
     }
 
-    // ---- shared production queue chips (units AND research — one chip each,
-    // cancelTrain is index-precise for both; the sim refunds techs via refundItem)
-    (b.trainQueue ?? []).forEach((item, i) => {
-      const model = queueChipModel(item);
+    // ---- shared production queue chips. Consecutive identical entries collapse
+    // into one stack (×2, ×3...) while preserving the actual 15-slot order.
+    for (const stack of queueStacks(b.trainQueue ?? [])) {
+      const model = queueChipModel(stack.item);
       const chip = document.createElement('div');
       chip.className = 'bf-qitem';
-      setGameTooltip(chip, model.isTech
-        ? `Researching ${model.name} (tap to cancel)`
-        : `${model.name} (tap to cancel)`);
+      const queueTip = model.isTech
+        ? `Researching ${model.name}${stack.count > 1 ? ` ×${stack.count}` : ''} (tap to cancel one)`
+        : `${model.name}${stack.count > 1 ? ` ×${stack.count}` : ''} (tap to cancel one)`;
+      const queueDetail = model.isTech
+        ? techExtendedTip(gameData.techs[stack.item.techId ?? ''])
+        : unitExtendedTip(gameData.units[stack.item.defId]);
+      setGameTooltip(chip, extendedTooltip(queueTip, queueDetail, getSettings().extendedTooltips));
       chip.appendChild(this.host.assets.getIconCanvas(model.icon));
+      if (stack.count > 1) {
+        const count = document.createElement('span');
+        count.className = 'bf-qcount';
+        count.textContent = `×${stack.count}`;
+        chip.appendChild(count);
+      }
       const prog = document.createElement('div');
       prog.className = 'bf-qprog';
       chip.appendChild(prog);
-      chip.addEventListener('click', () => this.host.cancelTrain(b.id, i));
+      // Remove the last item in the visible stack; the front item's live
+      // progress is never accidentally discarded when later copies exist.
+      chip.addEventListener('click', () => this.host.cancelTrain(b.id, stack.endIndex));
       this.queueRow.appendChild(chip);
-      this.queueProgressEls.push({ el: prog, buildingId: b.id, index: i });
+      this.queueProgressEls.push({ el: prog, buildingId: b.id, index: stack.startIndex });
       shown = true;
-    });
+    }
 
     // ---- housed queue-stall feedback (sim production.ts: a unit item at the
     // front waits, unstarted, until pop room opens)
@@ -1107,7 +1394,7 @@ export class Hud {
 
   /** GDD market: buy/sell each resource ×100 with live rate + ~30% fee shown. */
   private rebuildMarketPanel(view: PlayerCardView): void {
-    this.cardTitle.textContent = 'Market — Trade (30% fee)';
+    this.noteRow.textContent = 'Trade fee: 30%';
     this.marketBox.classList.add('show');
     const pendingReason = PENDING_COMMAND_KINDS.has('marketTrade')
       ? `trading ${WAVE2_REASON}`
@@ -1153,12 +1440,14 @@ export class Hud {
     ungarrisonEnabled: boolean,
     reason?: string,
     volleyArrows?: number,
+    healRate?: number,
   ): void {
     this.garrisonBox.classList.add('show');
     const label = document.createElement('div');
     label.className = 'bf-note bf-num';
     label.textContent = `Garrisoned ${formatRatio(count, capacity)}`
-      + (volleyArrows !== undefined ? ` · Volley ${volleyArrows} arrow${volleyArrows === 1 ? '' : 's'}` : '');
+      + (volleyArrows !== undefined ? ` · Volley ${volleyArrows} arrow${volleyArrows === 1 ? '' : 's'}` : '')
+      + (healRate ? ` · Healing ${formatStat(healRate)} HP/s` : '');
     const row = document.createElement('div');
     row.className = 'bf-goccrow';
     for (const occ of occupants) {
@@ -1186,7 +1475,17 @@ export class Hud {
    * icon or its `/gray` companion, so gray can only mean genuinely unavailable.
    * `badge` is a non-blocking warning glyph (housed) over a still-live button.
    */
-  private addButton(icon: string, tooltip: string, enabled: boolean, active: boolean, onClick: () => void, disabledReason?: string, badge?: string): void {
+  private addButton(
+    icon: string,
+    tooltip: string,
+    enabled: boolean,
+    active: boolean,
+    onClick: () => void,
+    disabledReason?: string,
+    badge?: string,
+    direction?: 'in' | 'out',
+    shiftRepeat = 1,
+  ): void {
     const btn = document.createElement('button');
     btn.className = 'bf-cmdbtn' + (active ? ' active' : '') + (enabled ? '' : ' disabled');
     // class instead of the disabled attribute: disabled buttons still receive the
@@ -1199,13 +1498,86 @@ export class Hud {
       span.textContent = badge;
       btn.appendChild(span);
     }
+    if (direction) {
+      const span = document.createElement('span');
+      span.className = `bf-cmddir ${direction}`;
+      span.textContent = direction === 'in' ? '↓ IN' : '↑ OUT';
+      btn.appendChild(span);
+    }
+    const hotkey = this.registerCommandHotkey(btn);
+    if (hotkey) {
+      const key = document.createElement('span');
+      key.className = 'bf-cmdkey';
+      key.textContent = hotkey.toUpperCase();
+      btn.appendChild(key);
+    }
     const fullTip = enabled ? tooltip : `${tooltip}\n(${disabledReason ?? 'not enough resources'})`;
-    setGameTooltip(btn, fullTip);
-    btn.addEventListener('click', () => {
-      if (enabled) onClick();
-      else this.showTip(fullTip, btn);
+    const displayedTip = hotkey ? `[${hotkey.toUpperCase()}] ${fullTip}` : fullTip;
+    setGameTooltip(btn, displayedTip);
+    btn.addEventListener('click', (event) => {
+      if (enabled) {
+        const repeats = commandRepeatCount(event.shiftKey, shiftRepeat);
+        for (let i = 0; i < repeats; i++) onClick();
+      }
+      else this.showTip(displayedTip, btn);
     });
     this.cardGrid.appendChild(btn);
+  }
+
+  private addCardSection(label: string, hint = false): void {
+    const section = document.createElement('div');
+    section.className = `bf-cardsection${hint ? ' hint' : ''}`;
+    section.textContent = label;
+    this.cardGrid.appendChild(section);
+  }
+
+  private registerCommandHotkey(btn: HTMLButtonElement): string | null {
+    const key = COMMAND_HOTKEYS[this.nextCommandHotkey++];
+    if (!key) return null;
+    this.commandHotkeys.set(key, btn);
+    return key;
+  }
+
+  private addFormationButton(formation: Formation, active: boolean): void {
+    const names: Record<Formation, string> = {
+      line: 'Line formation', rectangle: 'Rectangle formation', wedge: 'Wedge formation',
+    };
+    const points: Record<Formation, Array<[number, number]>> = {
+      line: [[8, 20], [16, 20], [24, 20], [32, 20]],
+      rectangle: [[13, 13], [27, 13], [13, 27], [27, 27]],
+      wedge: [[20, 8], [13, 17], [27, 17], [7, 28], [33, 28]],
+    };
+    const btn = document.createElement('button');
+    btn.className = `bf-cmdbtn${active ? ' active' : ''}`;
+    btn.setAttribute('aria-pressed', String(active));
+    const icon = document.createElement('span');
+    icon.className = 'bf-formationicon';
+    for (const [left, top] of points[formation]) {
+      const dot = document.createElement('span');
+      dot.className = 'bf-formationdot';
+      dot.style.left = `${left}px`;
+      dot.style.top = `${top}px`;
+      icon.appendChild(dot);
+    }
+    btn.appendChild(icon);
+    const hotkey = this.registerCommandHotkey(btn);
+    if (hotkey) {
+      const key = document.createElement('span');
+      key.className = 'bf-cmdkey';
+      key.textContent = hotkey.toUpperCase();
+      btn.appendChild(key);
+    }
+    setGameTooltip(btn, `${hotkey ? `[${hotkey.toUpperCase()}] ` : ''}${names[formation]}\nUse this arrangement for the next group move`);
+    btn.addEventListener('click', () => this.host.setFormation(formation));
+    this.cardGrid.appendChild(btn);
+  }
+
+  private setBuildingCardTitle(icon: string, text: string): void {
+    const label = document.createElement('div');
+    label.className = 'bf-buildingtitle bf-num';
+    label.textContent = text;
+    this.cardTitle.replaceChildren(this.host.assets.getIconCanvas(icon), label);
+    this.cardTitle.classList.add('with-icon');
   }
 
   private showTip(text: string, anchor: HTMLElement = this.card): void {
