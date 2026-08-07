@@ -150,12 +150,26 @@ export function nearestWalkableTile(
   return null;
 }
 
-/** Create a search serving `unitIds` toward `goal` (tile index). Registers motions as pending. */
-export function requestGroupPath(state: SimState, goal: number, unitIds: EntityId[]): void {
+/**
+ * Create a search serving `unitIds` toward the cheapest of `goals`. A multi-source
+ * reverse flood is important for wide targets: choosing one footprint-ring tile by
+ * scan order can send a builder around the far side of a Town Center even though a
+ * much nearer construction edge is reachable.
+ *
+ * `goal` remains one representative tile for the rare unreachable-goal fallback.
+ * The exact in-flight search is snapshotted verbatim, so multiple zero-distance
+ * sources require no snapshot-schema change.
+ */
+export function requestGroupPathToAny(
+  state: SimState, goals: readonly number[], unitIds: EntityId[],
+): void {
+  if (goals.length === 0 || unitIds.length === 0) return;
   const n = state.map.width * state.map.height;
+  const uniqueGoals = [...new Set(goals)].filter((goal) => goal >= 0 && goal < n);
+  if (uniqueGoals.length === 0) return;
   const search: GroupSearch = {
     groupId: state.nextGroupId++,
-    goal,
+    goal: uniqueGoals[0],
     dist: new Int32Array(n).fill(-1),
     settled: new Uint8Array(n),
     parent: new Int32Array(n).fill(-1),
@@ -163,8 +177,10 @@ export function requestGroupPath(state: SimState, goal: number, unitIds: EntityI
     waitingByTile: new Map(),
     waitingCount: 0,
   };
-  search.dist[goal] = 0;
-  search.open.push(0, goal);
+  for (const goal of uniqueGoals) {
+    search.dist[goal] = 0;
+    search.open.push(0, goal);
+  }
   for (const id of unitIds) {
     const e = state.entities.get(id);
     const m = state.motion.get(id);
@@ -179,6 +195,11 @@ export function requestGroupPath(state: SimState, goal: number, unitIds: EntityI
     search.waitingCount++;
   }
   if (search.waitingCount > 0) state.pathSearches.push(search);
+}
+
+/** Create a normal single-destination group search. */
+export function requestGroupPath(state: SimState, goal: number, unitIds: EntityId[]): void {
+  requestGroupPathToAny(state, [goal], unitIds);
 }
 
 function serveTile(state: SimState, s: GroupSearch, tile: number): void {
@@ -400,6 +421,50 @@ export function orderMove(state: SimState, unitIds: EntityId[], x: number, y: nu
     moving.push(id);
   }
   requestGroupPath(state, tileIndex(state.map, goalTile.x, goalTile.y), moving);
+}
+
+/**
+ * Walk units to the shortest reachable tile on a building footprint's one-tile
+ * interaction ring. Unlike orderMove(center), this considers every side at once,
+ * so the pathfinder—not a fixed spiral scan—chooses whether to go clockwise or
+ * counter-clockwise around intervening buildings.
+ */
+export function orderMoveToFootprint(
+  state: SimState,
+  unitIds: readonly EntityId[],
+  tileX: number,
+  tileY: number,
+  size: number,
+): void {
+  if (unitIds.length === 0) return;
+  const goals: number[] = [];
+  const x0 = tileX - 1, y0 = tileY - 1;
+  const x1 = tileX + size, y1 = tileY + size;
+  for (let x = x0; x <= x1; x++) {
+    if (isTileWalkable(state, x, y0)) goals.push(tileIndex(state.map, x, y0));
+    if (y1 !== y0 && isTileWalkable(state, x, y1)) goals.push(tileIndex(state.map, x, y1));
+  }
+  for (let y = y0 + 1; y < y1; y++) {
+    if (isTileWalkable(state, x0, y)) goals.push(tileIndex(state.map, x0, y));
+    if (x1 !== x0 && isTileWalkable(state, x1, y)) goals.push(tileIndex(state.map, x1, y));
+  }
+  if (goals.length === 0) return;
+
+  const targetX = (tileX + size / 2) * FP;
+  const targetY = (tileY + size / 2) * FP;
+  const moving: EntityId[] = [];
+  for (const id of unitIds) {
+    const e = state.entities.get(id);
+    if (!e || e.kind !== 'unit') continue;
+    state.motion.set(id, {
+      targetX, targetY, path: null, pathIndex: 0,
+      groupId: -1, stuckTicks: 0, repaths: 0,
+      lastX: e.x, lastY: e.y,
+    });
+    e.activity = 'moving';
+    moving.push(id);
+  }
+  requestGroupPathToAny(state, goals, moving);
 }
 
 /** One unit's assigned destination inside a formation. */

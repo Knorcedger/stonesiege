@@ -14,7 +14,10 @@ export interface MockFrame {
   anchorY: number;
 }
 
-const UNIT_FRAME_COUNTS: Record<string, number> = { idle: 2, walk: 6, attack: 5, die: 5, decay: 3, gather: 4, carry: 6 };
+const UNIT_FRAME_COUNTS: Record<string, number> = {
+  idle: 2, walk: 6, attack: 5, die: 5, decay: 3, gather: 4, carry: 6,
+  chop: 4, farm: 4, forage: 4, mine: 4, build: 4,
+};
 const ANIMAL_FRAME_COUNTS: Record<string, number> = { idle: 2, walk: 4, attack: 4, die: 3, decay: 2 };
 const ANIMAL_IDS = new Set(['sheep', 'deer', 'wolf']);
 const CAVALRY_IDS = new Set(['scout', 'lightCavalry', 'knight', 'cavalier', 'paladin']);

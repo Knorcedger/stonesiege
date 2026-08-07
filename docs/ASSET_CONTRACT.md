@@ -1,5 +1,22 @@
 # Asset Contract — atlases, naming, geometry
 
+## HD frame overrides
+
+The six baseline atlases below remain a complete fallback contract. Optional
+2× pre-rendered sheets are discovered through
+`apps/web/public/assets/hd/manifest.json`. When an HD sheet contains the same
+logical frame name, the renderer prefers it and applies `1 / meta.scale` as the
+world render scale. This preserves all existing anchors, footprints, animation
+lookups, hitboxes, and gameplay code while allowing atlas-family migration.
+
+HD sheets use linear texture sampling; baseline pixel atlases retain nearest
+sampling. Both use the same runtime player-color mask metadata. See
+`HD_ART_PIPELINE.md` for the active visual rules.
+
+The shipping HD manifest currently covers every baseline frame. Runtime team
+colors are resolved on demand and packed into shared 1,024px color pages; the
+renderer must never allocate a full recolored copy of each 2× source sheet.
+
 The asset generator (`tools/assetgen`) emits Pixi spritesheet atlases into
 `apps/web/public/assets/`: `terrain.png/.json`, `units.png/.json`, `buildings.png/.json`,
 `objects.png/.json`, `ui.png/.json`, `icons.png/.json` (standard Pixi spritesheet JSON,
@@ -55,6 +72,9 @@ baking, without the 8× atlas blowup. The mask ramp and the 8 player ramps are a
 `meta.bannerfall.maskPalette` / `meta.bannerfall.playerRamps` so the renderer never hardcodes
 hexes. (Baked `@p<idx>` frame naming remains reserved for a future strategy switch.)
 
-## Style (see ART_BIBLE.md for the full bible)
-Original stylized pixel art evoking late-90s isometric RTS: warm earthy palette, strong
-silhouette per unit role, 1px dark outline, dithered shading, NO content copied from any game.
+## Style (see `HD_ART_PIPELINE.md`)
+The shipping renderer prefers the premium pre-rendered 2× override set: grounded
+medieval materials, upper-left world light, antialiased silhouettes, and exact
+runtime player colors. The deterministic warm-palette pixel atlases described in
+`ART_BIBLE.md` remain the fallback and mechanical animation source; they are not
+the active visual target. No content is copied from another game.

@@ -116,6 +116,34 @@ describe('gather loop: carry to drop-off, deposit, return', () => {
     expect(far.state.players[HUMAN].stockpile.gold).toBe(110);
     expect(far.state.players[HUMAN].stockpile.food).toBe(200); // nothing wrongly banked as food
   });
+
+  it('takes carried stone across completed farms to the nearest Town Center edge', () => {
+    const game = createGame(scenarioConfig(71, grassMap(40, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 7, tileY: 11, ref: 'v' },
+      { defId: 'stoneMine', player: 0, tileX: 8, tileY: 11, ref: 'mine' },
+      { defId: 'farm', player: HUMAN, tileX: 12, tileY: 10 },
+      { defId: 'townCenter', player: HUMAN, tileX: 16, tileY: 9 },
+    ], [player()]));
+    const vid = game.state.refs.get('v')!;
+    game.advance([{
+      kind: 'gather', player: HUMAN, units: [vid], targetId: game.state.refs.get('mine')!,
+    }]);
+
+    let crossedFarmWithStone = false;
+    let deposited = false;
+    for (let t = 0; t < 900 && !deposited; t++) {
+      const events = game.advance([]);
+      const v = game.state.entities.get(vid)!;
+      if (v.activity === 'carrying' && v.carrying?.type === 'stone'
+        && v.tileX >= 12 && v.tileX <= 14 && v.tileY >= 10 && v.tileY <= 12) {
+        crossedFarmWithStone = true;
+      }
+      deposited = events.some((e) => e.kind === 'resourceDropped' && e.type === 'stone');
+    }
+    expect(crossedFarmWithStone).toBe(true);
+    expect(deposited).toBe(true);
+    expect(game.state.players[HUMAN].stockpile.stone).toBe(210);
+  });
 });
 
 describe('depletion: stump + tile unblock + auto-continue', () => {

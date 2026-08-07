@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
-  animForActivity, animFrameIndex, bakedColorName, facingFromDelta,
+  animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
   placementGhostFrames, resolveFrameName,
 } from './frames';
 
@@ -78,9 +78,14 @@ describe('anim helpers', () => {
     expect(animForActivity('moving', false)).toBe('walk');
     expect(animForActivity('gathering', true)).toBe('gather');
     expect(animForActivity('gathering', false)).toBe('attack');
-    expect(animForActivity('carrying', true)).toBe('carry');
+    expect(animForActivity('carrying', true)).toBe('walk');
     expect(animForActivity('dying', false)).toBe('die');
     expect(animForActivity('idle', false)).toBe('idle');
+    expect(villagerWorkAnim('gathering', 'tree')).toBe('chop');
+    expect(villagerWorkAnim('gathering', 'farm')).toBe('farm');
+    expect(villagerWorkAnim('gathering', 'berryBush')).toBe('forage');
+    expect(villagerWorkAnim('gathering', 'stoneMine')).toBe('mine');
+    expect(villagerWorkAnim('repairing', 'townCenter')).toBe('build');
   });
 
   it('loops looping anims and clamps die', () => {
@@ -96,5 +101,12 @@ describe('anim helpers', () => {
     expect(animFrameIndex('walk', -0.001, 6)).toBe(0);
     expect(animFrameIndex('attack', -3, 5)).toBe(0);
     expect(animFrameIndex('die', -1, 5)).toBe(0);
+  });
+
+  it('settles a farmer into the crouched work pose instead of bobbing upright', () => {
+    expect(animFrameIndex('farm', 0, 4)).toBe(0);
+    expect(animFrameIndex('farm', 0.2, 4)).toBe(1);
+    expect(animFrameIndex('farm', 0.4, 4)).toBe(2);
+    expect(animFrameIndex('farm', 30, 4)).toBe(2);
   });
 });

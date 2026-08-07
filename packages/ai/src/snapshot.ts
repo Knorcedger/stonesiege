@@ -248,7 +248,11 @@ export function makePlan(ctx: Ctx, snap: Snapshot, peakVillagers: number, peakMi
     // PEAK army ever fielded: raid parties die to TC fire, and re-testing the live
     // count kept un-satisfying wantAgeUp forever — a permanently-Dark raider whose
     // militia cannot dent a TC literally could not win any game
-    && peakMilitary >= ctx.tuning.minArmyBeforeAgeUp;
+    // Normal profiles reach Feudal on economy tempo, then may require a field
+    // army before banking for Castle. Raiders deliberately invert that order:
+    // their Dark-Age rush must exist before even the Feudal bank opens.
+    && (i === 0 && !ctx.tuning.raidEco
+      || peakMilitary >= ctx.tuning.minArmyBeforeAgeUp);
   const ageQueued = ageTechId !== null && (snap.own.townCenter ?? [])
     .some((tc) => tc.trainQueue?.some((item) => item.techId === ageTechId) ?? false);
   const savingForAge = wantAgeUp && !ageQueued;

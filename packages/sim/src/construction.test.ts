@@ -27,6 +27,60 @@ function run(game: Game, ticks: number, first: Command[] = []): SimEvent[] {
 }
 
 describe('construction', () => {
+  it('approaches a farm by the shortest reachable side instead of circling a Town Center', () => {
+    const game = createGame(scenarioConfig(70, grassMap(30, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 8, tileY: 12, ref: 'builder' },
+      { defId: 'townCenter', player: HUMAN, tileX: 10, tileY: 10 },
+      { defId: 'mill', player: HUMAN, tileX: 4, tileY: 4 },
+    ], [player()]));
+    const state = game.state as SimState;
+    const builder = state.refs.get('builder')!;
+
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [builder], defId: 'farm', tileX: 14, tileY: 8,
+    }]);
+
+    const path = state.motion.get(builder)?.path;
+    expect(path).not.toBeNull();
+    expect(path?.length).toBeGreaterThan(0);
+    const endpoint = path![path!.length - 1];
+    expect([endpoint % state.map.width, Math.floor(endpoint / state.map.width)]).toEqual([13, 9]);
+  });
+
+  it('turns a builder toward the foundation before playing the build animation', () => {
+    const game = setup([{ x: 11, y: 12 }]);
+    const builderId = game.state.refs.get('v0')!;
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [builderId], defId: 'house', tileX: 12, tileY: 10,
+    }]);
+    const builder = game.state.entities.get(builderId)!;
+    expect(builder.activity).toBe('building');
+    expect(builder.facing).toBe(6); // screen-right / east toward the house
+  });
+
+  it('a builder displaced by another placement resumes the original foundation', () => {
+    const game = setup([{ x: 10, y: 10 }, { x: 8, y: 10 }]);
+    const state = game.state as SimState;
+    const originalBuilder = state.refs.get('v0')!;
+    const secondBuilder = state.refs.get('v1')!;
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [originalBuilder], defId: 'house', tileX: 12, tileY: 10,
+    }]);
+    run(game, 20);
+    const firstHouse = entitiesOf(state.entities, HUMAN, 'house')[0];
+    const progressBeforeDisplacement = firstHouse.buildProgress!;
+
+    // The new 2x2 footprint covers the original builder's current tile.
+    game.advance([{
+      kind: 'build', player: HUMAN, units: [secondBuilder], defId: 'house', tileX: 9, tileY: 9,
+    }]);
+    expect(state.entities.get(originalBuilder)!.intent).toEqual({ kind: 'build', targetId: firstHouse.id });
+
+    run(game, 180);
+    expect(firstHouse.buildProgress).toBeGreaterThan(progressBeforeDisplacement);
+    expect(state.entities.get(originalBuilder)!.intent).toEqual({ kind: 'build', targetId: firstHouse.id });
+  });
+
   it('build pays up front, places a blocking foundation, and a villager raises it', () => {
     const game = setup([{ x: 10, y: 10 }]);
     const vid = game.state.refs.get('v0')!;

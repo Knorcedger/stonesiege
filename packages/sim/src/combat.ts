@@ -28,6 +28,8 @@ const MELEE_REACH_FP = 128;
 const LEASH_FP = 12 * FP;
 /** Idle auto-acquire scans run every N ticks per unit (deterministic stagger). */
 const ACQUIRE_STAGGER = 3;
+/** An active friendly fight alerts idle soldiers at twice their normal guard radius. */
+const BATTLE_SUPPORT_RADIUS_MULTIPLIER = 2;
 /** Visual spread for secondary tower/castle arrows. */
 const ARROW_JITTER_FP = 32;
 /** Explicit building assaults chain through structures within the same local base. */
@@ -399,6 +401,7 @@ function tryAcquire(
   const minRangeFp = stats.minRange * FP;
   let targetId = -1;
   let bestD = Infinity;
+  let supporting = false;
   const scanBuildings = (): void => {
     for (const t of state.entities.values()) {
       if (t.kind !== 'building' || t.hp <= 0 || t.player === GAIA) continue;
@@ -431,9 +434,46 @@ function tryAcquire(
     // attack-moving formation turn its weapons on structures.
     if (targetId < 0 && mode === 'unitsAndBuildings') scanBuildings();
   }
+  // A soldier actively trading blows raises the alarm for nearby troops at
+  // twice their usual guard radius. Only the original fighter can relay the
+  // fight (`supporting` recruits cannot), preventing awareness from chaining
+  // across an entire army or base one unit at a time.
+  // Campaign missions author exact wave behavior and balance, so the broader
+  // squad alarm is a skirmish/practice affordance for the human army only.
+  if (targetId < 0 && state.conquest && state.players[e.player]?.setup.isHuman) {
+    const supportRadiusFp = aggroFp * BATTLE_SUPPORT_RADIUS_MULTIPLIER;
+    const supportRadiusSq = supportRadiusFp * supportRadiusFp;
+    state.unitsGrid.queryCircleUnsorted(e.x, e.y, supportRadiusFp, queryBuf);
+    let bestFriendId = Infinity;
+    for (const id of queryBuf) {
+      if (id === e.id) continue;
+      const friend = state.entities.get(id);
+      if (!friend || friend.kind !== 'unit' || friend.player !== e.player || friend.hp <= 0
+        || friend.garrisonedIn !== undefined || friend.activity !== 'attacking') continue;
+      const fight = state.combat.get(friend.id);
+      if (!fight || fight.supporting) continue;
+      const target = state.entities.get(fight.targetId);
+      if (!target || target.hp <= 0 || target.kind === 'resource'
+        || (target.kind === 'unit' && target.garrisonedIn !== undefined)
+        || !isEnemy(state, e.player, target.player)) continue;
+      if (mode === 'units' && target.kind !== 'unit') continue;
+      if (mode === 'buildings' && target.kind !== 'building') continue;
+      if (minRangeFp > 0 && effDistFp(state, e, target) < minRangeFp) continue;
+      const dx = friend.x - e.x, dy = friend.y - e.y;
+      const dd = dx * dx + dy * dy;
+      if (dd > supportRadiusSq) continue;
+      if (dd < bestD || (dd === bestD && friend.id < bestFriendId)) {
+        bestD = dd;
+        bestFriendId = friend.id;
+        targetId = target.id;
+        supporting = true;
+      }
+    }
+  }
   if (targetId < 0) return undefined;
   const info: CombatInfo = {
     targetId, auto: true, nextAttackTick: 0, anchorX: e.x, anchorY: e.y,
+    ...(supporting ? { supporting: true } : {}),
   };
   state.combat.set(e.id, info);
   return info;

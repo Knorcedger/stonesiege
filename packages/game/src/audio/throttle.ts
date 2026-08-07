@@ -17,6 +17,7 @@ export const DEFAULT_POLICIES: Record<string, CategoryPolicy> = {
   bow: { maxConcurrent: 3, minGapMs: 70 },
   collapse: { maxConcurrent: 2, minGapMs: 250 },
   monk: { maxConcurrent: 2, minGapMs: 300 },
+  bell: { maxConcurrent: 1, minGapMs: 250 },
   sting: { maxConcurrent: 1, minGapMs: 1800 },
   ui: { maxConcurrent: 4, minGapMs: 30 },
 };

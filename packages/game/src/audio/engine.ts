@@ -22,6 +22,8 @@ export const SFX_CATEGORY: Record<SfxName, string> = {
   hornVictory: 'sting',
   hornDefeat: 'sting',
   monkChant: 'monk',
+  townBellIn: 'bell',
+  townBellOut: 'bell',
   uiTap: 'ui',
 };
 

@@ -3,10 +3,11 @@
 // - wonder countdown banner (persistent strip while a wonder stands)
 // - under-attack screen-edge red pulse
 // - victory / defeat end screen (ART_BIBLE dark wood + parchment + gold),
-//   with match time + basic counts and Return to Title / Continue watching.
+//   with match time + full match statistics and navigation actions.
 // Pure-DOM presentation; all game data arrives pre-derived (hud/summary.ts).
 
 import type { MatchSummary } from './summary';
+import { AGE_LABEL } from './cardModel';
 
 const OVERLAY_CSS = `
 .bf-agebanner { position:absolute; left:50%; top:22%; transform:translateX(-50%); text-align:center;
@@ -29,7 +30,8 @@ const OVERLAY_CSS = `
 .bf-end { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
   background:rgba(10,8,5,0.82); pointer-events:auto; z-index:50; font-family:"Pixelify Sans",monospace; }
 .bf-end.show { display:flex; }
-.bf-end-panel { width:min(420px, 88vw); padding:26px 26px 22px; text-align:center; color:#EFDDB5;
+.bf-end-panel { width:min(520px, 88vw); max-height:92vh; overflow-y:auto; padding:24px 26px 20px;
+  box-sizing:border-box; text-align:center; color:#EFDDB5;
   background:linear-gradient(#3a2a18,#2C1F12); border:2px solid #1A1208; border-radius:6px;
   box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.65); }
 .bf-end-title { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:54px; line-height:1;
@@ -38,8 +40,11 @@ const OVERLAY_CSS = `
 .bf-end-title.defeat { color:#C05B4E; }
 .bf-end-sub { font-size:14px; color:#B99A6B; margin:0 0 16px; }
 .bf-end-time { font-family:"VT323",monospace; font-size:26px; color:#EFDDB5; margin:0 0 14px; }
-.bf-end-stats { display:grid; grid-template-columns:1fr auto; gap:3px 18px; text-align:left;
-  font-size:15px; margin:0 auto 18px; max-width:280px; }
+.bf-end-stats { display:grid; grid-template-columns:1fr auto; gap:3px 24px; text-align:left;
+  font-size:15px; margin:0 auto 18px; max-width:390px; }
+.bf-end-stats h3 { grid-column:1 / -1; margin:9px 0 2px; padding-bottom:3px; color:#DABE8D;
+  border-bottom:1px solid #64492B; font-size:14px; font-weight:500; letter-spacing:1px; text-transform:uppercase; }
+.bf-end-stats h3:first-child { margin-top:0; }
 .bf-end-stats .bf-num { font-family:"VT323",monospace; font-size:18px; text-align:right; color:#E6C04A; }
 .bf-end-btn { display:block; width:100%; margin:8px 0 0; padding:11px 0; font-family:inherit; font-size:18px;
   color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border:1px solid #B99A6B; border-radius:4px;
@@ -172,6 +177,11 @@ export class Overlays {
 
     const stats = document.createElement('div');
     stats.className = 'bf-end-stats';
+    const section = (label: string): void => {
+      const h = document.createElement('h3');
+      h.textContent = label;
+      stats.appendChild(h);
+    };
     const row = (label: string, value: string): void => {
       const l = document.createElement('span');
       l.textContent = label;
@@ -180,12 +190,28 @@ export class Overlays {
       v.textContent = value;
       stats.append(l, v);
     };
+    const count = (value: number): string => Math.round(value).toLocaleString('en-US');
+
+    section('Economy');
+    row('Food gathered', count(summary.tallies.foodGathered));
+    row('Wood gathered', count(summary.tallies.woodGathered));
+    row('Gold gathered', count(summary.tallies.goldGathered));
+    row('Stone gathered', count(summary.tallies.stoneGathered));
+
+    section('Realm');
+    row('Final age', AGE_LABEL[summary.age] ?? summary.age);
+    row('Peak population', count(summary.tallies.peakPopulation));
+    row('Units trained', count(summary.tallies.unitsTrained));
+    row('Buildings completed', count(summary.tallies.buildingsBuilt));
+    row('Technologies', count(summary.techsResearched));
+
+    section('Battle');
+    row('Enemies slain', count(summary.tallies.unitsKilled));
+    row('Buildings razed', count(summary.tallies.buildingsRazed));
+    row('Units lost', count(summary.tallies.unitsLost));
+    row('Buildings lost', count(summary.tallies.buildingsLost));
     row('Units standing', String(summary.unitsAlive));
     row('Buildings standing', String(summary.buildingsAlive));
-    row('Enemies slain', String(summary.tallies.unitsKilled));
-    row('Buildings razed', String(summary.tallies.buildingsRazed));
-    row('Units lost', String(summary.tallies.unitsLost));
-    row('Technologies', String(summary.techsResearched));
 
     panel.append(title, sub, time, stats);
     for (const b of opts.buttons) {

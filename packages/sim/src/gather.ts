@@ -24,7 +24,7 @@ import { adjacentToFootprint, facingFromDelta } from './internal';
 import type { GatherInfo, SimState } from './internal';
 import { removeEntity, stumpify } from './entities';
 import { resolveUnitStats } from './stats';
-import { orderMove } from './path';
+import { orderMove, orderMoveToFootprint } from './path';
 import { cancelQueuedBuilds } from './construction';
 import { applyHit, meleeDamage } from './damage';
 import { onFarmExhausted } from './farms';
@@ -48,8 +48,9 @@ const BUMP_STAGGER = 5;
 const TREE_SLOTS = 1;
 /** Mines/bushes/carcasses: one gatherer per adjacent tile of the node. */
 const NODE_SLOTS = 8;
-/** Farmers shift work spots every few seconds; extraction continues during the short walk. */
-const FARM_SHIFT_TICKS = 10 * TICKS_PER_SECOND;
+/** Farmers stay crouched for a while, then briefly stand and relocate within the plot. */
+const FARM_SHIFT_MIN_SECONDS = 3;
+const FARM_SHIFT_SECONDS_SPAN = 8; // inclusive range: 3..10 seconds
 
 type GatherCmd = Extract<Command, { kind: 'gather' }>;
 
@@ -234,7 +235,8 @@ function startDeposit(state: SimState, e: Entity, info: GatherInfo): void {
   info.retries = 0;
   info.farmRepositioning = undefined;
   info.nextFarmMoveTick = undefined;
-  orderMove(state, [e.id], drop.x, drop.y);
+  const size = gameData.buildings[drop.defId]?.size ?? 1;
+  orderMoveToFootprint(state, [e.id], drop.tileX, drop.tileY, size);
   e.activity = 'carrying';
 }
 
@@ -270,7 +272,8 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
     if (!next) { release(state, e); return; }
     info.dropoffId = next.id;
     info.retries = 0;
-    orderMove(state, [e.id], next.x, next.y);
+    const nextSize = gameData.buildings[next.defId]?.size ?? 1;
+    orderMoveToFootprint(state, [e.id], next.tileX, next.tileY, nextSize);
     e.activity = 'carrying';
     return;
   }
@@ -301,7 +304,7 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
   if (!state.motion.has(e.id)) {
     if (info.retries >= STATIC_RETRIES) { release(state, e); return; }
     info.retries++;
-    orderMove(state, [e.id], drop.x, drop.y);
+    orderMoveToFootprint(state, [e.id], drop.tileX, drop.tileY, size);
   }
   if (e.activity === 'moving') e.activity = 'carrying'; // renderer: carry walk
 }
@@ -332,6 +335,12 @@ function approach(state: SimState, e: Entity, info: GatherInfo, target: Entity, 
   orderMove(state, [e.id], target.x, target.y);
 }
 
+/** Completed farms are walkable; harvesting must still happen on their own plot. */
+function insideFootprint(e: Entity, target: Entity, size: number): boolean {
+  return e.tileX >= target.tileX && e.tileX < target.tileX + size
+    && e.tileY >= target.tileY && e.tileY < target.tileY + size;
+}
+
 /** Next deterministic point inside a completed farm's traversable footprint. */
 function nextFarmWorkPoint(
   farm: Entity,
@@ -348,6 +357,19 @@ function nextFarmWorkPoint(
   const [dx, dy] = spots[index % spots.length];
   info.farmSpotIndex = (index + 1) % spots.length;
   return { x: (farm.tileX + dx) * FP, y: (farm.tileY + dy) * FP };
+}
+
+/**
+ * Deterministic visual timing without consuming the gameplay RNG stream. Each
+ * villager/spot pair gets a repeatable 3–10 second work spell, so a field of
+ * farmers looks irregular while replays and lockstep hashes remain identical.
+ */
+function nextFarmShiftDelay(villagerId: EntityId, spotIndex = 0): number {
+  let mixed = Math.imul(villagerId ^ 0x9e3779b9, 0x85ebca6b);
+  mixed = Math.imul(mixed ^ spotIndex, 0xc2b2ae35);
+  mixed ^= mixed >>> 16;
+  const seconds = FARM_SHIFT_MIN_SECONDS + ((mixed >>> 0) % FARM_SHIFT_SECONDS_SPAN);
+  return seconds * TICKS_PER_SECOND;
 }
 
 function stepWorker(
@@ -411,7 +433,10 @@ function stepWorker(
     return;
   }
 
-  if (!adjacentToFootprint(e, target.tileX, target.tileY, view.size)) {
+  const atWorkFace = view.kind === 'farm'
+    ? insideFootprint(e, target, view.size)
+    : adjacentToFootprint(e, target.tileX, target.tileY, view.size);
+  if (!atWorkFace) {
     approach(state, e, info, target, view);
     return;
   }
@@ -444,10 +469,10 @@ function stepWorker(
   if (view.kind === 'farm') {
     if (info.farmRepositioning && !state.motion.has(e.id)) {
       info.farmRepositioning = undefined;
-      info.nextFarmMoveTick = state.tick + FARM_SHIFT_TICKS;
+      info.nextFarmMoveTick = state.tick + nextFarmShiftDelay(e.id, info.farmSpotIndex);
     }
     if (!info.farmRepositioning) {
-      info.nextFarmMoveTick ??= state.tick + FARM_SHIFT_TICKS;
+      info.nextFarmMoveTick ??= state.tick + nextFarmShiftDelay(e.id, info.farmSpotIndex);
       if (state.tick >= info.nextFarmMoveTick) {
         const spot = nextFarmWorkPoint(target, view.size, info, e.id);
         info.farmRepositioning = true;

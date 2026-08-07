@@ -94,6 +94,8 @@ export interface CombatInfo {
   targetId: EntityId;
   /** Auto-acquired (LOS scan / retaliation): the chase leash applies. */
   auto: boolean;
+  /** Joined through a nearby friendly's active fight; cannot relay awareness again. */
+  supporting?: boolean;
   /** Explicit building assault: continue into nearby hostile structures after a kill. */
   continueBuildings?: boolean;
   nextAttackTick: number;

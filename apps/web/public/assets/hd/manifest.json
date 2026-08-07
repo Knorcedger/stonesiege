@@ -1,0 +1,21 @@
+{
+ "version": 1,
+ "density": 2,
+ "style": "pre-rendered-3d",
+ "frameCount": 3906,
+ "convertedFrames": 3399,
+ "bespokeFrames": 507,
+ "atlases": [
+  "terrain-0.json",
+  "objects-0.json",
+  "units-0.json",
+  "units-1.json",
+  "buildings-0.json",
+  "ui-0.json",
+  "icons-0.json",
+  "hero-redrawn-0.json",
+  "hero-redrawn-1.json",
+  "hero-redrawn-2.json",
+  "hero-redrawn-3.json"
+ ]
+}

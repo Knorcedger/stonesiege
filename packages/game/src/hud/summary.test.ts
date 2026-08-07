@@ -1,8 +1,11 @@
 // Match-summary derivation for the victory/defeat screens (pure).
 
 import { describe, expect, it } from 'vitest';
-import type { Entity, EntityId, GameState } from '@bf/sim/types';
-import { deriveMatchSummary, emptyTallies, formatMatchTime, recordDeath } from './summary';
+import type { Entity, EntityId, GameState, SimEvent } from '@bf/sim/types';
+import {
+  deriveMatchSummary, emptyTallies, formatMatchTime, isMatchTallies,
+  recordDeath, recordMatchEvent, recordPopulation,
+} from './summary';
 
 describe('formatMatchTime', () => {
   it('formats ticks (20/s) as M:SS and H:MM:SS', () => {
@@ -22,7 +25,33 @@ describe('recordDeath', () => {
     recordDeath(t, { defId: 'barracks', player: 2, killer: 1 }, 1); // razing
     recordDeath(t, { defId: 'archer', player: 2, killer: 2 }, 1); // not ours — ignored
     recordDeath(t, { defId: 'tree', player: 0 }, 1); // gaia — ignored
-    expect(t).toEqual({ unitsLost: 1, buildingsLost: 1, unitsKilled: 1, buildingsRazed: 1 });
+    expect(t).toMatchObject({ unitsLost: 1, buildingsLost: 1, unitsKilled: 1, buildingsRazed: 1 });
+  });
+});
+
+describe('match statistics', () => {
+  it('tracks gathered resources, production, construction, and peak population', () => {
+    const t = emptyTallies(4);
+    const events: SimEvent[] = [
+      { kind: 'resourceDropped', player: 1, type: 'food', amount: 10 },
+      { kind: 'resourceDropped', player: 1, type: 'wood', amount: 7 },
+      { kind: 'resourceDropped', player: 1, type: 'gold', amount: 5 },
+      { kind: 'resourceDropped', player: 1, type: 'stone', amount: 3 },
+      { kind: 'resourceDropped', player: 2, type: 'food', amount: 99 },
+      { kind: 'unitTrained', id: 20 as EntityId, defId: 'villager', player: 1, buildingId: 2 as EntityId },
+      { kind: 'buildingComplete', id: 21 as EntityId, defId: 'house', player: 1 },
+      { kind: 'buildingComplete', id: 22 as EntityId, defId: 'house', player: 2 },
+    ];
+    for (const event of events) recordMatchEvent(t, event, 1);
+    recordPopulation(t, 11);
+    recordPopulation(t, 8);
+
+    expect(t).toMatchObject({
+      foodGathered: 10, woodGathered: 7, goldGathered: 5, stoneGathered: 3,
+      unitsTrained: 1, buildingsBuilt: 1, peakPopulation: 11,
+    });
+    expect(isMatchTallies(t)).toBe(true);
+    expect(isMatchTallies({ ...t, foodGathered: -1 })).toBe(false);
   });
 });
 

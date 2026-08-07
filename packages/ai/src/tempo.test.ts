@@ -37,12 +37,33 @@ async function feudalTick(seed: number): Promise<number> {
   return -1;
 }
 
+async function firstAttackTick(seed: number): Promise<number> {
+  const game = createGame(config(seed));
+  const bot = createBot(game, 2, { difficulty: 'hard', seed });
+  let events: SimEvent[] = [];
+  for (let t = 0; t < 24000; t++) {
+    if (t % 4000 === 3999) await new Promise((r) => { setImmediate(r); });
+    const commands = bot.tick(events);
+    if (commands.some((cmd) => cmd.kind === 'attack' || cmd.kind === 'attackMove')) return t;
+    events = game.advance(commands);
+  }
+  return -1;
+}
+
 describe('hard dark-age tempo', () => {
   it('hard reaches Feudal inside 13.5 sim-minutes on two fresh solo seeds', { timeout: 300000 }, async () => {
     for (const seed of [12, 23]) {
       const at = await feudalTick(seed);
       expect(at, `seed ${seed}: hard never reached Feudal in the window`).toBeGreaterThan(0);
       expect(at, `seed ${seed}: hard too slow to Feudal (${(at / 1200).toFixed(1)} min)`).toBeLessThan(16200);
+    }
+  });
+
+  it('pressures an idle human before 20 sim-minutes across fresh seeds', { timeout: 300000 }, async () => {
+    for (const seed of [5, 12, 23]) {
+      const at = await firstAttackTick(seed);
+      expect(at, `seed ${seed}: hard never launched an attack in the window`).toBeGreaterThan(0);
+      expect(at, `seed ${seed}: hard attacked too late (${(at / 1200).toFixed(1)} min)`).toBeLessThan(24000);
     }
   });
 });

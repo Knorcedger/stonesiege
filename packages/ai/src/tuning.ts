@@ -23,6 +23,8 @@ export interface Tuning {
   research: boolean;
   /** 0 = no counters (easy), 1 = counter only strong skews, 2 = full counter comps. */
   counters: 0 | 1 | 2;
+  /** Smaller first-wave threshold; normally equal to attackArmy, lower on Hard. */
+  openingArmy: number;
   /** Military size that launches an attack wave. */
   attackArmy: number;
   /** A wave collapses (retreat + regroup) below this. */
@@ -53,7 +55,11 @@ export interface Tuning {
   maxFoundations: number;
   /** Barracks goes up at this villager count (raider drops it for the early rush). */
   barracksAt: number;
-  /** Age-up saving waits until this many military exist (raider: rush FIRST). */
+  /**
+   * Age-up saving waits until this many military have existed. Dark Age ignores
+   * this unless raidEco is enabled (raiders rush before Feudal); normal Hard
+   * uses it to field a Feudal pressure wave before banking for Castle.
+   */
   minArmyBeforeAgeUp: number;
   /**
    * Dark-age militia cap for non-rush profiles (threat at the base overrides it).
@@ -71,7 +77,7 @@ export interface Tuning {
 const BASE: Record<BotDifficulty, Tuning> = {
   easy: {
     interval: 60, batchCap: 4, villagerTarget: 14, ageUpVillagers: 14, farmTarget: 4, maxAge: 'feudal',
-    research: false, counters: 0, attackArmy: 8, regroupArmy: 3, waveReissue: 600,
+    research: false, counters: 0, openingArmy: 8, attackArmy: 8, regroupArmy: 3, waveReissue: 600,
     waveCooldown: 1200, raidEco: false, constantPressure: false, counterattackOnly: false,
     neverAttack: false, towers: false, walls: false, stoneMiners: 0, secondTc: false,
     market: false, monks: false, siege: false, multiFront: false, resignEarly: true,
@@ -85,7 +91,7 @@ const BASE: Record<BotDifficulty, Tuning> = {
     // economy could not sustain wave replacement — hour-long attrition stalemates
     // (AOE2_REFERENCE: ~25-30 villagers by Castle is the human norm).
     interval: 30, batchCap: 8, villagerTarget: 22, ageUpVillagers: 14, farmTarget: 8, maxAge: 'castle',
-    research: true, counters: 1, attackArmy: 12, regroupArmy: 4, waveReissue: 600,
+    research: true, counters: 1, openingArmy: 12, attackArmy: 12, regroupArmy: 4, waveReissue: 600,
     waveCooldown: 1200, raidEco: false, constantPressure: false, counterattackOnly: false,
     // towers: cheap standing defense — banking an age-up through harassment is
     // impossible when every raid must be answered with freshly-paid soldiers
@@ -103,12 +109,19 @@ const BASE: Record<BotDifficulty, Tuning> = {
     // militia will spend the gold), every dark-age hand gathers the Feudal bank:
     // hard is the FASTEST up, not the slowest. (At 14 hard still trailed easy to
     // Feudal by ~3 minutes on the same map — headless seed-12 measurement.)
+    // Hard used to out-boom Standard but wait for a 16-unit ball before its
+    // first attack (25:42 in the seed-12 idle-player probe). A human could boom
+    // untouched and meet that single late army fully prepared. A four-unit opening raid,
+    // tighter regrouping, and persistent pressure make its tempo challenging;
+    // its superior economy/counters still scale those attacks into the late game.
     interval: 14, batchCap: 12, villagerTarget: 28, ageUpVillagers: 12, farmTarget: 9, maxAge: 'castle',
-    research: true, counters: 2, attackArmy: 16, regroupArmy: 6, waveReissue: 600,
-    waveCooldown: 900, raidEco: false, constantPressure: false, counterattackOnly: false,
+    research: true, counters: 2, openingArmy: 4, attackArmy: 10, regroupArmy: 4, waveReissue: 300,
+    waveCooldown: 300, raidEco: false, constantPressure: true, counterattackOnly: false,
     neverAttack: false, towers: true, walls: false, stoneMiners: 1, secondTc: true,
     market: true, monks: true, siege: true, multiFront: true, resignEarly: false,
-    maxFoundations: 3, barracksAt: 9, minArmyBeforeAgeUp: 0, armyCap: 999, trainCooldown: 0,
+    // Field the first pressure wave before opening the Castle-Age piggy bank;
+    // otherwise the bank freezes military production from Feudal until ~25 min.
+    maxFoundations: 3, barracksAt: 9, minArmyBeforeAgeUp: 4, armyCap: 999, trainCooldown: 0,
     darkMilitia: 0,
   },
 };
@@ -130,6 +143,7 @@ export function tuningFor(difficulty: BotDifficulty, profile: AiProfile): Tuning
       // line, barracks first, and NO age-saving until the raid party exists
       // (the feudal piggy bank otherwise freezes militia until it's far too late)
       t.attackArmy = Math.max(4, Math.floor(t.attackArmy / 3));
+      t.openingArmy = t.attackArmy;
       t.regroupArmy = 2;
       t.raidEco = true;
       t.waveReissue = 400;
@@ -142,6 +156,7 @@ export function tuningFor(difficulty: BotDifficulty, profile: AiProfile): Tuning
     case 'aggressive':
       // constant pressure: smaller waves, no pause between them
       t.attackArmy = Math.max(5, Math.floor(t.attackArmy / 2));
+      t.openingArmy = Math.min(t.openingArmy, t.attackArmy);
       t.regroupArmy = 2;
       t.constantPressure = true;
       t.waveCooldown = 0;

@@ -71,6 +71,8 @@ export interface InputHost {
   confirmPlacement(keepActive?: boolean): void;
   placementHitTest(worldX: number, worldY: number): boolean;
   cancelPlacement(): void;
+  /** Shift was released after one or more repeat placements. */
+  releasePlacementModifier(): void;
   isAttackMoveArmed(): boolean;
   setAttackMoveArmed(v: boolean): void;
   /** Armed "next tap = target" verb (attack-move / garrison / convert / heal). */
@@ -161,11 +163,21 @@ function pointerInsideBuilding(e: Entity, wx: number, wy: number): boolean {
 export function enemyContextTarget(
   picks: readonly Entity[], human: PlayerId, wx: number, wy: number,
 ): Entity | undefined {
-  const enemy = (e: Entity): boolean =>
-    e.player !== human && e.player !== GAIA && e.kind !== 'resource' && e.hp > 0;
+  const enemy = (e: Entity): boolean => isContextAttackTarget(e, human);
   return picks.find((e) => enemy(e) && e.kind === 'building'
       && (e.buildProgress ?? 1000) < 1000 && pointerInsideBuilding(e, wx, wy))
     ?? picks.find(enemy);
+}
+
+/**
+ * A right-click attack target is either a normal enemy or armed Gaia wildlife.
+ * Harmless sheep/deer remain gather targets, while wolves (and any future Gaia
+ * unit with an attack) can be fought before or while they maul the selection.
+ */
+export function isContextAttackTarget(e: Entity, human: PlayerId): boolean {
+  if (e.player === human || e.kind === 'resource' || e.hp <= 0) return false;
+  if (e.player !== GAIA) return true;
+  return e.kind === 'unit' && (gameData.units[e.defId]?.attacks.length ?? 0) > 0;
 }
 
 /**
@@ -190,7 +202,7 @@ export function resolveTapAction(picks: Entity[], sel: TapSelection, human: Play
     // own sheep are food, not a reselect, while villagers hold the selection
     !(sel.units > 0 && villagersSelected && isFoodAnimal(p)));
   if (sel.units > 0) {
-    const enemy = picks.find((p) => p.player !== human && p.player !== GAIA && p.kind !== 'resource');
+    const enemy = picks.find((p) => isContextAttackTarget(p, human));
     if (!enemy && ownUnit && picks[0]?.id === ownUnit.id) return { type: 'select', id: ownUnit.id };
     return { type: 'command' };
   }
@@ -313,6 +325,15 @@ export class InputController {
     const trackEdge = (ev: PointerEvent) => {
       if (ev.pointerType !== 'mouse') return;
       const rect = el.getBoundingClientRect();
+      const insideCanvasBounds = ev.clientX >= rect.left && ev.clientX <= rect.right
+        && ev.clientY >= rect.top && ev.clientY <= rect.bottom;
+      // The DOM HUD sits over the Pixi canvas. Its controls are deliberately
+      // pointer-active, so hovering a top-bar button near the viewport edge
+      // must not be mistaken for pushing the pointer against the game edge.
+      if (insideCanvasBounds && ev.target !== el) {
+        this.edgePan = { x: 0, y: 0 };
+        return;
+      }
       this.edgePan = edgePanVector(
         ev.clientX - rect.left,
         ev.clientY - rect.top,
@@ -322,6 +343,7 @@ export class InputController {
     };
     const blur = () => {
       this.edgePan = { x: 0, y: 0 };
+      if (this.keysDown.has('Shift')) this.host.releasePlacementModifier();
       this.keysDown.clear(); // never leave Shift/arrow repeat latched after tabbing away
     };
     const ctxmenu = (ev: Event) => ev.preventDefault();
@@ -357,6 +379,7 @@ export class InputController {
     const keyup = (ev: KeyboardEvent) => {
       this.keysDown.delete(ev.key);
       this.keysDown.delete(ev.key.toLowerCase());
+      if (ev.key === 'Shift') this.host.releasePlacementModifier();
     };
 
     el.addEventListener('pointerdown', down);
@@ -526,11 +549,19 @@ export class InputController {
       return;
     }
     const w = this.host.camera.screenToWorld(sx, sy);
-    const action = resolveDesktopPrimaryAction(this.pickAt(w.x, w.y), this.host.humanPlayer);
+    const picks = this.pickAt(w.x, w.y);
+    const action = resolveDesktopPrimaryAction(picks, this.host.humanPlayer);
     if (action.type === 'select' || action.type === 'inspect') {
       this.host.setSelection([action.id]);
     } else if (action.type === 'deselect') {
-      this.host.deselect();
+      // The production card explicitly says "tap ground to rally". Honor that
+      // on desktop too (right-click remains supported); empty left-click still
+      // deselects every ordinary unit/building selection.
+      const selected = this.commandableSelection();
+      const productionOnly = selected.length > 0 && selected.every((e) =>
+        e.kind === 'building' && (gameData.buildings[e.defId]?.trains?.length ?? 0) > 0);
+      if (productionOnly) this.contextCommand(w.x, w.y, picks, selected);
+      else this.host.deselect();
     }
   }
 

@@ -52,6 +52,20 @@ export function showGameTooltip(text: string, anchor: HTMLElement): void {
   const a = anchor.getBoundingClientRect();
   const t = tip.getBoundingClientRect();
   const margin = 8;
+  // Controls in the right-side command card must explain themselves without
+  // covering that card's production queue. Prefer a fully side-by-side tooltip
+  // there; use the normal below/above placement elsewhere.
+  if (a.left + a.width / 2 > window.innerWidth * 0.62
+    && a.left - t.width - margin >= margin) {
+    const left = a.left - t.width - margin;
+    const top = Math.max(margin, Math.min(
+      window.innerHeight - t.height - margin,
+      a.top + a.height / 2 - t.height / 2,
+    ));
+    tip.style.left = `${Math.round(left)}px`;
+    tip.style.top = `${Math.round(top)}px`;
+    return;
+  }
   let left = a.left + a.width / 2 - t.width / 2;
   left = Math.max(margin, Math.min(window.innerWidth - t.width - margin, left));
   let top = a.bottom + 8;

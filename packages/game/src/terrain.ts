@@ -135,8 +135,14 @@ export class TerrainLayer {
 
   private createChunk(cx: number, cy: number): Chunk {
     const b = this.chunkBounds(cx, cy);
-    const rt = RenderTexture.create({ width: Math.ceil(b.x1 - b.x0), height: Math.ceil(b.y1 - b.y0) });
-    rt.source.scaleMode = 'nearest';
+    // Terrain is baked at 2x so HD material detail survives the chunk cache and
+    // remains visible at camera zoom 2/3 instead of being flattened to 1x first.
+    const rt = RenderTexture.create({
+      width: Math.ceil(b.x1 - b.x0),
+      height: Math.ceil(b.y1 - b.y0),
+      resolution: 2,
+    });
+    rt.source.scaleMode = 'linear';
     const sprite = new Sprite(rt);
     sprite.position.set(b.x0, b.y0);
     this.container.addChild(sprite);
@@ -181,6 +187,7 @@ export class TerrainLayer {
         const frame = this.assets.resolveFrame(`terr/${terr}/${variants > 0 ? variant % variants : 0}`);
         const spr = new Sprite(frame.texture);
         spr.anchor.set(frame.anchorX, frame.anchorY);
+        spr.scale.set(frame.renderScale);
         spr.position.set(lx, ly);
         temp.addChild(spr);
 
@@ -200,6 +207,7 @@ export class TerrainLayer {
           if (!trans) continue;
           const tspr = new Sprite(trans.texture);
           tspr.anchor.set(trans.anchorX, trans.anchorY);
+          tspr.scale.set(trans.renderScale);
           tspr.position.set(lx, ly);
           temp.addChild(tspr);
         }

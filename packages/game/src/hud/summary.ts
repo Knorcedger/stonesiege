@@ -1,8 +1,11 @@
 // Pure match-summary derivation for the victory/defeat screens (DOM-free,
-// unit-tested). Kill/loss tallies are renderer-side bookkeeping fed from
-// entityDied events (the sim keeps no score); alive counts read the state.
+// unit-tested). Match tallies are renderer-side bookkeeping fed from sim
+// events; alive counts and the final age read directly from state.
 
-import { GAIA, TICKS_PER_SECOND, type AgeId, type GameState, type PlayerId } from '@bf/sim/types';
+import {
+  GAIA, TICKS_PER_SECOND,
+  type AgeId, type GameState, type PlayerId, type SimEvent,
+} from '@bf/sim/types';
 import { gameData } from '@bf/data';
 
 /** 'M:SS' under an hour, 'H:MM:SS' beyond (match clocks are long in Imperial slugfests). */
@@ -16,14 +19,50 @@ export function formatMatchTime(ticks: number): string {
 }
 
 export interface MatchTallies {
+  foodGathered: number;
+  woodGathered: number;
+  goldGathered: number;
+  stoneGathered: number;
+  peakPopulation: number;
+  unitsTrained: number;
+  buildingsBuilt: number;
   unitsLost: number;
   buildingsLost: number;
   unitsKilled: number;
   buildingsRazed: number;
 }
 
-export const emptyTallies = (): MatchTallies =>
-  ({ unitsLost: 0, buildingsLost: 0, unitsKilled: 0, buildingsRazed: 0 });
+export const emptyTallies = (initialPopulation = 0): MatchTallies => ({
+  foodGathered: 0,
+  woodGathered: 0,
+  goldGathered: 0,
+  stoneGathered: 0,
+  peakPopulation: Math.max(0, initialPopulation),
+  unitsTrained: 0,
+  buildingsBuilt: 0,
+  unitsLost: 0,
+  buildingsLost: 0,
+  unitsKilled: 0,
+  buildingsRazed: 0,
+});
+
+/** A detached copy suitable for persistence while the live tally keeps changing. */
+export function copyTallies(tallies: MatchTallies): MatchTallies {
+  return { ...tallies };
+}
+
+/** Defensive validation for match tallies read back from local storage. */
+export function isMatchTallies(value: unknown): value is MatchTallies {
+  if (!value || typeof value !== 'object') return false;
+  const tally = value as Record<keyof MatchTallies, unknown>;
+  const keys: Array<keyof MatchTallies> = [
+    'foodGathered', 'woodGathered', 'goldGathered', 'stoneGathered',
+    'peakPopulation', 'unitsTrained', 'buildingsBuilt', 'unitsLost',
+    'buildingsLost', 'unitsKilled', 'buildingsRazed',
+  ];
+  return keys.every((key) => typeof tally[key] === 'number'
+    && Number.isFinite(tally[key]) && tally[key] >= 0);
+}
 
 /**
  * Fold one entityDied event into the human player's tallies. Gaia deaths
@@ -44,6 +83,39 @@ export function recordDeath(
     if (isBuilding) tallies.buildingsRazed++;
     else tallies.unitsKilled++;
   }
+}
+
+/** Fold any score-bearing sim event into one player's end-of-match totals. */
+export function recordMatchEvent(
+  tallies: MatchTallies,
+  ev: SimEvent,
+  human: PlayerId,
+): void {
+  switch (ev.kind) {
+    case 'entityDied':
+      recordDeath(tallies, ev, human);
+      break;
+    case 'resourceDropped':
+      if (ev.player !== human) break;
+      if (ev.type === 'food') tallies.foodGathered += ev.amount;
+      else if (ev.type === 'wood') tallies.woodGathered += ev.amount;
+      else if (ev.type === 'gold') tallies.goldGathered += ev.amount;
+      else tallies.stoneGathered += ev.amount;
+      break;
+    case 'unitTrained':
+      if (ev.player === human) tallies.unitsTrained++;
+      break;
+    case 'buildingComplete':
+      if (ev.player === human) tallies.buildingsBuilt++;
+      break;
+    default:
+      break;
+  }
+}
+
+/** Sample population after each sim tick so short-lived peaks are retained. */
+export function recordPopulation(tallies: MatchTallies, population: number): void {
+  tallies.peakPopulation = Math.max(tallies.peakPopulation, population);
 }
 
 export interface MatchSummary {
