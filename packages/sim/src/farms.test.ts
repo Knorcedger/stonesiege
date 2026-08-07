@@ -73,6 +73,28 @@ describe('farms', () => {
     expect(spots.size).toBeGreaterThanOrEqual(2);
   });
 
+  it('only harvests while physically inside its own farm footprint', () => {
+    const game = setup();
+    const vid = game.state.refs.get('v')!;
+    const farmId = game.state.refs.get('farm')!;
+    game.advance([{ kind: 'gather', player: HUMAN, units: [vid], targetId: farmId }]);
+
+    let gatheringTicks = 0;
+    for (let t = 0; t < 520; t++) {
+      game.advance([]);
+      const v = game.state.entities.get(vid)!;
+      if (v.activity !== 'gathering') continue;
+      gatheringTicks++;
+      expect(v.tileX).toBeGreaterThanOrEqual(10);
+      expect(v.tileX).toBeLessThanOrEqual(12);
+      expect(v.tileY).toBeGreaterThanOrEqual(9);
+      expect(v.tileY).toBeLessThanOrEqual(11);
+    }
+    // Periodic 3–10 s reposition walks are not gathering animation ticks, but
+    // every actual harvesting tick must remain strictly inside the field.
+    expect(gatheringTicks).toBeGreaterThanOrEqual(350);
+  });
+
   it('a farmer works the farm at the reference rate (0.40/s → 10 food in ~500 ticks)', () => {
     const game = setup();
     const vid = game.state.refs.get('v')!;
@@ -84,8 +106,10 @@ describe('farms', () => {
       game.advance([]);
       if ((game.state.entities.get(vid)!.carrying?.amount ?? 0) >= 10) { full = t; break; }
     }
-    expect(full).toBeGreaterThanOrEqual(498);
-    expect(full).toBeLessThanOrEqual(506);
+    // The worker begins one tile outside and now walks onto the actual plot
+    // before harvesting; the extraction itself remains exactly 500 ticks.
+    expect(full).toBeGreaterThanOrEqual(508);
+    expect(full).toBeLessThanOrEqual(516);
   });
 
   it('exactly one farmer per farm — the second queues politely', () => {
@@ -93,10 +117,11 @@ describe('farms', () => {
     const units = [game.state.refs.get('v')!, game.state.refs.get('v2')!];
     game.advance([{ kind: 'gather', player: HUMAN, units, targetId: game.state.refs.get('farm')! }]);
     run(game, 150);
-    const farming = units.filter((id) => game.state.entities.get(id)!.activity === 'gathering');
-    expect(farming).toHaveLength(1);
     const assigned = units.filter((id) => game.state.entities.get(id)!.intent?.kind === 'gather');
     expect(assigned).toHaveLength(1);
+    // The sole farmer may be in its brief within-plot reposition at this exact
+    // tick; assignment ownership, not one animation frame, is the invariant.
+    expect(['gathering', 'moving']).toContain(game.state.entities.get(assigned[0])!.activity);
     const unassigned = units.find((id) => id !== assigned[0])!;
     expect(game.state.entities.get(unassigned)!.carrying).toBeUndefined();
 

@@ -514,7 +514,7 @@ function drawTrebuchet(anim: HumanAnim, dir: Dir, frame: number): Raster {
 // ---------------------------------------------------------------- assembly
 
 interface AnimPlan {
-  anim: HumanAnim;
+  anim: HumanAnim | 'chop' | 'farm' | 'forage' | 'mine' | 'build';
   count: number;
 }
 
@@ -526,7 +526,15 @@ function animPlanFor(id: string): AnimPlan[] {
     { anim: 'walk', count: cavalry ? 8 : 6 },
   ];
   if (u.attacks.length > 0 || u.converts) plan.push({ anim: 'attack', count: 5 });
-  if (u.gather) plan.push({ anim: 'gather', count: 4 }, { anim: 'carry', count: 6 });
+  if (u.gather) plan.push(
+    { anim: 'gather', count: 4 },
+    { anim: 'chop', count: 4 },
+    { anim: 'farm', count: 4 },
+    { anim: 'forage', count: 4 },
+    { anim: 'mine', count: 4 },
+    { anim: 'build', count: 4 },
+    { anim: 'carry', count: 6 },
+  );
   plan.push({ anim: 'die', count: 5 }, { anim: 'decay', count: 3 });
   return plan;
 }
@@ -544,7 +552,9 @@ export function genUnits(): UnitsResult {
           let raster: Raster;
           let anchor: { x: number; y: number };
           if (HUMANS[u.id]) {
-            raster = drawHuman(HUMANS[u.id], anim, dir, f);
+            const rigAnim: HumanAnim = ['chop', 'farm', 'forage', 'mine', 'build'].includes(anim)
+              ? 'gather' : anim as HumanAnim;
+            raster = drawHuman(HUMANS[u.id], rigAnim, dir, f);
             anchor = { x: 24, y: 44 };
           } else if (CAVALRY[u.id]) {
             raster = drawCavalry(CAVALRY[u.id], anim as CavAnim, dir, f);
@@ -557,7 +567,7 @@ export function genUnits(): UnitsResult {
             raster = drawMangonel(u.id === 'onager', anim as CavAnim, dir, f);
             anchor = { x: 44, y: 75 };
           } else if (u.id === 'trebuchet') {
-            raster = drawTrebuchet(anim, dir, f);
+            raster = drawTrebuchet(anim as HumanAnim, dir, f);
             anchor = { x: 56, y: 103 };
           } else {
             throw new Error(`no rig for unit ${u.id}`);

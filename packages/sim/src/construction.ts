@@ -16,7 +16,7 @@ import {
   activateFoundationFootprint, recomputePopCap,
   releaseCompletedFarmFootprint, spawnEntity,
 } from './entities';
-import { orderMove } from './path';
+import { orderMove, orderMoveToFootprint } from './path';
 
 /** buildRate is a float factor in the data (villager = 1); scale to integers for determinism. */
 const RATE_SCALE = 10;
@@ -163,7 +163,6 @@ function walkUnitsOffFootprint(
   tileX: number,
   tileY: number,
   size: number,
-  protectedBuildId: EntityId,
 ): void {
   const available = footprintRingTiles(state, tileX, tileY, size);
   if (available.length === 0 || units.length === 0) return;
@@ -174,10 +173,12 @@ function walkUnitsOffFootprint(
     state.garrisoning.delete(e.id);
     state.fleeing.delete(e.id);
     e.targetId = undefined;
-    // Preserve the fresh construction task assigned to this site's builders, but
-    // cancel a bystander's old gather/build/repair job so it cannot immediately
-    // overwrite the clearance walk later in the same tick.
-    if (e.intent?.kind !== 'build' || e.intent.targetId !== protectedBuildId) {
+    // Preserve every construction assignment, including a builder who happened
+    // to be standing here while raising a DIFFERENT foundation. The clearance
+    // walk is temporary; once outside, tickConstruction sends that villager back
+    // to the remembered site. Non-build jobs are cancelled so they cannot
+    // overwrite the mandatory exit later in this tick.
+    if (e.intent?.kind !== 'build') {
       e.intent = undefined;
       state.gather.delete(e.id);
       state.buildRetries.delete(e.id);
@@ -294,11 +295,12 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
     const waiters = new Map(activeBuilders.map((b) => [b.id, b]));
     for (const e of occupants) waiters.set(e.id, e);
     walkUnitsOffFootprint(
-      state, [...waiters.values()], foundation.tileX, foundation.tileY, def.size, foundation.id,
+      state, [...waiters.values()], foundation.tileX, foundation.tileY, def.size,
     );
   } else {
-    // blocked center remaps to the nearest walkable tile — i.e. adjacent to the footprint
-    orderMove(state, activeBuilders.map((b) => b.id), foundation.x, foundation.y);
+    orderMoveToFootprint(
+      state, activeBuilders.map((b) => b.id), foundation.tileX, foundation.tileY, def.size,
+    );
   }
 }
 
@@ -316,7 +318,7 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
       // construction command must never redirect another player's unit.
       const stopped = occupants.filter((e) =>
         (e.player === site.player || e.player === GAIA) && !state.motion.has(e.id));
-      walkUnitsOffFootprint(state, stopped, site.tileX, site.tileY, size, site.id);
+      walkUnitsOffFootprint(state, stopped, site.tileX, site.tileY, size);
       continue;
     }
     activateFoundationFootprint(state, site);
@@ -324,7 +326,7 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
     for (const e of state.entities.values()) {
       if (e.kind === 'unit' && e.intent?.kind === 'build' && e.intent.targetId === site.id) builders.push(e.id);
     }
-    orderMove(state, builders, site.x, site.y);
+    orderMoveToFootprint(state, builders, site.tileX, site.tileY, size);
   }
 
   // 1) resolve builder intents -> scaled build-rate sum per foundation
@@ -361,7 +363,7 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
       // Permanently unreachable sites retain their order without starting a
       // fresh full-map path search every simulation tick.
       state.buildRetries.set(e.id, state.tick + TICKS_PER_SECOND);
-      orderMove(state, [e.id], site.x, site.y);
+      orderMoveToFootprint(state, [e.id], site.tileX, site.tileY, size);
     }
   }
 
@@ -428,7 +430,10 @@ function startNextQueuedFoundation(state: SimState, builder: Entity): boolean {
     builder.intent = { kind: 'build', targetId: id };
     builder.targetId = undefined;
     state.buildRetries.delete(builder.id);
-    if (!site.foundationPendingClearance) orderMove(state, [builder.id], site.x, site.y);
+    if (!site.foundationPendingClearance) {
+      const size = gameData.buildings[site.defId]?.size ?? 1;
+      orderMoveToFootprint(state, [builder.id], site.tileX, site.tileY, size);
+    }
     return true;
   }
   return false;
@@ -455,7 +460,8 @@ function autoJoinNearbyFoundation(state: SimState, builder: Entity): void {
   }
   if (!best) return;
   builder.intent = { kind: 'build', targetId: best.id };
-  orderMove(state, [builder.id], best.x, best.y);
+  const size = gameData.buildings[best.defId]?.size ?? 1;
+  orderMoveToFootprint(state, [builder.id], best.tileX, best.tileY, size);
 }
 
 /** Refund the unbuilt fraction of a deleted foundation (no-op for completed buildings). */

@@ -10,7 +10,7 @@ export type SfxName =
   | 'chopWood' | 'pickMine' | 'farmScythe' | 'hammer'
   | 'swordClash' | 'arrowShot' | 'collapse'
   | 'hornAge' | 'hornAlert' | 'hornVictory' | 'hornDefeat'
-  | 'monkChant' | 'uiTap';
+  | 'monkChant' | 'townBellIn' | 'townBellOut' | 'uiTap';
 
 /** Shared 1s white-noise buffer, built lazily per context. */
 const noiseBuffers = new WeakMap<BaseAudioContext, AudioBuffer>();
@@ -206,6 +206,24 @@ export function playVoice(
       lfo.stop(when + 0.8);
       tone(ctx, out, { when: when + 0.05, dur: 0.6, gain: 0.06 * v, freq: 523.3, attack: 0.2 });
       return 0.8;
+    }
+    case 'townBellIn':
+    case 'townBellOut': {
+      // Bronze bell: several inharmonic partials with a long tail. Gathering
+      // uses two firm descending tolls; return-to-work uses a lighter rising
+      // pair so the state change is recognizable without looking at the HUD.
+      const releasing = name === 'townBellOut';
+      const starts = releasing ? [0, 0.3] : [0, 0.48];
+      const roots = releasing ? [392, 493.9] : [392, 329.6];
+      for (let i = 0; i < starts.length; i++) {
+        const start = when + starts[i];
+        const root = roots[i];
+        tone(ctx, out, { when: start, dur: 1.15, gain: 0.2 * v, freq: root, type: 'sine', attack: 0.006 });
+        tone(ctx, out, { when: start, dur: 0.86, gain: 0.11 * v, freq: root * 2.37, type: 'sine', attack: 0.004 });
+        tone(ctx, out, { when: start, dur: 0.62, gain: 0.07 * v, freq: root * 3.91, type: 'triangle', attack: 0.003 });
+        noiseHit(ctx, out, { when: start, dur: 0.035, gain: 0.1 * v, filter: { type: 'bandpass', from: 1800, q: 2 } });
+      }
+      return releasing ? 1.5 : 1.75;
     }
     case 'uiTap': {
       tone(ctx, out, { when, dur: 0.06, gain: 0.12 * v, freq: 1200, freqTo: 900, type: 'triangle' });

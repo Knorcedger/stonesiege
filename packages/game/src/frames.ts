@@ -80,7 +80,9 @@ export function facingFromDelta(dxTiles: number, dyTiles: number, fallback = 0):
   return Math.round(rel / 45) % 8;
 }
 
-export type AnimName = 'idle' | 'walk' | 'attack' | 'gather' | 'carry' | 'die' | 'decay';
+export type AnimName =
+  | 'idle' | 'walk' | 'attack' | 'gather' | 'carry' | 'die' | 'decay'
+  | 'chop' | 'farm' | 'forage' | 'mine' | 'build';
 
 /** Map a sim activity to a contract anim name. Villagers use gather/carry variants. */
 export function animForActivity(activity: UnitActivity, isVillager: boolean): AnimName {
@@ -96,7 +98,10 @@ export function animForActivity(activity: UnitActivity, isVillager: boolean): An
     case 'repairing':
       return isVillager ? 'gather' : 'attack';
     case 'carrying':
-      return isVillager ? 'carry' : 'walk';
+      // The resource badge already communicates the carried material. Use the
+      // full directional walk cycle instead of the legacy one-pose carry rig,
+      // which made villagers slide across the ground at several angles.
+      return 'walk';
     case 'dying':
       return 'die';
     case 'healing':
@@ -106,6 +111,20 @@ export function animForActivity(activity: UnitActivity, isVillager: boolean): An
     case 'idle':
     default:
       return 'idle';
+  }
+}
+
+/** Task-specific villager work cycle, inferred from the public target entity. */
+export function villagerWorkAnim(activity: UnitActivity, targetDefId?: string): AnimName {
+  if (activity === 'building' || activity === 'repairing') return 'build';
+  if (activity !== 'gathering') return animForActivity(activity, true);
+  switch (targetDefId) {
+    case 'tree': return 'chop';
+    case 'farm': return 'farm';
+    case 'berryBush': return 'forage';
+    case 'goldMine':
+    case 'stoneMine': return 'mine';
+    default: return 'gather';
   }
 }
 
@@ -119,6 +138,11 @@ export const ANIM_FPS: Readonly<Record<AnimName, number>> = {
   walk: 10,
   attack: 10,
   gather: 8,
+  chop: 8,
+  farm: 7,
+  forage: 7,
+  mine: 8,
+  build: 8,
   carry: 10,
   die: 8,
   decay: 0.5,
@@ -131,5 +155,10 @@ export function animFrameIndex(anim: AnimName, animAgeSeconds: number, frameCoun
   // interpolation alpha wraps) must never yield a negative frame index.
   const raw = Math.max(0, Math.floor(animAgeSeconds * ANIM_FPS[anim]));
   if (anim === 'die' || anim === 'decay') return Math.min(raw, frameCount - 1);
+  // The farm sheet is a stand → crouch sequence, not a looping scythe swing.
+  // Holding its crouched work pose stops farmers bobbing upright every 0.6 s;
+  // the sim periodically switches them to walk and resets this sequence when
+  // they arrive at a different spot on the plot.
+  if (anim === 'farm') return Math.min(raw, Math.min(2, frameCount - 1));
   return raw % frameCount;
 }

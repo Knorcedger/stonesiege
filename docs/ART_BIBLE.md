@@ -1,4 +1,8 @@
-# Bannerfall — Art Bible
+# Bannerfall — Legacy Procedural Art Bible
+
+> The active visual target and 2× pre-rendered migration contract are defined in
+> `HD_ART_PIPELINE.md`. This document remains authoritative for the procedural
+> fallback atlases until their frame families are replaced.
 
 The complete visual specification for `tools/assetgen`. Every rule in this document is
 written to be implemented **in code** (TypeScript + pngjs): layered primitive fills,

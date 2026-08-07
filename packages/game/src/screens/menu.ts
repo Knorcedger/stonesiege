@@ -34,15 +34,15 @@ const MENU_CSS = `
     radial-gradient(ellipse at 50% 30%, rgba(230,192,74,0.08), transparent 60%),
     repeating-linear-gradient(90deg, #2C1F12 0 46px, #33241511 46px 48px),
     linear-gradient(#241809, #16100a);
-  font-family:"Pixelify Sans","VT323",monospace; color:#EFDDB5; }
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; color:#F2E6CB; }
 .bf-menu-panel { width:min(460px, 92vw); max-height:92vh; overflow-y:auto; margin:12px 0;
   padding:26px 26px 22px; text-align:center;
   background:linear-gradient(#3a2a18,#2C1F12); border:2px solid #1A1208; border-radius:6px;
   box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.6); }
-.bf-menu-name { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:56px; line-height:1;
-  color:#E6C04A; text-shadow:2px 2px 0 #1A1208; margin:0 0 6px; letter-spacing:2px; }
-.bf-menu-h { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:34px; line-height:1.05;
-  color:#E6C04A; text-shadow:2px 2px 0 #1A1208; margin:0 0 12px; letter-spacing:1px; }
+.bf-menu-name { font-family:"Cinzel","Georgia",serif; font-size:48px; font-weight:700; line-height:1;
+  color:#E9C76A; text-shadow:0 2px 3px #0b0703; margin:0 0 6px; letter-spacing:3px; }
+.bf-menu-h { font-family:"Cinzel","Georgia",serif; font-size:30px; font-weight:600; line-height:1.05;
+  color:#E9C76A; text-shadow:0 2px 3px #0b0703; margin:0 0 12px; letter-spacing:1.5px; }
 .bf-menu-sub { font-size:14px; color:#B99A6B; margin:0 0 22px; letter-spacing:1px; }
 .bf-menu-btn { display:block; width:100%; margin:10px 0; padding:12px 0; font-family:inherit; font-size:19px;
   color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border:1px solid #B99A6B; border-radius:4px;
@@ -76,7 +76,7 @@ const MENU_CSS = `
 .bf-camp-card { display:block; width:100%; text-align:left; padding:14px 16px; cursor:pointer; margin:8px 0;
   background:#241809; border:1px solid #64492B; border-radius:5px; color:#DABE8D; font-family:inherit; }
 .bf-camp-card:hover { border-color:#B99A6B; }
-.bf-camp-card .bf-camp-title { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:24px;
+.bf-camp-card .bf-camp-title { font-family:"Cinzel","Georgia",serif; font-size:21px; font-weight:600;
   color:#E6C04A; letter-spacing:1px; }
 .bf-camp-card .bf-camp-desc { font-size:12px; line-height:1.4; color:#B99A6B; margin-top:5px; }
 .bf-camp-card .bf-camp-progress { font-size:12px; color:#DABE8D; margin-top:7px; }
@@ -117,7 +117,7 @@ function ensureFonts(): void {
   const link = document.createElement('link');
   link.id = 'bf-fonts';
   link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Jacquard+12&family=Pixelify+Sans:wght@400;600&family=VT323&display=swap';
+  link.href = 'https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;600&family=Cinzel:wght@600;700&family=Jacquard+12&family=Pixelify+Sans:wght@400;600&family=VT323&display=swap';
   document.head.appendChild(link);
 }
 

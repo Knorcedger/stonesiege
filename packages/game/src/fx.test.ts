@@ -11,8 +11,9 @@ describe('move destination feedback', () => {
     const expected = tileToWorld(4, 6);
 
     fx.showMoveMarker(fp(4), fp(6), 100);
-    expect(fx.air.children).toHaveLength(2); // persistent conversion-beam layer + marker
-    const marker = fx.air.children[1];
+    expect(fx.air.children).toHaveLength(1); // persistent conversion-beam layer
+    expect(fx.overlay.children).toHaveLength(1);
+    const marker = fx.overlay.children[0];
     expect(marker.x).toBe(expected.x);
 
     fx.update(emptyState, 107);
@@ -20,7 +21,7 @@ describe('move destination feedback', () => {
     expect(marker.y).toBeLessThan(expected.y);
 
     fx.update(emptyState, 114);
-    expect(fx.air.children).toHaveLength(1);
+    expect(fx.overlay.children).toHaveLength(0);
     fx.destroy();
   });
 });

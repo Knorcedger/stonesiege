@@ -115,12 +115,12 @@ const QUEUE_ROWS = Math.ceil(TRAIN_QUEUE_CAP / CARD_COLS);
 const QUEUE_BLOCK_PX = `${QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP}px`;
 
 const HUD_CSS = `
-.bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Pixelify Sans","VT323",monospace; color:#EFDDB5; user-select:none; -webkit-user-select:none; }
-.bf-num { font-family:"VT323",monospace; } /* numerals: Pixelify's 2/5 read as S — VT323 digits are unambiguous */
-.bf-panel { background:linear-gradient(#3a2a18,#2C1F12); border:1px solid #1A1208; box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 2px #64492B inset; border-radius:4px; }
+.bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; color:#F2E6CB; user-select:none; -webkit-user-select:none; text-shadow:0 1px 1px rgba(0,0,0,.65); }
+.bf-num { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; }
+.bf-panel { background:linear-gradient(145deg,rgba(55,39,24,.96),rgba(25,17,11,.97)); border:1px solid #25170c; box-shadow:0 0 0 1px rgba(196,146,58,.7) inset, 0 0 0 3px rgba(87,57,29,.72) inset, 0 6px 18px rgba(0,0,0,.34); border-radius:6px; backdrop-filter:blur(2px); }
 .bf-top { position:absolute; top:6px; left:6px; right:6px; height:34px; display:flex; align-items:center; gap:12px; padding:0 10px; pointer-events:auto; }
 .bf-res { display:flex; align-items:center; gap:5px; font-size:16px; }
-.bf-res canvas { width:22px; height:22px; image-rendering:pixelated; }
+.bf-res canvas { width:22px; height:22px; image-rendering:auto; }
 .bf-age { margin-left:auto; font-size:16px; color:#E6C04A; letter-spacing:1px; }
 .bf-time { min-width:42px; text-align:right; color:#DABE8D; font-size:18px; }
 .bf-btn { position:relative; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:inherit; font-size:14px; padding:3px 10px; cursor:pointer; }
@@ -130,29 +130,30 @@ const HUD_CSS = `
 /* ≥44px touch targets (mobile-first): invisible centered hit-area expansion keeps visuals small */
 .bf-btn::after, .bf-idle::after, .bf-mbtn::after { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,44px); height:max(100%,44px); }
 .bf-idle { position:relative; display:flex; align-items:center; gap:3px; background:#46331F; border:1px solid #8A6414; border-radius:3px; padding:1px 5px; cursor:pointer; pointer-events:auto; color:#EFDDB5; font-family:inherit; }
-.bf-idle canvas { width:22px; height:22px; image-rendering:pixelated; }
+.bf-idle canvas { width:22px; height:22px; image-rendering:auto; }
 .bf-idle:disabled { opacity:0.4; cursor:default; }
 .bf-idlecount { font-family:"VT323",monospace; font-size:18px; line-height:1; color:#E6C04A; min-width:11px; text-align:center; }
-.bf-selpanel { position:absolute; left:6px; bottom:224px; width:172px; padding:8px; pointer-events:auto; display:none; }
+.bf-rightcluster { position:absolute; right:6px; bottom:6px; width:264px; display:flex; flex-direction:column; align-items:stretch; gap:6px; pointer-events:none; }
+.bf-selpanel { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-selpanel.show { display:block; }
 .bf-selrow { display:flex; gap:8px; align-items:center; }
-.bf-selrow canvas { width:40px; height:40px; image-rendering:pixelated; border:1px solid #8A6414; }
+.bf-selrow canvas { width:40px; height:40px; image-rendering:auto; border:1px solid #8A6414; }
 .bf-selicon.mixed { width:40px; height:40px; display:grid; grid-template-columns:repeat(2,19px); grid-auto-rows:19px; gap:2px; }
 .bf-selicon.mixed canvas { box-sizing:border-box; width:19px; height:19px; }
 .bf-selname { font-size:15px; flex:1; }
 .bf-selhp { font-size:14px; color:#DABE8D; }
 .bf-selcarry { display:none; align-items:center; gap:5px; min-height:22px; font-size:16px; color:#E6C04A; }
 .bf-selcarry.show { display:flex; }
-.bf-selcarry canvas { width:22px; height:22px; border:0; image-rendering:pixelated; }
+.bf-selcarry canvas { width:22px; height:22px; border:0; image-rendering:auto; }
 .bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:14px/1.05 "VT323",monospace; }
 .bf-selstats:empty { display:none; }
 .bf-selstat strong { color:#E6C04A; font-weight:normal; }
 .bf-x { position:absolute; top:2px; right:2px; width:22px; height:22px; padding:0; line-height:18px; font-size:14px; }
-.bf-card { position:absolute; right:6px; bottom:6px; width:246px; padding:8px; pointer-events:auto; display:none; }
+.bf-card { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-card.show { display:block; }
 .bf-cardtitle { font-size:13px; color:#C29422; margin:0 0 6px 2px; letter-spacing:1px; }
 .bf-cardtitle.with-icon { display:flex; align-items:center; gap:7px; min-height:34px; color:#E6C04A; }
-.bf-cardtitle.with-icon canvas { width:32px; height:32px; flex:0 0 32px; image-rendering:pixelated; border:1px solid #8A6414; background:#2C1F12; }
+.bf-cardtitle.with-icon canvas { width:32px; height:32px; flex:0 0 32px; image-rendering:auto; border:1px solid #8A6414; background:#2C1F12; }
 .bf-cardtitle.with-icon .bf-buildingtitle { min-width:0; line-height:1.15; }
 .bf-grid { display:grid; grid-template-columns:repeat(5,44px); gap:4px; }
 .bf-cardsection { grid-column:1/-1; padding-top:3px; color:#E6C04A; font:14px/1 "VT323",monospace; letter-spacing:.5px; border-bottom:1px solid #64492B; }
@@ -161,7 +162,7 @@ const HUD_CSS = `
    44px tracks exactly and the 4px gaps stay real (content-box made them 48px,
    overflowing the tracks and collapsing the gaps) */
 .bf-cmdbtn { position:relative; box-sizing:border-box; width:44px; height:44px; padding:1px; background:#2C1F12; border:1px solid #8A6414; border-radius:3px; cursor:pointer; pointer-events:auto; }
-.bf-cmdbtn canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
+.bf-cmdbtn canvas { width:40px; height:40px; image-rendering:auto; display:block; }
 /* disabled look via class (NOT the disabled attribute): a tap must still show the reason tip */
 .bf-cmdbtn:disabled, .bf-cmdbtn.disabled { border-color:#5a5a5a; opacity:0.9; }
 .bf-cmdbtn:disabled canvas, .bf-cmdbtn.disabled canvas { filter:grayscale(1) brightness(0.55); }
@@ -171,7 +172,7 @@ const HUD_CSS = `
 .bf-cmdbtn.active .bf-formationdot { background:#E6C04A; }
 .bf-quicknav { display:flex; gap:4px; height:44px; }
 .bf-quickbtn { width:44px; height:44px; padding:1px; border:1px solid #8A6414; border-radius:3px; background:#2C1F12; cursor:pointer; pointer-events:auto; }
-.bf-quickbtn canvas { width:40px; height:40px; display:block; image-rendering:pixelated; }
+.bf-quickbtn canvas { width:40px; height:40px; display:block; image-rendering:auto; }
 .bf-cmddir { position:absolute; right:1px; bottom:1px; min-width:25px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.92); border:1px solid #C29422; color:#F4EEDD; font:12px/12px "VT323",monospace; text-align:center; pointer-events:none; }
 .bf-cmddir.out { color:#9ED0FF; border-color:#6D9CC4; }
 /* non-blocking warning badge (housed): the order still queues — never grays the button */
@@ -185,16 +186,19 @@ const HUD_CSS = `
 .bf-queue:empty { margin-top:6px; } /* reserve spacing: first queued unit must not move the card */
 .bf-queuetitle { display:none; margin:7px 2px 0; padding-top:4px; border-top:1px solid #64492B; color:#E6C04A; font:14px/1 "VT323",monospace; }
 .bf-queuetitle.show { display:block; }
+.bf-queuetitle.stalled { margin-top:7px; padding:5px 6px; color:#FFD08A; background:rgba(132,35,24,.7); border:1px solid #D56A45; border-radius:3px; }
 .bf-qitem { position:relative; box-sizing:border-box; flex-shrink:0; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px hard floor: cancel-a-unit mis-taps are costly */
-.bf-qitem canvas { width:40px; height:40px; image-rendering:pixelated; display:block; }
+.bf-qitem.blocked { border-color:#E06B48; box-shadow:0 0 0 1px rgba(224,107,72,.55); }
+.bf-qitem canvas { width:40px; height:40px; image-rendering:auto; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
 .bf-qcount { position:absolute; right:1px; bottom:3px; min-width:20px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.94); color:#F4EEDD; font:15px/14px "VT323",monospace; text-align:center; pointer-events:none; }
+.bf-qblocked { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(78,18,13,.62); color:#FFD08A; font:bold 19px/1 "VT323",monospace; pointer-events:none; }
 .bf-note { font-size:13px; color:#DABE8D; margin:5px 2px 0; min-height:0; }
 .bf-note:empty { display:none; }
 .bf-market { display:none; flex-direction:column; gap:6px; margin-top:6px; }
 .bf-market.show { display:flex; }
 .bf-mrow { display:flex; align-items:center; gap:6px; }
-.bf-mrow canvas { width:22px; height:22px; image-rendering:pixelated; }
+.bf-mrow canvas { width:22px; height:22px; image-rendering:auto; }
 /* native ≥44px height (touch-target contract): trades mutate the stockpile
    instantly, so a thumb tap must never land on the adjacent resource row */
 .bf-mbtn { position:relative; box-sizing:border-box; flex:1; min-height:44px; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:"VT323",monospace; font-size:15px; padding:4px 2px; cursor:pointer; }
@@ -202,7 +206,7 @@ const HUD_CSS = `
 .bf-garrison { display:none; margin-top:6px; }
 .bf-garrison.show { display:block; }
 .bf-goccrow { display:flex; gap:3px; flex-wrap:wrap; margin:4px 0 6px; }
-.bf-goccrow canvas { width:24px; height:24px; image-rendering:pixelated; border:1px solid #64492B; }
+.bf-goccrow canvas { width:24px; height:24px; image-rendering:auto; border:1px solid #64492B; }
 .bf-toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); padding:6px 10px; display:none; align-items:center; gap:10px; font-size:14px; pointer-events:auto; }
 .bf-toast.show { display:flex; }
 /* scrollable overlay + margin:auto box: the settings block can exceed short
@@ -249,8 +253,8 @@ const HUD_CSS = `
    shrink the minimap so the card's train/build buttons are never covered, and
    lift the selection panel clear of the card's tallest layout (~190px). */
 @media (max-width: 480px) {
-  .bf-mini > canvas { width:112px !important; height:112px !important; image-rendering:pixelated; }
-  .bf-selpanel { bottom:200px; }
+  .bf-mini > canvas { width:112px !important; height:112px !important; image-rendering:auto; }
+  .bf-rightcluster { right:4px; bottom:4px; }
 }
 `;
 
@@ -315,6 +319,7 @@ export class Hud {
   private commandHotkeys = new Map<string, HTMLButtonElement>();
   private nextCommandHotkey = 0;
   private hotkeyListener!: (event: KeyboardEvent) => void;
+  private rightCluster!: HTMLDivElement;
 
   /** The minimap panel mounts here (bottom-left). */
   readonly minimapSlot: HTMLDivElement;
@@ -333,6 +338,9 @@ export class Hud {
     root.appendChild(this.el);
 
     this.buildTopBar();
+    this.rightCluster = document.createElement('div');
+    this.rightCluster.className = 'bf-rightcluster';
+    this.el.appendChild(this.rightCluster);
     this.buildSelectionPanel();
     this.buildCard();
     this.buildToast();
@@ -536,7 +544,7 @@ export class Hud {
     setGameTooltip(x, 'Deselect');
     x.addEventListener('click', () => this.host.deselect());
     this.selPanel.appendChild(x);
-    this.el.appendChild(this.selPanel);
+    this.rightCluster.appendChild(this.selPanel);
   }
 
   private buildCard(): void {
@@ -565,7 +573,7 @@ export class Hud {
     this.card.appendChild(this.queueTitle);
     this.card.appendChild(this.queueRow);
     this.card.appendChild(this.utilRow);
-    this.el.appendChild(this.card);
+    this.rightCluster.appendChild(this.card);
 
   }
 
@@ -1071,7 +1079,7 @@ export class Hud {
     this.queueRow.replaceChildren();
     this.queueRow.style.minHeight = '0px'; // production buildings re-reserve below
     this.queueTitle.textContent = '';
-    this.queueTitle.classList.remove('show');
+    this.queueTitle.classList.remove('show', 'stalled');
     this.utilRow.replaceChildren();
     this.noteRow.textContent = '';
     this.marketBox.replaceChildren();
@@ -1096,7 +1104,7 @@ export class Hud {
       shown = this.rebuildBuildingCard(state, buildings[0], view) || shown;
     } else if (buildings.length > 1 && units.length === 0) {
       const def = gameData.buildings[buildings[0].defId];
-      this.cardTitle.textContent = `${def?.name ?? buildings[0].defId} ×${buildings.length} — tap ground to rally`;
+      this.cardTitle.textContent = `${def?.name ?? buildings[0].defId} ×${buildings.length} — click ground to rally`;
       shown = true;
     }
 
@@ -1178,14 +1186,21 @@ export class Hud {
     }
     let shown = false;
     this.setBuildingCardTitle(def?.icon ?? `icon/${b.defId}`, `${name} · ${health}`);
+    const front = b.trainQueue?.[0];
+    const owner = state.players[this.host.humanPlayer];
+    const housingBlocked = !!front && front.techId === undefined && !front.started
+      && !!owner && owner.pop + (gameData.units[front.defId]?.pop ?? 1) > owner.popCap;
     // reserve the FULL queue block whenever this building can queue at all, so
     // chips appearing (or completing) never displace the buttons above them
     const hasProduction = (def?.trains?.length ?? 0) > 0 || (def?.researches?.length ?? 0) > 0;
     if (hasProduction) {
       this.queueRow.style.minHeight = QUEUE_BLOCK_PX;
       const count = b.trainQueue?.length ?? 0;
-      this.queueTitle.textContent = `Production queue · ${count > 0 ? `${count}/${TRAIN_QUEUE_CAP}` : 'empty'}`;
+      this.queueTitle.textContent = housingBlocked
+        ? '⚠ Production stopped — build a House'
+        : `Production queue · ${count > 0 ? `${count}/${TRAIN_QUEUE_CAP}` : 'empty'}`;
       this.queueTitle.classList.add('show');
+      this.queueTitle.classList.toggle('stalled', housingBlocked);
     }
 
     // ---- train buttons (housed renders as a non-blocking badge — queueing
@@ -1312,9 +1327,14 @@ export class Hud {
       const model = queueChipModel(stack.item);
       const chip = document.createElement('div');
       chip.className = 'bf-qitem';
-      const queueTip = model.isTech
+      const blockedStack = housingBlocked && stack.startIndex === 0;
+      if (blockedStack) chip.classList.add('blocked');
+      const baseQueueTip = model.isTech
         ? `Researching ${model.name}${stack.count > 1 ? ` ×${stack.count}` : ''} (tap to cancel one)`
         : `${model.name}${stack.count > 1 ? ` ×${stack.count}` : ''} (tap to cancel one)`;
+      const queueTip = blockedStack
+        ? `Blocked by housing — build a House\n${baseQueueTip}`
+        : baseQueueTip;
       const queueDetail = model.isTech
         ? techExtendedTip(gameData.techs[stack.item.techId ?? ''])
         : unitExtendedTip(gameData.units[stack.item.defId]);
@@ -1325,6 +1345,12 @@ export class Hud {
         count.className = 'bf-qcount';
         count.textContent = `×${stack.count}`;
         chip.appendChild(count);
+      }
+      if (blockedStack) {
+        const blocked = document.createElement('span');
+        blocked.className = 'bf-qblocked';
+        blocked.textContent = '⌂ !';
+        chip.appendChild(blocked);
       }
       const prog = document.createElement('div');
       prog.className = 'bf-qprog';
@@ -1339,14 +1365,10 @@ export class Hud {
 
     // ---- housed queue-stall feedback (sim production.ts: a unit item at the
     // front waits, unstarted, until pop room opens)
-    const front = b.trainQueue?.[0];
-    if (front && front.techId === undefined && !front.started) {
-      const p = state.players[this.host.humanPlayer];
-      if (p && p.pop + (gameData.units[front.defId]?.pop ?? 1) > p.popCap) {
-        const stall = 'Housed — build more houses';
-        this.noteRow.textContent = this.noteRow.textContent
-          ? `${this.noteRow.textContent} · ${stall}` : stall;
-      }
+    if (housingBlocked) {
+      const stall = 'Housing full — training resumes when a House completes';
+      this.noteRow.textContent = this.noteRow.textContent
+        ? `${this.noteRow.textContent} · ${stall}` : stall;
     }
 
     // ---- rally flag control (GDD: "tap the flag control to clear")
@@ -1567,7 +1589,7 @@ export class Hud {
       key.textContent = hotkey.toUpperCase();
       btn.appendChild(key);
     }
-    setGameTooltip(btn, `${hotkey ? `[${hotkey.toUpperCase()}] ` : ''}${names[formation]}\nUse this arrangement for the next group move`);
+    setGameTooltip(btn, `${hotkey ? `[${hotkey.toUpperCase()}] ` : ''}${names[formation]}\nArrange the selected troops now and keep this layout for their next move`);
     btn.addEventListener('click', () => this.host.setFormation(formation));
     this.cardGrid.appendChild(btn);
   }

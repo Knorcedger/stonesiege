@@ -16,6 +16,7 @@ import {
 import { makeMemoryStorage, setStorageBackend } from './storage';
 import { gameFromSerialized, type PracticeSetup } from './simBridge';
 import { SimLoop, TICK_MS } from './simloop';
+import { emptyTallies } from './hud/summary';
 
 const makeConfig = (): GameConfig => ({
   seed: 7,
@@ -102,6 +103,8 @@ describe('decodeSnapshot (defensive intake)', () => {
   it('accepts valid practice and scenario snapshot round-trips', () => {
     expect(decodeSnapshot(encodeSnapshot(valid()))).toEqual(valid());
     expect(decodeSnapshot(encodeSnapshot(validScenario()))).toEqual(validScenario());
+    const withTallies = { ...valid(), tallies: { ...emptyTallies(4), foodGathered: 120 } };
+    expect(decodeSnapshot(encodeSnapshot(withTallies))).toEqual(withTallies);
   });
 
   it('rejects null, garbage, and non-JSON', () => {
@@ -124,6 +127,9 @@ describe('decodeSnapshot (defensive intake)', () => {
     expect(decodeSnapshot(JSON.stringify(scenarioMap))).toBeNull();
     expect(decodeSnapshot(JSON.stringify({ ...validScenario(), scenarioId: '' }))).toBeNull();
     expect(decodeSnapshot(JSON.stringify({ ...validScenario(), seed: 'x' }))).toBeNull();
+    expect(decodeSnapshot(JSON.stringify({
+      ...valid(), tallies: { ...emptyTallies(), buildingsBuilt: -1 },
+    }))).toBeNull();
   });
 
   // Scenario resumes rebuild config from the CURRENT authored def and replay

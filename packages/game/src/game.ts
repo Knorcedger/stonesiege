@@ -35,7 +35,10 @@ import { Minimap } from './hud/minimap';
 import { Overlays } from './hud/overlays';
 import { MessageBanner } from './hud/messages';
 import { ObjectivesPanel } from './hud/objectives';
-import { deriveMatchSummary, emptyTallies, formatMatchTime, recordDeath } from './hud/summary';
+import {
+  copyTallies, deriveMatchSummary, emptyTallies, formatMatchTime,
+  recordMatchEvent, recordPopulation,
+} from './hud/summary';
 import {
   createGame, gameFromSerialized, practiceConfig, scenarioConfig, unitDisplayStats,
   DEFAULT_PRACTICE_SETUP, type PracticeSetup,
@@ -100,7 +103,7 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
 
 export async function runGame(root: HTMLElement, options: RunGameOptions): Promise<void> {
   const loading = document.createElement('div');
-  loading.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#DABE8D;font:18px "Pixelify Sans",monospace;background:#16100a;';
+  loading.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#E9D4A7;font:500 18px "Alegreya Sans","Trebuchet MS",sans-serif;background:#16100a;letter-spacing:.5px;';
   loading.textContent = 'Mustering the banners…';
   root.appendChild(loading);
 
@@ -123,11 +126,17 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   // snapshot when one rode along (scenarios always log-replay instead — the
   // TriggerRuntime's fired/objective state only reconstructs from the event
   // stream). A rejected blob falls back to replay below.
-  const restored = snapshot && plan.mode === 'practice'
+  const humanPlayer: PlayerId = (config.players.findIndex((p) => p.isHuman) + 1) as PlayerId;
+  // New snapshots carry renderer-owned match statistics. Legacy snapshots do
+  // not, so deliberately log-replay those instead of taking the serialized
+  // fast path; replay reconstructs their history without inventing totals.
+  const tallies = snapshot?.tallies ? copyTallies(snapshot.tallies) : emptyTallies();
+  const rebuildTalliesFromReplay = !!snapshot && !snapshot.tallies;
+  const restored = snapshot && snapshot.tallies && plan.mode === 'practice'
     ? gameFromSerialized(snapshot.serialized)
     : null;
   const game = restored ?? createGame(config);
-  const humanPlayer: PlayerId = (config.players.findIndex((p) => p.isHuman) + 1) as PlayerId;
+  recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
   const meta = plan.meta;
   const scenarioDef = meta ? scenariosById[meta.id] : null;
 
@@ -227,14 +236,14 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   // for scenarios, the deterministic trigger runtime fed the same events)
   // rebuilds the exact snapshotted state (GDD suspend/resume).
   const commandLog: CommandLog = snapshot?.log ?? [];
-  const replayedDeaths: Array<Extract<SimEvent, { kind: 'entityDied' }>> = [];
   if (snapshot && !restored) {
     loading.textContent = 'Restoring match…';
     await new Promise((r) => requestAnimationFrame(() => r(null))); // let the text paint
     replaying = true;
     replaySnapshot(game, snapshot, (events) => {
-      for (const ev of events) {
-        if (ev.kind === 'entityDied') replayedDeaths.push(ev);
+      if (rebuildTalliesFromReplay) {
+        for (const ev of events) recordMatchEvent(tallies, ev, humanPlayer);
+        recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
       }
       triggers?.tick(events);
     });
@@ -245,12 +254,16 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   await app.init({
     background: 0x0d0b08,
     resizeTo: root,
-    antialias: false,
-    resolution: 1,
-    roundPixels: true,
+    antialias: true,
+    resolution: Math.min(window.devicePixelRatio || 1, 2),
+    autoDensity: true,
+    roundPixels: false,
   });
   loading.remove();
-  app.canvas.style.cssText = 'position:absolute;inset:0;touch-action:none;';
+  // Pixi's 2x backing store must still occupy one CSS viewport. Setting
+  // cssText after init otherwise discards autoDensity's explicit CSS size and
+  // makes the canvas itself twice as large on Retina displays.
+  app.canvas.style.cssText = 'position:absolute;inset:0;width:100%;height:100%;touch-action:none;';
   root.appendChild(app.canvas);
 
   // --------------------------------------------------------------- layers
@@ -273,8 +286,10 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   ghostSprite.alpha = 0.6;
   ghostLayer.addChild(ghostFoot, ghostSprite);
   ghostLayer.visible = false;
-  // fx.ground (corpses/rubble) under entities; fx.air (projectiles/beams) above
-  worldRoot.addChild(terrain.container, fx.ground, world.container, fx.air, ghostLayer, fog.sprite);
+  // Destination arrows sit above fog so an order into unexplored terrain is
+  // visibly acknowledged. The overlay contains no world information, so this
+  // does not leak anything hidden by fog-of-war.
+  worldRoot.addChild(terrain.container, fx.ground, world.container, fx.air, ghostLayer, fog.sprite, fx.overlay);
   app.stage.addChild(worldRoot);
   const bandOverlay = new Graphics();
   app.stage.addChild(bandOverlay);
@@ -324,9 +339,8 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   let armedVerb: ArmedVerb | null = null;
   let formation: Formation = 'rectangle';
   let placement: { defId: string; tileX: number; tileY: number } | null = null;
-  const tallies = emptyTallies();
+  let placementHeldByShift = false;
   let housed = false;
-  for (const ev of replayedDeaths) recordDeath(tallies, ev, humanPlayer); // summary survives resume
   let wonderOwner: PlayerId | null = null; // whose countdown the banner tracks
   let endShown = false;
 
@@ -444,11 +458,12 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
 
   const handleSimEvents = (events: SimEvent[]): void => {
     const st = getState();
+    // Fold the whole tick before handling victory so the final report includes
+    // every resource delivery, completion, kill, and population peak from it.
+    recordPopulation(tallies, st.players[humanPlayer]?.pop ?? 0);
+    for (const ev of events) recordMatchEvent(tallies, ev, humanPlayer);
     for (const ev of events) {
       switch (ev.kind) {
-        case 'entityDied':
-          recordDeath(tallies, ev, humanPlayer);
-          break;
         case 'ageAdvanced':
           if (ev.player === humanPlayer) {
             overlays.showAgeBanner(AGE_LABEL[ev.age]); // audio: GameAudio horn
@@ -547,12 +562,13 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
         // content stamp: the resume is only valid against identical authored
         // def + game data ('' can never match, degrading to "no resume")
         fingerprint: scenarioFingerprint(meta.id) ?? '',
-        seed: config.seed, tick: st.tick, log: commandLog, ...withBlob,
+        seed: config.seed, tick: st.tick, log: commandLog,
+        tallies: copyTallies(tallies), ...withBlob,
       });
     } else if (plan.setup) {
       saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'practice', config, setup: plan.setup,
-        tick: st.tick, log: commandLog, ...withBlob,
+        tick: st.tick, log: commandLog, tallies: copyTallies(tallies), ...withBlob,
       });
     }
     lastSavedTick = st.tick;
@@ -609,6 +625,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     frame ??= assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
+    ghostSprite.scale.set(frame.renderScale);
   };
 
   const startPlacement = (defId: string): void => {
@@ -619,10 +636,12 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
       tileX: Math.round(t.x - size / 2),
       tileY: Math.round(t.y - size / 2),
     };
+    placementHeldByShift = false;
     refreshGhost();
   };
   const cancelPlacement = (): void => {
     placement = null;
+    placementHeldByShift = false;
     refreshGhost();
   };
   const confirmPlacement = (keepActive = false): void => {
@@ -666,11 +685,13 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
           : `${def?.name ?? defId} placed — Shift-click to keep building, Esc to stop`,
         undoBuild,
       );
+      placementHeldByShift = keepActive && !def?.wall;
       refreshGhost();
       return;
     }
     hud.showUndoToast(`Building ${def?.name ?? defId}`, undoBuild);
     placement = null;
+    placementHeldByShift = false;
     refreshGhost();
   };
 
@@ -707,6 +728,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
       const state = getState();
       const releasing = (b?.garrison ?? []).some((id) => state.entities.get(id)?.sheltering === true)
         || [...state.entities.values()].some((e) => isTownBellSeeking(e, humanPlayer, buildingId));
+      audioEngine.play(releasing ? 'townBellOut' : 'townBellIn');
       issue({ kind: 'townBell', player: humanPlayer, buildingId });
       hud.showUndoToast(releasing ? 'Villagers returning to work' : 'Town Bell — villagers seeking shelter', null);
     },
@@ -764,7 +786,21 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     },
     armVerb: (verb) => { armedVerb = armedVerb === verb ? null : verb; },
     getArmedVerb: () => armedVerb,
-    setFormation: (next) => { formation = next; },
+    setFormation: (next) => {
+      formation = next;
+      const soldiers = liveSelection().filter((e) => {
+        const def = e.kind === 'unit' ? gameData.units[e.defId] : undefined;
+        return e.kind === 'unit' && e.player === humanPlayer && e.defId !== 'villager'
+          && !!def && !def.herdable && !def.huntable && def.attacks.length > 0;
+      });
+      if (soldiers.length < 3) return;
+      const x = Math.round(soldiers.reduce((sum, e) => sum + e.x, 0) / soldiers.length);
+      const y = Math.round(soldiers.reduce((sum, e) => sum + e.y, 0) / soldiers.length);
+      issue({
+        kind: 'move', player: humanPlayer, units: soldiers.map((e) => e.id), x, y, formation: next,
+      });
+      hud.showUndoToast(`${next[0].toUpperCase()}${next.slice(1)} formation`, null);
+    },
     getFormation: () => formation,
     togglePause: () => loop.togglePause(),
     isPaused: () => loop.paused,
@@ -847,6 +883,9 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
       return Math.max(Math.abs(t.x - cx), Math.abs(t.y - cy)) <= size / 2 + 1;
     },
     cancelPlacement,
+    releasePlacementModifier: () => {
+      if (placementHeldByShift) cancelPlacement();
+    },
     isAttackMoveArmed: () => armedVerb === 'attackMove',
     setAttackMoveArmed: (v) => { armedVerb = v ? 'attackMove' : null; },
     getArmedVerb: () => armedVerb,

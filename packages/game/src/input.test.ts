@@ -9,7 +9,7 @@ import { describe, expect, it } from 'vitest';
 import { GAIA, type Entity, type EntityId, type PlayerId } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import {
-  edgePanVector, enemyContextTarget, isVillagerGatherTarget, isVillagerGatherTargetAt, keyboardPanVector,
+  edgePanVector, enemyContextTarget, isContextAttackTarget, isVillagerGatherTarget, isVillagerGatherTargetAt, keyboardPanVector,
   resolveDesktopPrimaryAction, resolveTapAction,
   type TapSelection,
 } from './input';
@@ -190,6 +190,23 @@ describe('enemy foundation targeting', () => {
     });
     const elsewhere = tileToWorld(2, 2);
     expect(enemyContextTarget([unit, foundation], HUMAN, elsewhere.x, elsewhere.y)?.id).toBe(unit.id);
+  });
+});
+
+describe('hostile Gaia targeting', () => {
+  it('makes wolves valid attack targets without turning harmless animals into enemies', () => {
+    const wolf = ent({ defId: 'wolf', player: GAIA });
+    const sheep = ent({ defId: 'sheep', player: GAIA });
+    const center = tileToWorld(0, 0);
+    expect(isContextAttackTarget(wolf, HUMAN)).toBe(true);
+    expect(enemyContextTarget([wolf], HUMAN, center.x, center.y)?.id).toBe(wolf.id);
+    expect(isContextAttackTarget(sheep, HUMAN)).toBe(false);
+    expect(enemyContextTarget([sheep], HUMAN, center.x, center.y)).toBeUndefined();
+  });
+
+  it('keeps a selected unit in command mode when a wolf is tapped', () => {
+    const wolf = ent({ defId: 'wolf', player: GAIA });
+    expect(resolveTapAction([wolf], UNIT_SEL, HUMAN)).toEqual({ type: 'command' });
   });
 });
 

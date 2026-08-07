@@ -133,6 +133,29 @@ describe('auto-engage defaults (GDD per-category behavior)', () => {
     expect(cavalryGame.state.entities.get(cavalryEnemy)!.hp).toBeLessThan(25);
   });
 
+  it('joins a friendly active fight from twice the normal guard radius', () => {
+    const game = createGame(scenarioConfig(131, grassMap(35, 25), [
+      { defId: 'knight', player: P1, tileX: 10, tileY: 10, ref: 'fighter' },
+      { defId: 'militia', player: P1, tileX: 18, tileY: 10, ref: 'support' },
+      { defId: 'knight', player: P2, tileX: 13, tileY: 10, ref: 'enemy' },
+      { defId: 'villager', player: P1, tileX: 2, tileY: 2 },
+      { defId: 'villager', player: P2, tileX: 32, tileY: 22 },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const fighter = game.state.refs.get('fighter')!;
+    const support = game.state.refs.get('support')!;
+    const enemy = game.state.refs.get('enemy')!;
+    (game.state as unknown as SimState).conquest = true; // practice/skirmish behavior
+
+    // Five tiles from the enemy is outside militia's ordinary four-tile guard
+    // radius. The knight starts the real fight and alerts it from nearby.
+    game.advance([{ kind: 'attack', player: P1, units: [fighter], targetId: enemy }]);
+    run(game, 100);
+
+    const fight = (game.state as unknown as SimState).combat.get(support);
+    expect(fight?.targetId).toBe(enemy);
+    expect(fight?.supporting).toBe(true);
+  });
+
   it('idle militia chases an enemy, leashes at ~12 tiles, and holds the battle endpoint', () => {
     const game = createGame(scenarioConfig(104, grassMap(40, 30), [
       { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'm' },

@@ -1,0 +1,555 @@
+{
+ "frames": {
+  "bld/archeryRange/rubble": {
+   "frame": {
+    "x": 1156,
+    "y": 739,
+    "w": 384,
+    "h": 246
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 246
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 246
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6098
+   }
+  },
+  "bld/barracks/rubble": {
+   "frame": {
+    "x": 1,
+    "y": 739,
+    "w": 384,
+    "h": 252
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 252
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 252
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.619
+   }
+  },
+  "bld/blacksmith/rubble": {
+   "frame": {
+    "x": 386,
+    "y": 739,
+    "w": 384,
+    "h": 252
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 252
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 252
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.619
+   }
+  },
+  "bld/castle/rubble": {
+   "frame": {
+    "x": 642,
+    "y": 1,
+    "w": 512,
+    "h": 342
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 512,
+    "h": 342
+   },
+   "sourceSize": {
+    "w": 512,
+    "h": 342
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6257
+   }
+  },
+  "bld/gate/rubble": {
+   "frame": {
+    "x": 1159,
+    "y": 992,
+    "w": 128,
+    "h": 120
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 120
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 120
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7333
+   }
+  },
+  "bld/guardTower/rubble": {
+   "frame": {
+    "x": 901,
+    "y": 992,
+    "w": 128,
+    "h": 142
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 142
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 142
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7746
+   }
+  },
+  "bld/house/rubble": {
+   "frame": {
+    "x": 1,
+    "y": 992,
+    "w": 256,
+    "h": 186
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 186
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 186
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6559
+   }
+  },
+  "bld/keep/rubble": {
+   "frame": {
+    "x": 772,
+    "y": 992,
+    "w": 128,
+    "h": 146
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 146
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 146
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7808
+   }
+  },
+  "bld/lumberCamp/rubble": {
+   "frame": {
+    "x": 515,
+    "y": 992,
+    "w": 256,
+    "h": 180
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 180
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 180
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6444
+   }
+  },
+  "bld/market/rubble": {
+   "frame": {
+    "x": 514,
+    "y": 418,
+    "w": 512,
+    "h": 316
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 512,
+    "h": 316
+   },
+   "sourceSize": {
+    "w": 512,
+    "h": 316
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5949
+   }
+  },
+  "bld/mill/rubble": {
+   "frame": {
+    "x": 1541,
+    "y": 739,
+    "w": 256,
+    "h": 196
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 196
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 196
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6735
+   }
+  },
+  "bld/miningCamp/rubble": {
+   "frame": {
+    "x": 258,
+    "y": 992,
+    "w": 256,
+    "h": 184
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 184
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 184
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6522
+   }
+  },
+  "bld/monastery/rubble": {
+   "frame": {
+    "x": 1540,
+    "y": 418,
+    "w": 384,
+    "h": 264
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 264
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 264
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6364
+   }
+  },
+  "bld/siegeWorkshop/rubble": {
+   "frame": {
+    "x": 1027,
+    "y": 418,
+    "w": 512,
+    "h": 312
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 512,
+    "h": 312
+   },
+   "sourceSize": {
+    "w": 512,
+    "h": 312
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5897
+   }
+  },
+  "bld/stable/rubble": {
+   "frame": {
+    "x": 771,
+    "y": 739,
+    "w": 384,
+    "h": 250
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 250
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 250
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.616
+   }
+  },
+  "bld/stoneWall/rubble": {
+   "frame": {
+    "x": 1288,
+    "y": 992,
+    "w": 128,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 116
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7241
+   }
+  },
+  "bld/townCenter/rubble": {
+   "frame": {
+    "x": 1,
+    "y": 418,
+    "w": 512,
+    "h": 320
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 512,
+    "h": 320
+   },
+   "sourceSize": {
+    "w": 512,
+    "h": 320
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6
+   }
+  },
+  "bld/university/rubble": {
+   "frame": {
+    "x": 1155,
+    "y": 1,
+    "w": 512,
+    "h": 324
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 512,
+    "h": 324
+   },
+   "sourceSize": {
+    "w": 512,
+    "h": 324
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6049
+   }
+  },
+  "bld/watchTower/rubble": {
+   "frame": {
+    "x": 1030,
+    "y": 992,
+    "w": 128,
+    "h": 136
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 136
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 136
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7647
+   }
+  },
+  "bld/wonder/rubble": {
+   "frame": {
+    "x": 1,
+    "y": 1,
+    "w": 640,
+    "h": 416
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 640,
+    "h": 416
+   },
+   "sourceSize": {
+    "w": 640,
+    "h": 416
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6154
+   }
+  }
+ },
+ "meta": {
+  "app": "bannerfall-assetgen",
+  "version": "1.0",
+  "image": "buildings-0.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 2048,
+   "h": 1179
+  },
+  "scale": 2,
+  "bannerfall": {
+   "playerColorStrategy": "runtime-swap",
+   "maskPalette": [
+    "#ff00ff",
+    "#cc00cc",
+    "#990099"
+   ],
+   "playerRamps": [
+    {
+     "name": "blue",
+     "light": "#5c8cd6",
+     "mid": "#2f5fb5",
+     "dark": "#1c3b76"
+    },
+    {
+     "name": "red",
+     "light": "#e06050",
+     "mid": "#b3261e",
+     "dark": "#711512"
+    },
+    {
+     "name": "green",
+     "light": "#6cbf5c",
+     "mid": "#3e8c34",
+     "dark": "#24591e"
+    },
+    {
+     "name": "yellow",
+     "light": "#f2d45c",
+     "mid": "#d4a82a",
+     "dark": "#8e6e14"
+    },
+    {
+     "name": "cyan",
+     "light": "#7ad2d2",
+     "mid": "#38a6aa",
+     "dark": "#1d6c70"
+    },
+    {
+     "name": "purple",
+     "light": "#b07cd6",
+     "mid": "#7e44a8",
+     "dark": "#4c2370"
+    },
+    {
+     "name": "gray",
+     "light": "#c9c9cf",
+     "mid": "#92929b",
+     "dark": "#5a5a64"
+    },
+    {
+     "name": "orange",
+     "light": "#f0a04e",
+     "mid": "#d26a1e",
+     "dark": "#8c4212"
+    }
+   ],
+   "impactFrame": {},
+   "artStyle": "pre-rendered-3d"
+  }
+ }
+}

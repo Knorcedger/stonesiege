@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { FP, type Entity, type PlayerId } from '@bf/sim/types';
+import { FP, type Entity, type GameMap, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
 import {
   buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
@@ -31,6 +31,24 @@ describe('resourceFrameName', () => {
   it('replaces every depleted tree variant with the stump frame', () => {
     expect(resourceFrameName(resource())).toMatch(/^obj\/tree\/[0-2]$/);
     expect(resourceFrameName(resource({ stump: true, amountLeft: 0 }))).toBe('obj/stump');
+  });
+
+  it('uses terrain and coarse map regions to create recognizable forest variety', () => {
+    const map: GameMap = {
+      width: 24, height: 24,
+      terrain: new Uint8Array(24 * 24),
+      terrainIds: ['grass', 'snow', 'dirt'],
+    };
+    map.terrain[3 * map.width + 3] = 1;
+    map.terrain[4 * map.width + 4] = 2;
+    expect(resourceFrameName(resource({ tileX: 3, tileY: 3 }), map)).toBe('obj/tree/1');
+    expect(resourceFrameName(resource({ tileX: 4, tileY: 4 }), map)).toBe('obj/tree/2');
+    const regions = new Set([
+      resourceFrameName(resource({ tileX: 1, tileY: 1 }), map),
+      resourceFrameName(resource({ tileX: 9, tileY: 1 }), map),
+      resourceFrameName(resource({ tileX: 17, tileY: 17 }), map),
+    ]);
+    expect(regions.size).toBeGreaterThan(1);
   });
 });
 

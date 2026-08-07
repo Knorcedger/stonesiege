@@ -68,6 +68,12 @@ export function createMilitary(ctx: Ctx): MilitaryManager {
   let waveDest: { x: Fixed; y: Fixed } | null = null;
   let waveOrderedAt = -1;
   let waveCooldownUntil = -1;
+  /**
+   * The first Hard raid is deliberately smaller than its later main waves.
+   * A controller created over a serialized mid-match sim must not mistake the
+   * next reinforcement wave for the opening raid after lifecycle resume.
+   */
+  let launchedAnyWave = st.tick > 0;
   /** Adaptive escalation: failed sieges raise the next wave's mass (eroded by the
    *  idle decay, so rams are never stranded behind an unreachable army count). */
   let armyNeedBoost = 0;
@@ -380,16 +386,18 @@ export function createMilitary(ctx: Ctx): MilitaryManager {
     // never even sustain) only delays the kill — attrition-stalemate fuel. Rams
     // waive it entirely: they grind a garrisoned TC no field escort could crack,
     // which is the exact failure the boost was compensating for.
+    const baseArmyNeed = launchedAnyWave ? t.attackArmy : t.openingArmy;
     const justifiedBoost = snap.rams.length > 0
       ? 0
       : Math.min(armyNeedBoost, Math.max(0, enemyCombat * 2 - t.attackArmy));
-    const armyNeed = Math.max(needFloor, t.attackArmy + justifiedBoost - idleDecay);
+    const armyNeed = Math.max(needFloor, baseArmyNeed + justifiedBoost - idleDecay);
     const mayLaunch = forced !== null || (!t.neverAttack
       && snap.tick >= waveCooldownUntil
       && (!t.counterattackOnly || snap.tick <= counterattackUntil)
       && military.length >= armyNeed);
     if (!waveActive && mayLaunch && military.length > 0) {
       waveActive = true;
+      launchedAnyWave = true;
       waveTarget = -1;
       waveDest = null;
       waveOrderedAt = -1;

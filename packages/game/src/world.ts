@@ -8,11 +8,13 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import {
   FP, GAIA, TICKS_PER_SECOND,
-  type Entity, type EntityId, type GameState, type PlayerId, type SimEvent,
+  type Entity, type EntityId, type GameMap, type GameState, type PlayerId, type SimEvent,
 } from '@bf/sim/types';
 import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets } from './assets';
-import { animForActivity, animFrameIndex, unitRig, type AnimName } from './frames';
+import {
+  animForActivity, animFrameIndex, facingFromDelta, unitRig, villagerWorkAnim, type AnimName,
+} from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
@@ -41,6 +43,8 @@ interface EntityView {
   animStartTick: number;
   lastHpKey: string;
   lastRingKey: string;
+  /** Facing derived from the real movement vector, avoiding NW/NE flicker on near-north paths. */
+  renderFacing: number;
   /** Root-local y of the sprite's first opaque row (trimmed visible top). */
   spriteTopPx: number;
   /** Carry icon over laden villagers (entity.carrying). */
@@ -330,6 +334,7 @@ export class WorldLayer {
     return {
       root, ring, sprite, hpBar,
       lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0,
+      renderFacing: 0,
       carry: null, lastCarryKey: '', badge: null, badgeText: null, lastBadgeKey: '',
     };
   }
@@ -341,11 +346,26 @@ export class WorldLayer {
     const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);
     view.root.zIndex = flat ? pos.y - 4000 : pos.y;
 
+    const prev = this.prevPos.get(e.id);
+    const cur = this.curPos.get(e.id);
+    if ((e.activity === 'moving' || e.activity === 'carrying' || e.activity === 'fleeing') && prev && cur) {
+      // On a view's first render prev/cur may be identical (for example when a
+      // resumed unit is already walking). Fall back to the sim facing instead
+      // of flashing the view's default south-facing pose for one frame.
+      const fallback = view.lastFrameKey === '' ? e.facing : view.renderFacing;
+      view.renderFacing = facingFromDelta(cur.x - prev.x, cur.y - prev.y, fallback);
+    } else {
+      view.renderFacing = e.facing;
+    }
+
     // Gaia entities use the neutral swap: some (sheep) carry a real mask band that
     // must never render raw magenta. Atlases without masks serve the plain frame.
     const colorIdx = e.player === GAIA ? GAIA_NEUTRAL_COLOR : state.players[e.player]?.setup.color;
     const { candidates, alpha: sprAlpha } = this.frameNameFor(state, e, tickFloat, view);
-    const key = candidates.join('|');
+    // Conversions can change ownership without changing the animation frame.
+    // Include the player ramp in the cache key so the sprite cannot retain its
+    // former owner's palette until its next animation/facing transition.
+    const key = `${colorIdx ?? 'none'}|${candidates.join('|')}`;
     if (key !== view.lastFrameKey) {
       let frame = null;
       let resolvedName = candidates[candidates.length - 1];
@@ -356,11 +376,14 @@ export class WorldLayer {
       frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      view.sprite.scale.x = frame.mirrored ? -1 : 1;
+      view.sprite.scale.set(
+        frame.mirrored ? -frame.renderScale : frame.renderScale,
+        frame.renderScale,
+      );
       // Trimmed visible top (frames carry transparent headroom): overlays like
       // the health bar must anchor to pixels, not the texture rect.
       view.spriteTopPx = Math.round(
-        this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height,
+        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height) * frame.renderScale,
       );
       view.lastFrameKey = key;
     }
@@ -437,14 +460,18 @@ export class WorldLayer {
 
   private frameNameFor(state: GameState, e: Entity, tickFloat: number, view: EntityView): { candidates: string[]; alpha: number } {
     if (e.kind === 'resource') {
-      return { candidates: [resourceFrameName(e)], alpha: 1 };
+      return { candidates: [resourceFrameName(e, state.map)], alpha: 1 };
     }
     if (e.kind === 'building') {
       return buildingFrame(state, e);
     }
     // unit (incl. gaia animals under obj/; heroes render via their `sprite` rig alias)
     const { spriteId, prefix } = unitRig(e.defId);
-    const anim = animForActivity(e.activity, e.defId === 'villager');
+    const workTargetId = e.intent?.kind === 'gather' ? e.intent.targetId : e.targetId;
+    const workTarget = workTargetId === undefined ? undefined : state.entities.get(workTargetId);
+    const anim = e.defId === 'villager'
+      ? villagerWorkAnim(e.activity, workTarget?.defId)
+      : animForActivity(e.activity, false);
     if (anim !== view.lastAnim) {
       view.lastAnim = anim;
       view.animStartTick = tickFloat;
@@ -464,13 +491,13 @@ export class WorldLayer {
         this.frameCounts.set(idleKey, idleCount);
       }
       if (idleCount > 0) {
-        return { candidates: [`${prefix}/${spriteId}/idle/${e.facing}/0`], alpha: 1 };
+        return { candidates: [`${prefix}/${spriteId}/idle/${view.renderFacing}/0`], alpha: 1 };
       }
-      return { candidates: [`${prefix}/${spriteId}/${anim}/${e.facing}/0`], alpha: 1 };
+      return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/0`], alpha: 1 };
     }
     const ageSec = (tickFloat - view.animStartTick) / TICKS_PER_SECOND;
     const frame = animFrameIndex(anim, ageSec, count);
-    return { candidates: [`${prefix}/${spriteId}/${anim}/${e.facing}/${frame}`], alpha: 1 };
+    return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/${frame}`], alpha: 1 };
   }
 
   private drawRing(e: Entity, view: EntityView): void {
@@ -491,9 +518,17 @@ export class WorldLayer {
         .moveTo(0, -hh).lineTo(hw, 0).lineTo(0, hh).lineTo(-hw, 0).closePath()
         .stroke({ width: 1.5, color });
     } else {
+      const resourceRadius: readonly [number, number] | undefined = e.kind === 'resource'
+        ? e.defId === 'tree'
+          ? [14, 7]
+          : e.defId === 'berryBush'
+            ? [15, 7]
+            : e.defId === 'goldMine' || e.defId === 'stoneMine'
+              ? [18, 9]
+              : [12, 6]
+        : undefined;
       const cav = (gameData.units[e.defId]?.speed ?? 0) > 1.1;
-      const rx = cav ? 14 : 10;
-      const ry = cav ? 7 : 5;
+      const [rx, ry] = resourceRadius ?? (cav ? [14, 7] : [10, 5]);
       view.ring.ellipse(0, 1, rx, ry + 1).stroke({ width: 1, color: OUTLINE });
       view.ring.ellipse(0, 0, rx, ry).stroke({ width: 1, color });
     }
@@ -591,6 +626,7 @@ export class WorldLayer {
               this.assets.resolveFrame(`bld/${g.defId}/done`, colorIdx);
           spr.texture = frame.texture;
           spr.anchor.set(frame.anchorX, frame.anchorY);
+          spr.scale.set(frame.renderScale);
           spr.position.set(Math.round(g.wx), Math.round(g.wy));
           spr.zIndex = g.wy;
         }
@@ -660,11 +696,24 @@ export function defaultRallyTilePoint(e: Entity): [number, number] {
   return [e.tileX + size / 2, e.tileY + size + 0.5];
 }
 
-export function resourceFrameName(e: Entity): string {
+export function resourceFrameName(e: Entity, map?: GameMap): string {
   if (e.stump) return 'obj/stump';
   const h = (Math.imul(e.id, 2654435761) >>> 0);
   switch (e.defId) {
-    case 'tree': return `obj/tree/${h % 3}`;
+    case 'tree': {
+      if (!map || e.tileX < 0 || e.tileY < 0 || e.tileX >= map.width || e.tileY >= map.height) {
+        return `obj/tree/${h % 3}`;
+      }
+      const terrain = map.terrainIds[map.terrain[e.tileY * map.width + e.tileX]];
+      if (terrain === 'snow') return 'obj/tree/1'; // conifer forest
+      if (terrain === 'sand' || terrain === 'dirt') return 'obj/tree/2'; // pale/dry woodland
+      // Coarse spatial hash: nearby trees read as a forest type, while another
+      // region of the map naturally gets a visibly different species.
+      const regionX = Math.floor(e.tileX / 8);
+      const regionY = Math.floor(e.tileY / 8);
+      const regionHash = Math.imul(regionX + 17, 73856093) ^ Math.imul(regionY + 31, 19349663);
+      return `obj/tree/${(regionHash >>> 0) % 3}`;
+    }
     case 'goldMine': return `obj/gold/${h % 2}`;
     case 'stoneMine': return `obj/stone/${h % 2}`;
     case 'berryBush': return 'obj/berries';

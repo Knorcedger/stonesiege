@@ -11,8 +11,10 @@
 // - conversion beam + sparkles while a monk's activity is 'converting'
 // - a short descending ground arrow confirming move-order destinations
 //
-// Two containers: `ground` sorts under the entity layer (corpses/rubble),
-// `air` above it (projectiles, flashes, beams).
+// Three containers: `ground` sorts under the entity layer (corpses/rubble),
+// `air` above it (projectiles, flashes, beams), and `overlay` above fog for
+// player-issued destination markers (orders into unexplored terrain must still
+// give immediate feedback without revealing the terrain below).
 
 import { Container, Graphics, Sprite } from 'pixi.js';
 import {
@@ -86,6 +88,7 @@ const MOVE_MARKER_TICKS = 14;
 export class FxLayer {
   readonly ground = new Container();
   readonly air = new Container();
+  readonly overlay = new Container();
 
   private projectiles: Projectile[] = [];
   private flashes: Flash[] = [];
@@ -102,6 +105,7 @@ export class FxLayer {
   destroy(): void {
     this.ground.destroy({ children: true });
     this.air.destroy({ children: true });
+    this.overlay.destroy({ children: true });
   }
 
   onSimEvents(state: GameState, events: SimEvent[], tick: number): void {
@@ -151,7 +155,7 @@ export class FxLayer {
       .poly([0, -2, 7, 1, 0, 4, -7, 1])
       .stroke({ width: 1.5, color: 0x8fd45e, alpha: 0.9 });
     gfx.position.set(p.x, p.y);
-    this.air.addChild(gfx);
+    this.overlay.addChild(gfx);
     this.moveMarkers.push({ gfx, startTick: tick, baseY: p.y });
   }
 
@@ -340,6 +344,7 @@ export class FxLayer {
       }
       sprite.texture = frame.texture;
       sprite.anchor.set(frame.anchorX, frame.anchorY);
+      sprite.scale.set(frame.renderScale);
       this.corpses.push({
         sprite, defId, colorIdx, facing, isBuilding: true,
         phaseStart: tick, phase: 'rubble', dieFrames: 0, decayFrames: 0, lastFrameKey: 'rubble',
@@ -415,7 +420,10 @@ export class FxLayer {
     if (!frame) return;
     c.sprite.texture = frame.texture;
     c.sprite.anchor.set(frame.anchorX, frame.anchorY);
-    c.sprite.scale.x = frame.mirrored ? -1 : 1;
+    c.sprite.scale.set(
+      frame.mirrored ? -frame.renderScale : frame.renderScale,
+      frame.renderScale,
+    );
   }
 
   // ---------------------------------------------------------------- conversion beam
