@@ -46,6 +46,7 @@ import {
 import { makeScenarioOps, type ScenarioUiHooks } from './scenario/runtime';
 import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
 import { setNavHint } from './screens/nav';
+import { NATIVE_BACK_EVENT, NATIVE_PAUSE_EVENT } from './nativeEvents';
 import {
   clearSnapshot, loadSnapshot, replaySnapshot, saveSnapshot, scenarioFingerprint,
   SNAPSHOT_VERSION, trySerialize, type CommandLog, type MatchSnapshot,
@@ -578,6 +579,19 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   };
   document.addEventListener('visibilitychange', onVisibility);
   window.addEventListener('pagehide', saveMatch);
+  // Native lifecycle delivery is more reliable than waiting for WebView
+  // visibility alone. Back pauses instead of exiting or abandoning a match.
+  const onNativePause = (): void => {
+    loop.pause(true);
+    saveMatch();
+  };
+  const onNativeBack = (event: Event): void => {
+    event.preventDefault();
+    loop.pause(false);
+    saveMatch();
+  };
+  window.addEventListener(NATIVE_PAUSE_EVENT, onNativePause);
+  window.addEventListener(NATIVE_BACK_EVENT, onNativeBack);
 
   const issue = (cmd: Command): void => loop.issue(cmd);
   const issueWithUndo = (cmd: Command, label: string, undo: (() => void) | null): void => {

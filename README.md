@@ -18,3 +18,4 @@ npm run test       # simulation & data tests
 ```
 
 See `docs/GDD.md` for the game design and `docs/ARCHITECTURE.md` for how it's built.
+Native build, signing, and store handoff instructions are in `docs/MOBILE.md`.

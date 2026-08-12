@@ -1,6 +1,6 @@
 # Bannerfall — Project Plan & Status
 
-_Last updated: 2026-08-04_
+_Last updated: 2026-08-12_
 
 **Bannerfall** is an original mobile RTS that recreates the feel and depth of Age of Empires II
 (economy → ages → armies → castles, counter-based combat, story campaigns). All art, text, and
@@ -39,10 +39,10 @@ input, HUD, menus, audio) · `ai` (bots) · `scenarios` (campaign maps + trigger
 | Wave 2 — economy, combat, tech, HUD, scenario engine | ✅ Done & verified | Full macro loop to victory |
 | Wave 3 — AI, campaign 2–6, menus, audio, snapshots | ✅ Done & verified | Feature-complete v1 |
 | QA-until-dry | ⏳ Blocked | Critics hit the usage limit; **did not actually run** (see below) |
-| Capacitor packaging (iOS/Android) | ⬜ Staged | Workflow written, not yet run |
+| Capacitor packaging (iOS/Android) | ✅ Packaged & locally verified | Android APK and iOS simulator build pass; store signing remains |
 
-**Health right now:** typecheck clean · production build clean · **541 tests passing**
-(11 skipped, opt-in heavy sweeps) · deterministic sim well under its per-tick budget · zero
+**Health right now:** typecheck clean · production, Android, and iOS builds clean · **605 tests passing**
+(11 skipped, including opt-in heavy sweeps) · deterministic sim well under its per-tick budget · zero
 console errors in the last full-loop browser playthrough. The current stabilization pass covers
 selection/build placement, custom tooltips and unit stats, guard-radius feedback, Town Bell
 sheltering/firepower, walkable completed farms, occupied-foundation clearance, friendly-unit
@@ -126,13 +126,14 @@ size), equal-cost balance battles verifying the full counter web, and rotating c
 — fixers by area, looping until two genuinely clean rounds. _Workflow script is written and
 staged:_ `…/workflows/scripts/bannerfall-qa.js`.
 
-### 2. Capacitor packaging — iOS + Android (staged, not started)
-Wrap `dist/` with Capacitor: `com.bannerfall.app`, landscape orientation, app icons + splash from
-the art pipeline, safe-area/notch handling, iOS WebAudio unlock, Android back-button → pause,
-lifecycle snapshot-resume, DPR-aware crisp scaling, simulator smoke tests where toolchains exist,
-and a `docs/MOBILE.md` with store-submission steps. _Workflow script staged:_
-`…/workflows/scripts/bannerfall-capacitor.js`. **Will need from you:** an Apple Developer account +
-signing, a Google Play account, and (optionally) your own bundle id.
+### 2. Capacitor packaging — iOS + Android (implemented)
+`dist/` is wrapped with Capacitor 8 as `com.bannerfall.app`. Both projects are landscape-only and
+include generated icons/splashes, safe-area handling, bundled offline fonts, lifecycle snapshots,
+and Android Back-to-pause behavior. `assembleDebug` and an unsigned iOS simulator build pass; the
+iPhone simulator launch reaches the title screen. See `docs/MOBILE.md` for reproducible builds,
+signing, privacy declarations, versioning, and store submission. **Still needed for publication:**
+Apple Developer/App Store Connect access, a Google Play Console account and upload key, final store
+copy/screenshots, and a decision on whether to keep the current permanent bundle id.
 
 ### Roadmap (explicitly out of scope for v1)
 Naval/water gameplay, elevation combat bonuses, formations & stances, trade carts, relics,
@@ -143,8 +144,6 @@ more civs and campaigns, a music score.
 
 ## Current blocker
 
-The multi-agent workflows are paused on the **account usage limit (resets Aug 8, 6am Europe/London)**.
-Waves 1–3 are fully committed and the game is feature-complete and playable today; the remaining
-QA and packaging waves are written and ready to launch when the limit resets. In the meantime the
-game runs via `npm run dev`, and individual fixes (like the command-hardening above) can be done
-directly.
+Native packages now build locally. Public release is blocked only on external store ownership and
+signing: Apple Developer/App Store Connect access and Google Play Console plus an upload key. The
+separate QA-until-dry wave described above still needs to run before a production submission.

@@ -112,15 +112,6 @@ const MENU_CSS = `
 .bf-brief-actions .bf-menu-btn.ghost { flex:1; }
 `;
 
-function ensureFonts(): void {
-  if (document.getElementById('bf-fonts')) return;
-  const link = document.createElement('link');
-  link.id = 'bf-fonts';
-  link.rel = 'stylesheet';
-  link.href = 'https://fonts.googleapis.com/css2?family=Alegreya+Sans:wght@400;500;600&family=Cinzel:wght@600;700&family=Jacquard+12&family=Pixelify+Sans:wght@400;600&family=VT323&display=swap';
-  document.head.appendChild(link);
-}
-
 const DIFFICULTIES: Array<{ id: BotDifficulty; label: string }> = [
   { id: 'easy', label: 'Easy' },
   { id: 'standard', label: 'Standard' },
@@ -141,7 +132,6 @@ export function showMenu(
   root: HTMLElement,
   opts: { canResume?: boolean; flow?: FlowState } = {},
 ): Promise<GameRequest> {
-  ensureFonts();
   if (!document.getElementById('bf-menu-style')) {
     const style = document.createElement('style');
     style.id = 'bf-menu-style';
