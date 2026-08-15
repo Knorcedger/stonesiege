@@ -53,6 +53,20 @@ upload, increment `versionCode` in `android/app/build.gradle`; set `versionName`
 release version. Google Play App Signing should hold the app-signing key while the local key is
 used only as the upload key.
 
+For this app, keep using `android/stonesiege-upload.jks` with alias `stonesiege-upload`. Its
+password is stored in macOS Keychain under service `StoneSiege Android Upload` and account
+`com.stonesiege.app`; using a different upload key will be rejected by Google Play. A local build
+can load the same password for both PKCS12 password variables without writing it to disk:
+
+```bash
+cd android
+stonesiege_upload_password="$(security find-generic-password \
+  -a com.stonesiege.app -s 'StoneSiege Android Upload' -w)"
+STONESIEGE_UPLOAD_STORE_PASSWORD="$stonesiege_upload_password" \
+STONESIEGE_UPLOAD_KEY_PASSWORD="$stonesiege_upload_password" \
+  ./gradlew bundleRelease
+```
+
 The StoneSiege Play Console app uses `com.stonesiege.app`. Upload each AAB to the internal-testing
 track first, add testers, and run the pre-launch report before promoting it. The first upload also
 enrols the app in Play App Signing; retain the local upload key and its credentials for every future

@@ -1,90 +1,20 @@
-// Deterministic source logo for native icons and splash screens. Capacitor's
-// asset tool expands this transparent 2048px mark into every platform density.
+// Deterministically expand the canonical StoneSiege store icon into every
+// native icon and splash-screen density.
 
-import { existsSync, mkdirSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 
-const SIZE = 2048;
-const png = new PNG({ width: SIZE, height: SIZE });
-
-type Point = readonly [number, number];
 type Rgba = readonly [number, number, number, number];
-
-function setPixel(x: number, y: number, color: Rgba): void {
-  if (x < 0 || y < 0 || x >= SIZE || y >= SIZE) return;
-  const i = (y * SIZE + x) * 4;
-  const a = color[3] / 255;
-  const inv = 1 - a;
-  png.data[i] = Math.round(color[0] * a + png.data[i] * inv);
-  png.data[i + 1] = Math.round(color[1] * a + png.data[i + 1] * inv);
-  png.data[i + 2] = Math.round(color[2] * a + png.data[i + 2] * inv);
-  png.data[i + 3] = Math.round((a + (png.data[i + 3] / 255) * inv) * 255);
-}
-
-function polygon(points: readonly Point[], color: Rgba): void {
-  const minY = Math.max(0, Math.floor(Math.min(...points.map((p) => p[1]))));
-  const maxY = Math.min(SIZE - 1, Math.ceil(Math.max(...points.map((p) => p[1]))));
-  for (let y = minY; y <= maxY; y++) {
-    const xs: number[] = [];
-    for (let i = 0; i < points.length; i++) {
-      const a = points[i];
-      const b = points[(i + 1) % points.length];
-      if ((a[1] <= y && b[1] > y) || (b[1] <= y && a[1] > y)) {
-        xs.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]));
-      }
-    }
-    xs.sort((a, b) => a - b);
-    for (let i = 0; i + 1 < xs.length; i += 2) {
-      for (let x = Math.ceil(xs[i]); x <= Math.floor(xs[i + 1]); x++) setPixel(x, y, color);
-    }
-  }
-}
-
-function thickLine(a: Point, b: Point, width: number, color: Rgba): void {
-  const dx = b[0] - a[0];
-  const dy = b[1] - a[1];
-  const length = Math.hypot(dx, dy);
-  const nx = (-dy / length) * width / 2;
-  const ny = (dx / length) * width / 2;
-  polygon([
-    [a[0] + nx, a[1] + ny], [b[0] + nx, b[1] + ny],
-    [b[0] - nx, b[1] - ny], [a[0] - nx, a[1] - ny],
-  ], color);
-}
-
-const bronze: Rgba = [201, 146, 52, 255];
-const gold: Rgba = [239, 211, 142, 255];
-const shadow: Rgba = [46, 27, 14, 255];
-const crimson: Rgba = [112, 34, 29, 255];
-
-// Crossed field spears behind the shield.
-thickLine([530, 1660], [1510, 330], 82, shadow);
-thickLine([1518, 1660], [538, 330], 82, shadow);
-polygon([[1465, 255], [1585, 280], [1530, 405]], bronze);
-polygon([[583, 255], [463, 280], [518, 405]], bronze);
-
-const outerShield: Point[] = [
-  [430, 440], [1618, 440], [1548, 1300], [1024, 1760], [500, 1300],
-];
-const innerShield: Point[] = [
-  [508, 522], [1540, 522], [1476, 1250], [1024, 1650], [572, 1250],
-];
-polygon(outerShield, bronze);
-polygon(innerShield, crimson);
-
-// A pale falling banner/castle sigil: three crenellations over a tapering pennon.
-polygon([
-  [700, 680], [822, 680], [822, 590], [958, 590], [958, 680],
-  [1090, 680], [1090, 590], [1226, 590], [1226, 680], [1348, 680],
-  [1300, 1180], [1024, 1430], [748, 1180],
-], gold);
-polygon([[868, 850], [1180, 850], [1164, 1080], [884, 1080]], shadow);
-polygon([[948, 850], [1100, 850], [1092, 1080], [956, 1080]], bronze);
-
 const outDir = join(import.meta.dirname, '..', 'assets');
 mkdirSync(outDir, { recursive: true });
-writeFileSync(join(outDir, 'logo.png'), PNG.sync.write(png));
+const sourcePath = join(outDir, 'app-icon-source.png');
+const markPath = join(outDir, 'app-icon-mark.png');
+const iconPng = PNG.sync.read(readFileSync(sourcePath));
+const markPng = PNG.sync.read(readFileSync(markPath));
+if (iconPng.width !== iconPng.height) throw new Error('assets/app-icon-source.png must be square');
+if (markPng.width !== markPng.height) throw new Error('assets/app-icon-mark.png must be square');
+writeFileSync(join(outDir, 'logo.png'), PNG.sync.write(markPng));
 
 const rootDir = join(import.meta.dirname, '..');
 
@@ -99,6 +29,7 @@ function compose(
   background: Rgba | null,
   markScale: number,
   round = false,
+  source = markPng,
 ): PNG {
   const output = new PNG({ width, height });
   const radius = Math.min(width, height) / 2;
@@ -126,20 +57,20 @@ function compose(
   for (let y = 0; y < targetSize; y++) {
     const outY = top + y;
     if (outY < 0 || outY >= height) continue;
-    const sourceY = Math.min(SIZE - 1, Math.floor((y * SIZE) / targetSize));
+    const sourceY = Math.min(source.height - 1, Math.floor((y * source.height) / targetSize));
     for (let x = 0; x < targetSize; x++) {
       const outX = left + x;
       if (outX < 0 || outX >= width) continue;
       if (round && Math.hypot(outX + 0.5 - centerX, outY + 0.5 - centerY) > radius) continue;
-      const sourceX = Math.min(SIZE - 1, Math.floor((x * SIZE) / targetSize));
-      const sourceIndex = (sourceY * SIZE + sourceX) * 4;
-      const alpha = png.data[sourceIndex + 3] / 255;
+      const sourceX = Math.min(source.width - 1, Math.floor((x * source.width) / targetSize));
+      const sourceIndex = (sourceY * source.width + sourceX) * 4;
+      const alpha = source.data[sourceIndex + 3] / 255;
       if (alpha === 0) continue;
       const outputIndex = (outY * width + outX) * 4;
       const inverse = 1 - alpha;
-      output.data[outputIndex] = Math.round(png.data[sourceIndex] * alpha + output.data[outputIndex] * inverse);
-      output.data[outputIndex + 1] = Math.round(png.data[sourceIndex + 1] * alpha + output.data[outputIndex + 1] * inverse);
-      output.data[outputIndex + 2] = Math.round(png.data[sourceIndex + 2] * alpha + output.data[outputIndex + 2] * inverse);
+      output.data[outputIndex] = Math.round(source.data[sourceIndex] * alpha + output.data[outputIndex] * inverse);
+      output.data[outputIndex + 1] = Math.round(source.data[sourceIndex + 1] * alpha + output.data[outputIndex + 1] * inverse);
+      output.data[outputIndex + 2] = Math.round(source.data[sourceIndex + 2] * alpha + output.data[outputIndex + 2] * inverse);
       output.data[outputIndex + 3] = Math.round((alpha + (output.data[outputIndex + 3] / 255) * inverse) * 255);
     }
   }
@@ -164,8 +95,8 @@ function generateAndroid(): number {
   let count = 0;
   for (const [density, iconSize, adaptiveSize] of densities) {
     const dir = join(resDir, `mipmap-${density}`);
-    writePng(join(dir, 'ic_launcher.png'), compose(iconSize, iconSize, iconBackground, 0.94));
-    writePng(join(dir, 'ic_launcher_round.png'), compose(iconSize, iconSize, iconBackground, 0.82, true));
+    writePng(join(dir, 'ic_launcher.png'), compose(iconSize, iconSize, null, 1, false, iconPng), true);
+    writePng(join(dir, 'ic_launcher_round.png'), compose(iconSize, iconSize, null, 1, true, iconPng), true);
     writePng(join(dir, 'ic_launcher_foreground.png'), compose(adaptiveSize, adaptiveSize, null, 0.72));
     writePng(join(dir, 'ic_launcher_background.png'), compose(adaptiveSize, adaptiveSize, iconBackground, 0));
     count += 4;
@@ -200,7 +131,7 @@ function generateIos(): number {
   const splashBackgroundDark = rgba('#0d0b08');
   writePng(
     join(assetDir, 'AppIcon.appiconset', 'AppIcon-512@2x.png'),
-    compose(1024, 1024, iconBackground, 0.94),
+    compose(1024, 1024, iconBackground, 1, false, iconPng),
     true,
   );
   const splashDir = join(assetDir, 'Splash.imageset');
