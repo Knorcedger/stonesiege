@@ -35,13 +35,17 @@ cd android
 ```
 
 The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. For the Play Store,
-create an upload key outside this repository, copy `android/keystore.properties.example` to
-`android/keystore.properties`, and fill in the local path and credentials. Both the properties file
-and keystores are ignored by Git. Then build the signed Android App Bundle:
+create an upload key inside `android/`, copy `android/keystore.properties.example` to
+`android/keystore.properties`, and set the local filename and alias. Both the properties file and
+keystores are ignored by Git. Supply the passwords through
+`STONESIEGE_UPLOAD_STORE_PASSWORD` and `STONESIEGE_UPLOAD_KEY_PASSWORD` (or, less safely, as
+properties in the ignored file), then build the signed Android App Bundle:
 
 ```bash
 cd android
-./gradlew bundleRelease
+STONESIEGE_UPLOAD_STORE_PASSWORD='…' \
+STONESIEGE_UPLOAD_KEY_PASSWORD='…' \
+  ./gradlew bundleRelease
 ```
 
 The AAB is written to `android/app/build/outputs/bundle/release/app-release.aab`. Before every
@@ -49,9 +53,10 @@ upload, increment `versionCode` in `android/app/build.gradle`; set `versionName`
 release version. Google Play App Signing should hold the app-signing key while the local key is
 used only as the upload key.
 
-In Play Console, create the app with `com.stonesiege.app`, complete the content rating and store
-listing, upload the AAB to an internal-testing track first, and run the pre-launch report before
-promoting it.
+The StoneSiege Play Console app uses `com.stonesiege.app`. Upload each AAB to the internal-testing
+track first, add testers, and run the pre-launch report before promoting it. The first upload also
+enrols the app in Play App Signing; retain the local upload key and its credentials for every future
+Android release.
 
 ## iOS
 

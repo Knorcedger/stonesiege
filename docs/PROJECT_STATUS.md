@@ -39,7 +39,7 @@ input, HUD, menus, audio) · `ai` (bots) · `scenarios` (campaign maps + trigger
 | Wave 2 — economy, combat, tech, HUD, scenario engine | ✅ Done & verified | Full macro loop to victory |
 | Wave 3 — AI, campaign 2–6, menus, audio, snapshots | ✅ Done & verified | Feature-complete v1 |
 | QA-until-dry | ⏳ Blocked | Critics hit the usage limit; **did not actually run** (see below) |
-| Capacitor packaging (iOS/Android) | ✅ Packaged & locally verified | Android APK and iOS simulator build pass; store signing remains |
+| Capacitor packaging (iOS/Android) | 🟡 Release staging | Signed Android AAB and iOS Release simulator build pass; Apple signing remains |
 
 **Health right now:** typecheck clean · production, Android, and iOS builds clean · **605 tests passing**
 (11 skipped, including opt-in heavy sweeps) · deterministic sim well under its per-tick budget · zero
@@ -129,11 +129,13 @@ staged:_ `…/workflows/scripts/bannerfall-qa.js`.
 ### 2. Capacitor packaging — iOS + Android (implemented)
 `dist/` is wrapped with Capacitor 8 as `com.stonesiege.app`. Both projects are landscape-only and
 include generated icons/splashes, safe-area handling, bundled offline fonts, lifecycle snapshots,
-and Android Back-to-pause behavior. `assembleDebug` and an unsigned iOS simulator build pass; the
-iPhone simulator launch reaches the title screen. See `docs/MOBILE.md` for reproducible builds,
-signing, privacy declarations, versioning, and store submission. **Still needed for publication:**
-Apple Developer/App Store Connect access, a Google Play Console account and upload key, final store
-copy/screenshots, and a decision on whether to keep the current permanent bundle id.
+and Android Back-to-pause behavior. The signed Android App Bundle and unsigned iOS Release
+simulator build pass. The Google Play app record and a Keychain-backed Android upload key now
+exist. See `docs/MOBILE.md` for reproducible builds, signing, privacy declarations, versioning, and
+store submission. **Still needed for the Apple pipeline:** select the Apple Developer team in
+Xcode, create/fetch its distribution certificate and provisioning profile, then upload the archive
+to App Store Connect/TestFlight. Final public store copy/screenshots remain separate from internal
+testing.
 
 ### Roadmap (explicitly out of scope for v1)
 Naval/water gameplay, elevation combat bonuses, formations & stances, trade carts, relics,
@@ -144,6 +146,6 @@ more civs and campaigns, a music score.
 
 ## Current blocker
 
-Native packages now build locally. Public release is blocked only on external store ownership and
-signing: Apple Developer/App Store Connect access and Google Play Console plus an upload key. The
-separate QA-until-dry wave described above still needs to run before a production submission.
+Native packages build locally and Android release signing is configured. The remaining native
+signing blocker is Apple Developer team access on this Mac. Store-listing metadata and the separate
+QA-until-dry wave described above still need to be completed before a production submission.
