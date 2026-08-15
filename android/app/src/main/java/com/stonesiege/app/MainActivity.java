@@ -1,4 +1,4 @@
-package com.bannerfall.app;
+package com.stonesiege.app;
 
 import com.getcapacitor.BridgeActivity;
 

@@ -1,6 +1,6 @@
 // One styled tooltip surface for every DOM control in the game. Native `title`
 // attributes are deliberately removed: their timing, typography, and placement
-// vary by browser and clash with Bannerfall's parchment/wood UI.
+// vary by browser and clash with StoneSiege's parchment/wood UI.
 
 const STYLE_ID = 'bf-game-tooltip-style';
 const TIP_ID = 'bf-game-tooltip';
@@ -79,7 +79,7 @@ export function hideGameTooltip(): void {
   if (tip) tip.style.display = 'none';
 }
 
-/** Bind or update a Bannerfall tooltip. Safe to call repeatedly for dynamic labels. */
+/** Bind or update a StoneSiege tooltip. Safe to call repeatedly for dynamic labels. */
 export function setGameTooltip(el: HTMLElement, text: string): void {
   el.removeAttribute('title');
   el.dataset.bfTooltip = text;

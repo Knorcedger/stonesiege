@@ -1,7 +1,7 @@
-# Bannerfall mobile packaging
+# StoneSiege mobile packaging
 
-Bannerfall ships the same offline Vite bundle on iOS and Android through Capacitor 8. The native
-application id is `com.bannerfall.app`; change it in `capacitor.config.ts`, Android Gradle, and the
+StoneSiege ships the same offline Vite bundle on iOS and Android through Capacitor 8. The native
+application id is `com.stonesiege.app`; change it in `capacitor.config.ts`, Android Gradle, and the
 Xcode target before the first store upload if a different permanent id is wanted.
 
 The wrappers are landscape-only and edge-to-edge. CSS safe-area insets protect the HUD around
@@ -49,7 +49,7 @@ upload, increment `versionCode` in `android/app/build.gradle`; set `versionName`
 release version. Google Play App Signing should hold the app-signing key while the local key is
 used only as the upload key.
 
-In Play Console, create the app with `com.bannerfall.app`, complete the content rating and store
+In Play Console, create the app with `com.stonesiege.app`, complete the content rating and store
 listing, upload the AAB to an internal-testing track first, and run the pre-launch report before
 promoting it.
 
@@ -72,7 +72,7 @@ An unsigned simulator compile can be verified without signing:
 xcodebuild -project ios/App/App.xcodeproj -scheme App \
   -configuration Debug -sdk iphonesimulator \
   -destination 'generic/platform=iOS Simulator' \
-  -derivedDataPath /tmp/bannerfall-ios-derived \
+  -derivedDataPath /tmp/stonesiege-ios-derived \
   CODE_SIGNING_ALLOWED=NO build
 ```
 

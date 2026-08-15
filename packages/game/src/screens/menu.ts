@@ -229,7 +229,7 @@ export function showMenu(
     // ---------------------------------------------------------------- views
     const renderTitle = (): void => {
       panel.append(
-        el('h1', 'bf-menu-name', 'Bannerfall'),
+        el('h1', 'bf-menu-name', 'StoneSiege'),
         el('p', 'bf-menu-sub', 'Raise your banner. Advance the ages.'),
       );
       if (opts.canResume) {

@@ -1,6 +1,6 @@
 # AoE2 reference numbers (auditor-compiled, for balance work)
 
-# AoE2 Reference Sheet — Real Numbers for the Bannerfall v1 Roster
+# AoE2 Reference Sheet — Real Numbers for the StoneSiege v1 Roster
 
 Source of truth: the current AoE2:DE game-data export (aoe2techtree.net `data.json`, pulled 2026-07-28, reflects the live balance patch), cross-checked against the Age of Empires wiki, Liquipedia, AoK Heaven, and AoEZone mechanics threads. All times are in-game seconds at 1.0× speed. Speeds are tiles/second. Armor is melee/pierce. RoF = seconds between attacks (lower = faster). TT = train time.
 
@@ -68,7 +68,7 @@ All units below are **1 population**.
 | Two-Handed Swordsman* | Imperial | 65 | 12 | +4 std buildings | 1/1 | 0.96 | 5 | 21s | 200F 100G / 45s |
 | Champion | Imperial | 70 | 14 | +4 std buildings | 1/1 | 0.96 | 5 | 21s | 650F 350G / 70s |
 
-*THS is skipped in Bannerfall's 4-tier line — include its numbers only if the pacing needs an intermediate step. If skipping, the Champion upgrade price should absorb some of THS's 200F 100G.
+*THS is skipped in StoneSiege's 4-tier line — include its numbers only if the pacing needs an intermediate step. If skipping, the Champion upgrade price should absorb some of THS's 200F 100G.
 
 ### Spearman line (Barracks) — 35F 25W, RoF 3.0, speed 1.0, armor 0/0, TT 22s
 | Unit | Age | HP | Atk | Key bonuses | Upgrade |
@@ -268,15 +268,15 @@ Hoardings 400F 400W/75s (+21% castle HP) · Sappers 400F 200W/10s (villagers +15
 | Archer / Skirm | 0.96 | | Trebuchet (packed) | 0.8 |
 | Monk | 0.7 | | Woad Raider | 1.17 (~1.35 w/ Celt bonus) |
 
-Population: every unit above = 1 pop. House +5, Town Center +5, Castle +20. AoE2 default cap 200 (Bannerfall v1 default 100 is a deliberate cut).
+Population: every unit above = 1 pop. House +5, Town Center +5, Castle +20. AoE2 default cap 200 (StoneSiege v1 default 100 is a deliberate cut).
 
 ---
 
 ## 10. Civ bonus reference (for tuning Scots/English)
 
-**Celts** (Scots reference): infantry +15% speed (from Feudal); lumberjacks +15%; siege weapons fire **25% faster** (note: faster, not cheaper — Bannerfall's \"cheap siege\" is its own design); herdables in a Celt unit's LOS can't be stolen. Team: siege workshops work 20% faster. UTs: Stronghold 250F 200G (castles/towers fire 25% faster) · Furor Celtica 750F 450G (siege workshop units +40% HP).
+**Celts** (Scots reference): infantry +15% speed (from Feudal); lumberjacks +15%; siege weapons fire **25% faster** (note: faster, not cheaper — StoneSiege's \"cheap siege\" is its own design); herdables in a Celt unit's LOS can't be stolen. Team: siege workshops work 20% faster. UTs: Stronghold 250F 200G (castles/towers fire 25% faster) · Furor Celtica 750F 450G (siege workshop units +40% HP).
 
-**Britons** (English reference): TCs cost −50% wood from Castle Age; foot archers +1 range in Castle, +2 total in Imperial; shepherds +25% (note: longer range yes, cheaper no — \"cheaper\" is Bannerfall's own design). Team: archery ranges work 20% faster. UTs: Yeomen 750W 450G (foot archers +1 range, towers +2 attack) · Warwolf 800W 400G (trebuchets get blast damage and 100% accuracy vs units).
+**Britons** (English reference): TCs cost −50% wood from Castle Age; foot archers +1 range in Castle, +2 total in Imperial; shepherds +25% (note: longer range yes, cheaper no — \"cheaper\" is StoneSiege's own design). Team: archery ranges work 20% faster. UTs: Yeomen 750W 450G (foot archers +1 range, towers +2 attack) · Warwolf 800W 400G (trebuchets get blast damage and 100% accuracy vs units).
 
 ---
 

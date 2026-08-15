@@ -4,8 +4,8 @@
 import type { CapacitorConfig } from '@capacitor/cli';
 
 const config: CapacitorConfig = {
-  appId: 'com.bannerfall.app',
-  appName: 'Bannerfall',
+  appId: 'com.stonesiege.app',
+  appName: 'StoneSiege',
   webDir: 'dist',
   backgroundColor: '#0d0b08',
   loggingBehavior: 'none',

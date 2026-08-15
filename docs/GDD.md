@@ -1,4 +1,4 @@
-# Bannerfall — Game Design Document
+# StoneSiege — Game Design Document
 
 An original mobile RTS that recreates the *feel and depth of Age of Empires II*: economy →
 ages → armies → castles, with counter-based combat and story campaigns. All art, names, text,

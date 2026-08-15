@@ -12,7 +12,7 @@ import '@fontsource/vt323/latin-400.css';
 import { installNativeBridge } from './native';
 
 const app = document.getElementById('app')!;
-app.innerHTML = '<div style="color:#c9b98a;font:16px monospace;padding:2rem">Bannerfall — bootstrapping…</div>';
+app.innerHTML = '<div style="color:#c9b98a;font:16px monospace;padding:2rem">StoneSiege — bootstrapping…</div>';
 
 async function boot() {
   await installNativeBridge();

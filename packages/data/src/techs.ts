@@ -391,7 +391,7 @@ export const techs: Record<string, TechDef> = {
     icon: 'icon/tech/longswordsmanUpgrade',
   },
   championUpgrade: {
-    // Priced above AoE2's bare Champion upgrade (650F 350G): Bannerfall's 4-tier militia
+    // Priced above AoE2's bare Champion upgrade (650F 350G): StoneSiege's 4-tier militia
     // line skips Two-Handed Swordsman, so this absorbs roughly half of that skipped cost.
     id: 'championUpgrade', name: 'Champion', age: 'imperial',
     researchedAt: ['barracks'], cost: { food: 750, gold: 400 }, researchTime: 70,

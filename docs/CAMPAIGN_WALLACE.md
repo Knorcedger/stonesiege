@@ -1,6 +1,6 @@
 # Campaign: William Wallace — The Rising of Scotland
 
-Bannerfall's first campaign and the game's tutorial arc. Six scenarios follow the historical
+StoneSiege's first campaign and the game's tutorial arc. Six scenarios follow the historical
 course of the First War of Scottish Independence from the killing of the Sheriff of Lanark
 (May 1297) to Wallace's last defiance (1304–05), teaching the full game progressively:
 movement → economy → ages → counters → siege → imperial warfare with trebuchets.

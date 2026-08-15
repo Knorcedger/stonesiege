@@ -1,5 +1,6 @@
 // Shelf-packer → single PNG + Pixi spritesheet JSON (meta.scale = 1) with
-// per-frame anchors and meta.bannerfall fields (ASSET_CONTRACT).
+// per-frame anchors and legacy meta.bannerfall fields (ASSET_CONTRACT). The
+// schema key stays stable so existing authored atlases remain compatible.
 
 import { Raster } from './raster.ts';
 import { nextPow2 } from './util.ts';
@@ -13,7 +14,7 @@ export interface FrameDef {
   anchor?: { x: number; y: number };
 }
 
-export interface BannerfallMeta {
+export interface StoneSiegeMeta {
   playerColorStrategy: 'runtime-swap';
   maskPalette: readonly string[];
   playerRamps: readonly PlayerRamp[];
@@ -31,9 +32,9 @@ export interface AtlasResult {
   };
 }
 
-export function defaultBannerfallMeta(
-  extra?: Partial<BannerfallMeta>,
-): BannerfallMeta {
+export function defaultStoneSiegeMeta(
+  extra?: Partial<StoneSiegeMeta>,
+): StoneSiegeMeta {
   return {
     playerColorStrategy: 'runtime-swap',
     maskPalette: MASK_HEX,
@@ -52,7 +53,7 @@ const PAD = 1;
 export function buildAtlas(
   frames: FrameDef[],
   imageName: string,
-  bannerfall: BannerfallMeta,
+  bannerfall: StoneSiegeMeta,
   maxWidth = 2048,
 ): AtlasResult {
   const seen = new Set<string>();
@@ -126,7 +127,7 @@ export function buildAtlas(
     json: {
       frames: jsonFrames,
       meta: {
-        app: 'bannerfall-assetgen',
+        app: 'stonesiege-assetgen',
         version: '1.0',
         image: imageName,
         format: 'RGBA8888',

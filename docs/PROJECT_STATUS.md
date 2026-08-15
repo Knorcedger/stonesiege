@@ -1,8 +1,8 @@
-# Bannerfall — Project Plan & Status
+# StoneSiege — Project Plan & Status
 
-_Last updated: 2026-08-12_
+_Last updated: 2026-08-15_
 
-**Bannerfall** is an original mobile RTS that recreates the feel and depth of Age of Empires II
+**StoneSiege** is an original mobile RTS that recreates the feel and depth of Age of Empires II
 (economy → ages → armies → castles, counter-based combat, story campaigns). All art, text, and
 code are original; AoE2 is a mechanics/balance reference only. Target platforms: iOS + Android
 (via Capacitor), plus the browser for development.
@@ -127,7 +127,7 @@ size), equal-cost balance battles verifying the full counter web, and rotating c
 staged:_ `…/workflows/scripts/bannerfall-qa.js`.
 
 ### 2. Capacitor packaging — iOS + Android (implemented)
-`dist/` is wrapped with Capacitor 8 as `com.bannerfall.app`. Both projects are landscape-only and
+`dist/` is wrapped with Capacitor 8 as `com.stonesiege.app`. Both projects are landscape-only and
 include generated icons/splashes, safe-area handling, bundled offline fonts, lifecycle snapshots,
 and Android Back-to-pause behavior. `assembleDebug` and an unsigned iOS simulator build pass; the
 iPhone simulator launch reaches the title screen. See `docs/MOBILE.md` for reproducible builds,

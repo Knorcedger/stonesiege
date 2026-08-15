@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">Bannerfall</string>
-    <string name="title_activity_main">Bannerfall</string>
-    <string name="package_name">com.bannerfall.app</string>
-    <string name="custom_url_scheme">com.bannerfall.app</string>
+    <string name="app_name">StoneSiege</string>
+    <string name="title_activity_main">StoneSiege</string>
+    <string name="package_name">com.stonesiege.app</string>
+    <string name="custom_url_scheme">com.stonesiege.app</string>
 </resources>

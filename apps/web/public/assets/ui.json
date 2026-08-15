@@ -914,7 +914,7 @@
   }
  },
  "meta": {
-  "app": "bannerfall-assetgen",
+  "app": "stonesiege-assetgen",
   "version": "1.0",
   "image": "ui.png",
   "format": "RGBA8888",

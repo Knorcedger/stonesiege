@@ -1,4 +1,4 @@
-# Bannerfall HD art direction
+# StoneSiege HD art direction
 
 Status: complete runtime contract coverage, active authored migration. All 3,806
 shipping frames have 2× HD overrides, but those overrides intentionally have two
@@ -9,7 +9,7 @@ load.
 
 ## Visual target
 
-Bannerfall uses an original, premium pre-rendered isometric strategy-game look:
+StoneSiege uses an original, premium pre-rendered isometric strategy-game look:
 
 - Orthographic 2:1 isometric camera; no perspective convergence.
 - Warm key light from the upper-left, cooler ambient fill, grounded contact

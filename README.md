@@ -1,4 +1,4 @@
-# Bannerfall (working title)
+# StoneSiege
 
 A love letter to Age of Empires II — an original real-time strategy game for iOS and Android
 (and the browser), with classic mechanics: villagers, resources, ages, counters, castles,

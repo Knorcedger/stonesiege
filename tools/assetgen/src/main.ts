@@ -5,7 +5,7 @@
 import { writeFileSync, mkdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { buildAtlas, defaultBannerfallMeta } from './atlas.ts';
+import { buildAtlas, defaultStoneSiegeMeta } from './atlas.ts';
 import type { FrameDef } from './atlas.ts';
 import { writePng } from './png.ts';
 import { genTerrain } from './gen-terrain.ts';
@@ -23,7 +23,7 @@ const OUT = join(ROOT, 'apps/web/public/assets');
 const QA = join(ROOT, '.qa/art');
 
 function emit(name: string, frames: FrameDef[], impactFrames: Record<string, number>, nineSlice?: Record<string, [number, number, number, number]>): void {
-  const atlas = buildAtlas(frames, `${name}.png`, defaultBannerfallMeta({ impactFrame: impactFrames, ...(nineSlice ? { nineSlice } : {}) }));
+  const atlas = buildAtlas(frames, `${name}.png`, defaultStoneSiegeMeta({ impactFrame: impactFrames, ...(nineSlice ? { nineSlice } : {}) }));
   writePng(join(OUT, `${name}.png`), atlas.image);
   writeFileSync(join(OUT, `${name}.json`), JSON.stringify(atlas.json, null, 1) + '\n');
   console.log(
@@ -40,7 +40,7 @@ function qaSheets(name: string, frames: FrameDef[]): void {
 const t0 = Date.now();
 mkdirSync(OUT, { recursive: true });
 mkdirSync(QA, { recursive: true });
-console.log('bannerfall assetgen');
+console.log('stonesiege assetgen');
 
 // ---- generate
 const terrain = genTerrain();

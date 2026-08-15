@@ -13,7 +13,7 @@ background with no scenery, labels, border, or shadow outside the platform.
 The chroma source was matted with the image-generation skill's
 `remove_chroma_key.py`, cropped, and Lanczos-downsampled into the padded 2×
 acceptance frame `frames/town-center-dark-neutral.png`. `npm run assets:hd`
-converts its two authored cloth regions to Bannerfall's exact runtime mask and
+converts its two authored cloth regions to StoneSiege's exact runtime mask and
 emits the shipping atlas. Never hand-edit the generated atlas in
 `apps/web/public/assets/hd/`; edit the neutral frame or builder instead.
 

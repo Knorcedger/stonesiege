@@ -1,6 +1,7 @@
 // Atlas loading + frame resolution (docs/ASSET_CONTRACT.md).
 // - Loads the 6 atlases from /assets/ by their exact names.
-// - Player colors: 'runtime-swap' — reads meta.bannerfall.maskPalette/playerRamps and
+// - Player colors: 'runtime-swap' — reads the legacy
+//   meta.bannerfall.maskPalette/playerRamps schema and
 //   builds per-color recolored canvases at match load for the colors in the match.
 //   (If an atlas declares strategy 'baked' with @p<idx> frames, those are used instead.)
 // - resolveFrame(name, playerColor) is THE sprite-frame lookup used everywhere: it
@@ -28,7 +29,7 @@ interface AtlasFrameData {
   anchor?: { x: number; y: number };
 }
 
-interface BannerfallMeta {
+interface StoneSiegeMeta {
   playerColorStrategy?: string;
   maskPalette?: string[];
   /** Either [light,mid,dark][] hex tuples or assetgen's {name,light,mid,dark}[] records. */
@@ -43,7 +44,7 @@ function parseRamp(entry: string[] | { light: string; mid: string; dark: string 
 
 interface AtlasJson {
   frames: Record<string, AtlasFrameData>;
-  meta?: { image?: string; scale?: number; bannerfall?: BannerfallMeta };
+  meta?: { image?: string; scale?: number; bannerfall?: StoneSiegeMeta };
 }
 
 interface Atlas {

@@ -1,5 +1,5 @@
 // Split authored 4x2 direction renders into the five directions stored by
-// Bannerfall's atlas contract (S, SW, W, NW, N). Runtime mirroring supplies
+// StoneSiege's atlas contract (S, SW, W, NW, N). Runtime mirroring supplies
 // NE, E, and SE exactly as it does for the mechanical sprites.
 
 import { readFileSync, writeFileSync } from 'node:fs';

@@ -7,7 +7,7 @@ import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
 import { buildings as buildingDefs } from '../../packages/data/src/buildings.ts';
-import { buildAtlas, defaultBannerfallMeta, type FrameDef } from '../assetgen/src/atlas.ts';
+import { buildAtlas, defaultStoneSiegeMeta, type FrameDef } from '../assetgen/src/atlas.ts';
 import { genBuildings } from '../assetgen/src/gen-buildings.ts';
 import { genIcons } from '../assetgen/src/gen-icons.ts';
 import { genObjects } from '../assetgen/src/gen-objects.ts';
@@ -625,7 +625,7 @@ function splitByArea(frames: FrameDef[]): [FrameDef[], FrameDef[]] {
 /** Recursively split only when the deterministic shelf pack exceeds 2048px. */
 function atlasGroups(frames: FrameDef[]): FrameDef[][] {
   try {
-    buildAtlas(frames, 'probe.png', defaultBannerfallMeta(), MAX_ATLAS);
+    buildAtlas(frames, 'probe.png', defaultStoneSiegeMeta(), MAX_ATLAS);
     return [frames];
   } catch (error) {
     if (frames.length <= 1 || !String(error).includes('exceeds 2048')) throw error;
@@ -655,7 +655,7 @@ function emitFamily(
     const stem = `${family}-${index}`;
     const imageName = `${stem}.png`;
     const jsonName = `${stem}.json`;
-    const meta = defaultBannerfallMeta({
+    const meta = defaultStoneSiegeMeta({
       impactFrame,
       ...(scaledNineSlice ? { nineSlice: scaledNineSlice } : {}),
     });
@@ -681,7 +681,7 @@ for (const file of readdirSync(OUT)) {
   }
 }
 
-console.log('bannerfall HD material build');
+console.log('stonesiege HD material build');
 const t0 = Date.now();
 const materials = new MaterialLibrary(MATERIAL_SOURCE);
 const manifest: string[] = [];
@@ -724,7 +724,7 @@ bespokeGroups.forEach((group, index) => {
   const stem = `hero-redrawn-${index}`;
   const imageName = `${stem}.png`;
   const jsonName = `${stem}.json`;
-  const heroAtlas = buildAtlas(group, imageName, defaultBannerfallMeta(), MAX_ATLAS);
+  const heroAtlas = buildAtlas(group, imageName, defaultStoneSiegeMeta(), MAX_ATLAS);
   heroAtlas.json.meta.scale = HD_DENSITY;
   (heroAtlas.json.meta.bannerfall as Record<string, unknown>).artStyle = 'pre-rendered-3d';
   writePng(join(OUT, imageName), heroAtlas.image);

@@ -1,4 +1,4 @@
-# Bannerfall — Legacy Procedural Art Bible
+# StoneSiege — Legacy Procedural Art Bible
 
 > The active visual target and 2× pre-rendered migration contract are defined in
 > `HD_ART_PIPELINE.md`. This document remains authoritative for the procedural

@@ -1,4 +1,4 @@
-# Bannerfall — AoE2-style mobile RTS
+# StoneSiege — AoE2-style mobile RTS
 
 TypeScript + PixiJS (WebGL) game. Deterministic sim core, web-first, Capacitor for iOS/Android later.
 
