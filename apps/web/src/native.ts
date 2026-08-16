@@ -2,13 +2,29 @@
 // Capacitor wrapper translates lifecycle/back events into cancelable DOM events
 // so the game package stays platform-agnostic and remains easy to test on web.
 
-import { Capacitor } from '@capacitor/core';
+import { Capacitor, SystemBars, SystemBarType } from '@capacitor/core';
 import { NATIVE_BACK_EVENT, NATIVE_PAUSE_EVENT } from '@bf/game/nativeEvents';
+
+async function applyGameSystemBars(): Promise<void> {
+  try {
+    // Keep the top notification/status bar out of the landscape game while
+    // preserving the platform navigation/gesture affordance at the bottom.
+    await SystemBars.hide({ bar: SystemBarType.StatusBar, animation: 'NONE' });
+    await SystemBars.show({ bar: SystemBarType.NavigationBar, animation: 'NONE' });
+  } catch (error) {
+    // A system-UI failure should never prevent the game itself from starting.
+    console.warn('Could not apply native system bar visibility', error);
+  }
+}
 
 export async function installNativeBridge(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 
   const { App } = await import('@capacitor/app');
+  await applyGameSystemBars();
+  await App.addListener('appStateChange', ({ isActive }) => {
+    if (isActive) void applyGameSystemBars();
+  });
   await App.addListener('pause', () => {
     window.dispatchEvent(new Event(NATIVE_PAUSE_EVENT));
   });

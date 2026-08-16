@@ -34,6 +34,13 @@ const config: CapacitorConfig = {
       androidScaleType: 'CENTER_INSIDE',
       showSpinner: false,
     },
+    SystemBars: {
+      // Prevent Capacitor's default visible state from overriding the native
+      // fullscreen flags before the web app has finished booting.
+      hidden: true,
+      style: 'DARK',
+      animation: 'NONE',
+    },
   },
 };
 
