@@ -1,6 +1,6 @@
 # StoneSiege — AoE2-style mobile RTS
 
-TypeScript + PixiJS (WebGL) game. Deterministic sim core, web-first, Capacitor for iOS/Android later.
+TypeScript + PixiJS (WebGL) game. Deterministic sim core with Capacitor 8 wrappers for iOS/Android.
 
 ## Commands
 - `npm run dev` — dev server at http://localhost:5199 (game is playable in browser)

@@ -1,0 +1,57 @@
+name: Feature request
+description: Propose an improvement to the official StoneSiege project
+title: "[Idea]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Describe the player problem before the implementation. Large changes follow the public decision process in `GOVERNANCE.md`.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: Player or contributor problem
+      description: Who is affected, and what is difficult today?
+    validations:
+      required: true
+
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed direction
+      description: Explain the desired experience. Technical ideas are welcome but optional.
+    validations:
+      required: true
+
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives and tradeoffs
+      description: What else could solve this, and what might the proposal make worse?
+
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Gameplay or balance
+        - Campaign or writing
+        - AI
+        - Input, UI, or accessibility
+        - Art or audio
+        - Performance or reliability
+        - Modding or contributor experience
+        - Mobile packaging or stores
+        - Other
+    validations:
+      required: true
+
+  - type: checkboxes
+    id: principles
+    attributes:
+      label: Project fit
+      options:
+        - label: I searched existing issues and the roadmap.
+          required: true
+        - label: This proposal respects the free single-player and fair-monetization principles, or clearly explains why they should change.
+          required: true

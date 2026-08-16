@@ -1,0 +1,66 @@
+name: Bug report
+description: Report a reproducible problem in StoneSiege
+title: "[Bug]: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for helping improve StoneSiege. For security vulnerabilities or leaked credentials, follow `SECURITY.md` instead of filing a public issue.
+
+  - type: textarea
+    id: problem
+    attributes:
+      label: What happened?
+      description: Describe the observed behavior and what you expected instead.
+      placeholder: After issuing a move order…
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Reproduction steps
+      description: Give the smallest reliable sequence, including campaign/scenario and difficulty where relevant.
+      placeholder: |
+        1. Start Practice on Standard
+        2. Select…
+        3. Observe…
+    validations:
+      required: true
+
+  - type: dropdown
+    id: platform
+    attributes:
+      label: Platform
+      options:
+        - Web browser
+        - Android
+        - iPhone or iPad
+        - More than one platform
+    validations:
+      required: true
+
+  - type: input
+    id: environment
+    attributes:
+      label: Version and device
+      description: Include build/commit, OS, device, and browser version where available.
+      placeholder: Commit abc123, Chrome 140, macOS 16…
+    validations:
+      required: true
+
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Logs or visual evidence
+      description: Add relevant logs, screenshots, or a short recording. Remove personal data first.
+
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Before submitting
+      options:
+        - label: I searched open and closed issues for this problem.
+          required: true
+        - label: This report contains no credentials or private player data.
+          required: true

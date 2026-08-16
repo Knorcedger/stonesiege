@@ -6,3 +6,16 @@ dist/
 .qa/
 .gstack/
 .vercel
+
+# Local environment and credentials
+.env
+.env.*
+!.env.example
+*.jks
+*.keystore
+keystore.properties
+*.p8
+*.p12
+*.mobileprovision
+GoogleService-Info.plist
+google-services.json

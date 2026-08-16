@@ -1,8 +1,9 @@
 # StoneSiege mobile packaging
 
-StoneSiege ships the same offline Vite bundle on iOS and Android through Capacitor 8. The native
-application id is `com.stonesiege.app`; change it in `capacitor.config.ts`, Android Gradle, and the
-Xcode target before the first store upload if a different permanent id is wanted.
+StoneSiege ships the same offline Vite bundle on iOS and Android through Capacitor 8. The official
+native application id is the permanent `com.stonesiege.app`. Forks and redistributed builds must
+choose a distinct id in `capacitor.config.ts`, Android Gradle, and the Xcode target, as well as a
+distinct name and icon under `TRADEMARK.md`.
 
 The wrappers are landscape-only and edge-to-edge. CSS safe-area insets protect the HUD around
 notches, native pause/background events snapshot the current match, and Android Back opens the
@@ -34,10 +35,10 @@ cd android
 ./gradlew assembleDebug
 ```
 
-The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. For the Play Store,
-create an upload key inside `android/`, copy `android/keystore.properties.example` to
-`android/keystore.properties`, and set the local filename and alias. Both the properties file and
-keystores are ignored by Git. Supply the passwords through
+The APK is written to `android/app/build/outputs/apk/debug/app-debug.apk`. For a release build,
+create or obtain the correct upload key outside Git, copy `android/keystore.properties.example`
+to `android/keystore.properties`, and set its local filename and alias. Both the properties file
+and keystores are ignored by Git. Supply the passwords through
 `STONESIEGE_UPLOAD_STORE_PASSWORD` and `STONESIEGE_UPLOAD_KEY_PASSWORD` (or, less safely, as
 properties in the ignored file), then build the signed Android App Bundle:
 
@@ -50,22 +51,13 @@ STONESIEGE_UPLOAD_KEY_PASSWORD='…' \
 
 The AAB is written to `android/app/build/outputs/bundle/release/app-release.aab`. Before every
 upload, increment `versionCode` in `android/app/build.gradle`; set `versionName` to the public
-release version. Google Play App Signing should hold the app-signing key while the local key is
-used only as the upload key.
+release version. Google Play App Signing holds the official app-signing key while a protected
+upload key signs each AAB.
 
-For this app, keep using `android/stonesiege-upload.jks` with alias `stonesiege-upload`. Its
-password is stored in macOS Keychain under service `StoneSiege Android Upload` and account
-`com.stonesiege.app`; using a different upload key will be rejected by Google Play. A local build
-can load the same password for both PKCS12 password variables without writing it to disk:
-
-```bash
-cd android
-stonesiege_upload_password="$(security find-generic-password \
-  -a com.stonesiege.app -s 'StoneSiege Android Upload' -w)"
-STONESIEGE_UPLOAD_STORE_PASSWORD="$stonesiege_upload_password" \
-STONESIEGE_UPLOAD_KEY_PASSWORD="$stonesiege_upload_password" \
-  ./gradlew bundleRelease
-```
+Authorized maintainers retrieve the official upload key and credentials from the shared
+StoneSiege vault in 1Password. They must never be copied into an issue, pull request, chat,
+shell history, repository file, or CI log. Other contributors should use their own local key and
+must not upload builds under the official application id.
 
 The StoneSiege Play Console app uses `com.stonesiege.app`. Upload each AAB to the internal-testing
 track first, add testers, and run the pre-launch report before promoting it. The first upload also
@@ -95,9 +87,11 @@ xcodebuild -project ios/App/App.xcodeproj -scheme App \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-Create the App Store Connect record before uploading, complete the age rating and export-compliance
-questions, add screenshots from real target sizes, submit to TestFlight, and test install/resume,
-audio unlock, rotation lock, and interrupted matches before review submission.
+For the official app, upload to the existing App Store Connect record, confirm the age rating,
+privacy, and export-compliance answers for every material feature change, and test install/resume,
+audio unlock, rotation lock, and interrupted matches in TestFlight before review submission.
+Distribution certificates, provisioning profiles, App Store Connect keys, and recovery material
+belong in the shared 1Password vault, never in Git.
 
 ## Privacy and release checklist
 
