@@ -32,16 +32,20 @@ const GHOST_TINT = 0x9aa4ad;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
-const WALL_ART_SCALE: Readonly<Record<string, number>> = {
-  stoneWall: 1.55,
-  gate: 1.65,
+const FORTIFICATION_ART_SCALE: Readonly<Record<string, number>> = {
+  stoneWall: 2.25,
+  gate: 2.3,
+  watchTower: 2.1,
+  guardTower: 2.15,
+  keep: 2.2,
 };
 
 /**
  * The wall sheet is authored along the screen's NW→SE isometric axis. Mirror the
  * same art for runs on the perpendicular tile axis so both sides of a circuit join
  * instead of reading as separated horizontal blocks. Corner pieces remain on the
- * primary axis; the modest visual overscale closes their shared joint.
+ * primary axis; the generous visual overscale closes their shared joint and lets
+ * the defensive circuit read at the same architectural scale as civic buildings.
  */
 export function mirroredWallIds(entities: Iterable<Entity>): Set<EntityId> {
   const connectors = Array.from(entities).filter((e) =>
@@ -402,7 +406,7 @@ export class WorldLayer {
       frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      const artScale = WALL_ART_SCALE[e.defId] ?? 1;
+      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? 1;
       const mirrorX = frame.mirrored !== mirrorWall;
       view.sprite.scale.set(
         mirrorX ? -frame.renderScale * artScale : frame.renderScale * artScale,
