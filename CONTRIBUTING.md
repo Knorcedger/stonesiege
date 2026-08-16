@@ -13,7 +13,7 @@ Good first contributions include tests, accessibility fixes, mobile UX polish, d
 
 ## Local setup
 
-Prerequisite: Node.js 22 or newer.
+Prerequisite: Node.js 22.12+ or 24+.
 
 ```bash
 npm ci

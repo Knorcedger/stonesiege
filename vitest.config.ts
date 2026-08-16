@@ -14,8 +14,8 @@ export default defineConfig({
   },
   resolve: {
     alias: [
-      { find: /^@bf\/(\w+)$/, replacement: path.resolve(__dirname, 'packages') + '/$1/src/index.ts' },
-      { find: /^@bf\/(\w+)\//, replacement: path.resolve(__dirname, 'packages') + '/$1/src/' },
+      { find: /^@bf\/(\w+)$/, replacement: path.resolve(import.meta.dirname, 'packages') + '/$1/src/index.ts' },
+      { find: /^@bf\/(\w+)\//, replacement: path.resolve(import.meta.dirname, 'packages') + '/$1/src/' },
     ],
   },
 });
