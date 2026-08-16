@@ -12,8 +12,8 @@ screens are bundled, so gameplay does not depend on a network connection.
 
 ## Rebuild and synchronize
 
-Prerequisites are Node 22+, Java 21 plus Android SDK 36 for Android, and current Xcode on macOS for
-iOS. From the repository root:
+Prerequisites are Node 22.12+ or 24+, Java 21 plus Android SDK 36 for Android, and current Xcode
+on macOS for iOS. From the repository root:
 
 ```bash
 npm ci

@@ -43,7 +43,7 @@ Expect rough edges, balance changes, and save incompatibilities while the projec
 
 ## Play locally
 
-You need [Node.js 22 or newer](https://nodejs.org/) and npm.
+You need [Node.js 22.12+ or 24+](https://nodejs.org/) and npm.
 
 ```bash
 git clone https://github.com/Knorcedger/stonesiege.git
