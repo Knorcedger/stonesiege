@@ -3,7 +3,7 @@ import { FP, type Entity, type GameMap, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
 import {
   buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
-  ownedResearchProgress, resourceFrameName,
+  mirroredWallIds, ownedResearchProgress, resourceFrameName,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -102,5 +102,18 @@ describe('buildingHpBarWidth', () => {
   it('uses half of the previous near-full-footprint width', () => {
     expect(buildingHpBarWidth(4)).toBe(124); // old Town Center bar: 248px
     expect(buildingHpBarWidth(3)).toBe(92); // old Barracks/Farm bar: 184px
+  });
+});
+
+describe('mirroredWallIds', () => {
+  const wall = (id: number, tileX: number, tileY: number, defId = 'stoneWall'): Entity =>
+    resource({ id, kind: 'building', defId, player: HUMAN, tileX, tileY, hp: 1800, maxHp: 1800 });
+
+  it('mirrors perpendicular wall runs while leaving the primary axis and corners stable', () => {
+    const walls = [
+      wall(1, 4, 4), wall(2, 5, 4), wall(3, 6, 4),
+      wall(4, 4, 5), wall(5, 4, 6), wall(6, 4, 7, 'gate'),
+    ];
+    expect([...mirroredWallIds(walls)].sort((a, b) => a - b)).toEqual([4, 5, 6]);
   });
 });

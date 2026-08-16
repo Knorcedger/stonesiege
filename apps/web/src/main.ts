@@ -16,6 +16,13 @@ app.innerHTML = '<div style="color:#c9b98a;font:16px monospace;padding:2rem">Sto
 
 async function boot() {
   await installNativeBridge();
+  const capturePreset = new URLSearchParams(window.location.search).get('capture');
+  if (import.meta.env.DEV && capturePreset === 'citadel') {
+    sessionStorage.setItem('bf.nav.hint.v1', JSON.stringify({
+      kind: 'startScenario',
+      scenarioId: 'showcase-citadel',
+    }));
+  }
   const { startApp } = await import('@bf/game');
   await startApp(app);
 }

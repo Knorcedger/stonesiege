@@ -58,6 +58,19 @@ const PLACE_RED = 0xb3261e;
 const AUTOSAVE_TICKS = 300;
 /** Trigger-driven camera pan duration (ms). */
 const PAN_MS = 750;
+const SHOWCASE_SCENARIO_ID = 'showcase-citadel';
+
+/** Put every staged farmer to work before the first rendered frame. */
+export function stageShowcaseEconomy(game: { state: GameState; advance(commands: Command[]): SimEvent[] }): void {
+  const commands: Command[] = [];
+  for (let index = 0; index < 10; index++) {
+    const villager = game.state.refs.get(`showcase_farmer_${index}`);
+    const farm = game.state.refs.get(`showcase_farm_${index}`);
+    if (villager === undefined || farm === undefined) continue;
+    commands.push({ kind: 'gather', player: 1, units: [villager], targetId: farm });
+  }
+  if (commands.length > 0) game.advance(commands);
+}
 
 export type RunGameOptions =
   | { mode: 'resume' }
@@ -137,6 +150,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     ? gameFromSerialized(snapshot.serialized)
     : null;
   const game = restored ?? createGame(config);
+  if (!snapshot && plan.meta?.id === SHOWCASE_SCENARIO_ID) stageShowcaseEconomy(game);
   recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
   const meta = plan.meta;
   const scenarioDef = meta ? scenariosById[meta.id] : null;
@@ -271,6 +285,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   const camera = new Camera();
   camera.setMapBounds(game.state.map.width, game.state.map.height);
   camera.setViewport(app.screen.width, app.screen.height);
+  if (meta?.id === SHOWCASE_SCENARIO_ID) camera.zoom = 0.5;
 
   const worldRoot = new Container();
   const terrain = new TerrainLayer(app.renderer, assets, game.state.map);
@@ -494,6 +509,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
         // wonder countdown stream (sim: started / once-per-second / cancelled)
         case 'wonderStarted':
         case 'wonderCountdown':
+          if (meta?.id === SHOWCASE_SCENARIO_ID) break;
           if (ev.kind === 'wonderStarted' && ev.player !== humanPlayer) audioEngine.play('hornAlert');
           wonderOwner = ev.player;
           overlays.setWonderBanner({
@@ -838,7 +854,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   };
   const hud = new Hud(root, hudHost);
   const overlays = new Overlays(root);
-  if (meta) {
+  if (meta && meta.id !== SHOWCASE_SCENARIO_ID) {
     objectivesPanel = new ObjectivesPanel(root);
     messageBanner = new MessageBanner(root);
     for (const op of pendingObjectiveOps) op(objectivesPanel); // resume-replayed state

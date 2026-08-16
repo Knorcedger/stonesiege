@@ -32,6 +32,29 @@ const GHOST_TINT = 0x9aa4ad;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
+const WALL_ART_SCALE: Readonly<Record<string, number>> = {
+  stoneWall: 1.55,
+  gate: 1.65,
+};
+
+/**
+ * The wall sheet is authored along the screen's NW→SE isometric axis. Mirror the
+ * same art for runs on the perpendicular tile axis so both sides of a circuit join
+ * instead of reading as separated horizontal blocks. Corner pieces remain on the
+ * primary axis; the modest visual overscale closes their shared joint.
+ */
+export function mirroredWallIds(entities: Iterable<Entity>): Set<EntityId> {
+  const connectors = Array.from(entities).filter((e) =>
+    e.kind === 'building' && e.hp > 0 && (e.defId === 'stoneWall' || e.defId === 'gate'));
+  const at = new Set(connectors.map((e) => `${e.tileX},${e.tileY}`));
+  const mirrored = new Set<EntityId>();
+  for (const e of connectors) {
+    const alongX = at.has(`${e.tileX - 1},${e.tileY}`) || at.has(`${e.tileX + 1},${e.tileY}`);
+    const alongY = at.has(`${e.tileX},${e.tileY - 1}`) || at.has(`${e.tileX},${e.tileY + 1}`);
+    if (alongY && !alongX) mirrored.add(e.id);
+  }
+  return mirrored;
+}
 
 interface EntityView {
   root: Container;
@@ -86,6 +109,7 @@ export class WorldLayer {
   private lastRallyFlagKey = '';
   private prevPos = new Map<EntityId, { x: number; y: number }>();
   private curPos = new Map<EntityId, { x: number; y: number }>();
+  private mirroredWalls = new Set<EntityId>();
   private frameCounts = new Map<string, number>();
   /** entityId -> tick until which the damage-taken red blink lasts. */
   private damagedUntil = new Map<EntityId, number>();
@@ -109,6 +133,7 @@ export class WorldLayer {
     const next = new Map<EntityId, { x: number; y: number }>();
     for (const e of state.entities.values()) next.set(e.id, { x: e.x, y: e.y });
     this.curPos = next;
+    this.mirroredWalls = mirroredWallIds(state.entities.values());
   }
 
   onSimEvents(events: SimEvent[], tick: number): void {
@@ -365,7 +390,8 @@ export class WorldLayer {
     // Conversions can change ownership without changing the animation frame.
     // Include the player ramp in the cache key so the sprite cannot retain its
     // former owner's palette until its next animation/facing transition.
-    const key = `${colorIdx ?? 'none'}|${candidates.join('|')}`;
+    const mirrorWall = this.mirroredWalls.has(e.id);
+    const key = `${colorIdx ?? 'none'}|${mirrorWall ? 'wall-y|' : ''}${candidates.join('|')}`;
     if (key !== view.lastFrameKey) {
       let frame = null;
       let resolvedName = candidates[candidates.length - 1];
@@ -376,14 +402,16 @@ export class WorldLayer {
       frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
+      const artScale = WALL_ART_SCALE[e.defId] ?? 1;
+      const mirrorX = frame.mirrored !== mirrorWall;
       view.sprite.scale.set(
-        frame.mirrored ? -frame.renderScale : frame.renderScale,
-        frame.renderScale,
+        mirrorX ? -frame.renderScale * artScale : frame.renderScale * artScale,
+        frame.renderScale * artScale,
       );
       // Trimmed visible top (frames carry transparent headroom): overlays like
       // the health bar must anchor to pixels, not the texture rect.
       view.spriteTopPx = Math.round(
-        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height) * frame.renderScale,
+        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height) * frame.renderScale * artScale,
       );
       view.lastFrameKey = key;
     }

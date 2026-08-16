@@ -7,6 +7,7 @@ import { wallace3 } from './scenarios/wallace3';
 import { wallace4 } from './scenarios/wallace4';
 import { wallace5 } from './scenarios/wallace5';
 import { wallace6 } from './scenarios/wallace6';
+import { showcaseCitadel } from './scenarios/showcaseCitadel';
 
 export const wallaceCampaign: CampaignDef = {
   id: 'wallace',
@@ -22,7 +23,7 @@ export const wallaceCampaign: CampaignDef = {
   scenarioIds: ['wallace-1', 'wallace-2', 'wallace-3', 'wallace-4', 'wallace-5', 'wallace-6'],
 };
 
-export { wallace1, wallace2, wallace3, wallace4, wallace5, wallace6 };
+export { showcaseCitadel, wallace1, wallace2, wallace3, wallace4, wallace5, wallace6 };
 
 /** Authored ScenarioDefs by id, in campaign order. */
 export const scenariosById: Record<string, ScenarioDef> = {
@@ -32,6 +33,7 @@ export const scenariosById: Record<string, ScenarioDef> = {
   [wallace4.id]: wallace4,
   [wallace5.id]: wallace5,
   [wallace6.id]: wallace6,
+  [showcaseCitadel.id]: showcaseCitadel,
 };
 
 export const campaigns: Record<string, CampaignDef> = {
