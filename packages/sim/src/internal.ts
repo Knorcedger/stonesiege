@@ -4,7 +4,10 @@
 import { gameData } from '@bf/data';
 import type { ClassValue, GatherTask } from '@bf/data';
 import { FP } from './types';
-import type { AgeId, Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile, UnitIntent } from './types';
+import type {
+  AgeId, Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, ProductionSpeed, Stockpile,
+  UnitIntent,
+} from './types';
 import type { SimRng } from './rng';
 import type { SpatialGrid } from './spatial';
 import type { PlayerModifierTable, ResolvedBuildingStats, ResolvedUnitStats } from './stats';
@@ -193,6 +196,8 @@ export interface SimState {
   players: PlayerState[];
   refs: Map<string, EntityId>;
   finished: boolean;
+  /** Global construction/training/research multiplier; never used by movement or combat. */
+  productionSpeed: ProductionSpeed;
 
   // --- internal ---
   rng: SimRng;

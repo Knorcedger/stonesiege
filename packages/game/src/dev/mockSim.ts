@@ -7,7 +7,7 @@
 import {
   FP, GAIA, TICKS_PER_SECOND,
   type Command, type Entity, type EntityId, type Fixed, type Game, type GameConfig,
-  type GameMap, type GameState, type PlayerId, type PlayerState, type SimEvent,
+  type GameMap, type GameState, type PlayerId, type PlayerState, type ProductionSpeed, type SimEvent,
   type Stockpile, type TerrainId,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
@@ -40,6 +40,7 @@ class MockGame implements Game {
     players: PlayerState[];
     refs: Map<string, EntityId>;
     finished: boolean;
+    productionSpeed: ProductionSpeed;
   };
 
   private nextId = 1;
@@ -74,7 +75,10 @@ class MockGame implements Game {
       players.push(p);
     });
 
-    this.st = { tick: 0, map, entities: new Map(), players, refs: new Map(), finished: false };
+    this.st = {
+      tick: 0, map, entities: new Map(), players, refs: new Map(), finished: false,
+      productionSpeed: config.productionSpeed ?? 2,
+    };
 
     // terrain decor: dirt patches, a lake, a road
     for (let i = 0; i < 14; i++) this.blob(terrain, width, height, T_DIRT, 2 + Math.floor(this.rand() * 4));
@@ -288,6 +292,9 @@ class MockGame implements Game {
         }
         break;
       }
+      case 'setProductionSpeed':
+        if (this.st.players[cmd.player]?.setup.isHuman) this.st.productionSpeed = cmd.multiplier;
+        break;
       default:
         // research/garrison/convert/heal/marketTrade: not simulated in the mock
         break;
@@ -385,7 +392,7 @@ class MockGame implements Game {
           const def = gameData.buildings[target.defId];
           const totalTicks = Math.max(1, (def?.buildTime ?? 30) * TICKS_PER_SECOND);
           const cur = this.buildFloat.get(target.id) ?? target.buildProgress ?? 0;
-          this.buildFloat.set(target.id, cur + 1000 / totalTicks);
+          this.buildFloat.set(target.id, cur + (1000 * this.st.productionSpeed) / totalTicks);
         }
       }
     }
@@ -395,7 +402,7 @@ class MockGame implements Game {
     for (const e of this.st.entities.values()) {
       if (e.kind !== 'building' || !e.trainQueue?.length || (e.buildProgress ?? 1000) < 1000) continue;
       const head = e.trainQueue[0];
-      head.ticksLeft--;
+      head.ticksLeft -= this.st.productionSpeed;
       if (head.ticksLeft <= 0) {
         e.trainQueue.shift();
         const def = gameData.buildings[e.defId];

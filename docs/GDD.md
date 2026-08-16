@@ -193,6 +193,10 @@ reference, then balanced by playtesting loops.
 - **Control groups** via saved-selection chips (mobile answer to ctrl+1): with units selected,
   **long-press an empty chip to save** the group; long-press an occupied chip to overwrite it;
   tap a chip to reselect (tap again to center the camera on the group).
+- **Production speed** in Settings offers **1× / 2× / 4×** (default **2×**) and applies
+  globally to construction, troop training, research, age advancement, and upgrades. It never
+  changes movement, gathering, repair, or combat timing. In-match changes enter the deterministic
+  command log so suspend/resume and replay remain exact.
 - Desktop testing: mouse + right-click + keyboard camera also supported (dev convenience).
 
 ## Audio

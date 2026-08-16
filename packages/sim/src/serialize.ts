@@ -29,7 +29,8 @@
 
 import { AGES, GAIA } from './types';
 import type {
-  AgeId, Entity, GameSnapshot, PlayerSetup, PlayerState, Stockpile, TerrainId, UnitIntent,
+  AgeId, Entity, GameSnapshot, PlayerSetup, PlayerState, ProductionSpeed, Stockpile, TerrainId,
+  UnitIntent,
 } from './types';
 import type {
   CombatInfo, FleeState, FoundationSite, GarrisonWalk, GatherInfo, MonkInfo, Motion,
@@ -111,6 +112,8 @@ export interface GameSnapshotV1 extends GameSnapshot {
   schemaVersion: 1;
   tick: number;
   finished: boolean;
+  /** Added compatibly to v1; missing legacy values restore as 1×. */
+  productionSpeed?: ProductionSpeed;
   conquest: boolean;
   popCapLimit: number;
   maxAge?: AgeId;
@@ -179,6 +182,7 @@ export function serializeSimState(state: SimState): GameSnapshot {
     schemaVersion: 1,
     tick: state.tick,
     finished: state.finished,
+    productionSpeed: state.productionSpeed,
     conquest: state.conquest,
     popCapLimit: state.popCapLimit,
     ...(state.maxAgeLimit !== undefined ? { maxAge: state.maxAgeLimit } : {}),
@@ -295,6 +299,7 @@ export function restoreSimState(snapshot: GameSnapshot): SimState {
     players,
     refs: new Map(snap.refs),
     finished: snap.finished,
+    productionSpeed: snap.productionSpeed ?? 1,
     rng: SimRng.fromState(snap.rngState),
     nextId: snap.nextId,
     conquest: snap.conquest,

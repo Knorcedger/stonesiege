@@ -7,6 +7,7 @@
 // bars) on every change, so sliders apply live while dragging.
 
 import { getSettings, updateSettings } from './settings';
+import type { ProductionSpeed } from '@bf/sim/types';
 
 const SETTINGS_CSS = `
 .bf-set-label { text-align:left; font-size:13px; color:#B99A6B; letter-spacing:1px; margin:12px 0 4px;
@@ -20,6 +21,7 @@ const SETTINGS_CSS = `
   cursor:pointer; color:#DABE8D; background:#241809; border:1px solid #64492B; border-radius:4px; }
 .bf-set-seg button.on { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border-color:#B99A6B;
   box-shadow:0 1px 0 #8A6414; }
+.bf-set-hint { margin:5px 0 7px; color:#8F7A59; font:13px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif; }
 `;
 
 export interface SettingsControlsOptions {
@@ -29,11 +31,13 @@ export interface SettingsControlsOptions {
    * just set instead of tuning blind.
    */
   onSliderRelease?: () => void;
+  /** In a live match, record the deterministic speed change at the next tick. */
+  onProductionSpeedChange?: (speed: ProductionSpeed) => void;
 }
 
 /**
  * Append the full settings control set (master/sfx/ambient volume, camera
- * speed, HP-bar visibility) to `container`. Controls read the live settings at
+ * speed, production speed, HP-bar visibility) to `container`. Controls read the live settings at
  * build time and write through updateSettings on every interaction.
  */
 export function buildSettingsControls(container: HTMLElement, opts: SettingsControlsOptions = {}): void {
@@ -86,6 +90,39 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
   slider('CAMERA SPEED', s.cameraSpeed * 100, 50, 200, (v) => `${v}%`,
     (v) => updateSettings({ cameraSpeed: v / 100 }));
 
+  label('PRODUCTION SPEED');
+  const speedSeg = document.createElement('div');
+  speedSeg.className = 'bf-set-seg';
+  const speedOptions: ProductionSpeed[] = [1, 2, 4];
+  const speedBtns: HTMLButtonElement[] = [];
+  for (const speed of speedOptions) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.textContent = `${speed}×`;
+    const refresh = (): void => {
+      const active = getSettings().productionSpeed === speed;
+      b.classList.toggle('on', active);
+      b.setAttribute('aria-pressed', String(active));
+    };
+    refresh();
+    b.addEventListener('click', () => {
+      updateSettings({ productionSpeed: speed });
+      speedBtns.forEach((btn, i) => {
+        const active = speedOptions[i] === speed;
+        btn.classList.toggle('on', active);
+        btn.setAttribute('aria-pressed', String(active));
+      });
+      opts.onProductionSpeedChange?.(speed);
+    });
+    speedBtns.push(b);
+    speedSeg.appendChild(b);
+  }
+  container.appendChild(speedSeg);
+  const speedHint = document.createElement('div');
+  speedHint.className = 'bf-set-hint';
+  speedHint.textContent = 'Construction, troop training and upgrades. Movement and combat stay unchanged.';
+  container.appendChild(speedHint);
+
   // HP-bar visibility: self-contained segmented toggle (updates its own .on
   // classes — no host re-render needed, unlike the old menu implementation)
   label('HEALTH BARS');
@@ -98,11 +135,18 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
   const segBtns: HTMLButtonElement[] = [];
   for (const opt of options) {
     const b = document.createElement('button');
+    b.type = 'button';
     b.textContent = opt.text;
-    b.classList.toggle('on', getSettings().showHpBars === opt.on);
+    const active = getSettings().showHpBars === opt.on;
+    b.classList.toggle('on', active);
+    b.setAttribute('aria-pressed', String(active));
     b.addEventListener('click', () => {
       updateSettings({ showHpBars: opt.on });
-      segBtns.forEach((btn, i) => btn.classList.toggle('on', options[i].on === opt.on));
+      segBtns.forEach((btn, i) => {
+        const selected = options[i].on === opt.on;
+        btn.classList.toggle('on', selected);
+        btn.setAttribute('aria-pressed', String(selected));
+      });
     });
     segBtns.push(b);
     seg.appendChild(b);

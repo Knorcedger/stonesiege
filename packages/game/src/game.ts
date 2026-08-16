@@ -8,7 +8,7 @@ import { Application, Container, Graphics, Sprite } from 'pixi.js';
 import {
   FP, TICKS_PER_SECOND, fp,
   type Command, type Entity, type EntityId, type Formation, type GameConfig, type GameState,
-  type PlayerId, type SimEvent,
+  type PlayerId, type ProductionSpeed, type SimEvent,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
@@ -46,6 +46,7 @@ import {
 import { makeScenarioOps, type ScenarioUiHooks } from './scenario/runtime';
 import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
 import { setNavHint } from './screens/nav';
+import { getSettings } from './settings';
 import { NATIVE_BACK_EVENT, NATIVE_PAUSE_EVENT } from './nativeEvents';
 import {
   clearSnapshot, loadSnapshot, replaySnapshot, saveSnapshot, scenarioFingerprint,
@@ -75,6 +76,19 @@ interface MatchPlan {
   snapshot: MatchSnapshot | null;
 }
 
+/**
+ * New scenario logs seed their initial production speed at tick 0. A log without
+ * that marker predates the setting and therefore ran at the legacy 1× rate.
+ */
+function initialScenarioProductionSpeed(log: CommandLog): ProductionSpeed {
+  for (const [tick, commands] of log) {
+    if (tick !== 0) continue;
+    const command = commands.find((candidate) => candidate.kind === 'setProductionSpeed');
+    if (command?.kind === 'setProductionSpeed') return command.multiplier;
+  }
+  return 1;
+}
+
 /** Null = a resume was requested but nothing valid remains (caller returns to the title). */
 function resolvePlan(options: RunGameOptions): MatchPlan | null {
   if (options.mode === 'resume') {
@@ -82,6 +96,7 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
     if (snapshot?.mode === 'scenario') {
       try {
         const { config, meta } = scenarioConfig(snapshot.scenarioId, snapshot.seed);
+        config.productionSpeed = initialScenarioProductionSpeed(snapshot.log);
         return { mode: 'scenario', config, setup: null, meta, snapshot };
       } catch {
         // the authored scenario set changed under the save
@@ -89,7 +104,11 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
       }
     }
     if (snapshot?.mode === 'practice') {
-      return { mode: 'practice', config: snapshot.config, setup: snapshot.setup, meta: null, snapshot };
+      const config = {
+        ...snapshot.config,
+        productionSpeed: snapshot.config.productionSpeed ?? 1,
+      };
+      return { mode: 'practice', config, setup: snapshot.setup, meta: null, snapshot };
     }
     // nothing (valid) to resume — never boot a match the player did not ask for
     return null;
@@ -121,6 +140,9 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   }
   const assets = await loadAssets();
   const { config, snapshot } = plan;
+  // Fresh matches inherit the persisted preference. Resumes retain the speed
+  // encoded in their deterministic state/config until the player changes it.
+  if (!snapshot) config.productionSpeed = getSettings().productionSpeed;
   if (!snapshot) clearSnapshot(); // starting fresh abandons any stale match
   assets.prepareMatchColors(config.players.map((p) => p.color));
   // Practice fast-path resume: rebuild straight from the sim's serialized
@@ -236,7 +258,9 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   // Otherwise: replay the recorded command log — the deterministic sim (and,
   // for scenarios, the deterministic trigger runtime fed the same events)
   // rebuilds the exact snapshotted state (GDD suspend/resume).
-  const commandLog: CommandLog = snapshot?.log ?? [];
+  const commandLog: CommandLog = snapshot?.log ?? [[0, [{
+    kind: 'setProductionSpeed', player: humanPlayer, multiplier: config.productionSpeed ?? 2,
+  }]]];
   if (snapshot && !restored) {
     loading.textContent = 'Restoring match…';
     await new Promise((r) => requestAnimationFrame(() => r(null))); // let the text paint
@@ -594,6 +618,15 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   window.addEventListener(NATIVE_BACK_EVENT, onNativeBack);
 
   const issue = (cmd: Command): void => loop.issue(cmd);
+  // A setting changed from the title screen should also apply when resuming a
+  // saved match. Queue it through the normal command path so the resumed log
+  // remains deterministic; this also upgrades legacy 1× saves to the new 2× default.
+  const preferredProductionSpeed = getSettings().productionSpeed;
+  if (snapshot && game.state.productionSpeed !== preferredProductionSpeed) {
+    issue({
+      kind: 'setProductionSpeed', player: humanPlayer, multiplier: preferredProductionSpeed,
+    });
+  }
   const issueWithUndo = (cmd: Command, label: string, undo: (() => void) | null): void => {
     loop.issue(cmd);
     if (cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
@@ -819,6 +852,9 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     togglePause: () => loop.togglePause(),
     isPaused: () => loop.paused,
     resumeGame: () => loop.resume(),
+    setProductionSpeed: (multiplier) => {
+      issue({ kind: 'setProductionSpeed', player: humanPlayer, multiplier });
+    },
     // pause-overlay slider release: the player hears the level they just set
     playUiSound: () => audioEngine.play('uiTap'),
     resign: () => {

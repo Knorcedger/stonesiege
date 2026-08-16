@@ -3,6 +3,7 @@
 // persisted through the storage seam on every change.
 
 import { appStorage, type KeyValueStorage } from './storage';
+import { isProductionSpeed, type ProductionSpeed } from '@bf/sim/types';
 
 export interface GameSettings {
   /** 0..1 gain multipliers. */
@@ -11,6 +12,8 @@ export interface GameSettings {
   ambientVolume: number;
   /** Keyboard/edge camera pan multiplier, 0.5..2. */
   cameraSpeed: number;
+  /** Construction, unit training, and research multiplier. */
+  productionSpeed: ProductionSpeed;
   showHpBars: boolean;
   /** Rich upgrade effects and unit counter advice in the custom HUD tooltips. */
   extendedTooltips: boolean;
@@ -21,6 +24,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   sfxVolume: 1,
   ambientVolume: 0.6,
   cameraSpeed: 1,
+  productionSpeed: 2,
   showHpBars: true,
   extendedTooltips: true,
 };
@@ -42,6 +46,9 @@ export function decodeSettings(raw: string | null): GameSettings {
       cameraSpeed: typeof s.cameraSpeed === 'number' && Number.isFinite(s.cameraSpeed)
         ? Math.min(2, Math.max(0.5, s.cameraSpeed))
         : DEFAULT_SETTINGS.cameraSpeed,
+      productionSpeed: isProductionSpeed(s.productionSpeed)
+        ? s.productionSpeed
+        : DEFAULT_SETTINGS.productionSpeed,
       showHpBars: typeof s.showHpBars === 'boolean' ? s.showHpBars : DEFAULT_SETTINGS.showHpBars,
       extendedTooltips: typeof s.extendedTooltips === 'boolean'
         ? s.extendedTooltips
