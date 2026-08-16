@@ -326,8 +326,8 @@ export interface Game {
   serialize(): GameSnapshot;
   /** True if the building def can be placed with its footprint at tile (for UI preview + AI). */
   canPlace(player: PlayerId, defId: string, tileX: number, tileY: number): boolean;
-  /** Walkability grid snapshot (for AI/debug). */
-  isWalkable(tileX: number, tileY: number): boolean;
+  /** Walkability grid snapshot. Passing a player includes that player/team's gates. */
+  isWalkable(tileX: number, tileY: number, player?: PlayerId): boolean;
   /** Scenario-engine surface (additive; absent on mock/replay implementations). */
   readonly ops?: SimOps;
 }

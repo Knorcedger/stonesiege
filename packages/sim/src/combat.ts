@@ -14,7 +14,9 @@ import { gameData, unitAggroRange } from '@bf/data';
 import type { UnitDef } from '@bf/data';
 import { FP, GAIA, TICKS_PER_SECOND } from './types';
 import type { Command, Entity, EntityId, Fixed, SimEvent } from './types';
-import { adjacentToFootprint, effDistFp, facingFromDelta, isTileWalkable } from './internal';
+import {
+  adjacentToFootprint, effDistFp, facingFromDelta, isTileWalkableForPlayer,
+} from './internal';
 import type { CombatInfo, SimState } from './internal';
 import { resolveBuildingStats, resolveUnitStats } from './stats';
 import { orderMove } from './path';
@@ -158,7 +160,7 @@ function buildingApproachPoint(state: SimState, e: Entity, info: CombatInfo, tar
     for (let tx = target.tileX - 1; tx <= target.tileX + size; tx++) {
       const onRing = tx === target.tileX - 1 || tx === target.tileX + size
         || ty === target.tileY - 1 || ty === target.tileY + size;
-      if (!onRing || !isTileWalkable(state, tx, ty) || taken(tx, ty)) continue;
+      if (!onRing || !isTileWalkableForPlayer(state, tx, ty, e.player) || taken(tx, ty)) continue;
       const dx = tx * FP + FP / 2 - e.x;
       const dy = ty * FP + FP / 2 - e.y;
       const d = dx * dx + dy * dy;

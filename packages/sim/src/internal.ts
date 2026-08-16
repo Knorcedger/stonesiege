@@ -3,7 +3,7 @@
 
 import { gameData } from '@bf/data';
 import type { ClassValue, GatherTask } from '@bf/data';
-import { FP } from './types';
+import { FP, GAIA } from './types';
 import type { AgeId, Entity, EntityId, Fixed, GameMap, PlayerId, PlayerState, Stockpile, UnitIntent } from './types';
 import type { SimRng } from './rng';
 import type { SpatialGrid } from './spatial';
@@ -207,6 +207,8 @@ export interface SimState {
   walkTerrain: Uint8Array;
   /** Count of blocking occupants (buildings/resource objects) per tile. */
   blockers: Uint16Array;
+  /** Gate entity by anchor tile. Derived from entities; friendly pathing may cross it. */
+  gatesByTile: Map<number, EntityId>;
   /** Spatial hash over units (soft obstacles) for range queries + local avoidance. */
   unitsGrid: SpatialGrid;
   motion: Map<EntityId, Motion>;
@@ -283,6 +285,36 @@ export function isTileWalkable(state: SimState, x: number, y: number): boolean {
   if (!inBounds(state.map, x, y)) return false;
   const i = y * state.map.width + x;
   return state.walkTerrain[i] === 1 && state.blockers[i] === 0;
+}
+
+/** Same owner or a non-FFA shared team. Gaia never receives gate access. */
+export function arePlayersFriendly(state: SimState, a: PlayerId, b: PlayerId): boolean {
+  if (a === GAIA || b === GAIA) return false;
+  if (a === b) return true;
+  const ta = state.players[a]?.setup.team ?? 0;
+  const tb = state.players[b]?.setup.team ?? 0;
+  return ta > 0 && ta === tb;
+}
+
+/**
+ * Unit-aware walkability. A completed gate remains a blocker for placement, enemies,
+ * and public map queries, but its owner and allies may path and step through it.
+ */
+export function isTileWalkableForPlayer(
+  state: SimState, x: number, y: number, player: PlayerId,
+): boolean {
+  if (!inBounds(state.map, x, y)) return false;
+  const i = y * state.map.width + x;
+  if (state.walkTerrain[i] !== 1) return false;
+  const blockers = state.blockers[i];
+  if (blockers === 0) return true;
+  // Overlapping blockers are never opened by a gate (normally placement prevents this).
+  if (blockers !== 1) return false;
+  const gateId = state.gatesByTile.get(i);
+  const gate = gateId === undefined ? undefined : state.entities.get(gateId);
+  return gate?.kind === 'building' && gate.defId === 'gate' && gate.hp > 0
+    && (gate.buildProgress ?? 1000) >= 1000
+    && arePlayersFriendly(state, player, gate.player);
 }
 
 /** Integer sqrt of a non-negative int (Math.sqrt is IEEE-exact; floor keeps it integral). */

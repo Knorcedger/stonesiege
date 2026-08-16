@@ -32,6 +32,7 @@ const GHOST_TINT = 0x9aa4ad;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
+const GATE_OPEN_RADIUS_FP = 2 * FP;
 const FORTIFICATION_ART_SCALE: Readonly<Record<string, number>> = {
   stoneWall: 2.25,
   gate: 2.3,
@@ -114,6 +115,8 @@ export class WorldLayer {
   private prevPos = new Map<EntityId, { x: number; y: number }>();
   private curPos = new Map<EntityId, { x: number; y: number }>();
   private mirroredWalls = new Set<EntityId>();
+  /** Gates with an own/allied unit close enough to trigger the visual opening. */
+  private openGates = new Set<EntityId>();
   private frameCounts = new Map<string, number>();
   /** entityId -> tick until which the damage-taken red blink lasts. */
   private damagedUntil = new Map<EntityId, number>();
@@ -154,6 +157,7 @@ export class WorldLayer {
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const seen = new Set<EntityId>();
     this.refreshGatherTargets(state);
+    this.refreshOpenGates(state);
 
     for (const e of state.entities.values()) {
       seen.add(e.id);
@@ -282,6 +286,27 @@ export class WorldLayer {
         ? e.intent.targetId
         : (e.activity === 'gathering' || e.activity === 'carrying') ? e.targetId : undefined;
       if (target !== undefined) this.gatherTargets.add(target);
+    }
+  }
+
+  /** Own/allied proximity drives presentation only; the sim enforces gate access. */
+  private refreshOpenGates(state: GameState): void {
+    this.openGates.clear();
+    const gates = [...state.entities.values()].filter((e) =>
+      e.kind === 'building' && e.defId === 'gate' && e.hp > 0
+      && (e.buildProgress ?? 1000) >= 1000);
+    if (gates.length === 0) return;
+    for (const unit of state.entities.values()) {
+      if (unit.kind !== 'unit' || unit.hp <= 0 || unit.garrisonedIn !== undefined) continue;
+      const unitTeam = state.players[unit.player]?.setup.team ?? 0;
+      for (const gate of gates) {
+        const gateTeam = state.players[gate.player]?.setup.team ?? 0;
+        const friendly = unit.player === gate.player || (unitTeam > 0 && unitTeam === gateTeam);
+        if (!friendly) continue;
+        if (Math.max(Math.abs(unit.x - gate.x), Math.abs(unit.y - gate.y)) <= GATE_OPEN_RADIUS_FP) {
+          this.openGates.add(gate.id);
+        }
+      }
     }
   }
 
@@ -419,7 +444,15 @@ export class WorldLayer {
       );
       view.lastFrameKey = key;
     }
-    view.sprite.alpha = sprAlpha;
+    const gateOpen = e.defId === 'gate' && this.openGates.has(e.id);
+    if (e.defId === 'gate') {
+      const baseScale = Math.abs(view.sprite.scale.x);
+      // The current gate sheet has no separate open frame. Retract it vertically
+      // like a raised portcullis while a permitted unit passes.
+      view.sprite.scale.y = baseScale * (gateOpen ? 0.42 : 1);
+      view.sprite.position.y = gateOpen ? -18 : 0;
+    }
+    view.sprite.alpha = sprAlpha * (gateOpen ? 0.82 : 1);
     // damage-taken red blink (attackImpact recorded in onSimEvents)
     view.sprite.tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat ? 0xff8070 : 0xffffff;
 

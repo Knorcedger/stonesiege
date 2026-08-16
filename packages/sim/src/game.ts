@@ -11,7 +11,7 @@ import type {
   SimEvent, Stockpile,
 } from './types';
 import { SimRng } from './rng';
-import { isTileWalkable } from './internal';
+import { isTileWalkable, isTileWalkableForPlayer } from './internal';
 import type { SimState, VisionGroup } from './internal';
 import { SpatialGrid } from './spatial';
 import { spawnEntity } from './entities';
@@ -116,6 +116,7 @@ export function createGame(config: GameConfig): Game {
     ...(config.maxAge !== undefined ? { maxAgeLimit: config.maxAge } : {}),
     walkTerrain: buildWalkTerrain(map),
     blockers: new Uint16Array(map.width * map.height),
+    gatesByTile: new Map(),
     unitsGrid: new SpatialGrid(),
     motion: new Map(),
     pathSearches: [],
@@ -243,6 +244,8 @@ function finalizeGame(state: SimState): Game {
       if (buildingFootprintOverlaps(state, tileX, tileY, def.size)) return false;
       return true;
     },
-    isWalkable: (tileX, tileY) => isTileWalkable(state, tileX, tileY),
+    isWalkable: (tileX, tileY, player) => player === undefined
+      ? isTileWalkable(state, tileX, tileY)
+      : isTileWalkableForPlayer(state, tileX, tileY, player),
   };
 }

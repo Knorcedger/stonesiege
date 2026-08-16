@@ -6,11 +6,11 @@
 import { gameData } from '@bf/data';
 import { FP, TICKS_PER_SECOND } from './types';
 import type { Entity, EntityId, Fixed } from './types';
-import { facingFromDelta, isqrt, isTileWalkable } from './internal';
+import { facingFromDelta, isqrt, isTileWalkableForPlayer } from './internal';
 import type { SimState } from './internal';
 import { fogOnTileChange } from './fog';
 import { resolveUnitStats } from './stats';
-import { requestGroupPath, nearestWalkableTile } from './path';
+import { requestGroupPath, nearestWalkableTileForPlayer } from './path';
 import { tileIndex } from './internal';
 
 const ARRIVE_DIST = FP / 2; // within half a tile of the exact target = arrived
@@ -27,12 +27,16 @@ const FAR_STUCK_TICKS = 30;
 
 function tryStep(state: SimState, e: Entity, nx: Fixed, ny: Fixed): boolean {
   const tx = Math.floor(nx / FP), ty = Math.floor(ny / FP);
-  if (isTileWalkable(state, tx, ty)) { applyPosition(state, e, nx, ny); return true; }
+  if (isTileWalkableForPlayer(state, tx, ty, e.player)) { applyPosition(state, e, nx, ny); return true; }
   // slide: keep the walkable axis
   const txOnly = Math.floor(nx / FP);
-  if (isTileWalkable(state, txOnly, e.tileY) && nx !== e.x) { applyPosition(state, e, nx, e.y); return true; }
+  if (isTileWalkableForPlayer(state, txOnly, e.tileY, e.player) && nx !== e.x) {
+    applyPosition(state, e, nx, e.y); return true;
+  }
   const tyOnly = Math.floor(ny / FP);
-  if (isTileWalkable(state, e.tileX, tyOnly) && ny !== e.y) { applyPosition(state, e, e.x, ny); return true; }
+  if (isTileWalkableForPlayer(state, e.tileX, tyOnly, e.player) && ny !== e.y) {
+    applyPosition(state, e, e.x, ny); return true;
+  }
   return false;
 }
 
@@ -115,7 +119,9 @@ function followPaths(state: SimState): void {
         if (m.repaths === 0) {
           m.repaths = 1;
           m.stuckTicks = 0;
-          const goal = nearestWalkableTile(state, Math.floor(m.targetX / FP), Math.floor(m.targetY / FP));
+          const goal = nearestWalkableTileForPlayer(
+            state, e.player, Math.floor(m.targetX / FP), Math.floor(m.targetY / FP),
+          );
           if (goal) requestGroupPath(state, tileIndex(state.map, goal.x, goal.y), [id]);
           else { arrived.push(id); finishMove(e); }
         } else {

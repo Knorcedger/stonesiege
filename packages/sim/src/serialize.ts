@@ -10,6 +10,7 @@
 //   through addBlockers(±footprintSize) in entities.ts, so re-adding each stored
 //   entity's CURRENT footprint reproduces the grid exactly (stumps, units, and
 //   clearance-pending foundations and completed farms count 0).
+// - gatesByTile: gate entity ids indexed by anchor tile, rebuilt from entities.
 // - unitsGrid: rebuilt by inserting every live, non-garrisoned unit. Within-cell array
 //   order differs from the original run but is unobservable: queryCircle sorts results
 //   by entity id (spatial.ts) before anyone iterates them.
@@ -97,6 +98,8 @@ interface SnapshotPlayer {
 /** GroupSearchSnapshot with the three map-sized arrays RLE'd. */
 interface SnapshotSearch {
   groupId: number;
+  /** Added to v1 snapshots with gate pathing; absent legacy saves infer it from units. */
+  player?: number;
   goal: number;
   distRle: number[];
   settledRle: number[];
@@ -211,6 +214,7 @@ export function serializeSimState(state: SimState): GameSnapshot {
     visionStamps: pairsOf(state.visionStamps),
     pathSearches: snapshotSearches(state).map((s) => ({
       groupId: s.groupId,
+      player: s.player,
       goal: s.goal,
       distRle: rleEncode(s.dist),
       settledRle: rleEncode(s.settled),
@@ -302,6 +306,7 @@ export function restoreSimState(snapshot: GameSnapshot): SimState {
     ...(snap.maxAge !== undefined ? { maxAgeLimit: snap.maxAge } : {}),
     walkTerrain: buildWalkTerrain(map),
     blockers: new Uint16Array(tiles),
+    gatesByTile: new Map(),
     unitsGrid: new SpatialGrid(),
     motion: new Map(snap.motion),
     pathSearches: [],
@@ -341,6 +346,9 @@ export function restoreSimState(snapshot: GameSnapshot): SimState {
   // re-inserted on eject) and dead bodies — corpses AND carcasses, both hp<=0 —
   // (removed via clearUnitBookkeeping) are out; everything else is in.
   for (const e of state.entities.values()) {
+    if (e.kind === 'building' && e.defId === 'gate') {
+      state.gatesByTile.set(tileIndex(map, e.tileX, e.tileY), e.id);
+    }
     const size = footprintSize(e);
     for (let dy = 0; dy < size; dy++) {
       for (let dx = 0; dx < size; dx++) {
@@ -357,6 +365,7 @@ export function restoreSimState(snapshot: GameSnapshot): SimState {
 
   restoreSearches(state, snap.pathSearches.map((s): GroupSearchSnapshot => ({
     groupId: s.groupId,
+    ...(s.player !== undefined ? { player: s.player } : {}),
     goal: s.goal,
     dist: rleToNumbers(s.distRle, tiles),
     settled: rleToNumbers(s.settledRle, tiles),

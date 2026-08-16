@@ -117,6 +117,9 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
   }
 
   state.entities.set(id, e);
+  if (kind === 'building' && gameData.buildings[init.defId]?.gate) {
+    state.gatesByTile.set(tileIndex(state.map, e.tileX, e.tileY), id);
+  }
   addBlockers(state, e, 1);
   if (kind === 'unit') state.unitsGrid.insert(id, e.x, e.y);
   fogOnSpawn(state, e);
@@ -155,6 +158,10 @@ export function removeEntity(state: SimState, id: EntityId): void {
   const e = state.entities.get(id);
   if (!e) return;
   addBlockers(state, e, -1);
+  if (e.kind === 'building' && gameData.buildings[e.defId]?.gate) {
+    const tile = tileIndex(state.map, e.tileX, e.tileY);
+    if (state.gatesByTile.get(tile) === id) state.gatesByTile.delete(tile);
+  }
   if (e.kind === 'unit') {
     state.unitsGrid.remove(id);
     state.motion.delete(id);

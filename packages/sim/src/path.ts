@@ -8,9 +8,9 @@
 // with units still waiting, rerouteRemaining walks them to the reachable tile closest
 // to the goal instead of dropping the order.
 
-import type { EntityId } from './types';
-import { FP } from './types';
-import { isTileWalkable, tileIndex } from './internal';
+import type { EntityId, PlayerId } from './types';
+import { FP, GAIA } from './types';
+import { isTileWalkable, isTileWalkableForPlayer, tileIndex } from './internal';
 import type { Motion, SimState } from './internal';
 
 /** Shared node-expansion budget per tick across all active searches. */
@@ -75,6 +75,8 @@ class MinHeap {
 
 export interface GroupSearch {
   groupId: number;
+  /** Every path search is owner-specific because allied gates are traversable. */
+  player: PlayerId;
   goal: number; // tile index
   dist: Int32Array; // -1 = unseen; else best known cost
   settled: Uint8Array;
@@ -94,6 +96,8 @@ export interface GroupSearch {
  */
 export interface GroupSearchSnapshot {
   groupId: number;
+  /** Optional for backwards compatibility with v1 snapshots written before gates. */
+  player?: PlayerId;
   goal: number;
   dist: number[];
   settled: number[];
@@ -107,6 +111,7 @@ export interface GroupSearchSnapshot {
 export function snapshotSearches(state: SimState): GroupSearchSnapshot[] {
   return state.pathSearches.map((s) => ({
     groupId: s.groupId,
+    player: s.player,
     goal: s.goal,
     dist: Array.from(s.dist),
     settled: Array.from(s.settled),
@@ -119,8 +124,11 @@ export function snapshotSearches(state: SimState): GroupSearchSnapshot[] {
 /** Rebuild state.pathSearches from snapshots (waitingCount is the sum of waiting lists). */
 export function restoreSearches(state: SimState, snaps: GroupSearchSnapshot[]): void {
   state.pathSearches = snaps.map((snap) => {
+    const firstWaitingId = snap.waiting.flatMap(([, ids]) => ids)[0];
+    const player = snap.player ?? state.entities.get(firstWaitingId)?.player ?? GAIA;
     const search: GroupSearch = {
       groupId: snap.groupId,
+      player,
       goal: snap.goal,
       dist: Int32Array.from(snap.dist),
       settled: Uint8Array.from(snap.settled),
@@ -150,6 +158,24 @@ export function nearestWalkableTile(
   return null;
 }
 
+/** Player-aware nearest tile; completed own/allied gates count as walkable. */
+export function nearestWalkableTileForPlayer(
+  state: SimState, player: PlayerId, tx: number, ty: number, maxR = 8,
+): { x: number; y: number } | null {
+  if (isTileWalkableForPlayer(state, tx, ty, player)) return { x: tx, y: ty };
+  for (let r = 1; r <= maxR; r++) {
+    for (let dy = -r; dy <= r; dy++) {
+      for (let dx = -r; dx <= r; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
+        if (isTileWalkableForPlayer(state, tx + dx, ty + dy, player)) {
+          return { x: tx + dx, y: ty + dy };
+        }
+      }
+    }
+  }
+  return null;
+}
+
 /**
  * Create a search serving `unitIds` toward the cheapest of `goals`. A multi-source
  * reverse flood is important for wide targets: choosing one footprint-ring tile by
@@ -167,8 +193,23 @@ export function requestGroupPathToAny(
   const n = state.map.width * state.map.height;
   const uniqueGoals = [...new Set(goals)].filter((goal) => goal >= 0 && goal < n);
   if (uniqueGoals.length === 0) return;
+  const byPlayer = new Map<PlayerId, EntityId[]>();
+  for (const id of unitIds) {
+    const e = state.entities.get(id);
+    if (!e || e.kind !== 'unit' || !state.motion.has(id)) continue;
+    const ids = byPlayer.get(e.player);
+    if (ids) ids.push(id);
+    else byPlayer.set(e.player, [id]);
+  }
+  for (const [player, ids] of byPlayer) createGroupSearch(state, uniqueGoals, ids, player, n);
+}
+
+function createGroupSearch(
+  state: SimState, uniqueGoals: readonly number[], unitIds: EntityId[], player: PlayerId, n: number,
+): void {
   const search: GroupSearch = {
     groupId: state.nextGroupId++,
+    player,
     goal: uniqueGoals[0],
     dist: new Int32Array(n).fill(-1),
     settled: new Uint8Array(n),
@@ -209,7 +250,7 @@ function serveTile(state: SimState, s: GroupSearch, tile: number): void {
   const rawPath: number[] = [];
   let t = s.parent[tile];
   while (t !== -1) { rawPath.push(t); t = s.parent[t]; }
-  const path = smoothTilePath(state, tile, rawPath);
+  const path = smoothTilePath(state, tile, rawPath, s.player);
   for (const id of waiting) {
     s.waitingCount--;
     const m = state.motion.get(id);
@@ -220,7 +261,7 @@ function serveTile(state: SimState, s: GroupSearch, tile: number): void {
 }
 
 /** True when a center-to-center segment crosses only walkable tiles and safe corners. */
-function clearTileLine(state: SimState, from: number, to: number): boolean {
+function clearTileLine(state: SimState, from: number, to: number, player: PlayerId): boolean {
   const width = state.map.width;
   let x = from % width, y = (from / width) | 0;
   const tx = to % width, ty = (to / width) | 0;
@@ -233,8 +274,9 @@ function clearTileLine(state: SimState, from: number, to: number): boolean {
     if (e2 > -dy) { err -= dy; nx += sx; }
     if (e2 < dx) { err += dx; ny += sy; }
     if (nx !== x && ny !== y
-      && (!isTileWalkable(state, nx, y) || !isTileWalkable(state, x, ny))) return false;
-    if (!isTileWalkable(state, nx, ny)) return false;
+      && (!isTileWalkableForPlayer(state, nx, y, player)
+        || !isTileWalkableForPlayer(state, x, ny, player))) return false;
+    if (!isTileWalkableForPlayer(state, nx, ny, player)) return false;
     x = nx; y = ny;
   }
   return true;
@@ -247,7 +289,9 @@ function clearTileLine(state: SimState, from: number, to: number): boolean {
  * line-of-sight compression preserves obstacle/corner safety while producing the
  * straight route the player intended.
  */
-function smoothTilePath(state: SimState, start: number, raw: readonly number[]): number[] {
+function smoothTilePath(
+  state: SimState, start: number, raw: readonly number[], player: PlayerId,
+): number[] {
   if (raw.length <= 1) return [...raw];
   const out: number[] = [];
   let anchor = start;
@@ -255,7 +299,7 @@ function smoothTilePath(state: SimState, start: number, raw: readonly number[]):
   while (firstCandidate < raw.length) {
     let chosen = firstCandidate;
     for (let i = raw.length - 1; i > firstCandidate; i--) {
-      if (clearTileLine(state, anchor, raw[i])) { chosen = i; break; }
+      if (clearTileLine(state, anchor, raw[i], player)) { chosen = i; break; }
     }
     out.push(raw[chosen]);
     anchor = raw[chosen];
@@ -281,8 +325,9 @@ function smoothTilePath(state: SimState, start: number, raw: readonly number[]):
  */
 function rerouteRemaining(state: SimState, s: GroupSearch): void {
   const { width, height } = state.map;
-  const walk = state.walkTerrain, blockers = state.blockers;
-  const passable = (t: number): boolean => walk[t] === 1 && blockers[t] === 0;
+  const passable = (t: number): boolean => isTileWalkableForPlayer(
+    state, t % width, (t / width) | 0, s.player,
+  );
 
   // Collect still-waiting units. A unit standing ON a blocked tile can never be served
   // by the tile flood (only passable tiles are settled) — drop those orders as before.
@@ -353,10 +398,11 @@ export function tickPathfinding(state: SimState): void {
 
 function expandSearch(state: SimState, s: GroupSearch, budget: number): number {
   const { width, height } = state.map;
-  const walk = state.walkTerrain, blockers = state.blockers;
   const open = s.open, dist = s.dist, settled = s.settled, parent = s.parent;
 
-  const passable = (t: number): boolean => walk[t] === 1 && blockers[t] === 0;
+  const passable = (t: number): boolean => isTileWalkableForPlayer(
+    state, t % width, (t / width) | 0, s.player,
+  );
 
   while (budget > 0 && open.size > 0 && s.waitingCount > 0) {
     const t = open.pop();
@@ -398,29 +444,39 @@ function expandSearch(state: SimState, s: GroupSearch, budget: number): number {
 export function orderMove(state: SimState, unitIds: EntityId[], x: number, y: number): void {
   if (unitIds.length === 0) return;
   const tx = Math.floor(x / FP), ty = Math.floor(y / FP);
-  // widen the spiral for clicks deep inside blocked areas (mid-lake, forest heart) so
-  // the order is never a silent no-op; unreachable goals then reroute via the search
-  const goalTile = nearestWalkableTile(state, tx, ty)
-    ?? nearestWalkableTile(state, tx, ty, Math.max(state.map.width, state.map.height));
-  if (!goalTile) return; // map has no walkable tile at all
-  const remapped = goalTile.x !== tx || goalTile.y !== ty;
-  const targetX = remapped ? goalTile.x * FP + FP / 2 : x;
-  const targetY = remapped ? goalTile.y * FP + FP / 2 : y;
-
-  const moving: EntityId[] = [];
+  const byPlayer = new Map<PlayerId, EntityId[]>();
   for (const id of unitIds) {
     const e = state.entities.get(id);
     if (!e || e.kind !== 'unit') continue;
-    const m: Motion = {
-      targetX, targetY, path: null, pathIndex: 0,
-      groupId: -1, stuckTicks: 0, repaths: 0,
-      lastX: e.x, lastY: e.y,
-    };
-    state.motion.set(id, m);
-    e.activity = 'moving';
-    moving.push(id);
+    const ids = byPlayer.get(e.player);
+    if (ids) ids.push(id);
+    else byPlayer.set(e.player, [id]);
   }
-  requestGroupPath(state, tileIndex(state.map, goalTile.x, goalTile.y), moving);
+  for (const [player, ids] of byPlayer) {
+    // Widen the spiral for clicks deep inside blocked areas (mid-lake, forest heart).
+    // Own/allied gate tiles are valid destinations and corridors for this owner only.
+    const goalTile = nearestWalkableTileForPlayer(state, player, tx, ty)
+      ?? nearestWalkableTileForPlayer(
+        state, player, tx, ty, Math.max(state.map.width, state.map.height),
+      );
+    if (!goalTile) continue;
+    const remapped = goalTile.x !== tx || goalTile.y !== ty;
+    const targetX = remapped ? goalTile.x * FP + FP / 2 : x;
+    const targetY = remapped ? goalTile.y * FP + FP / 2 : y;
+    const moving: EntityId[] = [];
+    for (const id of ids) {
+      const e = state.entities.get(id)!;
+      const m: Motion = {
+        targetX, targetY, path: null, pathIndex: 0,
+        groupId: -1, stuckTicks: 0, repaths: 0,
+        lastX: e.x, lastY: e.y,
+      };
+      state.motion.set(id, m);
+      e.activity = 'moving';
+      moving.push(id);
+    }
+    requestGroupPath(state, tileIndex(state.map, goalTile.x, goalTile.y), moving);
+  }
 }
 
 /**
@@ -437,34 +493,40 @@ export function orderMoveToFootprint(
   size: number,
 ): void {
   if (unitIds.length === 0) return;
-  const goals: number[] = [];
   const x0 = tileX - 1, y0 = tileY - 1;
   const x1 = tileX + size, y1 = tileY + size;
-  for (let x = x0; x <= x1; x++) {
-    if (isTileWalkable(state, x, y0)) goals.push(tileIndex(state.map, x, y0));
-    if (y1 !== y0 && isTileWalkable(state, x, y1)) goals.push(tileIndex(state.map, x, y1));
-  }
-  for (let y = y0 + 1; y < y1; y++) {
-    if (isTileWalkable(state, x0, y)) goals.push(tileIndex(state.map, x0, y));
-    if (x1 !== x0 && isTileWalkable(state, x1, y)) goals.push(tileIndex(state.map, x1, y));
-  }
-  if (goals.length === 0) return;
-
   const targetX = (tileX + size / 2) * FP;
   const targetY = (tileY + size / 2) * FP;
-  const moving: EntityId[] = [];
+  const byPlayer = new Map<PlayerId, EntityId[]>();
   for (const id of unitIds) {
     const e = state.entities.get(id);
     if (!e || e.kind !== 'unit') continue;
-    state.motion.set(id, {
-      targetX, targetY, path: null, pathIndex: 0,
-      groupId: -1, stuckTicks: 0, repaths: 0,
-      lastX: e.x, lastY: e.y,
-    });
-    e.activity = 'moving';
-    moving.push(id);
+    const ids = byPlayer.get(e.player);
+    if (ids) ids.push(id);
+    else byPlayer.set(e.player, [id]);
   }
-  requestGroupPathToAny(state, goals, moving);
+  for (const [player, ids] of byPlayer) {
+    const goals: number[] = [];
+    for (let x = x0; x <= x1; x++) {
+      if (isTileWalkableForPlayer(state, x, y0, player)) goals.push(tileIndex(state.map, x, y0));
+      if (y1 !== y0 && isTileWalkableForPlayer(state, x, y1, player)) goals.push(tileIndex(state.map, x, y1));
+    }
+    for (let y = y0 + 1; y < y1; y++) {
+      if (isTileWalkableForPlayer(state, x0, y, player)) goals.push(tileIndex(state.map, x0, y));
+      if (x1 !== x0 && isTileWalkableForPlayer(state, x1, y, player)) goals.push(tileIndex(state.map, x1, y));
+    }
+    if (goals.length === 0) continue;
+    for (const id of ids) {
+      const e = state.entities.get(id)!;
+      state.motion.set(id, {
+        targetX, targetY, path: null, pathIndex: 0,
+        groupId: -1, stuckTicks: 0, repaths: 0,
+        lastX: e.x, lastY: e.y,
+      });
+      e.activity = 'moving';
+    }
+    requestGroupPathToAny(state, goals, ids);
+  }
 }
 
 /** One unit's assigned destination inside a formation. */
@@ -477,13 +539,15 @@ export interface UnitMoveTarget { id: EntityId; x: number; y: number }
  * a flank inside a building or lake.
  */
 export function orderMoveToTargets(state: SimState, targets: readonly UnitMoveTarget[]): void {
-  const groups = new Map<number, EntityId[]>();
+  const groups = new Map<string, { goal: number; ids: EntityId[] }>();
   for (const target of targets) {
     const e = state.entities.get(target.id);
     if (!e || e.kind !== 'unit') continue;
     const tx = Math.floor(target.x / FP), ty = Math.floor(target.y / FP);
-    const goalTile = nearestWalkableTile(state, tx, ty)
-      ?? nearestWalkableTile(state, tx, ty, Math.max(state.map.width, state.map.height));
+    const goalTile = nearestWalkableTileForPlayer(state, e.player, tx, ty)
+      ?? nearestWalkableTileForPlayer(
+        state, e.player, tx, ty, Math.max(state.map.width, state.map.height),
+      );
     if (!goalTile) continue;
     const remapped = goalTile.x !== tx || goalTile.y !== ty;
     const targetX = remapped ? goalTile.x * FP + FP / 2 : target.x;
@@ -495,9 +559,10 @@ export function orderMoveToTargets(state: SimState, targets: readonly UnitMoveTa
     });
     e.activity = 'moving';
     const goal = tileIndex(state.map, goalTile.x, goalTile.y);
-    const ids = groups.get(goal);
-    if (ids) ids.push(target.id);
-    else groups.set(goal, [target.id]);
+    const key = `${e.player}:${goal}`;
+    const group = groups.get(key);
+    if (group) group.ids.push(target.id);
+    else groups.set(key, { goal, ids: [target.id] });
   }
-  for (const [goal, ids] of groups) requestGroupPath(state, goal, ids);
+  for (const { goal, ids } of groups.values()) requestGroupPath(state, goal, ids);
 }
