@@ -2,8 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { FP, type Entity, type GameMap, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
 import {
-  buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
-  mirroredWallIds, ownedResearchProgress, resourceFrameName,
+  advanceGateOpenProgress, buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
+  mirroredWallIds, ownedResearchProgress, resourceFrameName, wallCornerJoins,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -109,11 +109,37 @@ describe('mirroredWallIds', () => {
   const wall = (id: number, tileX: number, tileY: number, defId = 'stoneWall'): Entity =>
     resource({ id, kind: 'building', defId, player: HUMAN, tileX, tileY, hp: 1800, maxHp: 1800 });
 
-  it('mirrors perpendicular wall runs while leaving the primary axis and corners stable', () => {
+  it('mirrors perpendicular wall runs while leaving the primary axis and L-corners stable', () => {
     const walls = [
       wall(1, 4, 4), wall(2, 5, 4), wall(3, 6, 4),
       wall(4, 4, 5), wall(5, 4, 6), wall(6, 4, 7, 'gate'),
     ];
     expect([...mirroredWallIds(walls)].sort((a, b) => a - b)).toEqual([4, 5, 6]);
+    expect(wallCornerJoins(walls).get(1)).toEqual({ xDir: 1, yDir: 1 });
+  });
+
+  it('describes all four corner directions without treating a T-junction as a corner', () => {
+    const walls = [
+      wall(1, 5, 5), wall(2, 6, 5), wall(3, 5, 6),
+      wall(4, 10, 10), wall(5, 9, 10), wall(6, 10, 9),
+      wall(7, 15, 15), wall(8, 16, 15), wall(9, 15, 14),
+      wall(10, 20, 20), wall(11, 19, 20), wall(12, 20, 21),
+      wall(13, 30, 30), wall(14, 29, 30), wall(15, 31, 30), wall(16, 30, 31),
+    ];
+    const corners = wallCornerJoins(walls);
+    expect(corners.get(1)).toEqual({ xDir: 1, yDir: 1 });
+    expect(corners.get(4)).toEqual({ xDir: -1, yDir: -1 });
+    expect(corners.get(7)).toEqual({ xDir: 1, yDir: -1 });
+    expect(corners.get(10)).toEqual({ xDir: -1, yDir: 1 });
+    expect(corners.has(13)).toBe(false);
+  });
+});
+
+describe('advanceGateOpenProgress', () => {
+  it('opens and closes smoothly while clamping at both endpoints', () => {
+    expect(advanceGateOpenProgress(0, true, 1)).toBeGreaterThan(0);
+    expect(advanceGateOpenProgress(0.5, true, 999)).toBe(1);
+    expect(advanceGateOpenProgress(0.5, false, 999)).toBe(0);
+    expect(advanceGateOpenProgress(0.5, false, -1)).toBe(0.5);
   });
 });

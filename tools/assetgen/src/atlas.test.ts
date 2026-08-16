@@ -279,6 +279,10 @@ describe.runIf(buildingsArmed)('buildings atlas (stage 2, armed)', () => {
     }
     expectFrames(buildings, wanted);
   });
+
+  it('ships a permanent gatehouse and an independently animated door layer', () => {
+    expectFrames(buildings, ['bld/gate/done', 'bld/gate/open', 'bld/gate/door']);
+  });
 });
 
 describe.runIf(!unitsArmed)('units atlas (stage 2 pending)', () => {

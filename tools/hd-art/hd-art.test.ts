@@ -58,10 +58,10 @@ function frameMaskPixelCount(name: string): number {
 }
 
 describe('complete HD art override contract', () => {
-  it('covers every one of the 3,806 shipping frames exactly once at 2x', () => {
+  it('covers every one of the 3,908 shipping frames exactly once at 2x', () => {
     expect(manifest.bespokeFrames).toBeGreaterThanOrEqual(90);
-    expect(manifest.convertedFrames + manifest.bespokeFrames).toBe(3906);
-    expect(manifest.frameCount).toBe(3906);
+    expect(manifest.convertedFrames + manifest.bespokeFrames).toBe(3908);
+    expect(manifest.frameCount).toBe(3908);
 
     const hdNames = new Set<string>();
     for (const { atlas } of hdAtlases()) {
@@ -81,6 +81,13 @@ describe('complete HD art override contract', () => {
       for (const name of Object.keys(atlas.frames)) baseNames.add(name);
     }
     expect([...hdNames].sort()).toEqual([...baseNames].sort());
+  });
+
+  it('keeps the gatehouse present while splitting its door into a moving layer', () => {
+    const openHash = framePixelsHash('bld/gate/open');
+    const doorHash = framePixelsHash('bld/gate/door');
+    expect(openHash).not.toBe(framePixelsHash('bld/gate/done'));
+    expect(doorHash).not.toBe(openHash);
   });
 
   it('ships the approved padded Town Center with an exact runtime color mask', () => {
@@ -127,6 +134,31 @@ describe('complete HD art override contract', () => {
       for (const [sprite, count] of [['unit/villager', 6], ['unit/scout', 8], ['obj/sheep', 4]] as const) {
         const hashes = Array.from({ length: count }, (_, frame) => framePixelsHash(`${sprite}/walk/${dir}/${frame}`));
         expect(new Set(hashes).size, `${sprite} direction ${dir}`).toBe(count);
+      }
+    }
+  });
+
+  it('upgrades every trainable combat family with team-readable authored movement', () => {
+    const authoredUnits = [
+      'militia', 'manAtArms', 'longswordsman', 'champion',
+      'spearman', 'pikeman',
+      'archer', 'longbowman', 'eliteLongbowman',
+      'crossbowman', 'arbalester',
+      'skirmisher', 'eliteSkirmisher',
+      'lightCavalry', 'knight', 'cavalier', 'paladin',
+      'monk', 'highlandRaider', 'eliteHighlandRaider',
+      'batteringRam', 'cappedRam', 'siegeRam',
+      'mangonel', 'onager', 'trebuchet',
+    ] as const;
+
+    for (const id of authoredUnits) {
+      for (let dir = 0; dir < 5; dir++) {
+        const hashes = Array.from(
+          { length: 6 },
+          (_, frame) => framePixelsHash(`unit/${id}/walk/${dir}/${frame}`),
+        );
+        expect(new Set(hashes).size, `${id} direction ${dir}`).toBe(6);
+        expect(frameMaskPixelCount(`unit/${id}/idle/${dir}/0`), `${id} team mask`).toBeGreaterThan(0);
       }
     }
   });

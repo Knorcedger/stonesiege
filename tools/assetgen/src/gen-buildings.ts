@@ -1194,7 +1194,7 @@ function rStoneWall(c: Canvas, _age: Age, _banner: boolean): void {
   cren(s.St, s.Et);
 }
 
-function rGate(c: Canvas, _age: Age, banner: boolean): void {
+function rGateStructure(c: Canvas, banner: boolean): void {
   const H = 15;
   // flanking posts hugging the W and E tile corners
   for (const side of [-1, 1] as const) {
@@ -1217,6 +1217,10 @@ function rGate(c: Canvas, _age: Age, banner: boolean): void {
     c.r.fillRect(x, archY - 4 + dip, 1, 4, P.stoneBase);
     c.r.set(x, archY - 4 + dip, P.stoneLight);
   }
+}
+
+function rGateDoor(c: Canvas): void {
+  const archY = c.cy - 15;
   // portcullis lattice in the opening
   for (let x = c.cx - 10; x <= c.cx + 10; x += 3) {
     c.r.line(x, archY + 2, x, c.cy + 4, P.metalDark);
@@ -1224,6 +1228,11 @@ function rGate(c: Canvas, _age: Age, banner: boolean): void {
   for (let y = archY + 3; y <= c.cy + 3; y += 3) {
     c.r.line(c.cx - 10, y, c.cx + 10, y, P.metalDark);
   }
+}
+
+function rGate(c: Canvas, _age: Age, banner: boolean): void {
+  rGateStructure(c, banner);
+  rGateDoor(c);
 }
 
 function rCastle(c: Canvas, _age: Age, banner: boolean): void {
@@ -1600,6 +1609,22 @@ export function genBuildings(): BuildingsResult {
     } else {
       const d = drawDone(b.age as Age, true);
       frames.push({ name: `bld/${b.id}/done`, raster: d.raster, anchor: d.anchor });
+    }
+
+    // The gatehouse and its moving door are separate render layers. At rest the
+    // two frames reproduce `done`; at runtime only the door translates upward,
+    // so towers and arch remain planted while friendly troops pass underneath.
+    if (b.id === 'gate') {
+      const openCanvas = mkCanvas(b.size, spec.elev);
+      fpShadow(openCanvas);
+      rGateStructure(openCanvas, true);
+      openCanvas.r.outlinePass();
+      frames.push({ name: 'bld/gate/open', raster: openCanvas.r, anchor: openCanvas.anchor });
+
+      const doorCanvas = mkCanvas(b.size, spec.elev);
+      rGateDoor(doorCanvas);
+      doorCanvas.r.outlinePass();
+      frames.push({ name: 'bld/gate/door', raster: doorCanvas.r, anchor: doorCanvas.anchor });
     }
 
     // scaffold states use the unlock-age look, bannerless + mask-free

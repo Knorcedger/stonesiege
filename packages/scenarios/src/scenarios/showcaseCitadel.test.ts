@@ -22,9 +22,14 @@ describe('showcase-citadel capture preset', () => {
   it('stages a max-tier army behind a complete fortified circuit', () => {
     const eliteArmy = ['champion', 'eliteHighlandRaider', 'arbalester', 'eliteSkirmisher', 'paladin', 'onager', 'trebuchet'];
     expect(start.entities.filter((e) => e.player === 1 && eliteArmy.includes(e.defId))).toHaveLength(50);
-    expect(count('stoneWall')).toBeGreaterThan(130);
+    expect(count('stoneWall')).toBe(130);
     expect(count('gate')).toBe(2);
     expect(count('keep')).toBe(4);
+    const wallTiles = new Set(start.entities.filter((e) => e.defId === 'stoneWall')
+      .map((e) => `${e.tileX},${e.tileY}`));
+    for (const corner of ['20,18', '56,18', '20,50', '56,50']) {
+      expect(wallTiles.has(corner), corner).toBe(false);
+    }
   });
 
   it('is deep-linkable without appearing in the Wallace campaign sequence', () => {

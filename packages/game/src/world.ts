@@ -33,20 +33,23 @@ const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
 const GATE_OPEN_RADIUS_FP = 2 * FP;
-const FORTIFICATION_ART_SCALE: Readonly<Record<string, number>> = {
-  stoneWall: 2.25,
-  gate: 2.3,
-  watchTower: 2.1,
-  guardTower: 2.15,
-  keep: 2.2,
+const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
+interface ArtScale { x: number; y: number }
+const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
+  // Wall endpoints stay close to one mechanical tile while the masonry grows
+  // vertically to building scale. Uniform 2.25x scaling made every segment
+  // overlap its neighbours and is what caused the broken-looking corners.
+  stoneWall: { x: 1.16, y: 1.82 },
+  gate: { x: 2.5, y: 2.5 },
+  watchTower: { x: 2.55, y: 2.55 },
+  guardTower: { x: 2.72, y: 2.72 },
+  keep: { x: 2.95, y: 2.95 },
 };
 
 /**
  * The wall sheet is authored along the screen's NW→SE isometric axis. Mirror the
  * same art for runs on the perpendicular tile axis so both sides of a circuit join
- * instead of reading as separated horizontal blocks. Corner pieces remain on the
- * primary axis; the generous visual overscale closes their shared joint and lets
- * the defensive circuit read at the same architectural scale as civic buildings.
+ * instead of reading as separated horizontal blocks.
  */
 export function mirroredWallIds(entities: Iterable<Entity>): Set<EntityId> {
   const connectors = Array.from(entities).filter((e) =>
@@ -61,10 +64,48 @@ export function mirroredWallIds(entities: Iterable<Entity>): Set<EntityId> {
   return mirrored;
 }
 
+export interface WallCornerJoin {
+  /** Connected neighbour on the tile X axis. */
+  xDir: -1 | 1;
+  /** Connected neighbour on the tile Y axis. */
+  yDir: -1 | 1;
+}
+
+/** Exact L-corners. The renderer clips one sprite per axis at the shared post. */
+export function wallCornerJoins(entities: Iterable<Entity>): Map<EntityId, WallCornerJoin> {
+  const connectors = Array.from(entities).filter((e) =>
+    e.kind === 'building' && e.hp > 0 && (e.defId === 'stoneWall' || e.defId === 'gate'));
+  const at = new Set(connectors.map((e) => `${e.tileX},${e.tileY}`));
+  const corners = new Map<EntityId, WallCornerJoin>();
+  for (const e of connectors) {
+    const xNeg = at.has(`${e.tileX - 1},${e.tileY}`);
+    const xPos = at.has(`${e.tileX + 1},${e.tileY}`);
+    const yNeg = at.has(`${e.tileX},${e.tileY - 1}`);
+    const yPos = at.has(`${e.tileX},${e.tileY + 1}`);
+    if (xNeg === xPos || yNeg === yPos) continue;
+    corners.set(e.id, { xDir: xPos ? 1 : -1, yDir: yPos ? 1 : -1 });
+  }
+  return corners;
+}
+
+/** Deterministic gate-leaf tween used for both opening and closing. */
+export function advanceGateOpenProgress(current: number, open: boolean, elapsedTicks: number): number {
+  const direction = open ? 1 : -1;
+  return Math.max(0, Math.min(1, current + direction * Math.max(0, elapsedTicks) / GATE_OPEN_TICKS));
+}
+
 interface EntityView {
   root: Container;
   ring: Graphics;
+  /** Perpendicular half-segment used only for a true L-shaped wall corner. */
+  cornerSprite: Sprite;
+  cornerPrimaryMask: Graphics;
+  cornerSecondaryMask: Graphics;
   sprite: Sprite;
+  /** Independent gate leaf/portcullis layer, drawn behind the permanent arch. */
+  gateDoor: Sprite;
+  gateOpenProgress: number;
+  gateLastTickFloat: number;
   hpBar: Graphics;
   lastFrameKey: string;
   lastAnim: AnimName | '';
@@ -115,6 +156,7 @@ export class WorldLayer {
   private prevPos = new Map<EntityId, { x: number; y: number }>();
   private curPos = new Map<EntityId, { x: number; y: number }>();
   private mirroredWalls = new Set<EntityId>();
+  private wallCorners = new Map<EntityId, WallCornerJoin>();
   /** Gates with an own/allied unit close enough to trigger the visual opening. */
   private openGates = new Set<EntityId>();
   private frameCounts = new Map<string, number>();
@@ -141,6 +183,7 @@ export class WorldLayer {
     for (const e of state.entities.values()) next.set(e.id, { x: e.x, y: e.y });
     this.curPos = next;
     this.mirroredWalls = mirroredWallIds(state.entities.values());
+    this.wallCorners = wallCornerJoins(state.entities.values());
   }
 
   onSimEvents(events: SimEvent[], tick: number): void {
@@ -381,12 +424,22 @@ export class WorldLayer {
   private createView(): EntityView {
     const root = new Container();
     const ring = new Graphics();
+    const gateDoor = new Sprite();
+    const cornerSprite = new Sprite();
     const sprite = new Sprite();
+    const cornerPrimaryMask = new Graphics();
+    const cornerSecondaryMask = new Graphics();
     const hpBar = new Graphics();
-    root.addChild(ring, sprite, hpBar);
+    gateDoor.visible = false;
+    cornerSprite.visible = false;
+    root.addChild(
+      ring, gateDoor, cornerSprite, sprite, hpBar,
+      cornerPrimaryMask, cornerSecondaryMask,
+    );
     this.container.addChild(root);
     return {
-      root, ring, sprite, hpBar,
+      root, ring, cornerSprite, cornerPrimaryMask, cornerSecondaryMask,
+      sprite, gateDoor, gateOpenProgress: 0, gateLastTickFloat: 0, hpBar,
       lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0,
       renderFacing: 0,
       carry: null, lastCarryKey: '', badge: null, badgeText: null, lastBadgeKey: '',
@@ -398,7 +451,10 @@ export class WorldLayer {
     view.root.position.set(Math.round(pos.x), Math.round(pos.y));
     // flat things (farms, foundations-stage-0) sort under everything else
     const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);
-    view.root.zIndex = flat ? pos.y - 4000 : pos.y;
+    // Gatehouses render over their immediately adjacent wall caps; otherwise a
+    // later-sorted wall can hide half the arch and make it read as a breach.
+    const gateLayer = e.defId === 'gate' ? HALF_H + 1 : 0;
+    view.root.zIndex = flat ? pos.y - 4000 : pos.y + gateLayer;
 
     const prev = this.prevPos.get(e.id);
     const cur = this.curPos.get(e.id);
@@ -415,12 +471,20 @@ export class WorldLayer {
     // Gaia entities use the neutral swap: some (sheep) carry a real mask band that
     // must never render raw magenta. Atlases without masks serve the plain frame.
     const colorIdx = e.player === GAIA ? GAIA_NEUTRAL_COLOR : state.players[e.player]?.setup.color;
-    const { candidates, alpha: sprAlpha } = this.frameNameFor(state, e, tickFloat, view);
+    const frameChoice = this.frameNameFor(state, e, tickFloat, view);
+    const gateOperational = e.kind === 'building' && e.defId === 'gate' && e.hp > 0
+      && (e.buildProgress ?? 1000) >= 1000;
+    const candidates = gateOperational
+      ? ['bld/gate/open', ...frameChoice.candidates]
+      : frameChoice.candidates;
+    const sprAlpha = frameChoice.alpha;
     // Conversions can change ownership without changing the animation frame.
     // Include the player ramp in the cache key so the sprite cannot retain its
     // former owner's palette until its next animation/facing transition.
     const mirrorWall = this.mirroredWalls.has(e.id);
-    const key = `${colorIdx ?? 'none'}|${mirrorWall ? 'wall-y|' : ''}${candidates.join('|')}`;
+    const corner = e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined;
+    const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
+    const key = `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
     if (key !== view.lastFrameKey) {
       let frame = null;
       let resolvedName = candidates[candidates.length - 1];
@@ -431,30 +495,81 @@ export class WorldLayer {
       frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? 1;
+      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? { x: 1, y: 1 };
       const mirrorX = frame.mirrored !== mirrorWall;
       view.sprite.scale.set(
-        mirrorX ? -frame.renderScale * artScale : frame.renderScale * artScale,
-        frame.renderScale * artScale,
+        mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
+        frame.renderScale * artScale.y,
       );
+
+      if (corner) {
+        view.cornerSprite.texture = frame.texture;
+        view.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
+        view.cornerSprite.scale.set(-view.sprite.scale.x, view.sprite.scale.y);
+        view.cornerSprite.visible = true;
+
+        const drawHalfMask = (mask: Graphics, screenSide: -1 | 1): void => {
+          mask.clear();
+          mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
+        };
+        // +tileX projects down-right; +tileY projects down-left.
+        drawHalfMask(view.cornerPrimaryMask, corner.xDir);
+        drawHalfMask(view.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
+        view.sprite.mask = view.cornerPrimaryMask;
+        view.cornerSprite.mask = view.cornerSecondaryMask;
+      } else {
+        view.cornerSprite.visible = false;
+        view.sprite.mask = null;
+        view.cornerSprite.mask = null;
+        view.cornerPrimaryMask.clear();
+        view.cornerSecondaryMask.clear();
+      }
+
+      const doorFrame = gateOperational && resolvedName === 'bld/gate/open'
+        ? this.assets.tryResolve('bld/gate/door', colorIdx)
+        : null;
+      if (doorFrame) {
+        view.gateDoor.texture = doorFrame.texture;
+        view.gateDoor.anchor.set(doorFrame.anchorX, doorFrame.anchorY);
+        const doorMirrorX = doorFrame.mirrored !== mirrorWall;
+        view.gateDoor.scale.set(
+          doorMirrorX ? -doorFrame.renderScale * artScale.x : doorFrame.renderScale * artScale.x,
+          doorFrame.renderScale * artScale.y,
+        );
+        view.gateDoor.visible = true;
+      } else {
+        view.gateDoor.visible = false;
+        view.gateOpenProgress = 0;
+        view.gateLastTickFloat = tickFloat;
+      }
       // Trimmed visible top (frames carry transparent headroom): overlays like
       // the health bar must anchor to pixels, not the texture rect.
       view.spriteTopPx = Math.round(
-        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height) * frame.renderScale * artScale,
+        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height)
+          * frame.renderScale * artScale.y,
       );
       view.lastFrameKey = key;
     }
     const gateOpen = e.defId === 'gate' && this.openGates.has(e.id);
-    if (e.defId === 'gate') {
-      const baseScale = Math.abs(view.sprite.scale.x);
-      // The current gate sheet has no separate open frame. Retract it vertically
-      // like a raised portcullis while a permitted unit passes.
-      view.sprite.scale.y = baseScale * (gateOpen ? 0.42 : 1);
-      view.sprite.position.y = gateOpen ? -18 : 0;
+    if (view.gateDoor.visible) {
+      const elapsed = view.gateLastTickFloat === 0
+        ? 0
+        : Math.max(0, Math.min(TICKS_PER_SECOND, tickFloat - view.gateLastTickFloat));
+      view.gateOpenProgress = advanceGateOpenProgress(view.gateOpenProgress, gateOpen, elapsed);
+      view.gateLastTickFloat = tickFloat;
+      // Lift the leaf behind the permanent stone arch; the gatehouse itself is
+      // never scaled or faded, so the opening remains architectural and legible.
+      view.gateDoor.position.y = -view.gateDoor.texture.height
+        * Math.abs(view.gateDoor.scale.y) * 0.24 * view.gateOpenProgress;
     }
-    view.sprite.alpha = sprAlpha * (gateOpen ? 0.82 : 1);
+    view.sprite.alpha = sprAlpha;
+    view.cornerSprite.alpha = sprAlpha;
+    view.gateDoor.alpha = sprAlpha;
     // damage-taken red blink (attackImpact recorded in onSimEvents)
-    view.sprite.tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat ? 0xff8070 : 0xffffff;
+    const tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat ? 0xff8070 : 0xffffff;
+    view.sprite.tint = tint;
+    view.cornerSprite.tint = tint;
+    view.gateDoor.tint = tint;
 
     this.drawRing(e, view);
     this.drawHpBar(e, view);

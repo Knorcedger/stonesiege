@@ -482,7 +482,7 @@
   },
   "bld/gate/construct0": {
    "frame": {
-    "x": 456,
+    "x": 586,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -506,7 +506,7 @@
   },
   "bld/gate/construct1": {
    "frame": {
-    "x": 326,
+    "x": 456,
     "y": 1483,
     "w": 64,
     "h": 63
@@ -576,9 +576,57 @@
     "y": 0.7895
    }
   },
+  "bld/gate/door": {
+   "frame": {
+    "x": 1,
+    "y": 1483,
+    "w": 64,
+    "h": 76
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 76
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 76
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7895
+   }
+  },
+  "bld/gate/open": {
+   "frame": {
+    "x": 66,
+    "y": 1483,
+    "w": 64,
+    "h": 76
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 76
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 76
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.7895
+   }
+  },
   "bld/gate/rubble": {
    "frame": {
-    "x": 391,
+    "x": 521,
     "y": 1483,
     "w": 64,
     "h": 60
@@ -602,7 +650,7 @@
   },
   "bld/guardTower/construct0": {
    "frame": {
-    "x": 521,
+    "x": 651,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -698,7 +746,7 @@
   },
   "bld/guardTower/rubble": {
    "frame": {
-    "x": 66,
+    "x": 196,
     "y": 1483,
     "w": 64,
     "h": 71
@@ -914,7 +962,7 @@
   },
   "bld/keep/construct0": {
    "frame": {
-    "x": 586,
+    "x": 716,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -1010,7 +1058,7 @@
   },
   "bld/keep/rubble": {
    "frame": {
-    "x": 1,
+    "x": 131,
     "y": 1483,
     "w": 64,
     "h": 73
@@ -1874,7 +1922,7 @@
   },
   "bld/stoneWall/construct0": {
    "frame": {
-    "x": 651,
+    "x": 781,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -1898,7 +1946,7 @@
   },
   "bld/stoneWall/construct1": {
    "frame": {
-    "x": 716,
+    "x": 846,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -1922,7 +1970,7 @@
   },
   "bld/stoneWall/construct2": {
    "frame": {
-    "x": 196,
+    "x": 326,
     "y": 1483,
     "w": 64,
     "h": 66
@@ -1946,7 +1994,7 @@
   },
   "bld/stoneWall/done": {
    "frame": {
-    "x": 261,
+    "x": 391,
     "y": 1483,
     "w": 64,
     "h": 66
@@ -1970,7 +2018,7 @@
   },
   "bld/stoneWall/rubble": {
    "frame": {
-    "x": 781,
+    "x": 911,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -2306,7 +2354,7 @@
   },
   "bld/watchTower/construct0": {
    "frame": {
-    "x": 846,
+    "x": 976,
     "y": 1483,
     "w": 64,
     "h": 58
@@ -2402,7 +2450,7 @@
   },
   "bld/watchTower/rubble": {
    "frame": {
-    "x": 131,
+    "x": 261,
     "y": 1483,
     "w": 64,
     "h": 68
@@ -2552,7 +2600,7 @@
   "format": "RGBA8888",
   "size": {
    "w": 2048,
-   "h": 1557
+   "h": 1560
   },
   "scale": 1,
   "bannerfall": {

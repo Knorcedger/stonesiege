@@ -7,6 +7,15 @@ import { unitGroup, wallRing } from './authoring';
 
 const WIDTH = 80;
 const HEIGHT = 72;
+const CORNER_KEEPS: Array<[number, number]> = [
+  [20, 18], [55, 18], [20, 49], [55, 49],
+];
+const WALL_GAPS: Array<[number, number]> = [
+  [20, 35], [39, 50],
+  // The exact turn tile is occupied by the keep. The two adjacent wall ends
+  // continue beneath its wide footprint so no daylight appears at the joint.
+  [20, 18], [56, 18], [20, 50], [56, 50],
+];
 const FARM_TILES: Array<[number, number]> = [
   [22, 19], [25, 19], [28, 19], [31, 19], [34, 19],
   [22, 22], [25, 22], [28, 22], [31, 22], [34, 22],
@@ -63,13 +72,10 @@ export const showcaseCitadel: ScenarioDef = {
   entities: [
     // A compact, uninterrupted stone circuit. Keeps punctuate the four corners;
     // gates sit on the west approach and the south processional road.
-    ...wallRing(1, 20, 18, 56, 50, [[20, 35], [39, 50]]),
+    ...wallRing(1, 20, 18, 56, 50, WALL_GAPS),
     { def: 'gate', player: 1, x: 20, y: 35 },
     { def: 'gate', player: 1, x: 39, y: 50 },
-    { def: 'keep', player: 1, x: 21, y: 19 },
-    { def: 'keep', player: 1, x: 54, y: 19 },
-    { def: 'keep', player: 1, x: 21, y: 48 },
-    { def: 'keep', player: 1, x: 54, y: 48 },
+    ...CORNER_KEEPS.map(([x, y]) => ({ def: 'keep', player: 1, x, y })),
 
     // Productive agricultural quarter: contiguous fields, a mill, and one active
     // farmer per plot. The game host assigns their gather orders on boot.

@@ -36,6 +36,65 @@ interface CutoutSpec {
   preserveSourceCenter?: boolean;
   /** Cap scale for multi-pose sheets so raised tools do not shrink the body. */
   maxScale?: number;
+  /** Crop one pose from a regular source-sheet grid before fitting it. */
+  cell?: {
+    columns: number;
+    rows: number;
+    column: number;
+    row: number;
+  };
+  /** Keep every pose in a visual family on the same animation canvas. */
+  stableSize?: readonly [number, number];
+  /** Convert authored blue cloth to the runtime team ramp, with a sash fallback. */
+  teamColor?: 'blue' | 'sash';
+}
+
+const AUTHORED_DIRECTIONS = [0, 1, 2, 3, 4] as const;
+
+interface WalkGridOptions {
+  stableSize: readonly [number, number];
+  fitWidth?: number;
+  fitHeight?: number;
+  bottom?: number;
+  teamColor?: 'blue' | 'sash';
+  walkFrames?: number;
+}
+
+/** Map a 6x5 authored movement sheet over every tier in a visual family. */
+function walkGridCutouts(
+  source: string,
+  ids: readonly string[],
+  options: WalkGridOptions,
+): CutoutSpec[] {
+  const sourceFrames = 6;
+  const walkFrames = options.walkFrames ?? sourceFrames;
+  const common = {
+    source,
+    fitWidth: options.fitWidth ?? 0.96,
+    fitHeight: options.fitHeight ?? 0.96,
+    bottom: options.bottom ?? 0.97,
+    preserveSourceCenter: true,
+    stableSize: options.stableSize,
+    teamColor: options.teamColor ?? 'blue',
+  } as const;
+
+  return ids.flatMap((id) => AUTHORED_DIRECTIONS.flatMap((dir) => [
+    {
+      ...common,
+      frames: [`unit/${id}/idle/${dir}/0`, `unit/${id}/idle/${dir}/1`],
+      cell: { columns: sourceFrames, rows: AUTHORED_DIRECTIONS.length, column: 0, row: dir },
+    },
+    ...Array.from({ length: walkFrames }, (_, frame): CutoutSpec => ({
+      ...common,
+      frames: [`unit/${id}/walk/${dir}/${frame}`],
+      cell: {
+        columns: sourceFrames,
+        rows: AUTHORED_DIRECTIONS.length,
+        column: frame % sourceFrames,
+        row: dir,
+      },
+    })),
+  ]));
 }
 
 function iconCutouts(
@@ -301,6 +360,80 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       bottom: 0.97,
     }))),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
+    source: `art/hd/frames/units/scout-dir-${dir}-cutout-v3.png`,
+    frames: Array.from({ length: 2 }, (_, frame) => `unit/lightCavalry/idle/${dir}/${frame}`),
+    fitWidth: 0.96,
+    fitHeight: 0.96,
+    bottom: 0.97,
+    stableSize: [68, 80],
+    teamColor: 'blue',
+  })),
+  ...([0, 1, 2, 3, 4] as const).flatMap((dir) =>
+    Array.from({ length: 8 }, (_, frame): CutoutSpec => ({
+      source: `art/hd/frames/units/scout-walk-dir-${dir}-frame-${frame}-cutout-v4.png`,
+      frames: [`unit/lightCavalry/walk/${dir}/${frame}`],
+      fitWidth: 0.96,
+      fitHeight: 0.96,
+      bottom: 0.97,
+      stableSize: [68, 80],
+      teamColor: 'blue',
+    }))),
+  ...walkGridCutouts(
+    'art/hd/frames/units/champion-walk-grid-cutout-v1.png',
+    ['militia', 'manAtArms', 'longswordsman', 'champion'],
+    { stableSize: [84, 88] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/pikeman-walk-grid-cutout-v1.png',
+    ['spearman', 'pikeman'],
+    { stableSize: [104, 90] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/longbowman-walk-grid-cutout-v1.png',
+    ['archer', 'longbowman', 'eliteLongbowman'],
+    { stableSize: [104, 90] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/crossbowman-walk-grid-cutout-v1.png',
+    ['crossbowman', 'arbalester'],
+    { stableSize: [92, 90] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/skirmisher-walk-grid-cutout-v1.png',
+    ['skirmisher', 'eliteSkirmisher'],
+    { stableSize: [104, 90] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/highland-raider-walk-grid-cutout-v1.png',
+    ['highlandRaider', 'eliteHighlandRaider'],
+    { stableSize: [104, 96] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/paladin-walk-grid-cutout-v1.png',
+    ['knight', 'cavalier', 'paladin'],
+    { stableSize: [120, 104], walkFrames: 8 },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/monk-walk-grid-cutout-v1.png',
+    ['monk'],
+    { stableSize: [84, 90], teamColor: 'sash' },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/siege-ram-roll-grid-cutout-v1.png',
+    ['batteringRam', 'cappedRam', 'siegeRam'],
+    { stableSize: [144, 112] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/onager-roll-grid-cutout-v1.png',
+    ['mangonel', 'onager'],
+    { stableSize: [144, 112] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/trebuchet-roll-grid-cutout-v1.png',
+    ['trebuchet'],
+    { stableSize: [160, 128] },
+  ),
+  ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/sheep-dir-${dir}-cutout-v3.png`,
     frames: Array.from({ length: 2 }, (_, frame) => `obj/sheep/idle/${dir}/${frame}`),
     fitWidth: 0.94,
@@ -365,10 +498,13 @@ for (const spec of CUTOUT_SPECS) {
   }
 }
 
+const GATE_LAYER_NAMES = ['bld/gate/open', 'bld/gate/door'] as const;
+
 const BESPOKE_FRAMES = new Set([
   HERO_FRAME,
   ...CUTOUT_SPECS.flatMap((spec) => spec.frames),
   ...CONSTRUCTION_CUTOUTS.map((entry) => entry.name),
+  ...GATE_LAYER_NAMES,
 ]);
 
 type Point = readonly [number, number];
@@ -422,13 +558,27 @@ function heroFrame(): { frame: FrameDef; masked: number } {
 
 interface AlphaBounds { left: number; top: number; right: number; bottom: number }
 
-function alphaBounds(png: PNG): AlphaBounds {
-  let left = png.width;
-  let top = png.height;
+function cellBounds(png: PNG, spec: CutoutSpec): AlphaBounds {
+  if (!spec.cell) return { left: 0, top: 0, right: png.width - 1, bottom: png.height - 1 };
+  const { columns, rows, column, row } = spec.cell;
+  if (columns < 1 || rows < 1 || column < 0 || column >= columns || row < 0 || row >= rows) {
+    throw new Error(`invalid ${columns}x${rows} grid cell ${column},${row} for ${spec.source}`);
+  }
+  return {
+    left: Math.round((column * png.width) / columns),
+    top: Math.round((row * png.height) / rows),
+    right: Math.round(((column + 1) * png.width) / columns) - 1,
+    bottom: Math.round(((row + 1) * png.height) / rows) - 1,
+  };
+}
+
+function alphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
+  let left = region.right + 1;
+  let top = region.bottom + 1;
   let right = -1;
   let bottom = -1;
-  for (let y = 0; y < png.height; y++) {
-    for (let x = 0; x < png.width; x++) {
+  for (let y = region.top; y <= region.bottom; y++) {
+    for (let x = region.left; x <= region.right; x++) {
       if (png.data[(y * png.width + x) * 4 + 3] < 8) continue;
       left = Math.min(left, x);
       top = Math.min(top, y);
@@ -477,7 +627,8 @@ function bilinearPixel(png: PNG, x: number, y: number): readonly [number, number
 /** Fit an authored transparent render into the exact mechanical frame contract. */
 function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
   const png = PNG.sync.read(readFileSync(join(ROOT, spec.source)));
-  const bounds = alphaBounds(png);
+  const region = cellBounds(png, spec);
+  const bounds = alphaBounds(png, region);
   const sourceWidth = bounds.right - bounds.left + 1;
   const sourceHeight = bounds.bottom - bounds.top + 1;
   // Mechanical source animations are aggressively trimmed per pose. Authored
@@ -486,7 +637,7 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
   const authoredVillager = name.startsWith('unit/villager/');
   const authoredScout = name.startsWith('unit/scout/');
   const authoredTree = name.startsWith('obj/tree/');
-  const stableUnitSize: readonly [number, number] | null = authoredVillager
+  const stableUnitSize: readonly [number, number] | null = spec.stableSize ?? (authoredVillager
     ? /\/(chop|farm|forage|mine|build)\//.test(name)
       ? [64, 80]
       : name.includes('/attack/')
@@ -496,7 +647,7 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
         : [52, 64]
     : name.startsWith('unit/scout/')
       ? [68, 80]
-      : null;
+      : null);
   const width = stableUnitSize?.[0] ?? (authoredTree ? 144 : base.raster.width * HD_DENSITY);
   const height = stableUnitSize?.[1] ?? (authoredTree ? 192 : base.raster.height * HD_DENSITY);
   const fittedScale = Math.min(
@@ -507,7 +658,8 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
   const drawWidth = Math.max(1, Math.round(sourceWidth * scale));
   const drawHeight = Math.max(1, Math.round(sourceHeight * scale));
   const centeredDx = Math.round((width - drawWidth) / 2);
-  const registeredDx = Math.round(width / 2 - (png.width / 2 - bounds.left) * scale);
+  const sourceCenterX = (region.left + region.right + 1) / 2;
+  const registeredDx = Math.round(width / 2 - (sourceCenterX - bounds.left) * scale);
   const dx = spec.preserveSourceCenter
     ? Math.max(0, Math.min(width - drawWidth, registeredDx))
     : centeredDx;
@@ -521,6 +673,7 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
   const bottom = Math.round(height * (spec.bottom ?? 0.95)) + motionBob;
   const dy = bottom - drawHeight;
   const raster = new Raster(width, height);
+  let authoredMaskPixels = 0;
   const decayFrame = name.match(/\/decay\/\d\/(\d+)$/);
   const frameOpacity = decayFrame ? [0.76, 0.52, 0.3][Number(decayFrame[1])] ?? 0.3 : 1;
   for (let y = 0; y < drawHeight; y++) {
@@ -534,11 +687,32 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
         g = luma;
         b = luma;
       }
+      if (spec.teamColor === 'blue' && a > 8 && b > 55 && b - r > 18 && b - g > 6) {
+        const brightness = Math.max(r, g, b);
+        [r, g, b] = brightness >= 176
+          ? [255, 0, 255]
+          : brightness >= 96
+            ? [204, 0, 204]
+            : [153, 0, 153];
+        authoredMaskPixels++;
+      }
       a = Math.round(a * frameOpacity);
       if (a > 0) raster.set(dx + x, dy + y, [r, g, b], a);
     }
   }
-  if (authoredVillager) {
+  const needsAuthoredSash = spec.teamColor === 'sash'
+    || (spec.teamColor === 'blue' && authoredMaskPixels < 8);
+  if (needsAuthoredSash) {
+    const sashY = Math.round(dy + drawHeight * 0.52);
+    const sashHalfWidth = Math.max(2, Math.round(drawWidth * 0.2));
+    const sashCenter = Math.round(dx + drawWidth / 2);
+    for (let y = sashY; y < sashY + 3; y++) {
+      for (let x = sashCenter - sashHalfWidth; x <= sashCenter + sashHalfWidth; x++) {
+        const [, , , a] = raster.get(x, y);
+        if (a > 24) raster.set(x, y, y === sashY ? [255, 0, 255] : [204, 0, 204], a);
+      }
+    }
+  } else if (authoredVillager) {
     // A stable generated sash follows the resized body. Reusing the aggressively
     // trimmed mechanical mask put detached blue pixels beside wider carry poses.
     const sashY = Math.round(dy + drawHeight * (name.includes('/attack/') ? 0.6 : 0.52));
@@ -588,6 +762,37 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
         ? { x: base.anchor.x * HD_DENSITY, y: base.anchor.y * HD_DENSITY }
         : undefined;
   return { name, raster, ...(anchor ? { anchor } : {}) };
+}
+
+/**
+ * Split the approved gate render into a permanent stone gatehouse and a moving
+ * wooden door. The source artwork is kept pixel-identical outside the arched
+ * opening; when the door layer is at y=0 the two layers reproduce `done`.
+ */
+function gateLayerFrames(closed: FrameDef): FrameDef[] {
+  const open = closed.raster.clone();
+  const door = new Raster(open.width, open.height);
+  const cx = Math.round(open.width / 2);
+  const halfWidth = Math.max(5, Math.round(open.width * 0.066));
+  const top = Math.round(open.height * 0.61);
+  const archCy = top + halfWidth;
+  const bottom = Math.round(open.height * 0.86);
+
+  for (let y = top; y <= bottom; y++) {
+    for (let x = cx - halfWidth; x <= cx + halfWidth; x++) {
+      const dx = x - cx;
+      const inArch = y >= archCy || dx * dx + (y - archCy) * (y - archCy) <= halfWidth * halfWidth;
+      if (!inArch || open.alphaAt(x, y) === 0) continue;
+      const [r, g, b, a] = open.get(x, y);
+      door.set(x, y, [r, g, b], a);
+      open.clear(x, y);
+    }
+  }
+
+  return [
+    { name: GATE_LAYER_NAMES[0], raster: open, anchor: closed.anchor },
+    { name: GATE_LAYER_NAMES[1], raster: door, anchor: closed.anchor },
+  ];
 }
 
 function constructionFrame(
@@ -713,12 +918,15 @@ const cutouts = CUTOUT_SPECS.flatMap((spec) => spec.frames.map((name) => {
   if (!base) throw new Error(`missing mechanical source frame for cutout ${name}`);
   return cutoutFrame(spec, name, base);
 }));
+const gateClosed = cutouts.find((frame) => frame.name === 'bld/gate/done');
+if (!gateClosed) throw new Error('missing approved closed gate cutout');
+const gateLayers = gateLayerFrames(gateClosed);
 const constructions = CONSTRUCTION_CUTOUTS.map((entry) => {
   const base = sourceByName.get(entry.name);
   if (!base) throw new Error(`missing mechanical source frame for construction ${entry.name}`);
   return constructionFrame(entry, base, materials);
 });
-const bespokeFrames = [hero.frame, ...cutouts, ...constructions];
+const bespokeFrames = [hero.frame, ...cutouts, ...gateLayers, ...constructions];
 const bespokeGroups = atlasGroups(bespokeFrames);
 bespokeGroups.forEach((group, index) => {
   const stem = `hero-redrawn-${index}`;
