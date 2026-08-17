@@ -163,10 +163,12 @@ reference, then balanced by playtesting loops.
   double-tap window *expands* the selection to all of that type on screen. Band-select =
   **long-press on ground, then drag** the box — it never depends on precisely hitting a tiny
   sprite (long-press without dragging opens the alternate command menu instead, see below).
-  **Deselect** = tap the ✕ on the current-selection panel, or **two-finger tap** anywhere.
+  **Deselect** = tap empty ground, tap the 44 px ✕ on the current-selection panel, or
+  **two-finger tap** anywhere.
   Tapping an enemy with nothing selected inspects it (stats panel), never issues a command.
-- **Commands**: tap ground/enemy with a selection = context command (move / attack / gather /
-  build / garrison) — the "right-click" of AoE2 becomes "tap with intent inferred". Intent
+- **Commands**: movement on touch is deliberate: tap the **Move** flag in the command card,
+  then tap a destination. Tapping a target with a selection remains a context command (attack /
+  gather / build / garrison) — the "right-click" of AoE2 becomes "tap with intent inferred". Intent
   inference uses a tap-slop radius with snap priority **enemy unit > resource/Gaia > own
   building > ground**, so fat fingers resolve toward the likeliest target. Every issued
   command shows a brief **undo toast** (~2 s) that reverts the order — the mis-tap safety net.

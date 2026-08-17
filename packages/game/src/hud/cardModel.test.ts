@@ -363,19 +363,22 @@ describe('queueStacks', () => {
 });
 
 describe('unitVerbButtons', () => {
-  it('military selection: attack-move toggle (active when armed), stop, garrison', () => {
+  it('military selection: explicit move, attack-move toggle, stop, garrison', () => {
     const sel = [ent({ defId: 'militia' })];
     const idle = unitVerbButtons(sel, null);
-    expect(idle.map((b) => b.id)).toEqual(['attackMove', 'stop', 'garrison']);
-    expect(idle[0].active).toBe(false);
+    expect(idle.map((b) => b.id)).toEqual(['move', 'attackMove', 'stop', 'garrison']);
+    expect(idle[1].active).toBe(false);
     const armed = unitVerbButtons(sel, 'attackMove');
-    expect(armed[0].active).toBe(true);
+    expect(armed[1].active).toBe(true);
     // garrison enabled-ness tracks the wave-2 gate
-    expect(idle[2].enabled).toBe(!PENDING_COMMAND_KINDS.has('garrison'));
+    expect(idle[3].enabled).toBe(!PENDING_COMMAND_KINDS.has('garrison'));
   });
 
-  it('villager-only selection: no attack-move, but stop + garrison', () => {
-    const ids = unitVerbButtons([ent({ defId: 'villager' })], null).map((b) => b.id);
+  it('villager-only selection: explicit move, no attack-move, plus stop + garrison', () => {
+    const buttons = unitVerbButtons([ent({ defId: 'villager' })], 'move');
+    const ids = buttons.map((b) => b.id);
+    expect(ids).toContain('move');
+    expect(buttons.find((b) => b.id === 'move')?.active).toBe(true);
     expect(ids).not.toContain('attackMove');
     expect(ids).toContain('stop');
     expect(ids).toContain('garrison');

@@ -60,8 +60,8 @@ describe('resolveTapAction — units selected', () => {
     expect(resolveTapAction([res, own], UNIT_SEL, HUMAN)).toEqual({ type: 'command' });
   });
 
-  it('ground tap: command with units selected, nothing without a selection', () => {
-    expect(resolveTapAction([], UNIT_SEL, HUMAN)).toEqual({ type: 'command' });
+  it('ground tap: deselects units instead of issuing an accidental move', () => {
+    expect(resolveTapAction([], UNIT_SEL, HUMAN)).toEqual({ type: 'deselect' });
     expect(resolveTapAction([], NO_SEL, HUMAN)).toEqual({ type: 'none' });
   });
 

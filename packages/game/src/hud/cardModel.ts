@@ -49,7 +49,7 @@ export interface CardButtonModel {
 }
 
 /** Verbs that arm a "next tap = target" flow (GDD alternate-command semantics). */
-export type ArmedVerb = 'attackMove' | 'garrison' | 'convert' | 'heal';
+export type ArmedVerb = 'move' | 'attackMove' | 'garrison' | 'convert' | 'heal';
 
 export interface VerbButtonModel extends CardButtonModel {
   verb?: ArmedVerb;
@@ -353,7 +353,7 @@ const pendingVerb = (kind: 'attack' | 'garrison' | 'convert' | 'heal'): boolean 
 
 /**
  * Verb buttons for a unit selection (military and/or villagers):
- * attack-move toggle, stop, garrison-into-target, monk convert/heal,
+ * explicit move target, attack-move toggle, stop, garrison-into-target, monk convert/heal,
  * trebuchet pack/unpack, per GDD Mobile UX. Arming verbs stay disabled while
  * their sim command is wave-2-pending (the armed tap would be dropped).
  */
@@ -371,6 +371,15 @@ export function unitVerbButtons(sel: readonly Entity[], armed: ArmedVerb | null)
   const packers = units.filter((e) => !!gameData.units[e.defId]?.pack);
   const out: VerbButtonModel[] = [];
 
+  out.push({
+    id: 'move', verb: 'move',
+    // The rally flag is already the game's established destination marker and
+    // reads clearly at 40 px; reuse it instead of introducing a near-duplicate.
+    icon: 'icon/cmd/rally',
+    enabled: true,
+    active: armed === 'move',
+    tip: 'Move\nNext tap = move there',
+  });
   if (military.length > 0) {
     out.push({
       id: 'attackMove', verb: 'attackMove',

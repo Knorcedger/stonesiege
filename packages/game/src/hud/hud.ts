@@ -66,7 +66,7 @@ export interface HudHost {
   stopSelection(): void;
   /** Trebuchets: pack (fold to move) or unpack (deploy to fire) the selected trebs. */
   packSelection(pack: boolean): void;
-  /** Toggle an armed "next tap = target" verb (attack-move / garrison / convert / heal). */
+  /** Toggle an armed "next tap = target" verb (move / attack-move / garrison / convert / heal). */
   armVerb(verb: ArmedVerb): void;
   getArmedVerb(): ArmedVerb | null;
   setFormation(formation: Formation): void;
@@ -136,7 +136,7 @@ const HUD_CSS = `
 .bf-rightcluster { position:absolute; right:6px; bottom:6px; width:264px; display:flex; flex-direction:column; align-items:stretch; gap:6px; pointer-events:none; }
 .bf-selpanel { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-selpanel.show { display:block; }
-.bf-selrow { display:flex; gap:8px; align-items:center; }
+.bf-selrow { display:flex; gap:8px; align-items:center; padding-right:36px; }
 .bf-selrow canvas { width:40px; height:40px; image-rendering:auto; border:1px solid #8A6414; }
 .bf-selicon.mixed { width:40px; height:40px; display:grid; grid-template-columns:repeat(2,19px); grid-auto-rows:19px; gap:2px; }
 .bf-selicon.mixed canvas { box-sizing:border-box; width:19px; height:19px; }
@@ -148,7 +148,7 @@ const HUD_CSS = `
 .bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:14px/1.05 "VT323",monospace; }
 .bf-selstats:empty { display:none; }
 .bf-selstat strong { color:#E6C04A; font-weight:normal; }
-.bf-x { position:absolute; top:2px; right:2px; width:22px; height:22px; padding:0; line-height:18px; font-size:14px; }
+.bf-x { position:absolute; top:0; right:0; box-sizing:border-box; width:44px; height:44px; padding:0; line-height:40px; font-size:20px; touch-action:manipulation; }
 .bf-card { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-card.show { display:block; }
 .bf-cardtitle { font-size:13px; color:#C29422; margin:0 0 6px 2px; letter-spacing:1px; }
@@ -541,6 +541,7 @@ export class Hud {
     const x = document.createElement('button');
     x.className = 'bf-btn bf-x';
     x.textContent = '✕';
+    x.setAttribute('aria-label', 'Deselect current selection');
     setGameTooltip(x, 'Deselect');
     x.addEventListener('click', () => this.host.deselect());
     this.selPanel.appendChild(x);
@@ -1128,7 +1129,7 @@ export class Hud {
 
     if (units.length > 0) {
       if (villagers.length === 0) this.cardTitle.textContent = 'Commands';
-      // attack-move / stop / garrison / convert / heal / pack (cardModel decides
+      // move / attack-move / stop / garrison / convert / heal / pack (cardModel decides
       // visibility per selection contents and wave-2 enabled-ness)
       for (const vb of unitVerbButtons(units, this.host.getArmedVerb())) {
         const onClick = vb.id === 'stop'
