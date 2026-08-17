@@ -380,7 +380,10 @@ export function unitVerbButtons(sel: readonly Entity[], armed: ArmedVerb | null)
       tip: 'Attack-move\nNext tap = attack-move there',
     });
   }
-  out.push({ id: 'stop', icon: 'icon/cmd/stop', enabled: true, tip: 'Stop' });
+  out.push({
+    id: 'stop', icon: 'icon/cmd/stop', enabled: true,
+    tip: 'Stop\nCancel current orders and stand still',
+  });
   {
     const enabled = !pendingVerb('garrison');
     out.push({
@@ -389,7 +392,7 @@ export function unitVerbButtons(sel: readonly Entity[], armed: ArmedVerb | null)
       enabled,
       active: armed === 'garrison',
       reason: enabled ? undefined : `garrison ${WAVE2_REASON}`,
-      tip: 'Garrison\nNext tap on a building = garrison inside',
+      tip: 'Garrison\nNext tap a friendly building to send the selected units inside',
     });
   }
   if (monks.length > 0) {

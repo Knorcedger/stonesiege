@@ -1135,7 +1135,7 @@ export class Hud {
       if ((def?.trains?.length ?? 0) > 0) {
         this.addButton(
           'icon/cmd/rally',
-          'Set rally point\nThen tap the destination',
+          'Set rally point\nNext tap chooses where newly trained units will travel',
           true,
           this.host.getArmedVerb() === 'rally',
           () => this.host.armVerb('rally'),
@@ -1320,7 +1320,7 @@ export class Hud {
     if ((def?.trains?.length ?? 0) > 0) {
       this.addButton(
         'icon/cmd/rally',
-        'Set rally point\nThen tap the destination',
+        'Set rally point\nNext tap chooses where newly trained units will travel',
         true,
         this.host.getArmedVerb() === 'rally',
         () => this.host.armVerb('rally'),
@@ -1553,6 +1553,7 @@ export class Hud {
     shiftRepeat = 1,
   ): void {
     const btn = document.createElement('button');
+    let lastPointerType: string | null = null;
     btn.className = 'bf-cmdbtn' + (active ? ' active' : '') + (enabled ? '' : ' disabled');
     // class instead of the disabled attribute: disabled buttons still receive the
     // tap so we can surface WHY they are disabled (cost / wave-2 gating)
@@ -1580,12 +1581,26 @@ export class Hud {
     const fullTip = enabled ? tooltip : `${tooltip}\n(${disabledReason ?? 'not enough resources'})`;
     const displayedTip = hotkey ? `[${hotkey.toUpperCase()}] ${fullTip}` : fullTip;
     setGameTooltip(btn, displayedTip);
+    btn.addEventListener('pointerdown', (event) => {
+      lastPointerType = event.pointerType;
+    });
     btn.addEventListener('click', (event) => {
       if (enabled) {
         const repeats = commandRepeatCount(event.shiftKey, shiftRepeat);
         for (let i = 0; i < repeats; i++) onClick();
+
+        // Touch has no persistent hover. Arming Rally/Garrison also rebuilds
+        // the command card, which used to erase the pointer tooltip instantly.
+        // Wait for that rebuild, then explain the action beside the fresh card.
+        if (lastPointerType !== null && lastPointerType !== 'mouse') {
+          requestAnimationFrame(() => requestAnimationFrame(() => {
+            if (!this.card.classList.contains('show')) return;
+            this.showTip(displayedTip, btn.isConnected ? btn : this.card);
+          }));
+        }
       }
       else this.showTip(displayedTip, btn);
+      lastPointerType = null;
     });
     this.cardGrid.appendChild(btn);
   }

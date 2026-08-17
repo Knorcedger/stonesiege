@@ -375,11 +375,14 @@ describe('unitVerbButtons', () => {
   });
 
   it('villager-only selection: no move/attack-move buttons, but stop + garrison', () => {
-    const ids = unitVerbButtons([ent({ defId: 'villager' })], null).map((b) => b.id);
+    const buttons = unitVerbButtons([ent({ defId: 'villager' })], null);
+    const ids = buttons.map((b) => b.id);
     expect(ids).not.toContain('move');
     expect(ids).not.toContain('attackMove');
     expect(ids).toContain('stop');
     expect(ids).toContain('garrison');
+    expect(buttons.find((b) => b.id === 'stop')?.tip).toContain('Cancel current orders');
+    expect(buttons.find((b) => b.id === 'garrison')?.tip).toContain('friendly building');
   });
 
   it('monks add convert + heal', () => {
