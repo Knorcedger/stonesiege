@@ -14,6 +14,16 @@ import {
   wallaceChapter09, wallaceChapter10, wallaceChapter11, wallaceChapter12,
 } from './scenarios/wallaceChapters';
 import { showcaseCitadel } from './scenarios/showcaseCitadel';
+import {
+  alexiosCampaign,
+  genghisCampaign,
+  hardradaCampaign,
+  henryCampaign,
+  joanCampaign,
+  legendaryCampaigns,
+  legendaryScenarios,
+  saladinCampaign,
+} from './scenarios/legendaryCampaigns';
 
 export const wallaceCampaign: CampaignDef = {
   id: 'wallace',
@@ -38,11 +48,14 @@ export {
   wallaceChapter01, wallaceChapter02, wallaceChapter03, wallaceChapter04,
   wallaceChapter05, wallaceChapter06, wallaceChapter07, wallaceChapter08,
   wallaceChapter09, wallaceChapter10, wallaceChapter11, wallaceChapter12,
+  henryCampaign, hardradaCampaign, joanCampaign, genghisCampaign, alexiosCampaign, saladinCampaign,
+  legendaryScenarios,
 };
 
 /** Authored ScenarioDefs by id, in campaign order. */
 export const scenariosById: Record<string, ScenarioDef> = {
   ...Object.fromEntries(wallaceChapters.map((scenario) => [scenario.id, scenario])),
+  ...Object.fromEntries(legendaryScenarios.map((scenario) => [scenario.id, scenario])),
   // Legacy ids stay loadable for old saved matches and deep links. They are no longer
   // shown in the campaign sequence; progress.ts migrates their completion state.
   [wallace1.id]: wallace1,
@@ -56,4 +69,5 @@ export const scenariosById: Record<string, ScenarioDef> = {
 
 export const campaigns: Record<string, CampaignDef> = {
   [wallaceCampaign.id]: wallaceCampaign,
+  ...Object.fromEntries(legendaryCampaigns.map((campaign) => [campaign.id, campaign])),
 };

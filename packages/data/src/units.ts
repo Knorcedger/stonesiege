@@ -586,18 +586,39 @@ export const units: Record<string, UnitDef> = {
   heroWarenne: heroDef('heroWarenne', 'John de Warenne', 200, 12, 'knight'),
   heroEdward: heroDef('heroEdward', 'Edward Longshanks', 250, 16, 'paladin'),
   heroValence: heroDef('heroValence', 'Aymer de Valence', 200, 14, 'knight'),
+
+  // ----------------------------------------- legendary campaign protagonists
+  // These use the closest existing battlefield rig while retaining hero-only stats.
+  // Henry and Hardrada fought on foot in their defining battles; the remaining
+  // commanders use mounted rigs appropriate to their campaign identity.
+  heroHenryV: heroDef('heroHenryV', 'Henry V', 240, 16, 'champion'),
+  heroHardrada: heroDef('heroHardrada', 'Harald Hardrada', 250, 17, 'champion'),
+  heroJoan: heroDef('heroJoan', 'Joan of Arc', 220, 14, 'paladin', ['cavalry', 'uniqueUnit'], 1.35),
+  heroGenghis: heroDef('heroGenghis', 'Temüjin (Chinggis Khan)', 230, 15, 'scout', ['cavalry', 'archer', 'uniqueUnit'], 1.45, 4),
+  heroAlexios: heroDef('heroAlexios', 'Alexios I Komnenos', 260, 16, 'cavalier', ['cavalry', 'uniqueUnit'], 1.32),
+  heroSaladin: heroDef('heroSaladin', 'Saladin', 250, 16, 'lightCavalry', ['cavalry', 'uniqueUnit'], 1.4),
 };
 
 /** Campaign hero scaffold: boosted infantry-class stats, unconvertible, untrainable. */
-function heroDef(id: string, name: string, hp: number, attack: number, sprite: string): UnitDef {
+function heroDef(
+  id: string,
+  name: string,
+  hp: number,
+  attack: number,
+  sprite: string,
+  classes: UnitDef['classes'] = ['infantry', 'uniqueUnit'],
+  speed = 0.96,
+  range = 0,
+): UnitDef {
   return {
     id, name, age: 'dark',
     trainedAt: [], cost: {}, trainTime: 0, // never trainable; scenario-placed only
     hp,
-    attacks: [{ cls: 'melee', amount: attack }],
+    attacks: [{ cls: range > 0 ? 'pierce' : 'melee', amount: attack }],
     armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 1 }],
-    range: 0, rof: 2, speed: 0.96, los: 6,
-    classes: ['infantry', 'uniqueUnit'],
+    range, rof: 2, speed, los: range > 0 ? 8 : 6,
+    ...(range > 0 ? { projectileSpeed: 7, accuracy: 85 } : {}),
+    classes,
     conversionResist: 100, // heroes cannot be converted
     icon: `icon/${sprite}`,
     sprite,
