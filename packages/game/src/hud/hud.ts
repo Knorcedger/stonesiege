@@ -149,6 +149,8 @@ const HUD_CSS = `
 .bf-selcarry canvas { width:22px; height:22px; border:0; image-rendering:auto; }
 .bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:14px/1.05 "VT323",monospace; }
 .bf-selstats:empty { display:none; }
+.bf-selstat { min-width:0; white-space:nowrap; cursor:help; outline:none; }
+.bf-selstat:focus-visible { box-shadow:0 1px 0 #E6C04A; }
 .bf-selstat strong { color:#E6C04A; font-weight:normal; }
 .bf-x { position:absolute; top:0; right:0; box-sizing:border-box; width:44px; height:44px; padding:0; line-height:40px; font-size:20px; touch-action:manipulation; }
 .bf-card { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
@@ -907,20 +909,31 @@ export class Hud {
     } else if (first.kind === 'unit') {
       const stats = this.host.getUnitStats(first.player, first.defId);
       if (stats) {
-        const values: Array<[string, string]> = [
-          ['ATK', formatStat(stats.attack)],
-          ['ARM', `${formatStat(stats.meleeArmor)}/${formatStat(stats.pierceArmor)}`],
-          ['RNG', formatStat(stats.range)],
-          ['SPD', formatStat(stats.speed)],
-          ['LOS', formatStat(stats.los)],
-          ['ROF', `${formatStat(stats.rofSeconds)}s`],
+        const values: Array<[label: string, value: string, explanation: string]> = [
+          ['Attack', formatStat(stats.attack), 'Damage dealt by each hit before armor and bonuses.'],
+          [
+            'Armor',
+            `${formatStat(stats.meleeArmor)}/${formatStat(stats.pierceArmor)}`,
+            'Melee armor / pierce armor. Each number reduces that damage type per hit.',
+          ],
+          ['Range', formatStat(stats.range), 'Maximum attack distance, measured in tiles.'],
+          ['Speed', formatStat(stats.speed), 'Movement speed, measured in tiles per second.'],
+          ['Line of Sight', formatStat(stats.los), 'How far this unit can see through fog, measured in tiles.'],
+          ['Rate of Fire', `${formatStat(stats.rofSeconds)}s`, 'Seconds between attacks. Lower is faster.'],
         ];
-        const key = values.flat().join('|');
+        const key = values.flatMap(([label, value]) => [label, value]).join('|');
         if (this.selStats.dataset.key !== key) {
           this.selStats.dataset.key = key;
-          this.selStats.innerHTML = values
-            .map(([label, value]) => `<span class="bf-selstat"><strong>${label}</strong> ${value}</span>`)
-            .join('');
+          this.selStats.replaceChildren(...values.map(([label, value, explanation]) => {
+            const item = document.createElement('span');
+            item.className = 'bf-selstat';
+            item.tabIndex = 0;
+            const heading = document.createElement('strong');
+            heading.textContent = label;
+            item.append(heading, ` ${value}`);
+            setGameTooltip(item, `${label}: ${value}\n${explanation}`);
+            return item;
+          }));
         }
       } else {
         delete this.selStats.dataset.key;
