@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from 'vitest';
 import { autoOpenObjectives, ObjectivesModel } from './objectives';
-import { CHIPS_NARROW_MAX_PX } from './layout';
+import { HUD_NARROW_MAX_PX } from './layout';
 
 describe('ObjectivesModel', () => {
   it('keeps insertion order and dedupes by id', () => {
@@ -39,8 +39,8 @@ describe('autoOpenObjectives', () => {
   });
 
   it('auto-opens above the chip strip breakpoint, where they cannot collide', () => {
-    expect(autoOpenObjectives(CHIPS_NARROW_MAX_PX)).toBe(false);
-    expect(autoOpenObjectives(CHIPS_NARROW_MAX_PX + 1)).toBe(true);
+    expect(autoOpenObjectives(HUD_NARROW_MAX_PX)).toBe(false);
+    expect(autoOpenObjectives(HUD_NARROW_MAX_PX + 1)).toBe(true);
     expect(autoOpenObjectives(1280)).toBe(true);
   });
 });

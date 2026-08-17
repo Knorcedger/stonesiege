@@ -29,7 +29,7 @@ import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
-import { CHIPS_HEIGHT_PX, CHIPS_NARROW_MAX_PX, CHIPS_TOP_NARROW_PX, CHIPS_TOP_PX } from './layout';
+import { HUD_NARROW_MAX_PX } from './layout';
 import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
 import type { UnitDisplayStats } from '../simBridge';
@@ -83,6 +83,8 @@ export interface HudHost {
   playUiSound(): void;
   /** Back to the title screen — the pause overlay's exit while spectating a finished match. */
   returnToTitle(): void;
+  /** Persist the current resumable match snapshot on this device immediately. */
+  saveGame(): void;
   /** Idle-unit badges (GDD: touch answer to AoE2's `.` hotkey). */
   getIdleCounts(): Record<IdleCategory, number>;
   cycleIdle(cat: IdleCategory): void;
@@ -222,6 +224,11 @@ const HUD_CSS = `
 .bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:42px; color:#E6C04A; margin:0; }
 /* in-match settings (same controls as the menu screen — see settingsUi.ts) */
 .bf-pausesettings { width:min(320px, 88vw); text-align:left; }
+.bf-pausesection { box-sizing:border-box; width:min(320px,88vw); padding:10px 12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
+.bf-pausetitle { color:#E6C04A; font:15px/1 "Pixelify Sans",monospace; letter-spacing:1px; }
+.bf-pausehint { margin-top:5px; font:14px/1.25 "VT323",monospace; }
+.bf-pausesaverow { display:flex; align-items:center; gap:10px; margin-top:8px; }
+.bf-pausestate { color:#E6C04A; font:15px/1 "VT323",monospace; }
 .bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }
 .bf-help.show { display:flex; }
 .bf-helpbox { box-sizing:border-box; width:min(430px,calc(100vw - 24px)); margin:auto; padding:20px; }
@@ -233,26 +240,22 @@ const HUD_CSS = `
 .bf-helpstate { color:#E6C04A; font:18px/1 "VT323",monospace; }
 .bf-place { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:8px 10px; display:none; gap:10px; pointer-events:auto; }
 .bf-place.show { display:flex; }
-/* top-center: the only HUD region that never collides with minimap (168px, bottom-left),
-   command card (bottom-right) or the placement bar (bottom-center) on phone widths.
-   Geometry comes from hud/layout.ts — the message banner and objectives panel
-   position themselves below/around the strip from the same constants. */
-.bf-chips { position:absolute; left:50%; top:${CHIPS_TOP_PX}px; transform:translateX(-50%); display:flex; gap:6px; pointer-events:auto; }
+/* Control groups live in Pause: useful on demand without permanently covering the battlefield. */
+.bf-chips { display:flex; justify-content:center; gap:6px; margin-top:8px; pointer-events:auto; }
 .bf-chips.hide { display:none; }
-.bf-chip { position:relative; width:${CHIPS_HEIGHT_PX}px; height:${CHIPS_HEIGHT_PX}px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
+.bf-chip { position:relative; width:44px; height:44px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
 .bf-chip.empty { background:#3a2a18; color:#B99A6B; border-color:#64492B; box-shadow:none; }
 .bf-chipcount { position:absolute; right:3px; bottom:1px; font-size:14px; color:#64492B; }
 /* ---- narrow widths (portrait phones): compress the top bar. It may wrap to a
    second row, but every control — the pause button above all — stays on-screen
-   and tappable. Group chips drop below the (possibly two-row) bar. ---- */
-@media (max-width: ${CHIPS_NARROW_MAX_PX}px) {
+   and tappable. ---- */
+@media (max-width: ${HUD_NARROW_MAX_PX}px) {
   .bf-top { flex-wrap:wrap; height:auto; min-height:34px; gap:2px 7px; padding:3px 8px; }
   .bf-res { font-size:14px; gap:2px; }
   .bf-res canvas { width:18px; height:18px; }
   .bf-poplabel { display:none; } /* numerals carry the meaning on phones */
   .bf-age { font-size:13px; letter-spacing:0; }
   .bf-time { min-width:36px; font-size:16px; }
-  .bf-chips { top:${CHIPS_TOP_NARROW_PX}px; }
 }
 /* The 168px minimap and the 246px command card cannot share one <=480px row —
    shrink the minimap so the card's train/build buttons are never covered, and
@@ -314,6 +317,8 @@ export class Hud {
   private quickNavBtns = new Map<'townCenter' | 'barracks', HTMLButtonElement>();
   private chipStrip!: HTMLDivElement;
   private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
+  private pauseGroups!: HTMLDivElement;
+  private groupStatus!: HTMLDivElement;
   private lastCardKey = '';
   private queueProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId; index: number }> = [];
   private utilRow!: HTMLDivElement;
@@ -644,6 +649,40 @@ export class Hud {
     const settings = document.createElement('div');
     settings.className = 'bf-pausesettings';
     buildSettingsControls(settings, { onSliderRelease: () => this.host.playUiSound() });
+
+    const saveSection = document.createElement('div');
+    saveSection.className = 'bf-pausesection';
+    const saveTitle = document.createElement('div');
+    saveTitle.className = 'bf-pausetitle';
+    saveTitle.textContent = 'SAVE GAME';
+    const saveHint = document.createElement('div');
+    saveHint.className = 'bf-pausehint';
+    saveHint.textContent = 'StoneSiege keeps one resumable match locally on this device. It autosaves every 15 seconds and when the app is backgrounded.';
+    const saveRow = document.createElement('div');
+    saveRow.className = 'bf-pausesaverow';
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'bf-btn';
+    saveBtn.textContent = 'Save now';
+    const saveState = document.createElement('span');
+    saveState.className = 'bf-pausestate';
+    saveBtn.addEventListener('click', () => {
+      this.host.saveGame();
+      saveState.textContent = 'Saved locally';
+    });
+    saveRow.append(saveBtn, saveState);
+    saveSection.append(saveTitle, saveHint, saveRow);
+
+    this.pauseGroups = document.createElement('div');
+    this.pauseGroups.className = 'bf-pausesection';
+    const groupTitle = document.createElement('div');
+    groupTitle.className = 'bf-pausetitle';
+    groupTitle.textContent = 'CONTROL GROUPS';
+    const groupHint = document.createElement('div');
+    groupHint.className = 'bf-pausehint';
+    groupHint.textContent = 'Hold a number to assign the currently selected units. Tap an assigned group to select it and resume. These are temporary unit shortcuts, not game saves.';
+    this.groupStatus = document.createElement('div');
+    this.groupStatus.className = 'bf-pausestate';
+    this.pauseGroups.append(groupTitle, groupHint, this.groupStatus);
     // Resign (GDD: a human can resign at any time) — two taps to confirm,
     // because a mis-tap here forfeits the whole match.
     this.resignBtn = document.createElement('button');
@@ -665,7 +704,7 @@ export class Hud {
       this.resetResign();
       this.host.resign();
     });
-    box.append(h, btn, settings, this.resignBtn);
+    box.append(h, btn, saveSection, this.pauseGroups, settings, this.resignBtn);
     this.pauseOverlay.appendChild(box);
     this.pauseOverlay.addEventListener('click', (e) => {
       if (e.target === this.pauseOverlay) this.host.resumeGame();
@@ -767,9 +806,8 @@ export class Hud {
   }
 
   /**
-   * Control-group chips (GDD Mobile UX): long-press an empty chip to save the
-   * current selection, long-press an occupied chip to overwrite it, tap to
-   * reselect, tap the active group again to center the camera on it.
+   * Pause-menu control groups: long-press to assign/overwrite the current
+   * selection; tap a populated group to select it and return to the match.
    */
   private buildGroupChips(): void {
     const LONG_PRESS_MS = 450;
@@ -795,25 +833,30 @@ export class Hud {
         timer = setTimeout(() => {
           longFired = true;
           const saved = this.host.saveGroup(i);
-          this.showUndoToast(saved ? `Group ${i + 1} saved` : 'Select units to save a group', null);
+          this.groupStatus.textContent = saved
+            ? `Group ${i + 1} assigned` : 'Select units before assigning a group';
         }, LONG_PRESS_MS);
       });
       btn.addEventListener('pointerup', () => {
         cancelTimer();
-        if (!longFired) this.host.selectGroup(i);
+        if (!longFired) {
+          if ((this.host.getGroupCounts()[i] ?? 0) === 0) {
+            this.groupStatus.textContent = `Group ${i + 1} is empty`;
+            return;
+          }
+          this.host.selectGroup(i);
+          this.host.resumeGame();
+        }
       });
       btn.addEventListener('pointerleave', cancelTimer);
       btn.addEventListener('pointercancel', cancelTimer);
       this.chipStrip.appendChild(btn);
       this.chipEls.push({ btn, count });
     }
-    this.stage.appendChild(this.chipStrip);
+    this.pauseGroups.appendChild(this.chipStrip);
   }
 
   private updateGroupChips(): void {
-    // hide while placing: placement is a deliberate commit/abort moment (GDD) —
-    // no selection-switching affordances competing with confirm/cancel
-    this.chipStrip.classList.toggle('hide', this.host.getPlacement() !== null);
     const counts = this.host.getGroupCounts();
     this.chipEls.forEach((chip, i) => {
       const n = counts[i] ?? 0;
@@ -821,8 +864,8 @@ export class Hud {
       const text = n > 0 ? String(n) : '';
       if (chip.count.textContent !== text) chip.count.textContent = text;
       setGameTooltip(chip.btn, n > 0
-        ? `Group ${i + 1} (${n}) — tap: select, tap again: center camera, long-press: overwrite`
-        : `Group ${i + 1} — long-press with a selection to save`);
+        ? `Control group ${i + 1} (${n}) — tap to select and resume, hold to overwrite`
+        : `Control group ${i + 1} — hold to assign the current selection`);
     });
   }
 

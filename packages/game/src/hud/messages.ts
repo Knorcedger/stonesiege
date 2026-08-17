@@ -1,9 +1,9 @@
 // Scenario dialogue banner: a queue of speaker+text messages shown one at a
-// time below the control-group chip strip. Auto-dismisses after a reading-time
+// time below the resource bar. Auto-dismisses after a reading-time
 // duration or on tap. The queue model is pure (unit-tested); the DOM view
 // renders whatever the model says is current.
 
-import { belowChipsPx, CHIPS_NARROW_MAX_PX } from './layout';
+import { belowTopBarPx, HUD_NARROW_MAX_PX } from './layout';
 
 export interface ScenarioMessage {
   text: string;
@@ -54,16 +54,14 @@ export class MessageQueue {
 // ------------------------------------------------------------------ DOM view
 
 const MSG_CSS = `
-/* Sits BELOW the control-group chip strip (hud/layout.ts): the banner is
-   tap-to-dismiss with pointer-events:auto, so overlapping the chips turned
-   group-select taps into message dismissals for the length of every wallace-1
-   dialogue burst. Tap-to-dismiss stays limited to the banner's own rect. */
-.bf-msgbanner { position:absolute; left:50%; top:${belowChipsPx(false)}px; transform:translateX(-50%);
+/* Sits below the responsive resource bar; tap-to-dismiss stays limited to the
+   banner's own rect. */
+.bf-msgbanner { position:absolute; left:50%; top:${belowTopBarPx(false)}px; transform:translateX(-50%);
   width:min(560px, 92vw); padding:9px 14px 10px; z-index:28; cursor:pointer; display:none;
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
   border:1px solid #64492B; border-radius:5px; box-shadow:0 0 0 1px #1A1208, 0 4px 16px rgba(0,0,0,0.5);
   font-family:"Pixelify Sans",monospace; pointer-events:auto; }
-@media (max-width: ${CHIPS_NARROW_MAX_PX}px) { .bf-msgbanner { top:${belowChipsPx(true)}px; } }
+@media (max-width: ${HUD_NARROW_MAX_PX}px) { .bf-msgbanner { top:${belowTopBarPx(true)}px; } }
 .bf-msgbanner.show { display:block; animation:bfMsgIn 0.22s ease-out; }
 @keyframes bfMsgIn { from { opacity:0; transform:translate(-50%,-6px); } to { opacity:1; transform:translate(-50%,0); } }
 .bf-msg-speaker { font-size:13px; color:#E6C04A; letter-spacing:1px; margin:0 0 2px; }

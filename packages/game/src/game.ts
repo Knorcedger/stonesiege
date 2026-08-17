@@ -832,7 +832,10 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
       hud.showUndoToast(`${next[0].toUpperCase()}${next.slice(1)} formation`, null);
     },
     getFormation: () => formation,
-    togglePause: () => loop.togglePause(),
+    togglePause: () => {
+      loop.togglePause();
+      if (loop.paused) saveMatch();
+    },
     isPaused: () => loop.paused,
     resumeGame: () => loop.resume(),
     // pause-overlay slider release: the player hears the level they just set
@@ -845,6 +848,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     // commands post-finish, so Resign is swapped for this) — same full reboot
     // the end screen's Return to Title performs
     returnToTitle: () => reloadTo(meta ? { kind: 'scenarioList', campaignId: meta.campaign } : null),
+    saveGame: saveMatch,
     getIdleCounts,
     cycleIdle,
     focusBuilding,

@@ -1,11 +1,11 @@
 // Scenario objectives panel: collapsible parchment list, top-right, fed live
 // by TriggerRuntime host callbacks (add/complete/fail). Completed objectives
 // get a gold check, failed a red cross; new/changed entries flash briefly.
-// On narrow viewports the expanded list would cover the control-group chips,
+// On narrow viewports the expanded list covers too much of the battlefield,
 // so there the panel stays collapsed and flashes its head instead of
 // force-opening (expanding stays a deliberate tap on the head).
 
-import { CHIPS_NARROW_MAX_PX } from './layout';
+import { HUD_NARROW_MAX_PX } from './layout';
 
 export type ObjectiveUiState = 'open' | 'complete' | 'failed';
 
@@ -47,15 +47,11 @@ export class ObjectivesModel {
 }
 
 /**
- * May the panel auto-expand (new objective) without burying the chip strip?
- * The list is right-anchored at width min(250px, 60vw); the chips are centered
- * (up to 4 × 44px + gaps ≈ 194px wide). Their x-ranges overlap for viewports
- * narrower than ~706px, and below the 720px breakpoint the chips sit at
- * y 84..128 — squarely under the expanded list. So: only auto-open above the
- * chip strip's narrow breakpoint, where the two can never collide.
+ * On phone widths, keep new objectives collapsed so the list does not cover a
+ * large fraction of the battlefield. The player can still expand it deliberately.
  */
 export function autoOpenObjectives(viewportWidth: number): boolean {
-  return viewportWidth > CHIPS_NARROW_MAX_PX;
+  return viewportWidth > HUD_NARROW_MAX_PX;
 }
 
 const OBJ_CSS = `
