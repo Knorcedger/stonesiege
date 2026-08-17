@@ -98,11 +98,9 @@ describe('wallace-1 — loads clean', () => {
     expect(meta.briefing.hints).toHaveLength(4);
   });
 
-  it('is registered in the wallace campaign', () => {
-    expect(wallaceCampaign.scenarioIds).toEqual([
-      'wallace-1', 'wallace-2', 'wallace-3', 'wallace-4', 'wallace-5', 'wallace-6',
-    ]);
-    expect(wallaceCampaign.scenarioIds[wallace1.index]).toBe(wallace1.id);
+  it('keeps the original scenario registered for legacy saves', () => {
+    expect(wallaceCampaign.scenarioIds).toHaveLength(12);
+    expect(wallaceCampaign.scenarioIds[0]).toBe('wallace-01-ledger');
     expect(scenariosById['wallace-1']).toBe(wallace1);
   });
 });

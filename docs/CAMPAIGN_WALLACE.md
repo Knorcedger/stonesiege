@@ -1,5 +1,10 @@
 # Campaign: William Wallace — The Rising of Scotland
 
+> Legacy scenario specification. The live campaign now divides these six long maps
+> into twelve focused chapters across five acts; see
+> [`CAMPAIGN_WALLACE_CHAPTERS.md`](./CAMPAIGN_WALLACE_CHAPTERS.md). The original
+> scenario ids remain loadable for existing saved matches.
+
 StoneSiege's first campaign and the game's tutorial arc. Six scenarios follow the historical
 course of the First War of Scottish Independence from the killing of the Sheriff of Lanark
 (May 1297) to Wallace's last defiance (1304–05), teaching the full game progressively:

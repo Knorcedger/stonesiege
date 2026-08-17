@@ -101,6 +101,16 @@ export interface ScenarioDef {
   campaign: string;
   index: number; // order within campaign
   title: string;
+  /** Campaign-menu presentation. Optional so standalone/dev scenarios stay lightweight. */
+  chapter?: {
+    act: string;
+    number: number;
+    date: string;
+    location: string;
+    estimatedMinutes: string;
+    image: string;
+    imageAlt: string;
+  };
   briefing: {
     history: string; // pre-mission story text (shown on briefing screen)
     objectives: string[]; // initial objective list
@@ -120,4 +130,10 @@ export interface CampaignDef {
   title: string;
   description: string;
   scenarioIds: string[]; // in order; completing one unlocks the next
+  acts?: Array<{
+    id: string;
+    title: string;
+    years: string;
+    scenarioIds: string[];
+  }>;
 }

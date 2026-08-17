@@ -7,26 +7,44 @@ import { wallace3 } from './scenarios/wallace3';
 import { wallace4 } from './scenarios/wallace4';
 import { wallace5 } from './scenarios/wallace5';
 import { wallace6 } from './scenarios/wallace6';
+import {
+  wallaceChapters,
+  wallaceChapter01, wallaceChapter02, wallaceChapter03, wallaceChapter04,
+  wallaceChapter05, wallaceChapter06, wallaceChapter07, wallaceChapter08,
+  wallaceChapter09, wallaceChapter10, wallaceChapter11, wallaceChapter12,
+} from './scenarios/wallaceChapters';
 import { showcaseCitadel } from './scenarios/showcaseCitadel';
 
 export const wallaceCampaign: CampaignDef = {
   id: 'wallace',
   title: 'William Wallace — The Rising of Scotland',
   description:
-    'Scotland, 1297. English sheriffs hold Scottish towns and English law hangs Scottish ' +
-    'men — until a commoner from Lanarkshire decides the price of obedience is too high. ' +
-    'Rise from a hillside camp to the head of a nation in arms: learn to gather, build, ' +
-    'and fight; break an army of knights at a narrow bridge; carry the war across the ' +
-    'border; survive the terrible day at Falkirk; and, when every noble has made peace, ' +
-    'teach an empire that one unbroken man is a country. Six scenarios. Its ending, at ' +
-    'least, is all true.',
-  scenarioIds: ['wallace-1', 'wallace-2', 'wallace-3', 'wallace-4', 'wallace-5', 'wallace-6'],
+    'From the killing of the sheriff at Lanark to the victory at Stirling Bridge, the ' +
+    'Guardianship, Falkirk, outlaw years, capture, trial, and execution: play William ' +
+    'Wallace’s complete story across twelve focused chapters in five historical acts.',
+  scenarioIds: wallaceChapters.map((scenario) => scenario.id),
+  acts: [
+    { id: 'outlaw', title: 'Act I — The Outlaw', years: '1297', scenarioIds: wallaceChapters.slice(0, 4).map((scenario) => scenario.id) },
+    { id: 'victory', title: 'Act II — The Great Victory', years: '1297', scenarioIds: wallaceChapters.slice(4, 6).map((scenario) => scenario.id) },
+    { id: 'guardian', title: 'Act III — Guardian of Scotland', years: '1297–1298', scenarioIds: wallaceChapters.slice(6, 8).map((scenario) => scenario.id) },
+    { id: 'broken-field', title: 'Act IV — The Broken Field', years: '1298', scenarioIds: wallaceChapters.slice(8, 10).map((scenario) => scenario.id) },
+    { id: 'unbroken', title: 'Act V — The Unbroken', years: '1303–1305', scenarioIds: wallaceChapters.slice(10, 12).map((scenario) => scenario.id) },
+  ],
 };
 
-export { showcaseCitadel, wallace1, wallace2, wallace3, wallace4, wallace5, wallace6 };
+export {
+  showcaseCitadel,
+  wallace1, wallace2, wallace3, wallace4, wallace5, wallace6,
+  wallaceChapter01, wallaceChapter02, wallaceChapter03, wallaceChapter04,
+  wallaceChapter05, wallaceChapter06, wallaceChapter07, wallaceChapter08,
+  wallaceChapter09, wallaceChapter10, wallaceChapter11, wallaceChapter12,
+};
 
 /** Authored ScenarioDefs by id, in campaign order. */
 export const scenariosById: Record<string, ScenarioDef> = {
+  ...Object.fromEntries(wallaceChapters.map((scenario) => [scenario.id, scenario])),
+  // Legacy ids stay loadable for old saved matches and deep links. They are no longer
+  // shown in the campaign sequence; progress.ts migrates their completion state.
   [wallace1.id]: wallace1,
   [wallace2.id]: wallace2,
   [wallace3.id]: wallace3,

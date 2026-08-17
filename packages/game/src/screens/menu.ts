@@ -39,6 +39,7 @@ const MENU_CSS = `
   padding:26px 26px 22px; text-align:center;
   background:linear-gradient(#3a2a18,#2C1F12); border:2px solid #1A1208; border-radius:6px;
   box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.6); }
+.bf-menu-panel.wide { width:min(720px, 94vw); }
 .bf-menu-name { font-family:"Cinzel","Georgia",serif; font-size:48px; font-weight:700; line-height:1;
   color:#E9C76A; text-shadow:0 2px 3px #0b0703; margin:0 0 6px; letter-spacing:3px; }
 .bf-menu-h { font-family:"Cinzel","Georgia",serif; font-size:30px; font-weight:600; line-height:1.05;
@@ -92,6 +93,11 @@ const MENU_CSS = `
   font-family:inherit; font-size:15px; cursor:pointer; }
 .bf-scn:disabled { cursor:default; color:#6e6252; background:#1d1409; }
 .bf-scn:not(:disabled):hover { border-color:#B99A6B; }
+.bf-act { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:19px 2px 7px;
+  padding-bottom:6px; border-bottom:1px solid #64492B; text-align:left; }
+.bf-act:first-of-type { margin-top:8px; }
+.bf-act-title { color:#E6C04A; font-family:"Cinzel","Georgia",serif; font-size:15px; letter-spacing:.8px; }
+.bf-act-years { color:#8f7958; font-size:11px; letter-spacing:1px; }
 .bf-medal { flex:0 0 34px; width:34px; height:34px; border-radius:50%; display:flex; align-items:center;
   justify-content:center; font-size:15px; border:2px solid #1A1208; }
 .bf-medal.completed { background:radial-gradient(circle at 35% 30%, #F2D45C, #D4A82A 60%, #8E6E14);
@@ -100,8 +106,17 @@ const MENU_CSS = `
   color:#1A1208; box-shadow:0 0 0 1px #B99A6B; }
 .bf-medal.locked { background:radial-gradient(circle at 35% 30%, #4a3a26, #2C1F12); color:#7a7266;
   box-shadow:0 0 0 1px #3a2d1c; }
+.bf-scn-copy { min-width:0; display:flex; flex-direction:column; gap:2px; }
+.bf-scn-title { line-height:1.15; }
+.bf-scn-meta { color:#8f7958; font-size:11px; letter-spacing:.35px; }
 .bf-scn .bf-scn-state { margin-left:auto; font-size:11px; color:#B99A6B; letter-spacing:1px; }
 .bf-brief { text-align:left; }
+.bf-chapter-kicker { margin:-3px 0 10px; color:#B99A6B; font-size:11px; letter-spacing:1.1px; text-align:center; text-transform:uppercase; }
+.bf-chapter-art { position:relative; overflow:hidden; margin:0 0 15px; border:1px solid #8A6414;
+  border-radius:4px; background:#16100a; box-shadow:0 4px 16px rgba(0,0,0,.45); aspect-ratio:16/9; }
+.bf-chapter-art img { display:block; width:100%; height:100%; object-fit:cover; }
+.bf-chapter-art::after { content:""; position:absolute; inset:auto 0 0; height:28%;
+  background:linear-gradient(transparent,rgba(16,10,5,.7)); pointer-events:none; }
 .bf-brief-hist { font-size:14px; line-height:1.5; color:#EFDDB5; }
 .bf-brief-hist p { margin:0 0 10px; }
 .bf-brief-list { margin:4px 0 0; padding-left:18px; font-size:13.5px; line-height:1.45; color:#DABE8D; }
@@ -117,6 +132,15 @@ const MENU_CSS = `
 .bf-brief-actions .bf-menu-btn { width:auto; margin:0; }
 .bf-brief-actions .bf-menu-btn.primary { flex:2; }
 .bf-brief-actions .bf-menu-btn.ghost { flex:1; }
+@media (max-width:520px) {
+  .bf-menu-panel.wide { width:96vw; padding:22px 16px 20px; }
+  .bf-scn { gap:9px; padding:9px; }
+  .bf-scn .bf-scn-state { display:none; }
+  .bf-scn-meta { font-size:10px; }
+  .bf-act-title { font-size:14px; }
+  .bf-act-years { flex:none; white-space:nowrap; }
+  .bf-chapter-kicker { font-size:10px; letter-spacing:.7px; }
+}
 `;
 
 const DIFFICULTY_DETAILS: Record<BotDifficulty, { label: string; description: string }> = {
@@ -363,7 +387,7 @@ export function showMenu(
         card.append(
           el('div', 'bf-camp-title', campaign.title),
           el('div', 'bf-camp-desc', campaign.description),
-          el('div', 'bf-camp-progress', `${doneCount} / ${campaign.scenarioIds.length} scenarios complete`),
+          el('div', 'bf-camp-progress', `${doneCount} / ${campaign.scenarioIds.length} chapters complete`),
         );
         card.addEventListener('click', () => dispatch({ kind: 'openScenarios', campaignId: campaign.id }));
         panel.appendChild(card);
@@ -375,19 +399,36 @@ export function showMenu(
       panel.appendChild(el('h1', 'bf-menu-h', campaign.title));
       const progress = loadProgress();
       const statuses = scenarioStatuses(campaign, progress);
+      const actsAt = new Map(campaign.acts?.map((act) => [act.scenarioIds[0], act]) ?? []);
       campaign.scenarioIds.forEach((scenarioId, i) => {
+        const act = actsAt.get(scenarioId);
+        if (act) {
+          const heading = el('div', 'bf-act');
+          heading.append(
+            el('span', 'bf-act-title', act.title),
+            el('span', 'bf-act-years', act.years),
+          );
+          panel.appendChild(heading);
+        }
         const status = statuses[i];
         const def = scenariosById[scenarioId];
         const authored = def !== undefined;
         const row = el('button', 'bf-scn');
         const medal = el('div', `bf-medal ${status}`);
         medal.textContent = status === 'completed' ? '✔' : status === 'locked' ? '🔒' : String(i + 1);
-        const title = el('span', '', authored ? def.title : `Scenario ${i + 1}`);
+        const copy = el('span', 'bf-scn-copy');
+        copy.appendChild(el('span', 'bf-scn-title', authored ? def.title : `Scenario ${i + 1}`));
+        if (def?.chapter) {
+          copy.appendChild(el(
+            'span', 'bf-scn-meta',
+            `${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`,
+          ));
+        }
         const state = el('span', 'bf-scn-state',
           status === 'completed' ? 'COMPLETED'
             : status === 'locked' ? 'LOCKED'
               : authored ? 'READY' : 'COMING SOON');
-        row.append(medal, title, state);
+        row.append(medal, copy, state);
         row.disabled = status === 'locked' || !authored;
         if (!row.disabled) {
           row.addEventListener('click', () => dispatch({ kind: 'openBriefing', campaignId: campaign.id, scenarioId }));
@@ -405,6 +446,19 @@ export function showMenu(
       }
       panel.appendChild(el('h1', 'bf-menu-h', def.title));
       const brief = el('div', 'bf-brief');
+      if (def.chapter) {
+        brief.appendChild(el(
+          'div', 'bf-chapter-kicker',
+          `${def.chapter.act} · ${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`,
+        ));
+        const art = el('figure', 'bf-chapter-art');
+        const image = document.createElement('img');
+        image.src = def.chapter.image;
+        image.alt = def.chapter.imageAlt;
+        image.decoding = 'async';
+        art.appendChild(image);
+        brief.appendChild(art);
+      }
       const hist = el('div', 'bf-brief-hist');
       for (const para of def.briefing.history.split('\n\n')) {
         hist.appendChild(el('p', '', para));
@@ -440,6 +494,7 @@ export function showMenu(
     const render = (): void => {
       panel.replaceChildren();
       const top: MenuScreen = currentScreen(flow);
+      panel.classList.toggle('wide', top.id === 'scenarioList' || top.id === 'briefing');
       switch (top.id) {
         case 'title': renderTitle(); break;
         case 'play': renderPlay(); break;

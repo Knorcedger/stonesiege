@@ -61,4 +61,15 @@ describe('progress storage', () => {
     expect(decodeProgress('{"completed":"w1"}')).toEqual(emptyProgress());
     expect(decodeProgress('{"completed":["w1", 7]}')).toEqual({ completed: ['w1'] });
   });
+
+  it('migrates each completed legacy Wallace scenario to its two focused chapters', () => {
+    expect(decodeProgress('{"completed":["wallace-1","wallace-3"]}').completed).toEqual([
+      'wallace-1',
+      'wallace-3',
+      'wallace-01-ledger',
+      'wallace-02-lanark',
+      'wallace-05-two-risings',
+      'wallace-06-stirling',
+    ]);
+  });
 });

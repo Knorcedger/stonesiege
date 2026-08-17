@@ -89,9 +89,9 @@ describe('wallace-4 — loads clean', () => {
     expect(of(0, 'monk')).toBe(2);
   });
 
-  it('is registered in the wallace campaign', () => {
+  it('keeps the original scenario registered for legacy saves', () => {
     expect(scenariosById['wallace-4']).toBe(wallace4);
-    expect(wallaceCampaign.scenarioIds[wallace4.index]).toBe(wallace4.id);
+    expect(wallaceCampaign.scenarioIds).not.toContain(wallace4.id);
   });
 });
 

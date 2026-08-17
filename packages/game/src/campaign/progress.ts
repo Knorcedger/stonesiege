@@ -51,12 +51,37 @@ export function nextScenarioId(campaign: CampaignDef, progress: CampaignProgress
 
 const STORAGE_KEY = 'bf.campaign.progress.v1';
 
+// The first public campaign shipped as six long scenarios. Keep those saves useful
+// after the twelve-chapter cut: finishing a legacy scenario counts as finishing both
+// of the focused chapters made from it. Legacy ids remain in the array so old match
+// snapshots and older app versions can still understand the same storage record.
+const LEGACY_WALLACE_CHAPTERS: Record<string, string[]> = {
+  'wallace-1': ['wallace-01-ledger', 'wallace-02-lanark'],
+  'wallace-2': ['wallace-03-tay', 'wallace-04-ormesby'],
+  'wallace-3': ['wallace-05-two-risings', 'wallace-06-stirling'],
+  'wallace-4': ['wallace-07-winter', 'wallace-08-guardian'],
+  'wallace-5': ['wallace-09-schiltrons', 'wallace-10-falkirk'],
+  'wallace-6': ['wallace-11-forest', 'wallace-12-unbroken'],
+};
+
+function migrateLegacyProgress(completed: string[]): string[] {
+  const migrated = new Set(completed);
+  for (const id of completed) {
+    for (const chapterId of LEGACY_WALLACE_CHAPTERS[id] ?? []) migrated.add(chapterId);
+  }
+  return [...migrated];
+}
+
 export function decodeProgress(raw: string | null): CampaignProgress {
   if (!raw) return emptyProgress();
   try {
     const p = JSON.parse(raw) as CampaignProgress;
     if (!Array.isArray(p.completed)) return emptyProgress();
-    return { completed: p.completed.filter((id): id is string => typeof id === 'string') };
+    return {
+      completed: migrateLegacyProgress(
+        p.completed.filter((id): id is string => typeof id === 'string'),
+      ),
+    };
   } catch {
     return emptyProgress();
   }
