@@ -125,6 +125,10 @@ async function appleAudit(version, buildNumber) {
   try {
     const app = await appleRequest(`/apps/${APPLE_APP_ID}`);
     requireCheck(app.data?.attributes?.bundleId === PACKAGE_NAME, 'App Store Connect bundle id matches');
+    requireCheck(
+      app.data?.attributes?.contentRightsDeclaration === metadata.contentRightsDeclaration,
+      'App Store content-rights declaration matches the repository source of truth',
+    );
 
     const versions = await appleRequest(
       `/apps/${APPLE_APP_ID}/appStoreVersions?filter[platform]=IOS&limit=50`,
@@ -167,6 +171,21 @@ async function appleAudit(version, buildNumber) {
             && attachedBuild.data?.attributes?.processingState === 'VALID',
           `App Store product version uses valid build ${buildNumber}`,
         );
+      }
+      try {
+        const review = await appleRequest(`/appStoreVersions/${current.id}/appStoreReviewDetail`);
+        const details = review.data?.attributes ?? {};
+        requireCheck(
+          Boolean(details.contactFirstName && details.contactLastName
+            && details.contactPhone && details.contactEmail),
+          'App Store reviewer contact name, phone, and email are populated',
+        );
+        requireCheck(
+          details.demoAccountRequired === false && details.notes === metadata.reviewNotes,
+          'App Store review access declaration and notes match the repository source of truth',
+        );
+      } catch (error) {
+        blockers.push(`App Store review details are populated (${error.message})`);
       }
     }
 

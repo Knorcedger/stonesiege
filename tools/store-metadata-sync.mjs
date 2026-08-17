@@ -133,11 +133,23 @@ async function replaceAppleScreenshotSet(localizationId, displayType, files) {
   const current = await appleRequest(
     `/appStoreVersionLocalizations/${localizationId}/appScreenshotSets?limit=50`,
   );
-  for (const set of current.data ?? []) {
-    if (set.attributes.screenshotDisplayType === displayType) {
-      await appleRequest(`/appScreenshotSets/${set.id}`, { method: 'DELETE' });
+  const matching = (current.data ?? []).filter(
+    (set) => set.attributes.screenshotDisplayType === displayType,
+  );
+  const expectedNames = files.map((file) => basename(file)).sort();
+  for (const set of matching) {
+    const screenshots = await appleRequest(`/appScreenshotSets/${set.id}/appScreenshots?limit=50`);
+    const currentNames = (screenshots.data ?? [])
+      .filter((shot) => shot.attributes.assetDeliveryState?.state === 'COMPLETE')
+      .map((shot) => shot.attributes.fileName)
+      .sort();
+    if (currentNames.length === expectedNames.length
+      && currentNames.every((name, index) => name === expectedNames[index])) {
+      console.log(`App Store Connect: ${displayType} screenshots are already current.`);
+      return;
     }
   }
+  for (const set of matching) await appleRequest(`/appScreenshotSets/${set.id}`, { method: 'DELETE' });
   const created = await appleRequest('/appScreenshotSets', {
     method: 'POST',
     body: JSON.stringify({
@@ -162,6 +174,16 @@ async function syncAppleMetadata() {
   if (!existsSync(join(APPLE_KEYS_DIR, `AuthKey_${APPLE_KEY_ID}.p8`))) {
     throw new Error('App Store Connect API key is missing.');
   }
+  await appleRequest(`/apps/${APPLE_APP_ID}`, {
+    method: 'PATCH',
+    body: JSON.stringify({
+      data: {
+        type: 'apps',
+        id: APPLE_APP_ID,
+        attributes: { contentRightsDeclaration: metadata.contentRightsDeclaration },
+      },
+    }),
+  });
   const versions = await appleRequest(`/apps/${APPLE_APP_ID}/appStoreVersions?filter[platform]=IOS&limit=50`);
   let appVersion = (versions.data ?? []).find((item) => item.attributes.versionString === version);
   if (!appVersion) {
@@ -204,6 +226,22 @@ async function syncAppleMetadata() {
       data: { type: 'appStoreVersions', id: appVersion.id, attributes: { copyright: metadata.copyright } },
     }),
   });
+  try {
+    const review = await appleRequest(`/appStoreVersions/${appVersion.id}/appStoreReviewDetail`);
+    await appleRequest(`/appStoreReviewDetails/${review.data.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: {
+          type: 'appStoreReviewDetails',
+          id: review.data.id,
+          attributes: { demoAccountRequired: false, notes: metadata.reviewNotes },
+        },
+      }),
+    });
+  } catch (error) {
+    if (!error.message.includes('failed (404)')) throw error;
+    console.warn('App Store Connect: reviewer contact record is not created yet; review notes were not synced.');
+  }
 
   const localizations = await appleRequest(
     `/appStoreVersions/${appVersion.id}/appStoreVersionLocalizations?limit=50`,
@@ -274,7 +312,7 @@ async function syncAppleMetadata() {
   await replaceAppleScreenshotSet(
     english.id, 'APP_IPAD_PRO_3GEN_129', pngs('store/screenshots/ios/ipad-13'),
   );
-  console.log(`App Store Connect: synced StoneSiege ${version} metadata, age rating, and privacy URL.`);
+  console.log(`App Store Connect: synced StoneSiege ${version} metadata, content rights, age rating, and privacy URL.`);
 }
 
 async function googleToken() {
