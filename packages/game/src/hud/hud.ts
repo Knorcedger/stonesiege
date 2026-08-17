@@ -66,7 +66,7 @@ export interface HudHost {
   stopSelection(): void;
   /** Trebuchets: pack (fold to move) or unpack (deploy to fire) the selected trebs. */
   packSelection(pack: boolean): void;
-  /** Toggle an armed "next tap = target" verb (move / attack-move / garrison / convert / heal). */
+  /** Toggle an armed "next tap = target" verb (move / rally / attack-move / garrison / convert / heal). */
   armVerb(verb: ArmedVerb): void;
   getArmedVerb(): ArmedVerb | null;
   setFormation(formation: Formation): void;
@@ -1105,7 +1105,16 @@ export class Hud {
       shown = this.rebuildBuildingCard(state, buildings[0], view) || shown;
     } else if (buildings.length > 1 && units.length === 0) {
       const def = gameData.buildings[buildings[0].defId];
-      this.cardTitle.textContent = `${def?.name ?? buildings[0].defId} ×${buildings.length} — click ground to rally`;
+      this.cardTitle.textContent = `${def?.name ?? buildings[0].defId} ×${buildings.length}`;
+      if ((def?.trains?.length ?? 0) > 0) {
+        this.addButton(
+          'icon/cmd/rally',
+          'Set rally point\nThen tap the destination',
+          true,
+          this.host.getArmedVerb() === 'rally',
+          () => this.host.armVerb('rally'),
+        );
+      }
       shown = true;
     }
 
@@ -1283,7 +1292,15 @@ export class Hud {
     }
 
     if ((def?.trains?.length ?? 0) > 0) {
-      this.addCardSection('Rally flag · tap / right-click ground to move', true);
+      this.addButton(
+        'icon/cmd/rally',
+        'Set rally point\nThen tap the destination',
+        true,
+        this.host.getArmedVerb() === 'rally',
+        () => this.host.armVerb('rally'),
+      );
+      this.addCardSection('Rally flag · arm the button, then choose a destination', true);
+      shown = true;
     }
 
     // ---- specials: farm reseed, mill auto-reseed, market trade panel

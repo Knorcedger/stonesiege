@@ -175,8 +175,8 @@ reference, then balanced by playtesting loops.
   A move order also shows a short descending arrow at its exact ground destination.
 - Long-press (held in place, with a selection) = attack-move / alternate command menu;
   long-press-then-drag on ground = band-select (above).
-- **Rally points**: with a production building selected, tapping ground/resource/enemy sets
-  its rally flag (see Buildings for behavior).
+- **Rally points**: with a production building selected, tap the **Rally** flag button first,
+  then tap ground/resource/enemy to set its destination (see Buildings for behavior).
 - HUD: top resource + pop bar with a top-right **elapsed match clock** (simulation time, so it
   freezes while paused), plus an **idle-villager button** (badge shows the idle
   count; tapping cycles through idle villagers, centering the camera with the command card

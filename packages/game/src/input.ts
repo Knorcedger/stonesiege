@@ -76,7 +76,7 @@ export interface InputHost {
   releasePlacementModifier(): void;
   isAttackMoveArmed(): boolean;
   setAttackMoveArmed(v: boolean): void;
-  /** Armed "next tap = target" verb (move / attack-move / garrison / convert / heal). */
+  /** Armed "next tap = target" verb (move / rally / attack-move / garrison / convert / heal). */
   getArmedVerb(): ArmedVerb | null;
   clearArmedVerb(): void;
   /** Current group arrangement selected in the command card. */
@@ -191,10 +191,11 @@ export function isContextAttackTarget(e: Entity, human: PlayerId): boolean {
  *   Exception: with villagers selected, an own herdable/huntable (a captured
  *   sheep) is a GATHER target, not a reselect — the AoE2 opening (eat the
  *   starting sheep under the TC) must be one tap.
- * - With a buildings-only selection, GDD "tap a unit/building = select" wins:
+ * - With a buildings-only selection, plain taps remain selection-only:
  *   tapping any own unit, or an own building as the nearest pick, reselects
  *   (so TC -> Barracks is one tap and re-tapping the TC never moves its rally).
- *   Ground/resource/enemy taps still set the rally point.
+ *   Empty ground deselects, while resources/enemies are inspected. Rally points
+ *   require arming the Rally button before choosing a destination.
  * - Bare taps (no selection) stay instant-select.
  */
 export function resolveTapAction(picks: Entity[], sel: TapSelection, human: PlayerId): TapAction {
@@ -219,8 +220,8 @@ export function resolveTapAction(picks: Entity[], sel: TapSelection, human: Play
     if (nearest && nearest.player === human && nearest.kind === 'building') {
       return { type: 'select', id: nearest.id };
     }
-    // ground / resource / enemy: context command (rally point)
-    return { type: 'command' };
+    if (nearest) return { type: 'inspect', id: nearest.id };
+    return { type: 'deselect' };
   }
   if (ownUnit) return { type: 'select', id: ownUnit.id };
   const ownBuilding = picks.find((p) => p.player === human && p.kind === 'building');
@@ -522,6 +523,10 @@ export class InputController {
       this.movePlacementToWorld(w.x, w.y);
       return;
     }
+    if (this.host.getArmedVerb() !== null) {
+      this.el.style.cursor = 'crosshair';
+      return;
+    }
     const w = this.host.camera.screenToWorld(sx, sy);
     const picks = this.pickAt(w.x, w.y);
     const sel = this.commandableSelection();
@@ -576,13 +581,7 @@ export class InputController {
     if (action.type === 'select' || action.type === 'inspect') {
       this.host.setSelection([action.id]);
     } else if (action.type === 'deselect') {
-      // The production card explicitly says "tap ground to rally". Honor that
-      // on desktop too (right-click remains supported); empty left-click still
-      // deselects every ordinary unit/building selection.
-      const productionOnly = selected.length > 0 && selected.every((e) =>
-        e.kind === 'building' && (gameData.buildings[e.defId]?.trains?.length ?? 0) > 0);
-      if (productionOnly) this.contextCommand(w.x, w.y, picks, selected);
-      else this.host.deselect();
+      this.host.deselect();
     }
   }
 
@@ -651,8 +650,9 @@ export class InputController {
 
   /**
    * GDD intent inference: snap priority enemy unit > resource/Gaia > own
-   * building > ground; villagers gather/build, military attack, production
-   * buildings set rally. Every command gets the ~2 s undo toast.
+   * building > ground; villagers gather/build and military attack. Production
+   * buildings set rally only after the Rally verb is armed. Every command gets
+   * the ~2 s undo toast.
    */
   private contextCommand(wx: number, wy: number, picks: Entity[], sel: Entity[]): void {
     const human = this.host.humanPlayer;
@@ -668,15 +668,20 @@ export class InputController {
     const gatherTarget = picks.find((p) => isVillagerGatherTargetAt(p, human, wx, wy));
     const ownBld = picks.find((p) => p.player === human && p.kind === 'building');
     const unitIds = units.map((e) => e.id);
+    const armedVerb = this.host.getArmedVerb();
     const undoStop = unitIds.length > 0
       ? () => this.host.issue({ kind: 'stop', player: human, units: unitIds })
       : null;
 
-    // Production buildings selected (and no units): tap sets the rally point.
+    // Production buildings selected (and no units): Rally must be armed first.
+    // This prevents an ordinary map tap/right-click from silently moving the
+    // spawn destination while the player is merely trying to clear selection.
     // Undo restores each building's previous rally (or re-centers it on the
     // building itself when none was set — the sim remaps a blocked center tile
     // to the nearest walkable one, i.e. the default spawn side).
     if (units.length === 0 && buildings.length > 0) {
+      if (armedVerb !== 'rally') return;
+      this.host.clearArmedVerb();
       const target = enemy ?? gatherTarget;
       const prevRallies = buildings.map((b) => ({
         id: b.id,
@@ -706,7 +711,6 @@ export class InputController {
     }
     if (unitIds.length === 0) return;
 
-    const armedVerb = this.host.getArmedVerb();
     const armed = armedVerb === 'attackMove';
     const formation = military.length >= 3 ? this.host.getFormation() : undefined;
     this.host.clearArmedVerb();

@@ -49,7 +49,7 @@ export interface CardButtonModel {
 }
 
 /** Verbs that arm a "next tap = target" flow (GDD alternate-command semantics). */
-export type ArmedVerb = 'move' | 'attackMove' | 'garrison' | 'convert' | 'heal';
+export type ArmedVerb = 'move' | 'rally' | 'attackMove' | 'garrison' | 'convert' | 'heal';
 
 export interface VerbButtonModel extends CardButtonModel {
   verb?: ArmedVerb;

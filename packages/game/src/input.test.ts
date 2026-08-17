@@ -71,7 +71,7 @@ describe('resolveTapAction — units selected', () => {
   });
 });
 
-describe('resolveTapAction — buildings-only selection (GDD: tap a building = select)', () => {
+describe('resolveTapAction — buildings-only selection', () => {
   it('re-tapping the selected building reselects — it must NOT move the rally point', () => {
     const tc = ent({ kind: 'building', defId: 'townCenter', player: HUMAN });
     expect(resolveTapAction([tc], BLD_SEL, HUMAN)).toEqual({ type: 'select', id: tc.id });
@@ -87,18 +87,18 @@ describe('resolveTapAction — buildings-only selection (GDD: tap a building = s
     expect(resolveTapAction([vill], BLD_SEL, HUMAN)).toEqual({ type: 'select', id: vill.id });
   });
 
-  it('ground / resource / enemy taps still set the rally (command)', () => {
-    expect(resolveTapAction([], BLD_SEL, HUMAN)).toEqual({ type: 'command' });
+  it('ground deselects; resource and enemy taps inspect instead of setting rally', () => {
+    expect(resolveTapAction([], BLD_SEL, HUMAN)).toEqual({ type: 'deselect' });
     const sheep = ent({ kind: 'unit', defId: 'sheep', player: GAIA });
-    expect(resolveTapAction([sheep], BLD_SEL, HUMAN)).toEqual({ type: 'command' });
+    expect(resolveTapAction([sheep], BLD_SEL, HUMAN)).toEqual({ type: 'inspect', id: sheep.id });
     const enemy = ent({ player: ENEMY });
-    expect(resolveTapAction([enemy], BLD_SEL, HUMAN)).toEqual({ type: 'command' });
+    expect(resolveTapAction([enemy], BLD_SEL, HUMAN)).toEqual({ type: 'inspect', id: enemy.id });
   });
 
-  it('an own building that is NOT the nearest pick does not steal a rally tap onto a resource', () => {
+  it('an own building that is NOT the nearest pick does not steal an inspection tap', () => {
     const sheep = ent({ kind: 'unit', defId: 'sheep', player: GAIA });
     const tc = ent({ kind: 'building', defId: 'townCenter', player: HUMAN });
-    expect(resolveTapAction([sheep, tc], BLD_SEL, HUMAN)).toEqual({ type: 'command' });
+    expect(resolveTapAction([sheep, tc], BLD_SEL, HUMAN)).toEqual({ type: 'inspect', id: sheep.id });
   });
 });
 
