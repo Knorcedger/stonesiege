@@ -3,7 +3,7 @@
 import { describe, expect, it } from 'vitest';
 import { FP, GAIA, type Entity, type EntityId, type GameState, type PlayerId } from '@bf/sim/types';
 import {
-  centroidTile, idleUnits, isIdleOwnUnit, isTownBellSeeking, liveGroupIds,
+  centroidTile, hasOwnedCompletedBuilding, idleUnits, isIdleOwnUnit, isTownBellSeeking, liveGroupIds,
   nextOwnedCompletedBuilding, sameIdSet,
   selectionTypeCounts,
 } from './selectionTools';
@@ -114,6 +114,18 @@ describe('nextOwnedCompletedBuilding', () => {
     expect(nextOwnedCompletedBuilding(st, HUMAN, 'barracks', first.id)?.id).toBe(second.id);
     expect(nextOwnedCompletedBuilding(st, HUMAN, 'barracks', second.id)?.id).toBe(first.id);
     expect(nextOwnedCompletedBuilding(st, HUMAN, 'townCenter')).toBeNull();
+  });
+
+  it('only reports a living, completed building owned by the player', () => {
+    const foundation = ent({ kind: 'building', defId: 'barracks', buildProgress: 500 });
+    const enemy = ent({ kind: 'building', defId: 'barracks', player: 2 as PlayerId, buildProgress: 1000 });
+    const destroyed = ent({ kind: 'building', defId: 'barracks', hp: 0, buildProgress: 1000 });
+    const st = stateWith([foundation, enemy, destroyed]);
+    expect(hasOwnedCompletedBuilding(st, HUMAN, 'barracks')).toBe(false);
+
+    const completed = ent({ kind: 'building', defId: 'barracks', buildProgress: 1000 });
+    const completedState = stateWith([foundation, enemy, destroyed, completed]);
+    expect(hasOwnedCompletedBuilding(completedState, HUMAN, 'barracks')).toBe(true);
   });
 });
 

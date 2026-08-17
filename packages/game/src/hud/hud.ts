@@ -16,7 +16,9 @@ import {
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
-import { isTownBellSeeking, selectionTypeCounts, type IdleCategory } from '../selectionTools';
+import {
+  hasOwnedCompletedBuilding, isTownBellSeeking, selectionTypeCounts, type IdleCategory,
+} from '../selectionTools';
 import {
   ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, hasActiveRally,
   millAutoReseedButton, queueChipModel, queueStacks, researchMenuButtons, trainMenuButtons,
@@ -304,6 +306,7 @@ export class Hud {
   private placeConfirm!: HTMLButtonElement;
   private placeLabel!: HTMLSpanElement;
   private idleBtns = new Map<IdleCategory, { btn: HTMLButtonElement; count: HTMLSpanElement }>();
+  private quickNavBtns = new Map<'townCenter' | 'barracks', HTMLButtonElement>();
   private chipStrip!: HTMLDivElement;
   private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
   private lastCardKey = '';
@@ -390,6 +393,7 @@ export class Hud {
     this.pauseBtn.textContent = this.matchFinished ? 'MENU' : this.host.isPaused() ? '▶' : 'II';
     this.pauseOverlay.classList.toggle('show', this.host.isPaused());
     if (!this.host.isPaused() && this.resignArmed) this.resetResign();
+    this.updateQuickNavigation(state);
     this.updateIdleButtons();
     this.updateGroupChips();
     this.updateSelectionPanel();
@@ -496,11 +500,20 @@ export class Hud {
       btn.addEventListener('click', () => {
         if (!this.host.focusBuilding(defId)) this.showTip(`No completed ${def?.name ?? defId}`, btn);
       });
+      if (defId === 'barracks') btn.hidden = true;
+      this.quickNavBtns.set(defId, btn);
       nav.appendChild(btn);
     };
     add('townCenter');
     add('barracks');
     this.minimapSlot.appendChild(nav);
+  }
+
+  private updateQuickNavigation(state: GameState): void {
+    const barracksBtn = this.quickNavBtns.get('barracks');
+    if (barracksBtn) {
+      barracksBtn.hidden = !hasOwnedCompletedBuilding(state, this.host.humanPlayer, 'barracks');
+    }
   }
 
   private updateIdleButtons(): void {

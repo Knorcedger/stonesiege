@@ -50,6 +50,15 @@ export function nextOwnedCompletedBuilding(
   return buildings[index < 0 ? 0 : (index + 1) % buildings.length];
 }
 
+/** Whether a player currently owns a living, fully constructed building of a type. */
+export function hasOwnedCompletedBuilding(
+  state: GameState,
+  player: PlayerId,
+  defId: string,
+): boolean {
+  return nextOwnedCompletedBuilding(state, player, defId) !== null;
+}
+
 /** Public presentation marker for a villager currently answering a Town Bell. */
 export function isTownBellSeeking(
   e: Entity,
