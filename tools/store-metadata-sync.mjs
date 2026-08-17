@@ -13,6 +13,9 @@ const APPLE_KEY_ID = process.env.APP_STORE_CONNECT_KEY_ID ?? '9XLJZ77PVF';
 const APPLE_ISSUER_ID = process.env.APP_STORE_CONNECT_ISSUER_ID
   ?? '20f43c69-0c46-4588-b22c-baf6f8fe8a07';
 const APPLE_KEYS_DIR = resolve(process.env.API_PRIVATE_KEYS_DIR ?? join(root, '.secrets/appstore'));
+const APPLE_SCREENSHOT_TIMEOUT_MS = Number(
+  process.env.APP_STORE_CONNECT_SCREENSHOT_TIMEOUT_MS ?? 5 * 60_000,
+);
 const GOOGLE_PACKAGE = 'com.stonesiege.app';
 const GOOGLE_CREDENTIALS = resolve(
   process.env.GOOGLE_PLAY_SERVICE_ACCOUNT_JSON
@@ -113,7 +116,8 @@ async function uploadAppleScreenshot(setId, file) {
 const wait = (milliseconds) => new Promise((resolvePromise) => setTimeout(resolvePromise, milliseconds));
 
 async function waitForAppleScreenshot(id) {
-  for (let attempt = 0; attempt < 30; attempt += 1) {
+  const deadline = Date.now() + APPLE_SCREENSHOT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
     const screenshot = await appleRequest(`/appScreenshots/${id}`);
     const state = screenshot.data.attributes.assetDeliveryState?.state;
     if (state === 'COMPLETE') return;
@@ -237,6 +241,17 @@ async function syncAppleMetadata() {
   const infos = await appleRequest(`/apps/${APPLE_APP_ID}/appInfos?limit=50`);
   let infoLocalizationUpdated = false;
   for (const info of infos.data ?? []) {
+    const declaration = await appleRequest(`/appInfos/${info.id}/ageRatingDeclaration`);
+    await appleRequest(`/ageRatingDeclarations/${declaration.data.id}`, {
+      method: 'PATCH',
+      body: JSON.stringify({
+        data: {
+          type: 'ageRatingDeclarations',
+          id: declaration.data.id,
+          attributes: metadata.appleAgeRatingDeclarations,
+        },
+      }),
+    });
     const infoLocalizations = await appleRequest(`/appInfos/${info.id}/appInfoLocalizations?limit=50`);
     const infoEnglish = (infoLocalizations.data ?? []).find((item) => item.attributes.locale === 'en-US');
     if (!infoEnglish) continue;
@@ -259,7 +274,7 @@ async function syncAppleMetadata() {
   await replaceAppleScreenshotSet(
     english.id, 'APP_IPAD_PRO_3GEN_129', pngs('store/screenshots/ios/ipad-13'),
   );
-  console.log(`App Store Connect: synced StoneSiege ${version} metadata and privacy URL.`);
+  console.log(`App Store Connect: synced StoneSiege ${version} metadata, age rating, and privacy URL.`);
 }
 
 async function googleToken() {

@@ -104,6 +104,36 @@ async function waitForBuild(marketingVersion, buildNumber) {
   throw new Error(`Timed out waiting for iOS ${marketingVersion} (${buildNumber}) in App Store Connect.`);
 }
 
+async function findAppStoreVersion(marketingVersion) {
+  const query = new URLSearchParams({
+    'filter[platform]': 'IOS',
+    limit: '50',
+  });
+  const response = await request(`/apps/${APP_ID}/appStoreVersions?${query}`);
+  return (response.data ?? []).find(
+    (version) => version.attributes?.versionString === marketingVersion,
+  );
+}
+
+async function attachBuildToVersion(marketingVersion, build) {
+  const appStoreVersion = await findAppStoreVersion(marketingVersion);
+  if (!appStoreVersion) {
+    throw new Error(`Could not find App Store product version ${marketingVersion}.`);
+  }
+  const linkage = await request(
+    `/appStoreVersions/${encodeURIComponent(appStoreVersion.id)}/relationships/build`,
+  );
+  if (linkage.data?.id === build.id) {
+    console.log(`iOS ${marketingVersion} (${build.attributes.version}) is already attached to the App Store version.`);
+    return;
+  }
+  await request(`/appStoreVersions/${encodeURIComponent(appStoreVersion.id)}/relationships/build`, {
+    method: 'PATCH',
+    body: JSON.stringify({ data: { type: 'builds', id: build.id } }),
+  });
+  console.log(`Attached iOS ${marketingVersion} (${build.attributes.version}) to the App Store version.`);
+}
+
 async function findGroup() {
   const query = new URLSearchParams({
     'filter[app]': APP_ID,
@@ -128,6 +158,7 @@ if (!marketingVersion || !buildNumber) {
 }
 
 const build = await waitForBuild(marketingVersion, buildNumber);
+await attachBuildToVersion(marketingVersion, build);
 const group = await findGroup();
 if (!group) throw new Error(`Could not find internal TestFlight group "${GROUP_NAME}".`);
 

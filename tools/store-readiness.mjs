@@ -117,7 +117,7 @@ async function appleRequest(path) {
   });
 }
 
-async function appleAudit(version) {
+async function appleAudit(version, buildNumber) {
   if (!existsSync(join(APPLE_KEYS_DIR, `AuthKey_${APPLE_KEY_ID}.p8`))) {
     blockers.push('App Store Connect API key is installed');
     return;
@@ -149,15 +149,36 @@ async function appleAudit(version) {
         const required = new Set(['APP_IPHONE_67', 'APP_IPAD_PRO_3GEN_129']);
         for (const set of sets.data ?? []) {
           const shots = await appleRequest(`/appScreenshotSets/${set.id}/appScreenshots?limit=50`);
-          if ((shots.data?.length ?? 0) >= 4) required.delete(set.attributes?.screenshotDisplayType);
+          const processed = (shots.data ?? []).filter(
+            (shot) => shot.attributes?.assetDeliveryState?.state === 'COMPLETE',
+          );
+          if (processed.length >= 4) required.delete(set.attributes?.screenshotDisplayType);
         }
-        requireCheck(required.size === 0, 'App Store has four iPhone 6.9-inch and four iPad 13-inch screenshots');
+        requireCheck(required.size === 0, 'App Store has four processed iPhone 6.9-inch and four processed iPad 13-inch screenshots');
+      }
+      const linkage = await appleRequest(
+        `/appStoreVersions/${current.id}/relationships/build`,
+      );
+      requireCheck(Boolean(linkage.data?.id), 'App Store product version has a build attached');
+      if (linkage.data?.id) {
+        const attachedBuild = await appleRequest(`/builds/${linkage.data.id}`);
+        requireCheck(
+          attachedBuild.data?.attributes?.version === buildNumber
+            && attachedBuild.data?.attributes?.processingState === 'VALID',
+          `App Store product version uses valid build ${buildNumber}`,
+        );
       }
     }
 
     const infos = await appleRequest(`/apps/${APPLE_APP_ID}/appInfos?limit=20`);
     const info = infos.data?.[0];
     if (info) {
+      const declaration = await appleRequest(`/appInfos/${info.id}/ageRatingDeclaration`);
+      const expected = Object.entries(metadata.appleAgeRatingDeclarations);
+      requireCheck(
+        expected.every(([key, value]) => declaration.data?.attributes?.[key] === value),
+        'App Store age-rating declaration matches the repository source of truth',
+      );
       const localizations = await appleRequest(`/appInfos/${info.id}/appInfoLocalizations?limit=50`);
       const english = localizations.data?.find((item) => item.attributes?.locale === 'en-US');
       requireCheck(Boolean(english?.attributes?.privacyPolicyUrl), 'App Store privacy-policy URL is populated');
@@ -295,7 +316,7 @@ await Promise.all([
 ]);
 
 if (!localOnly) {
-  await appleAudit(packageJson.version);
+  await appleAudit(packageJson.version, String(iosBuild));
   await googleAudit();
 }
 
