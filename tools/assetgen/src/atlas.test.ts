@@ -80,7 +80,7 @@ describe('terrain atlas', () => {
     // TerrainId is a type — enumerate via the generator table and cross-check a
     // frame exists per id; the table itself is typed against TerrainId.
     const ids = TERRAINS.map((t) => t.id).sort();
-    expect(ids).toEqual(['dirt', 'farmland', 'grass', 'road', 'sand', 'shallows', 'snow', 'water']);
+    expect(ids).toEqual(['cliff', 'dirt', 'farmland', 'grass', 'road', 'sand', 'shallows', 'snow', 'water']);
   });
 
   it('has all 4 edge-transition frames for every priority pair', () => {
@@ -88,7 +88,7 @@ describe('terrain atlas', () => {
     for (const [hi, lo] of edgePairs()) {
       for (const edge of EDGES) wanted.push(`terr/${hi}_${lo}/${edge}`);
     }
-    expect(wanted.length).toBe(28 * 4);
+    expect(wanted.length).toBe(36 * 4);
     expectFrames(terrain, wanted);
   });
 

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from './game';
-import { MAP_SIZE_PRESETS } from './mapgen';
+import { allPassableTerrainConnected, MAP_SIZE_PRESETS } from './mapgen';
 import type { Entity, Game } from './types';
 import { entitiesOf, grassMap, practiceConfig, player, tileDist } from './testutil';
 
@@ -83,6 +83,26 @@ function resourceComponents(game: Game, defId: string): Entity[][] {
 
 const HARVEST_DEFS = ['berryBush', 'goldMine', 'stoneMine'] as const;
 
+function expectConnectedLandforms(game: Game, label: string): void {
+  const { map } = game.state;
+  const counts = new Map<string, number>();
+  for (let i = 0; i < map.terrain.length; i++) {
+    const id = map.terrainIds[map.terrain[i]];
+    counts.set(id, (counts.get(id) ?? 0) + 1);
+  }
+  expect(counts.get('water') ?? 0, `${label}: river`).toBeGreaterThan(map.width);
+  expect(counts.get('shallows') ?? 0, `${label}: fords`).toBeGreaterThanOrEqual(30);
+  expect(counts.get('cliff') ?? 0, `${label}: cliffs`).toBeGreaterThan(20);
+  expect(allPassableTerrainConnected(map), `${label}: every land tile connected`).toBe(true);
+
+  const water = map.terrain.findIndex((terrain) => map.terrainIds[terrain] === 'water');
+  const cliff = map.terrain.findIndex((terrain) => map.terrainIds[terrain] === 'cliff');
+  const ford = map.terrain.findIndex((terrain) => map.terrainIds[terrain] === 'shallows');
+  expect(game.isWalkable(water % map.width, (water / map.width) | 0), `${label}: water blocks movement`).toBe(false);
+  expect(game.isWalkable(cliff % map.width, (cliff / map.width) | 0), `${label}: cliff blocks movement`).toBe(false);
+  expect(game.isWalkable(ford % map.width, (ford / map.width) | 0), `${label}: ford permits movement`).toBe(true);
+}
+
 /** Fairness invariant: no berry/gold/stone cluster may be fully walled off by forest. */
 function expectNoSealedClusters(game: Game, reach: Uint8Array, label: string): void {
   for (const defId of HARVEST_DEFS) {
@@ -114,6 +134,7 @@ describe('practice mapgen fairness', () => {
         const players = Array.from({ length: playerCount }, (_, i) =>
           player({ name: `P${i + 1}`, civ: i % 2 === 0 ? 'scots' : 'english', color: i }));
         const game = createGame(practiceConfig(seed, players));
+        expectConnectedLandforms(game, `seed ${seed} ${playerCount}p`);
 
         const tcs: Entity[] = [];
         for (let p = 1; p <= playerCount; p++) {
@@ -197,6 +218,7 @@ describe('practice mapgen fairness', () => {
     for (let seed = 500; seed < 540; seed++) {
       const players = [player(), player({ civ: 'english' }), player({ civ: 'scots' })];
       const game = createGame(practiceConfig(seed, players));
+      expectConnectedLandforms(game, `seed ${seed}`);
       const reach = floodFrom(game, gateOf(game, entitiesOf(game.state.entities, 1, 'townCenter')[0]));
       for (let p = 1; p <= players.length; p++) {
         const tcs = entitiesOf(game.state.entities, p, 'townCenter');
@@ -223,6 +245,7 @@ describe('practice map size presets (96/120/144) × 2-4 players', () => {
         const game = createGame(practiceConfig(9000 + size + playerCount, players, size));
         expect(game.state.map.width).toBe(size);
         expect(game.state.map.height).toBe(size);
+        expectConnectedLandforms(game, `${label} ${playerCount}p`);
 
         const tcs: Entity[] = [];
         for (let p = 1; p <= playerCount; p++) {

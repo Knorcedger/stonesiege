@@ -172,16 +172,20 @@ picking variants per-coordinate hash at runtime.
 | `dirt` | `dirtBase` | ~50 px: 50% `dirtDark`, 30% `dirtLight`, 20% `dirtPale`; 3–5 pebbles (2×1 `dirtDark` with 1 px `dirtLight` top) | 3 — v2 adds a dry crack: 6–10 px meandering 1 px `dirtDark` polyline |
 | `forest` (floor under trees) | `grassShadow` | ~80 px litter: 50% `leafShadow`, 30% `grassDark`, 20% `dirtDark`; 2–3 root knuckles (2×2 `woodDark`) | 3 |
 | `water` | `waterBase` | 3 horizontal shimmer bands: rows y=8/16/24 dashed `waterLight` (dash 4 px, gap 6 px, x-offset differs per variant); ~10 px `waterDeep` speckle below center; 1–2 single `highlight` sparkle px | 4 (band offsets shift +2 px per variant — tiling water looks alive without animation) |
+| `shallows` | `waterLight` | sandy-bottom patches, sparse `waterBase` speckle, and broken `highlight` ripple bands | 3 |
+| `sand` | `dirtPale` | sparse earth/thatch flecks and short wind-ripple dashes | 3 |
 | `road` | `dirtPale` | ~40 px: 50% `dirtLight`, 30% `dirtBase`, 20% `stoneLight` fleck; two 1 px wheel-rut lines of `dirtBase` running corner-to-corner of the diamond long axis | 3 |
 | `farmland` (under farm objects, optional) | `dirtBase` | plow rows: 1 px `dirtDark` lines parallel to the NW edge every 4 px, `dirtLight` line adjacent (furrow highlight) | 2 |
+| `snow` | `highlight` | cool stone/parchment speckle with short pale drift lines | 3 |
+| `cliff` (blocked) | `stoneDark` | raised `stoneBase`/`stoneLight` shelf over dark layered strata, broken seams, cracks, and stone flecks | 3 |
 
 Noise placement: rejection-sample points inside the diamond via
 `insideDiamond(x, y) = abs(x-32)/32 + abs(y-16)/16 <= 1` (minus a 1 px margin).
 
 ### 3.2 Edge transitions
 
-Terrain priority (high paints over low): `road 5 > farmland 4 > forest 3 > grass 2 >
-dirt 1 > water 0`.
+Terrain priority (high paints over low): `cliff > road > farmland > forest > snow >
+grass > dirt > sand > shallows > water`.
 
 Algorithm (implemented as an overlay pass when the renderer composes, or as baked
 transition frames `terr/<hi>_<lo>/<edge>` if we prefer baking — assetgen picks baked;

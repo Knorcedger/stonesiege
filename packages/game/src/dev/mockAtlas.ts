@@ -25,10 +25,10 @@ const SIEGE_IDS = new Set(['batteringRam', 'cappedRam', 'siegeRam', 'mangonel', 
 
 const TERRAIN_COLORS: Record<string, string> = {
   grass: '#6B8C3F', dirt: '#8A683E', sand: '#C2A268', water: '#2C6283',
-  shallows: '#4884A4', road: '#CBAB70', farmland: '#7A5E38', snow: '#D9D9E2',
+  shallows: '#4884A4', road: '#CBAB70', farmland: '#7A5E38', snow: '#D9D9E2', cliff: '#55555E',
 };
 const TERRAIN_VARIANTS: Record<string, number> = {
-  grass: 4, dirt: 3, sand: 3, water: 4, shallows: 3, road: 3, farmland: 2, snow: 3,
+  grass: 4, dirt: 3, sand: 3, water: 4, shallows: 3, road: 3, farmland: 2, snow: 3, cliff: 3,
 };
 
 function hashStr(s: string): number {

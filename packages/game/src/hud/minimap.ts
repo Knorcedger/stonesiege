@@ -11,7 +11,7 @@ import { setGameTooltip } from '../tooltip';
 const SIZE = 168;
 const TERRAIN_MINI_COLORS: Record<string, string> = {
   grass: '#527033', dirt: '#6B4E2E', sand: '#A8854F', water: '#1D4763',
-  shallows: '#2C6283', road: '#A8854F', farmland: '#5E4A2C', snow: '#B9B9C4',
+  shallows: '#2C6283', road: '#A8854F', farmland: '#5E4A2C', snow: '#B9B9C4', cliff: '#3E4654',
 };
 const RES_COLORS: Record<string, string> = {
   goldMine: '#E6C04A', stoneMine: '#C0C0C6', berryBush: '#A62E3E', tree: '#2E5426',

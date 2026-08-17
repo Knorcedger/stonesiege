@@ -1,9 +1,10 @@
 // Practice random-map generation, AoE2 "Arabia"-style fair starts. Seeded and fully
 // deterministic: players in spaced quadrants; each start gets TC + 3 villagers + scout,
 // 4 sheep, a berry patch, main + secondary gold, stone (+ small secondary), nearby deer
-// and two distant wolves. Forest blobs with clearings avoid start zones, extra neutral
-// golds sit near the middle, and a carve pass guarantees every TC AND every resource
-// cluster (players' + mid golds) can be reached — forests never wall anything off.
+// and two distant wolves. Rivers have broad shallows crossings; broken cliff ridges
+// create defensible terrain without sealing regions. Forest blobs with clearings avoid
+// start zones, extra neutral golds sit near the middle, and carve passes guarantee every
+// land region, TC, and resource cluster can be reached.
 
 import { gameData } from '@bf/data';
 import type { GameMap, TerrainId } from './types';
@@ -13,14 +14,17 @@ import type { SimRng } from './rng';
 import { findFreeAdjacentTile, removeEntity, spawnEntity } from './entities';
 
 export const TERRAIN_IDS: readonly TerrainId[] = [
-  'grass', 'dirt', 'sand', 'water', 'shallows', 'road', 'farmland', 'snow',
+  'grass', 'dirt', 'sand', 'water', 'shallows', 'road', 'farmland', 'snow', 'cliff',
 ];
 const T_GRASS = 0;
 const T_DIRT = 1;
+const T_SAND = 2;
 const T_WATER = 3;
+const T_SHALLOWS = 4;
+const T_CLIFF = 8;
 
 export function terrainPassable(terrainIndex: number): boolean {
-  return terrainIndex !== T_WATER;
+  return terrainIndex !== T_WATER && terrainIndex !== T_CLIFF;
 }
 
 /**
@@ -31,7 +35,7 @@ export const MAP_SIZE_PRESETS = { small: 96, medium: 120, large: 144 } as const;
 export type MapSizePreset = keyof typeof MAP_SIZE_PRESETS;
 
 /**
- * 1 = terrain passable per tile (water is not); blockers overlay separately.
+ * 1 = terrain passable per tile (water and cliffs are not); blockers overlay separately.
  * Pure function of the map — snapshot restore re-derives it instead of storing it.
  * Resolves passability through terrainIds so scenario maps with custom index order work.
  */
@@ -39,7 +43,8 @@ export function buildWalkTerrain(map: GameMap): Uint8Array {
   const walk = new Uint8Array(map.width * map.height);
   const passableIndex = new Uint8Array(map.terrainIds.length);
   for (let i = 0; i < map.terrainIds.length; i++) {
-    passableIndex[i] = map.terrainIds[i] === 'water' ? 0 : 1;
+    const id = map.terrainIds[i];
+    passableIndex[i] = id === 'water' || id === 'cliff' ? 0 : 1;
   }
   for (let i = 0; i < walk.length; i++) walk[i] = passableIndex[map.terrain[i]] ?? 1;
   return walk;
@@ -71,7 +76,9 @@ function playerAnchors(rng: SimRng, w: number, h: number, count: number): Array<
 const START_ZONE_RADIUS = 14; // forests keep out of this ring around each anchor
 
 function tileFree(state: SimState, x: number, y: number): boolean {
-  return isTileWalkable(state, x, y);
+  if (!isTileWalkable(state, x, y)) return false;
+  const terrainId = state.map.terrainIds[state.map.terrain[tileIndex(state.map, x, y)]];
+  return terrainId !== 'shallows';
 }
 
 /** Collect `count` free tiles clustered around (cx, cy), spiraling outward. */
@@ -166,6 +173,200 @@ function paintDirtPatches(state: SimState, rng: SimRng): void {
       }
     }
   }
+}
+
+/** One edge-to-edge meandering river with three wide, permanently open fords. */
+function paintRiver(state: SimState, rng: SimRng): void {
+  const { width, height, terrain } = state.map;
+  const vertical = rng.chance(1, 2);
+  const length = vertical ? height : width;
+  const breadth = vertical ? width : height;
+  const centers = new Int16Array(length);
+  const minCenter = Math.floor((breadth * 2) / 5);
+  const maxCenter = Math.floor((breadth * 3) / 5);
+  let center = rng.nextRange(minCenter, maxCenter);
+  let drift = rng.nextRange(-1, 1);
+
+  const indexAt = (along: number, across: number): number =>
+    vertical ? along * width + across : across * width + along;
+
+  for (let along = 0; along < length; along++) {
+    if (along % 5 === 0) {
+      drift = Math.max(-1, Math.min(1, drift + rng.nextRange(-1, 1)));
+      if (drift === 0 && rng.chance(1, 3)) drift = rng.chance(1, 2) ? -1 : 1;
+    }
+    center = Math.max(minCenter, Math.min(maxCenter, center + drift));
+    if (center === minCenter) drift = 1;
+    else if (center === maxCenter) drift = -1;
+    centers[along] = center;
+
+    // Sand banks make the river readable; the three inner tiles are deep water.
+    for (let across = center - 3; across <= center + 3; across++) {
+      if (across < 0 || across >= breadth) continue;
+      terrain[indexAt(along, across)] = Math.abs(across - center) <= 1 ? T_WATER : T_SAND;
+    }
+  }
+
+  // A three-tile-wide ford at each quarter keeps both banks strategically connected.
+  for (const fraction of [1, 2, 3]) {
+    const ford = Math.floor((length * fraction) / 4);
+    for (let along = Math.max(0, ford - 1); along <= Math.min(length - 1, ford + 1); along++) {
+      const centerAtFord = centers[along];
+      for (let across = centerAtFord - 2; across <= centerAtFord + 2; across++) {
+        if (across < 0 || across >= breadth) continue;
+        const index = indexAt(along, across);
+        if (terrain[index] === T_WATER || terrain[index] === T_SAND) terrain[index] = T_SHALLOWS;
+      }
+    }
+  }
+}
+
+function nearAnchor(
+  anchors: Array<{ x: number; y: number }>, x: number, y: number, radius: number,
+): boolean {
+  return anchors.some((a) => {
+    const dx = x - a.x, dy = y - a.y;
+    return dx * dx + dy * dy < radius * radius;
+  });
+}
+
+/** Broken 2–3-tile-thick ridges: every ridge has a deliberate pass and open ends. */
+function paintCliffs(
+  state: SimState, rng: SimRng, anchors: Array<{ x: number; y: number }>,
+): void {
+  const { width, height, terrain } = state.map;
+  const ridgeCount = Math.max(2, Math.floor((width * height) / 4200));
+  const directions = [
+    { x: 1, y: 0 }, { x: 0, y: 1 }, { x: 1, y: 1 }, { x: 1, y: -1 },
+  ] as const;
+
+  for (let ridge = 0; ridge < ridgeCount; ridge++) {
+    const direction = directions[rng.nextInt(directions.length)];
+    const perpendicular = { x: -direction.y, y: direction.x };
+    const length = rng.nextRange(16, 28);
+    let cx = rng.nextRange(12, width - 13);
+    let cy = rng.nextRange(12, height - 13);
+    for (let attempt = 0; attempt < 20 && nearAnchor(anchors, cx, cy, START_ZONE_RADIUS); attempt++) {
+      cx = rng.nextRange(12, width - 13);
+      cy = rng.nextRange(12, height - 13);
+    }
+    const gap = rng.nextRange(-3, 3);
+    let bend = 0;
+
+    for (let step = -(length >> 1); step <= (length >> 1); step++) {
+      if (Math.abs(step - gap) <= 1) continue; // at least a three-tile pass
+      if ((step + length) % 6 === 0) bend = Math.max(-2, Math.min(2, bend + rng.nextRange(-1, 1)));
+      const baseX = cx + direction.x * step + perpendicular.x * bend;
+      const baseY = cy + direction.y * step + perpendicular.y * bend;
+      for (let thickness = -1; thickness <= 1; thickness++) {
+        const x = baseX + perpendicular.x * thickness;
+        const y = baseY + perpendicular.y * thickness;
+        if (x < 4 || y < 4 || x >= width - 4 || y >= height - 4) continue;
+        if (nearAnchor(anchors, x, y, START_ZONE_RADIUS - 2)) continue;
+        const index = y * width + x;
+        if (terrain[index] === T_WATER || terrain[index] === T_SHALLOWS) continue;
+        terrain[index] = T_CLIFF;
+      }
+    }
+  }
+}
+
+function terrainTilePassable(map: GameMap, index: number): boolean {
+  const id = map.terrainIds[map.terrain[index]];
+  return id !== 'water' && id !== 'cliff';
+}
+
+/** 4-way flood: stricter than movement, so diagonal corner contact cannot fake access. */
+function floodTerrain(map: GameMap, start: number): Uint8Array {
+  const seen = new Uint8Array(map.width * map.height);
+  const queue = [start];
+  seen[start] = 1;
+  while (queue.length > 0) {
+    const index = queue.pop()!;
+    const x = index % map.width, y = (index / map.width) | 0;
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+      const nx = x + dx, ny = y + dy;
+      if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+      const next = ny * map.width + nx;
+      if (!seen[next] && terrainTilePassable(map, next)) {
+        seen[next] = 1;
+        queue.push(next);
+      }
+    }
+  }
+  return seen;
+}
+
+/** Public invariant used by tests and future map generators. */
+export function allPassableTerrainConnected(map: GameMap): boolean {
+  let start = -1;
+  for (let i = 0; i < map.terrain.length; i++) {
+    if (terrainTilePassable(map, i)) { start = i; break; }
+  }
+  if (start < 0) return true;
+  const seen = floodTerrain(map, start);
+  for (let i = 0; i < map.terrain.length; i++) {
+    if (terrainTilePassable(map, i) && !seen[i]) return false;
+  }
+  return true;
+}
+
+/** Convert a narrow blocked route into grass (cliff) or shallows (water). */
+function carveTerrainCorridor(state: SimState, from: number, to: number): void {
+  const { map } = state;
+  let x = from % map.width, y = (from / map.width) | 0;
+  const x1 = to % map.width, y1 = (to / map.width) | 0;
+  const dx = Math.abs(x1 - x), dy = Math.abs(y1 - y);
+  const stepX = x < x1 ? 1 : -1, stepY = y < y1 ? 1 : -1;
+  let err = dx - dy;
+  for (;;) {
+    for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        const nx = x + ox, ny = y + oy;
+        if (nx < 0 || ny < 0 || nx >= map.width || ny >= map.height) continue;
+        const index = ny * map.width + nx;
+        if (map.terrain[index] === T_WATER) map.terrain[index] = T_SHALLOWS;
+        else if (map.terrain[index] === T_CLIFF) map.terrain[index] = T_GRASS;
+      }
+    }
+    if (x === x1 && y === y1) break;
+    const e2 = 2 * err;
+    if (e2 > -dy) { err -= dy; x += stepX; }
+    if (e2 < dx) { err += dx; y += stepY; }
+  }
+}
+
+/** Repair any land pocket by cutting a pass or adding a ford to the main component. */
+function ensureTerrainConnectivity(state: SimState): void {
+  const { map } = state;
+  for (let pass = 0; pass < 64; pass++) {
+    let start = -1;
+    for (let i = 0; i < map.terrain.length; i++) {
+      if (terrainTilePassable(map, i)) { start = i; break; }
+    }
+    if (start < 0) break;
+    const seen = floodTerrain(map, start);
+    let pocket = -1;
+    for (let i = 0; i < map.terrain.length; i++) {
+      if (terrainTilePassable(map, i) && !seen[i]) { pocket = i; break; }
+    }
+    if (pocket < 0) {
+      state.walkTerrain = buildWalkTerrain(map);
+      return;
+    }
+
+    const px = pocket % map.width, py = (pocket / map.width) | 0;
+    let nearest = start, nearestD = Infinity;
+    for (let i = 0; i < seen.length; i++) {
+      if (!seen[i]) continue;
+      const dx = (i % map.width) - px, dy = ((i / map.width) | 0) - py;
+      const distance = dx * dx + dy * dy;
+      if (distance < nearestD) { nearestD = distance; nearest = i; }
+    }
+    carveTerrainCorridor(state, pocket, nearest);
+  }
+  state.walkTerrain = buildWalkTerrain(map);
+  if (!allPassableTerrainConnected(map)) throw new Error('mapgen failed to connect every land region');
 }
 
 function growForests(state: SimState, rng: SimRng, anchors: Array<{ x: number; y: number }>): void {
@@ -331,6 +532,9 @@ export function generatePracticeMap(state: SimState, rng: SimRng): void {
   paintDirtPatches(state, rng.fork(101));
 
   const anchors = playerAnchors(rng.fork(102), width, height, playerCount);
+  paintRiver(state, rng.fork(105));
+  paintCliffs(state, rng.fork(106), anchors);
+  ensureTerrainConnectivity(state);
 
   // player starts BEFORE forests so start layouts never fight the treeline
   const resourceClusters: Array<Array<{ x: number; y: number }>> = [];

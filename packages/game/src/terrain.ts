@@ -14,10 +14,11 @@ const MAX_BAKED_CHUNKS = 30;
 /**
  * Terrain priority (high bleeds over low) — ART_BIBLE §3.2 order, extended with
  * the sim-only terrains exactly as the generated terrain.json transition pairs
- * imply: road > farmland > (forest) > snow > grass > dirt > sand > shallows > water.
+ * imply: cliff > road > farmland > (forest) > snow > grass > dirt > sand > shallows > water.
  */
 const TERRAIN_PRIORITY: Record<string, number> = {
-  road: 8, farmland: 7, forest: 6, snow: 5, grass: 4, dirt: 3, sand: 2, shallows: 1, water: 0,
+  cliff: 9, road: 8, farmland: 7, forest: 6, snow: 5,
+  grass: 4, dirt: 3, sand: 2, shallows: 1, water: 0,
 };
 
 interface Chunk {

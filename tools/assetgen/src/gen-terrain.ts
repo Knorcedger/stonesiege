@@ -19,8 +19,9 @@ export interface TerrainSpec {
   base: RGB;
 }
 
-/** Priority order: road > farmland > snow > grass > dirt > sand > shallows > water. */
+/** Priority order: cliff > road > farmland > snow > grass > dirt > sand > shallows > water. */
 export const TERRAINS: readonly TerrainSpec[] = [
+  { id: 'cliff', priority: 8, variants: 3, base: PALETTE.stoneDark },
   { id: 'road', priority: 7, variants: 3, base: PALETTE.dirtPale },
   { id: 'farmland', priority: 6, variants: 2, base: PALETTE.dirtBase },
   { id: 'snow', priority: 5, variants: 3, base: PALETTE.highlight },
@@ -254,6 +255,43 @@ function snowTile(r: Raster, rng: Rng, variant: number): void {
   }
 }
 
+/** Raised, broken stone shelf. Dark lower strata make the blocked tile read as height. */
+function cliffTile(r: Raster, rng: Rng, variant: number): void {
+  baseDiamond(r, PALETTE.stoneDark);
+  for (let y = 2; y < TILE_H - 1; y++) {
+    const row = diamondRow(y, TILE_W, TILE_H);
+    if (!row) continue;
+    for (let x = row[0]; x < row[1]; x++) {
+      const upperFace = y < 16 + (((x + variant * 5) % 13) === 0 ? 1 : 0);
+      if (upperFace) r.set(x, y, y < 9 ? PALETTE.stoneLight : PALETTE.stoneBase);
+      else if ((y + variant) % 5 === 0 && (x + y) % 4 !== 0) r.set(x, y, PALETTE.slateDark);
+    }
+  }
+
+  // Layer seams and short diagonal cracks keep repeated ridge tiles organic.
+  for (const seamY of [16, 22, 27]) {
+    const offset = (variant * 7 + seamY) % 11;
+    for (let x = 2; x < TILE_W - 2; x++) {
+      if ((x + offset) % 11 < 7 && inTile(x, seamY)) r.set(x, seamY, PALETTE.outline);
+    }
+  }
+  const cracks = 3 + variant;
+  for (let i = 0; i < cracks; i++) {
+    let [x, y] = samplePoint(rng);
+    y = Math.max(8, Math.min(25, y));
+    for (let step = 0; step < 4; step++) {
+      if (inTile(x, y)) r.set(x, y, PALETTE.stoneDark);
+      x += step % 2 === 0 ? 1 : -1;
+      y += 1;
+    }
+  }
+  speckle(r, rng, 18, [
+    [PALETTE.stonePale, 25],
+    [PALETTE.stoneLight, 35],
+    [PALETTE.slateDark, 40],
+  ]);
+}
+
 const TILE_PAINTERS: Record<TerrainId, (r: Raster, rng: Rng, variant: number) => void> = {
   grass: grassTile,
   dirt: dirtTile,
@@ -263,6 +301,7 @@ const TILE_PAINTERS: Record<TerrainId, (r: Raster, rng: Rng, variant: number) =>
   road: roadTile,
   farmland: farmlandTile,
   snow: snowTile,
+  cliff: cliffTile,
 };
 
 /**

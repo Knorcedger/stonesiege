@@ -22,7 +22,9 @@ export type AgeId = 'dark' | 'feudal' | 'castle' | 'imperial';
 export const AGES: readonly AgeId[] = ['dark', 'feudal', 'castle', 'imperial'] as const;
 
 // ---------- terrain ----------
-export type TerrainId = 'grass' | 'dirt' | 'sand' | 'water' | 'shallows' | 'road' | 'farmland' | 'snow';
+export type TerrainId =
+  | 'grass' | 'dirt' | 'sand' | 'water' | 'shallows'
+  | 'road' | 'farmland' | 'snow' | 'cliff';
 
 export interface GameMap {
   width: number; // tiles

@@ -3,7 +3,7 @@
 import type { Entity, GameConfig, GameMap, PlayerSetup, ScenarioStart, TerrainId } from './types';
 
 export const TEST_TERRAIN_IDS: readonly TerrainId[] = [
-  'grass', 'dirt', 'sand', 'water', 'shallows', 'road', 'farmland', 'snow',
+  'grass', 'dirt', 'sand', 'water', 'shallows', 'road', 'farmland', 'snow', 'cliff',
 ];
 
 export function grassMap(width: number, height: number): GameMap {

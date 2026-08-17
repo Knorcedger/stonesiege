@@ -36,7 +36,7 @@ export const OBJECT_DEF_IDS: Record<NonNullable<MapToken['object']>, string> = {
 };
 
 const VALID_TERRAINS: readonly TerrainId[] = [
-  'grass', 'dirt', 'sand', 'water', 'shallows', 'road', 'farmland', 'snow',
+  'grass', 'dirt', 'sand', 'water', 'shallows', 'road', 'farmland', 'snow', 'cliff',
 ];
 
 export interface ScenarioMeta {
