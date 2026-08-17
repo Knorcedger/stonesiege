@@ -34,7 +34,10 @@
     "release:mobile:upload": "node tools/mobile-release.mjs upload",
     "release:android": "node tools/mobile-release.mjs android",
     "release:ios": "node tools/mobile-release.mjs ios",
-    "release:android:credentials": "zsh tools/mobile-keychain-setup.zsh"
+    "release:android:credentials": "zsh tools/mobile-keychain-setup.zsh",
+    "store:check": "node tools/store-readiness.mjs",
+    "store:check:local": "node tools/store-readiness.mjs --local-only",
+    "store:sync": "node tools/store-metadata-sync.mjs"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

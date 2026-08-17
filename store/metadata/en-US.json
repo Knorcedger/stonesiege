@@ -1,0 +1,45 @@
+{
+  "name": "StoneSiege",
+  "subtitle": "Build Empires. Make History.",
+  "shortDescription": "Build kingdoms, command armies and relive history in an offline medieval RTS.",
+  "promotionalText": "Raise a civilization from a working village to a fortified empire, command historically distinct armies, and fight through 48 campaign chapters — completely offline.",
+  "keywords": "strategy,RTS,medieval,history,empire,castle,battle,offline,campaign,viking,mongol",
+  "description": "BUILD A CIVILIZATION\nStart with villagers and scarce resources. Gather food, wood, gold, and stone; construct a working economy; advance through four ages; and turn an exposed settlement into a fortified medieval city.\n\nCOMMAND DISTINCT HISTORICAL ARMIES\nLead the Scots, English, Vikings, French, Mongols, Byzantines, or Saracens. Every civilization has its own battlefield identity, economic strengths, military bonuses, named units, and castle troops.\n\nPLAY 48 STORY CAMPAIGN CHAPTERS\nExperience seven chronological campaigns inspired by documented medieval history:\n\n• William Wallace and the Scottish rising\n• Henry V from Harfleur to the Treaty of Troyes\n• Harald Hardrada from exile to Stamford Bridge\n• Joan of Arc from Chinon to Compiègne\n• Chinggis Khan from survival on the steppe to empire\n• Alexios Komnenos and the recovery of Byzantium\n• Saladin from Egypt to Jerusalem and the Third Crusade\n\nHistorical outcomes are respected. Defeats, retreats, captures, and last stands remain part of the story instead of being rewritten as easy victories. Tactical layouts and dialogue are dramatized for play.\n\nFIGHT YOUR WAY\nTrain infantry, archers, cavalry, monks, siege engines, and civilization-specific elite troops. Build walls, towers, gates that open for friendly units, castles, and wonders. Use formations, rally points, control groups, terrain, rivers, cliffs, and multiple difficulty levels to shape every battle.\n\nDESIGNED FOR TOUCH\nA scalable landscape HUD, contextual controls, tooltips, minimap, pause menu, local save slots, and touch-first selection make a full real-time strategy game practical on phones and tablets. Mouse and keyboard controls are also supported on the web version.\n\nPLAY OFFLINE, WITHOUT DARK PATTERNS\nStoneSiege is a complete single-player game. It has no accounts, ads, analytics, tracking, loot boxes, subscriptions, or in-app purchases. Campaign progress, settings, and saved matches remain on your device.\n\nStoneSiege is built in public as an open-source historical strategy game. Learn more and play the web version at stonesiegegame.com.",
+  "releaseNotes": "Welcome to StoneSiege 0.1.1.\n\n• Seven historically distinct civilizations\n• Seven story campaigns with 48 playable chapters\n• Expanded Wallace campaign and new Henry V, Hardrada, Joan of Arc, Chinggis Khan, Alexios, and Saladin campaigns\n• Upgraded buildings, walls, gates, troops, and walking animations\n• Improved touch selection, rally points, scalable HUD, tooltips, pause saves, rivers, cliffs, and AI difficulty controls\n• Offline play with no accounts, ads, tracking, or purchases",
+  "supportUrl": "https://stonesiegegame.com/",
+  "marketingUrl": "https://stonesiegegame.com/",
+  "privacyPolicyUrl": "https://stonesiegegame.com/privacy",
+  "copyright": "2026 Flarmio Ltd",
+  "category": "Games / Strategy",
+  "price": "Free",
+  "reviewNotes": "StoneSiege is a landscape-only, offline single-player historical RTS. No account, login, network connection, purchase, subscription, advertisement, or special reviewer access is required. All gameplay is available immediately: tap Play, then choose Practice or Campaign. The app intentionally supports both landscape orientations and saves settings, campaign progress, and resumable matches only in local app storage. Historical battles contain small stylized combat units without blood, gore, or graphic injury. Support: support@flarmio.com.",
+  "ageRating": {
+    "minimumAudience": "13+",
+    "violence": "Frequent stylized medieval combat; no blood, gore, dismemberment, or graphic injury",
+    "matureThemes": "Historical descriptions include war, executions, captivity, and death",
+    "gambling": "None",
+    "userGeneratedContent": "None",
+    "unrestrictedWebAccess": "No"
+  },
+  "privacy": {
+    "dataCollected": false,
+    "dataShared": false,
+    "tracking": false,
+    "accounts": false,
+    "ads": false,
+    "analytics": false,
+    "purchases": false,
+    "localData": "Settings, campaign progress, and saved matches only; Android cloud backup is disabled"
+  },
+  "googlePlayDeclarations": {
+    "containsAds": false,
+    "appAccessRestricted": false,
+    "targetAudience": "13 and older; not designed for children",
+    "contentRating": "Complete IARC questionnaire using the age-rating statements above",
+    "dataSafety": "No data collected and no data shared",
+    "governmentApp": false,
+    "newsApp": false,
+    "healthApp": false,
+    "financialFeatures": false
+  }
+}

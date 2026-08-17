@@ -59,10 +59,10 @@ function frameMaskPixelCount(name: string): number {
 }
 
 describe('complete HD art override contract', () => {
-  it('covers every one of the 3,908 shipping frames exactly once at 2x', () => {
+  it('covers every one of the 3,943 shipping frames exactly once at 2x', () => {
     expect(manifest.bespokeFrames).toBeGreaterThanOrEqual(90);
-    expect(manifest.convertedFrames + manifest.bespokeFrames).toBe(3908);
-    expect(manifest.frameCount).toBe(3908);
+    expect(manifest.convertedFrames + manifest.bespokeFrames).toBe(3943);
+    expect(manifest.frameCount).toBe(3943);
 
     const hdNames = new Set<string>();
     for (const { atlas } of hdAtlases()) {

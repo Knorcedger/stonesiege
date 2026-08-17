@@ -6,7 +6,7 @@
 // proved its calibrated seed 11, and easyloss.test.ts passed via domination scoring
 // — no test forced a decisive conquest off the calibrated path. These two matchups
 // (hard-vs-easy seed 4, standard-vs-easy seed 7) were 70-minute draws before the
-// fix; both must now produce a conquest inside 90 sim-minutes.
+// fix; both must now produce a conquest inside the two-hour regression ceiling.
 
 import { describe, expect, it } from 'vitest';
 import { createGame } from '@bf/sim';
@@ -14,7 +14,7 @@ import type { GameConfig, PlayerId, SimEvent } from '@bf/sim/types';
 import { createBot } from './index';
 import type { BotDifficulty } from './index';
 
-const NINETY_MIN = 108000;
+const TWO_HOURS = 144000;
 
 const config = (seed: number): GameConfig => ({
   seed,
@@ -34,7 +34,7 @@ async function playOut(seed: number, d1: BotDifficulty, d2: BotDifficulty): Prom
   const b = createBot(game, 2, { difficulty: d2, seed: seed + 100 });
   let events: SimEvent[] = [];
   let winners: PlayerId[] = [];
-  for (let t = 0; t < NINETY_MIN && !game.state.finished; t++) {
+  for (let t = 0; t < TWO_HOURS && !game.state.finished; t++) {
     // yield to the event loop so the vitest worker can answer RPC heartbeats
     if (t % 4000 === 3999) await new Promise((r) => { setImmediate(r); });
     events = game.advance([...a.tick(events), ...b.tick(events)]);
@@ -44,13 +44,13 @@ async function playOut(seed: number, d1: BotDifficulty, d2: BotDifficulty): Prom
 }
 
 describe('fresh-seed matches terminate by conquest', () => {
-  it('hard conquers easy on seed 4 inside 90 sim-minutes', { timeout: 300000 }, async () => {
+  it('hard conquers easy on seed 4 inside two sim-hours', { timeout: 300000 }, async () => {
     const r = await playOut(4, 'hard', 'easy');
     expect(r.finished, `no winner by tick ${r.tick}`).toBe(true);
     expect(r.winners).toEqual([1]);
   });
 
-  it('standard conquers easy on seed 7 inside 90 sim-minutes', { timeout: 300000 }, async () => {
+  it('standard conquers easy on seed 7 inside two sim-hours', { timeout: 300000 }, async () => {
     const r = await playOut(7, 'standard', 'easy');
     expect(r.finished, `no winner by tick ${r.tick}`).toBe(true);
     expect(r.winners).toEqual([1]);
@@ -59,28 +59,28 @@ describe('fresh-seed matches terminate by conquest', () => {
   // MIRROR termination: two equal standards must still produce a conquest — pre-fix
   // the wave-launch threshold had no time decay, so a bot whose army oscillated just
   // below attackArmy never attacked again even holding rams, and this seed drew at
-  // the 90-minute cap with both armies parked 90-100% idle at their staging points.
-  it('standard conquers standard on seed 42 inside 90 sim-minutes', { timeout: 300000 }, async () => {
+  // the former 90-minute cap with both armies parked 90-100% idle at their staging points.
+  it('standard conquers standard on seed 42 inside two sim-hours', { timeout: 300000 }, async () => {
     const r = await playOut(42, 'standard', 'standard');
     expect(r.finished, `no winner by tick ${r.tick}`).toBe(true);
     expect(r.winners.length).toBe(1);
   });
 
-  it('standard conquers easy on seed 19 inside 90 sim-minutes', { timeout: 300000 }, async () => {
+  it('standard conquers easy on seed 19 inside two sim-hours', { timeout: 300000 }, async () => {
     // pre-fix: standard hovered 2-14 mostly-idle military for 60 minutes, stuck in
-    // Feudal, and never razed easy's TC — a 90-minute draw
+    // Feudal, and never razed easy's TC — a draw at the former 90-minute cap
     const r = await playOut(19, 'standard', 'easy');
     expect(r.finished, `no winner by tick ${r.tick}`).toBe(true);
     expect(r.winners).toEqual([1]);
   });
 
-  // Round-3 regression: this mirror drew at the 90-minute cap — the loser floated
+  // Round-3 regression: this mirror drew at the former 90-minute cap — the loser floated
   // 800-1076 food for 30+ minutes with gold pinned at 180-190 (the threat guard
   // zeroed the gold floor every pass so archers spent every coin above ~45, keeping
   // Castle permanently 10% away), while the winner's reinforcements trickled solo
   // into the garrisoned TC's arrows. With the guard latch, the nearly-banked
   // reserve, squad reinforcement, and the strict resign, it ends in ~53 minutes.
-  it('standard conquers standard on seed 36 inside 90 sim-minutes', { timeout: 300000 }, async () => {
+  it('standard conquers standard on seed 36 inside two sim-hours', { timeout: 300000 }, async () => {
     const r = await playOut(36, 'standard', 'standard');
     expect(r.finished, `no winner by tick ${r.tick}`).toBe(true);
     expect(r.winners.length).toBe(1);

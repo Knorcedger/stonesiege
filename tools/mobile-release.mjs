@@ -74,6 +74,7 @@ function checksAndSync() {
     run('npm', ['run', 'typecheck']);
     run('npm', ['audit', '--omit=dev']);
   }
+  run('npm', ['run', 'store:check:local']);
   run('npm', ['run', 'mobile:sync']);
 }
 
@@ -120,7 +121,7 @@ function buildIos() {
     '-exportPath', iosExport,
     '-exportOptionsPlist', 'ios/ExportOptions.plist',
   ]);
-  iosPackage();
+  validateIos(iosPackage());
 }
 
 function iosPackage() {
@@ -128,6 +129,17 @@ function iosPackage() {
   const ipa = readdirSync(iosExport).find((name) => name.endsWith('.ipa'));
   if (!ipa) throw new Error(`No IPA found in ${iosExport}`);
   return join(iosExport, ipa);
+}
+
+let validatedIosPath = '';
+function validateIos(ipa) {
+  if (validatedIosPath === ipa) return;
+  requireFile(join(appleKeysDir, `AuthKey_${appleKeyId}.p8`), 'App Store Connect API key');
+  const authArgs = ['--api-key', appleKeyId, '--api-issuer', appleIssuerId];
+  run('xcrun', ['altool', '--validate-app', '-f', ipa, ...authArgs], {
+    env: { API_PRIVATE_KEYS_DIR: appleKeysDir },
+  });
+  validatedIosPath = ipa;
 }
 
 function uploadAndroid() {
@@ -146,10 +158,9 @@ function uploadAndroid() {
 
 function uploadIos() {
   const ipa = iosPackage();
-  requireFile(join(appleKeysDir, `AuthKey_${appleKeyId}.p8`), 'App Store Connect API key');
+  validateIos(ipa);
   const authArgs = ['--api-key', appleKeyId, '--api-issuer', appleIssuerId];
   const env = { API_PRIVATE_KEYS_DIR: appleKeysDir };
-  run('xcrun', ['altool', '--validate-app', '-f', ipa, ...authArgs], { env });
   run('xcrun', ['altool', '--upload-app', '-f', ipa, ...authArgs], { env });
   run('node', [
     'tools/app-store-connect-release.mjs',
