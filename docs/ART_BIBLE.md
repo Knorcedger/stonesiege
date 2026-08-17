@@ -322,6 +322,12 @@ this table rather than their unlock age.
 Per contract: `construct0..2` + `rubble`, one set per building (age-variant buildings
 use the *unlock-age* look for scaffolds).
 
+The HD override keeps all three construction stages on the approved completed
+building's exact canvas and ground anchor. It progressively reveals that same
+silhouette beneath a neutral foundation/scaffold layer; an older building recipe
+must never be overlaid into an authored construction frame. Additional Town Centers
+use the Castle-age model because that is the age in which they become constructible.
+
 - `construct0`: footprint diamond of `dirtBase` (edges 50%-dithered into terrain), 4
   corner stakes (1×4 `woodBase`), 2–3 plank piles (6×2 `woodPale` stacks), one
   `clothDark` sack.

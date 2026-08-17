@@ -73,10 +73,13 @@ legacy fallback and HD overrides.
 
 ## Production coverage
 
-1. Buildings: every completed building and age variant is newly rendered;
-   construction stages composite the new render with mechanically exact
-   scaffolding. Rubble uses the systemic material pass because it already meets
-   the material and gameplay-readability target.
+1. Buildings: every completed building and age variant is newly rendered.
+   Construction stages reuse the approved final canvas, footprint, scale, and
+   anchor, progressively reveal that exact silhouette, and add only the neutral
+   foundation plus HD scaffolding—legacy building geometry is never composited
+   into an authored stage. Rubble uses the systemic material pass because it
+   already meets the material and gameplay-readability target. Run
+   `node tools/hd-art/qa-construction.ts` to inspect every lifecycle side by side.
 2. Static resources: trees, stump, berries, gold, stone, and farms are newly
    rendered. Terrain tiles and transitions use the systemic material pass.
 3. Units: villagers, infantry, archers, cavalry, monks, siege, sheep, deer, and

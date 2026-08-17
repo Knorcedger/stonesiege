@@ -3,6 +3,7 @@ import { createHash } from 'node:crypto';
 import { join } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { PNG } from 'pngjs';
+import { buildings } from '../../packages/data/src/buildings.ts';
 
 const ROOT = join(import.meta.dirname, '../..');
 const HD = join(ROOT, 'apps/web/public/assets/hd');
@@ -120,6 +121,33 @@ describe('complete HD art override contract', () => {
     expect(frames['obj/farm/3'].anchor).toEqual({ x: 0.5, y: 0.399 });
     expect(frames['obj/tree/0'].anchor).toEqual({ x: 0.5, y: 0.9688 });
     expect(frames['obj/berries'].anchor).toEqual({ x: 0.5, y: 0.9063 });
+  });
+
+  it('uses the approved final canvas and anchor for every construction stage', () => {
+    for (const id of Object.keys(buildings).filter((buildingId) => buildingId !== 'farm')) {
+      const doneName = id === 'house'
+        ? 'bld/house/dark/done'
+        : id === 'townCenter'
+          ? 'bld/townCenter/castle/done'
+          : `bld/${id}/done`;
+      const doneMatch = hdAtlases().find(({ atlas }) => atlas.frames[doneName]);
+      expect(doneMatch, doneName).toBeDefined();
+      const done = doneMatch!.atlas.frames[doneName];
+      const hashes = [framePixelsHash(doneName)];
+
+      for (const stage of [0, 1, 2]) {
+        const name = `bld/${id}/construct${stage}`;
+        const match = hdAtlases().find(({ atlas }) => atlas.frames[name]);
+        expect(match, name).toBeDefined();
+        expect(match!.file.startsWith('hero-redrawn-'), `${name} must be a bespoke override`).toBe(true);
+        const frame = match!.atlas.frames[name];
+        expect(frame.frame.w, `${name} width`).toBe(done.frame.w);
+        expect(frame.frame.h, `${name} height`).toBe(done.frame.h);
+        expect(frame.anchor, `${name} anchor`).toEqual(done.anchor);
+        hashes.push(framePixelsHash(name));
+      }
+      expect(new Set(hashes).size, `${id} lifecycle stages must be visually distinct`).toBe(4);
+    }
   });
 
   it('does not stamp legacy player-color bars onto buildings or resources', () => {

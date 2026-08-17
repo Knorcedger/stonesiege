@@ -14,6 +14,7 @@ import { genObjects } from '../assetgen/src/gen-objects.ts';
 import { genTerrain } from '../assetgen/src/gen-terrain.ts';
 import { genUi } from '../assetgen/src/gen-ui.ts';
 import { genUnits } from '../assetgen/src/gen-units.ts';
+import { PALETTE } from '../assetgen/src/palette.ts';
 import { writePng } from '../assetgen/src/png.ts';
 import { Raster } from '../assetgen/src/raster.ts';
 import { HD_DENSITY, MaterialLibrary, materializeFrame } from './materialize.ts';
@@ -738,24 +739,29 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
 ];
 
 interface ConstructionCutout {
-  spec: CutoutSpec;
   name: string;
   stage: 0 | 1 | 2;
 }
 
 const CONSTRUCTION_CUTOUTS: ConstructionCutout[] = [];
 const constructionPrefixes = new Set<string>();
+
+function constructionPrefixForDone(name: string): string {
+  let prefix = name.slice(0, -'/done'.length);
+  if (prefix.startsWith('bld/house/') || prefix.startsWith('bld/townCenter/')) {
+    prefix = prefix.replace(/\/(dark|feudal|castle|imperial)$/, '');
+  }
+  return prefix;
+}
+
 for (const spec of CUTOUT_SPECS) {
   for (const name of spec.frames) {
     if (!name.startsWith('bld/') || !name.endsWith('/done')) continue;
-    let prefix = name.slice(0, -'/done'.length);
-    if (prefix.startsWith('bld/house/') || prefix.startsWith('bld/townCenter/')) {
-      prefix = prefix.replace(/\/(dark|feudal|castle|imperial)$/, '');
-    }
+    const prefix = constructionPrefixForDone(name);
     if (constructionPrefixes.has(prefix)) continue;
     constructionPrefixes.add(prefix);
     for (const stage of [0, 1, 2] as const) {
-      CONSTRUCTION_CUTOUTS.push({ spec, name: `${prefix}/construct${stage}`, stage });
+      CONSTRUCTION_CUTOUTS.push({ name: `${prefix}/construct${stage}`, stage });
     }
   }
 }
@@ -1175,19 +1181,101 @@ function gateLayerFrames(closed: FrameDef): FrameDef[] {
   ];
 }
 
+function rasterAlphaBounds(raster: Raster): { top: number; bottom: number } {
+  let top = raster.height;
+  let bottom = -1;
+  for (let y = 0; y < raster.height; y++) {
+    for (let x = 0; x < raster.width; x++) {
+      if (raster.alphaAt(x, y) === 0) continue;
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  return bottom >= 0 ? { top, bottom } : { top: 0, bottom: 0 };
+}
+
+function blitAtSharedAnchor(target: FrameDef, overlay: FrameDef): void {
+  const targetAnchor = target.anchor ?? { x: target.raster.width / 2, y: target.raster.height / 2 };
+  const overlayAnchor = overlay.anchor ?? { x: overlay.raster.width / 2, y: overlay.raster.height / 2 };
+  target.raster.blit(
+    overlay.raster,
+    Math.round(targetAnchor.x - overlayAnchor.x),
+    Math.round(targetAnchor.y - overlayAnchor.y),
+  );
+}
+
+function scaffoldLine(
+  raster: Raster,
+  x0: number, y0: number, x1: number, y1: number,
+): void {
+  raster.line(x0, y0, x1, y1, PALETTE.woodDark);
+  raster.line(x0 + 1, y0, x1 + 1, y1, PALETTE.woodBase);
+  raster.line(x0 + 2, y0, x1 + 2, y1, PALETTE.woodLight);
+}
+
+/** HD scaffold built around the approved final footprint, never old geometry. */
+function addConstructionScaffold(frame: FrameDef, size: number, stage: 1 | 2): void {
+  const anchor = frame.anchor ?? { x: frame.raster.width / 2, y: frame.raster.height / 2 };
+  const bounds = rasterAlphaBounds(frame.raster);
+  const halfW = Math.min(frame.raster.width * 0.44, size * 58);
+  const halfH = Math.min(frame.raster.height * 0.2, size * 27);
+  const structureH = Math.max(28, anchor.y - bounds.top);
+  const scaffoldH = Math.round(structureH * (stage === 1 ? 0.58 : 0.84));
+  const left: readonly [number, number] = [Math.round(anchor.x - halfW), Math.round(anchor.y)];
+  const south: readonly [number, number] = [Math.round(anchor.x), Math.round(anchor.y + halfH)];
+  const right: readonly [number, number] = [Math.round(anchor.x + halfW), Math.round(anchor.y)];
+  const faces = stage === 1 ? [[left, south], [south, right]] as const : [[south, right]] as const;
+
+  for (const [start, end] of faces) {
+    const poles: Array<readonly [number, number]> = [
+      start,
+      [Math.round((start[0] + end[0]) / 2), Math.round((start[1] + end[1]) / 2)],
+      end,
+    ];
+    for (const [x, y] of poles) scaffoldLine(frame.raster, x, y, x, y - scaffoldH);
+    for (const level of [0.48, 0.96]) {
+      scaffoldLine(
+        frame.raster,
+        start[0], Math.round(start[1] - scaffoldH * level),
+        end[0], Math.round(end[1] - scaffoldH * level),
+      );
+    }
+    scaffoldLine(
+      frame.raster,
+      start[0], start[1] - 3,
+      end[0], end[1] - scaffoldH + 3,
+    );
+  }
+}
+
 function constructionFrame(
   entry: ConstructionCutout,
-  base: FrameDef,
+  done: FrameDef,
+  foundationBase: FrameDef,
   materials: MaterialLibrary,
 ): FrameDef {
-  const frame = cutoutFrame(entry.spec, entry.name, base);
-  const revealTop = Math.round(frame.raster.height * ([0.78, 0.5, 0.23][entry.stage]));
-  for (let y = 0; y < revealTop; y++) {
-    for (let x = 0; x < frame.raster.width; x++) frame.raster.clear(x, y);
+  // Every stage uses the exact approved done canvas + anchor, eliminating the
+  // scale/position jump and the legacy procedural silhouette at construct2.
+  const frame: FrameDef = {
+    name: entry.name,
+    raster: new Raster(done.raster.width, done.raster.height),
+    anchor: done.anchor,
+  };
+  const foundation = materializeFrame(foundationBase, materials);
+  blitAtSharedAnchor(frame, foundation);
+
+  if (entry.stage > 0) {
+    const revealed = done.raster.clone();
+    const bounds = rasterAlphaBounds(revealed);
+    const fraction = entry.stage === 1 ? 0.42 : 0.78;
+    const revealTop = Math.round(bounds.bottom - (bounds.bottom - bounds.top + 1) * fraction);
+    for (let y = 0; y < revealTop; y++) {
+      for (let x = 0; x < revealed.width; x++) revealed.clear(x, y);
+    }
+    frame.raster.blit(revealed, 0, 0);
+    const id = entry.name.split('/')[1];
+    addConstructionScaffold(frame, buildingDefs[id]?.size ?? 1, entry.stage === 1 ? 1 : 2);
   }
-  // Retain authored stage-specific scaffolding and foundations over the new
-  // render so construction remains mechanically legible and visibly advances.
-  frame.raster.blit(materializeFrame(base, materials).raster, 0, 0);
   return frame;
 }
 
@@ -1299,13 +1387,32 @@ const cutouts = CUTOUT_SPECS.flatMap((spec) => spec.frames.map((name) => {
   if (!base) throw new Error(`missing mechanical source frame for cutout ${name}`);
   return cutoutFrame(spec, name, base);
 }));
+const doneCutoutByConstructionPrefix = new Map<string, FrameDef>();
+for (const frame of cutouts) {
+  if (!frame.name.startsWith('bld/') || !frame.name.endsWith('/done')) continue;
+  const prefix = constructionPrefixForDone(frame.name);
+  // Extra Town Centers unlock in Castle Age, so their non-age-specific
+  // construction lifecycle must lead into the Castle model rather than briefly
+  // showing the Feudal architecture. Houses intentionally use their Dark source.
+  const preferred = prefix === 'bld/townCenter'
+    ? 'bld/townCenter/castle/done'
+    : prefix === 'bld/house'
+      ? 'bld/house/dark/done'
+      : null;
+  if (!doneCutoutByConstructionPrefix.has(prefix) || frame.name === preferred) {
+    doneCutoutByConstructionPrefix.set(prefix, frame);
+  }
+}
 const gateClosed = cutouts.find((frame) => frame.name === 'bld/gate/done');
 if (!gateClosed) throw new Error('missing approved closed gate cutout');
 const gateLayers = gateLayerFrames(gateClosed);
 const constructions = CONSTRUCTION_CUTOUTS.map((entry) => {
-  const base = sourceByName.get(entry.name);
-  if (!base) throw new Error(`missing mechanical source frame for construction ${entry.name}`);
-  return constructionFrame(entry, base, materials);
+  const prefix = entry.name.replace(/\/construct[0-2]$/, '');
+  const done = doneCutoutByConstructionPrefix.get(prefix);
+  if (!done) throw new Error(`missing approved done frame for construction ${entry.name}`);
+  const foundation = sourceByName.get(`${prefix}/construct0`);
+  if (!foundation) throw new Error(`missing mechanical foundation for construction ${entry.name}`);
+  return constructionFrame(entry, done, foundation, materials);
 });
 const bespokeFrames = [hero.frame, ...cutouts, ...gateLayers, ...constructions];
 const bespokeGroups = atlasGroups(bespokeFrames);
