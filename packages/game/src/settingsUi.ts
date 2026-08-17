@@ -1,4 +1,4 @@
-// Shared settings controls: volume/camera sliders + HP-bar toggle, used by
+// Shared settings controls: volume/camera/HUD sliders + HP-bar toggle, used by
 // BOTH the menu settings screen (screens/menu.ts) and the in-match pause
 // overlay (hud/hud.ts) — changing the volume must never cost a resign.
 // Injects its own stylesheet so it also works on boots that never showed the
@@ -85,6 +85,8 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
     (v) => updateSettings({ ambientVolume: v / 100 }));
   slider('CAMERA SPEED', s.cameraSpeed * 100, 50, 200, (v) => `${v}%`,
     (v) => updateSettings({ cameraSpeed: v / 100 }));
+  slider('HUD SIZE', s.hudScale * 100, 75, 125, (v) => `${v}%`,
+    (v) => updateSettings({ hudScale: v / 100 }));
 
   // HP-bar visibility: self-contained segmented toggle (updates its own .on
   // classes — no host re-render needed, unlike the old menu implementation)

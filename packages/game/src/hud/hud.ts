@@ -34,7 +34,7 @@ import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
 import type { UnitDisplayStats } from '../simBridge';
 import { formatMatchTime } from './summary';
-import { getSettings, updateSettings } from '../settings';
+import { getSettings, onSettingsChanged, updateSettings } from '../settings';
 import { extendedTooltip, techExtendedTip, unitExtendedTip } from './helpText';
 
 export interface HudHost {
@@ -118,6 +118,7 @@ const QUEUE_BLOCK_PX = `${QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP}p
 
 const HUD_CSS = `
 .bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; color:#F2E6CB; user-select:none; -webkit-user-select:none; text-shadow:0 1px 1px rgba(0,0,0,.65); }
+.bf-hudstage { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform-origin:top left; }
 .bf-num { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; }
 .bf-panel { background:linear-gradient(145deg,rgba(55,39,24,.96),rgba(25,17,11,.97)); border:1px solid #25170c; box-shadow:0 0 0 1px rgba(196,146,58,.7) inset, 0 0 0 3px rgba(87,57,29,.72) inset, 0 6px 18px rgba(0,0,0,.34); border-radius:6px; backdrop-filter:blur(2px); }
 .bf-top { position:absolute; top:6px; left:6px; right:6px; height:34px; display:flex; align-items:center; gap:12px; padding:0 10px; pointer-events:auto; }
@@ -279,6 +280,8 @@ export class Hud {
   private root: HTMLElement;
   private host: HudHost;
   private el: HTMLDivElement;
+  private stage: HTMLDivElement;
+  private stopSettingsListener: (() => void) | null = null;
   private resSpans = new Map<ResourceType, HTMLSpanElement>();
   private popSpan!: HTMLSpanElement;
   private ageSpan!: HTMLSpanElement;
@@ -341,11 +344,16 @@ export class Hud {
     this.el = document.createElement('div');
     this.el.className = 'bf-hud';
     root.appendChild(this.el);
+    this.stage = document.createElement('div');
+    this.stage.className = 'bf-hudstage';
+    this.el.appendChild(this.stage);
+    this.applyHudScale(getSettings().hudScale);
+    this.stopSettingsListener = onSettingsChanged((settings) => this.applyHudScale(settings.hudScale));
 
     this.buildTopBar();
     this.rightCluster = document.createElement('div');
     this.rightCluster.className = 'bf-rightcluster';
-    this.el.appendChild(this.rightCluster);
+    this.stage.appendChild(this.rightCluster);
     this.buildSelectionPanel();
     this.buildCard();
     this.buildToast();
@@ -358,15 +366,22 @@ export class Hud {
     this.minimapSlot = document.createElement('div');
     this.minimapSlot.className = 'bf-mini';
     this.minimapSlot.style.cssText = 'position:absolute;left:6px;bottom:6px;display:flex;flex-direction:column;gap:4px;pointer-events:auto;';
-    this.el.appendChild(this.minimapSlot);
+    this.stage.appendChild(this.minimapSlot);
     this.buildQuickNavigation();
   }
 
   destroy(): void {
     hideGameTooltip();
     if (this.toastTimer) clearTimeout(this.toastTimer);
+    this.stopSettingsListener?.();
     window.removeEventListener('keydown', this.hotkeyListener);
     this.el.remove();
+  }
+
+  private applyHudScale(scale: number): void {
+    this.stage.style.width = `${100 / scale}%`;
+    this.stage.style.height = `${100 / scale}%`;
+    this.stage.style.transform = `scale(${scale})`;
   }
 
   // ------------------------------------------------------------------ update
@@ -473,7 +488,7 @@ export class Hud {
       else this.host.togglePause();
     });
     bar.appendChild(this.pauseBtn);
-    this.el.appendChild(bar);
+    this.stage.appendChild(bar);
   }
 
   private addIdleButton(bar: HTMLElement, cat: IdleCategory, icon: string, title: string): void {
@@ -608,7 +623,7 @@ export class Hud {
       this.toast.classList.remove('show');
     });
     this.toast.appendChild(this.toastUndoBtn);
-    this.el.appendChild(this.toast);
+    this.stage.appendChild(this.toast);
   }
 
   private buildPauseOverlay(): void {
@@ -792,7 +807,7 @@ export class Hud {
       this.chipStrip.appendChild(btn);
       this.chipEls.push({ btn, count });
     }
-    this.el.appendChild(this.chipStrip);
+    this.stage.appendChild(this.chipStrip);
   }
 
   private updateGroupChips(): void {
@@ -828,7 +843,7 @@ export class Hud {
     this.placeBar.appendChild(this.placeLabel);
     this.placeBar.appendChild(this.placeConfirm);
     this.placeBar.appendChild(cancel);
-    this.el.appendChild(this.placeBar);
+    this.stage.appendChild(this.placeBar);
   }
 
   // ------------------------------------------------------------------ dynamic
