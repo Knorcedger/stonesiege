@@ -111,6 +111,10 @@ export const showcaseCitadel: ScenarioDef = {
     // Max-tier army in clean formations, with heroes and supporting monks.
     { def: 'heroWallace', player: 1, x: 38, y: 41, facing: 0 },
     { def: 'heroGraham', player: 1, x: 40, y: 41, facing: 0 },
+    ...unitGroup('pikeman', 1, [
+      [30, 42], [31, 42], [32, 42], [33, 42],
+      [34, 42], [35, 42], [36, 42], [37, 42],
+    ]),
     ...unitGroup('champion', 1, [
       [30, 43], [31, 43], [32, 43], [33, 43], [34, 43],
       [35, 43], [36, 43], [37, 43], [38, 43], [39, 43],
@@ -127,11 +131,16 @@ export const showcaseCitadel: ScenarioDef = {
       [30, 46], [31, 46], [32, 46], [33, 46],
       [34, 46], [35, 46], [36, 46], [37, 46],
     ]),
+    ...unitGroup('eliteLongbowman', 1, [
+      [30, 47], [31, 47], [32, 47], [33, 47],
+      [34, 47], [35, 47], [36, 47], [37, 47],
+    ]),
     ...unitGroup('paladin', 1, [
       [42, 42], [44, 42], [42, 44], [44, 44], [42, 46], [44, 46],
     ]),
     ...unitGroup('onager', 1, [[47, 43], [49, 43], [47, 46], [49, 46]]),
     ...unitGroup('trebuchet', 1, [[52, 43], [54, 43]]),
+    ...unitGroup('siegeRam', 1, [[52, 39], [55, 39]]),
     ...unitGroup('monk', 1, [[40, 48], [42, 48], [44, 48], [46, 48]]),
   ],
   triggers: [],

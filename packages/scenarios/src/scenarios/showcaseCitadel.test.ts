@@ -20,8 +20,11 @@ describe('showcase-citadel capture preset', () => {
   });
 
   it('stages a max-tier army behind a complete fortified circuit', () => {
-    const eliteArmy = ['champion', 'eliteHighlandRaider', 'arbalester', 'eliteSkirmisher', 'paladin', 'onager', 'trebuchet'];
-    expect(start.entities.filter((e) => e.player === 1 && eliteArmy.includes(e.defId))).toHaveLength(50);
+    const eliteArmy = [
+      'pikeman', 'champion', 'eliteHighlandRaider', 'arbalester', 'eliteSkirmisher',
+      'eliteLongbowman', 'paladin', 'onager', 'trebuchet', 'siegeRam',
+    ];
+    expect(start.entities.filter((e) => e.player === 1 && eliteArmy.includes(e.defId))).toHaveLength(68);
     expect(count('stoneWall')).toBe(130);
     expect(count('gate')).toBe(2);
     expect(count('keep')).toBe(4);
