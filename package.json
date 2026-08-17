@@ -1,7 +1,7 @@
 {
   "name": "stonesiege",
   "private": true,
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "An open-source historical real-time strategy game for web, Android, and iOS.",
   "license": "MPL-2.0",
   "homepage": "https://stonesiegegame.com",
@@ -28,7 +28,13 @@
     "mobile:sync": "npm run build && npx cap sync",
     "mobile:assets": "node tools/mobile-assets.ts",
     "mobile:android": "npm run mobile:sync && npx cap open android",
-    "mobile:ios": "npm run mobile:sync && npx cap open ios"
+    "mobile:ios": "npm run mobile:sync && npx cap open ios",
+    "release:mobile": "node tools/mobile-release.mjs all",
+    "release:mobile:build": "node tools/mobile-release.mjs build",
+    "release:mobile:upload": "node tools/mobile-release.mjs upload",
+    "release:android": "node tools/mobile-release.mjs android",
+    "release:ios": "node tools/mobile-release.mjs ios",
+    "release:android:credentials": "zsh tools/mobile-keychain-setup.zsh"
   },
   "dependencies": {
     "@capacitor/android": "^8.5.0",

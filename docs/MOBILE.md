@@ -111,3 +111,52 @@ Before promoting a release:
 4. Check `npm audit --omit=dev`, native dependency reports, store privacy answers, screenshots,
    support/privacy-policy URLs, release notes, and version/build numbers.
 5. Keep signing keys, passwords, provisioning data, and store credentials out of Git.
+
+## Automated local releases
+
+The repository includes a local release pipeline. It builds the shared production web bundle,
+synchronizes Capacitor, creates signed Android and iOS artifacts, validates both packages, and
+uploads them without using either store's manual upload form. The iOS path also waits for App Store
+Connect processing and adds the build to the `StoneSiege Internal` TestFlight group.
+
+The one-time local credential setup is:
+
+1. Keep `android/stonesiege-upload.jks` and `android/keystore.properties` in place.
+2. Run `npm run release:android:credentials` and enter the upload-key password. It is stored in
+   macOS Keychain, not in the repository or shell history.
+3. Save the Google Play service-account JSON as
+   `.secrets/google-play-service-account.json`. Enable the Google Play Android Developer API for
+   its Google Cloud project, then invite the service-account email in Play Console with access to
+   StoneSiege and the **Release apps to testing tracks** permission.
+4. Save the App Store Connect API private key as
+   `.secrets/appstore/AuthKey_9XLJZ77PVF.p8`. The key ID and issuer ID are non-secret project
+   defaults and can be overridden with `APP_STORE_CONNECT_KEY_ID` and
+   `APP_STORE_CONNECT_ISSUER_ID`.
+5. Install the `StoneSiege App Store 2026` provisioning profile and the matching Apple
+   Distribution certificate in the login keychain. Override the profile name with
+   `IOS_PROVISIONING_PROFILE_SPECIFIER` if it is renewed under another name.
+
+Commands:
+
+```bash
+# Run checks, build both signed packages, validate them, and upload Android to
+# internal testing plus iOS to App Store Connect/TestFlight.
+npm run release:mobile
+
+# Build and validate both packages without uploading.
+npm run release:mobile:build
+
+# Upload already-built artifacts.
+npm run release:mobile:upload
+
+# Build and upload one platform only.
+npm run release:android
+npm run release:ios
+```
+
+Google Play defaults to the `internal` track. A future public release must opt in explicitly, for
+example `GOOGLE_PLAY_TRACK=production npm run release:android`, after the store listing and policy
+work is complete. `MOBILE_RELEASE_NOTES` overrides the Android release notes. Set
+`MOBILE_RELEASE_SKIP_TESTS=1` only when the exact synchronized commit has already passed the
+release checks. iOS defaults to the `StoneSiege Internal` group; override it with
+`APP_STORE_CONNECT_BETA_GROUP` when another TestFlight group is desired.

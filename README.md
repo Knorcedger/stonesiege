@@ -95,6 +95,7 @@ npm test                # deterministic unit and integration tests
 npm run build           # production web bundle
 npm run assets          # rebuild generated art atlases
 npm run mobile:sync     # build web and synchronize native wrappers
+npm run release:mobile  # sign, validate, and upload both internal mobile builds
 ```
 
 Simulation changes must preserve determinism: no wall clock, platform APIs, floating-point gameplay state, or unstable iteration in `packages/sim`. Same seed plus the same command stream must produce the same result.

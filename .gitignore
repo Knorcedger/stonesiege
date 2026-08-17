@@ -6,6 +6,8 @@ dist/
 .qa/
 .gstack/
 .vercel
+.secrets/
+ios/build/
 
 # Local environment and credentials
 .env
