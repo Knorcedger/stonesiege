@@ -505,6 +505,89 @@ export const techs: Record<string, TechDef> = {
     icon: 'icon/tech/ludgar',
   },
 
+  // ----------------------------------------------- Norse unique techs (castle)
+  shieldWall: {
+    id: 'shieldWall', name: 'Shield Wall', age: 'castle',
+    researchedAt: ['castle'], cost: { food: 350, gold: 200 }, researchTime: 45,
+    effects: [{ kind: 'statAdd', stat: 'armorPierce', amount: 1, targetClasses: ['infantry'] }],
+    unique: true,
+    icon: 'icon/tech/chainMailArmor',
+  },
+  jarlsLevy: {
+    id: 'jarlsLevy', name: 'Jarl’s Levy', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 650, gold: 450 }, researchTime: 55,
+    effects: [{ kind: 'statMult', stat: 'trainTime', percent: -25, targetClasses: ['infantry'] }],
+    unique: true,
+    icon: 'icon/tech/championUpgrade',
+  },
+
+  // ---------------------------------------------- French unique techs (castle)
+  oriflamme: {
+    id: 'oriflamme', name: 'Oriflamme', age: 'castle',
+    researchedAt: ['castle'], cost: { food: 450, gold: 300 }, researchTime: 45,
+    effects: [{ kind: 'statAdd', stat: 'attack', amount: 2, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/ironCasting',
+  },
+  compagniesOrdonnance: {
+    id: 'compagniesOrdonnance', name: 'Compagnies d’Ordonnance', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 800, gold: 600 }, researchTime: 60,
+    effects: [{ kind: 'statMult', stat: 'trainTime', percent: -25, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/cavalierUpgrade',
+  },
+
+  // ---------------------------------------------- Mongol unique techs (castle)
+  nomadRemounts: {
+    id: 'nomadRemounts', name: 'Nomad Remounts', age: 'castle',
+    researchedAt: ['castle'], cost: { food: 400, gold: 250 }, researchTime: 45,
+    effects: [{ kind: 'statMult', stat: 'hp', percent: 15, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/lightCavalryUpgrade',
+  },
+  steppeTactics: {
+    id: 'steppeTactics', name: 'Steppe Tactics', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 700, gold: 550 }, researchTime: 60,
+    effects: [{ kind: 'statMult', stat: 'rof', percent: -20, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/bracer',
+  },
+
+  // ------------------------------------------- Byzantine unique techs (castle)
+  themeSystem: {
+    id: 'themeSystem', name: 'Theme System', age: 'castle',
+    researchedAt: ['castle'], cost: { food: 350, gold: 250 }, researchTime: 45,
+    effects: [{
+      kind: 'costMult', percent: -15,
+      targetIds: ['spearman', 'pikeman', 'skirmisher', 'eliteSkirmisher'],
+    }],
+    unique: true,
+    icon: 'icon/tech/pikemanUpgrade',
+  },
+  lamellarBarding: {
+    id: 'lamellarBarding', name: 'Lamellar Barding', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 700, gold: 500 }, researchTime: 60,
+    effects: [{ kind: 'statAdd', stat: 'armorPierce', amount: 2, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/plateBardingArmor',
+  },
+
+  // --------------------------------------------- Saracen unique techs (castle)
+  furusiyya: {
+    id: 'furusiyya', name: 'Furusiyya', age: 'castle',
+    researchedAt: ['castle'], cost: { food: 450, gold: 300 }, researchTime: 45,
+    effects: [{ kind: 'statMult', stat: 'hp', percent: 20, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/chainBardingArmor',
+  },
+  desertLogistics: {
+    id: 'desertLogistics', name: 'Desert Logistics', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 700, gold: 450 }, researchTime: 55,
+    effects: [{ kind: 'costMult', percent: -15, targetClasses: ['cavalry'] }],
+    unique: true,
+    icon: 'icon/tech/cavalierUpgrade',
+  },
+
   // -------------------------------------------------- elite unique upgrades
   eliteHighlandRaiderUpgrade: {
     id: 'eliteHighlandRaiderUpgrade', name: 'Elite Highland Raider', age: 'imperial',
@@ -519,5 +602,40 @@ export const techs: Record<string, TechDef> = {
     effects: [{ kind: 'upgradeUnit', from: 'longbowman', to: 'eliteLongbowman' }],
     unique: true,
     icon: 'icon/tech/eliteLongbowmanUpgrade',
+  },
+  eliteHousecarlUpgrade: {
+    id: 'eliteHousecarlUpgrade', name: 'Elite Housecarl', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 900, gold: 700 }, researchTime: 50,
+    effects: [{ kind: 'upgradeUnit', from: 'housecarl', to: 'eliteHousecarl' }],
+    unique: true,
+    icon: 'icon/tech/championUpgrade',
+  },
+  eliteChevalierUpgrade: {
+    id: 'eliteChevalierUpgrade', name: 'Elite Chevalier', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 1100, gold: 900 }, researchTime: 70,
+    effects: [{ kind: 'upgradeUnit', from: 'chevalier', to: 'eliteChevalier' }],
+    unique: true,
+    icon: 'icon/tech/paladinUpgrade',
+  },
+  eliteMangudaiUpgrade: {
+    id: 'eliteMangudaiUpgrade', name: 'Elite Kheshig Horse Archer', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 900, gold: 700 }, researchTime: 60,
+    effects: [{ kind: 'upgradeUnit', from: 'mangudai', to: 'eliteMangudai' }],
+    unique: true,
+    icon: 'icon/tech/eliteSkirmisherUpgrade',
+  },
+  eliteCataphractUpgrade: {
+    id: 'eliteCataphractUpgrade', name: 'Elite Cataphract', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 1100, gold: 800 }, researchTime: 65,
+    effects: [{ kind: 'upgradeUnit', from: 'cataphract', to: 'eliteCataphract' }],
+    unique: true,
+    icon: 'icon/tech/cavalierUpgrade',
+  },
+  eliteMamlukUpgrade: {
+    id: 'eliteMamlukUpgrade', name: 'Elite Mamluk', age: 'imperial',
+    researchedAt: ['castle'], cost: { food: 950, gold: 750 }, researchTime: 60,
+    effects: [{ kind: 'upgradeUnit', from: 'mamluk', to: 'eliteMamluk' }],
+    unique: true,
+    icon: 'icon/tech/cavalierUpgrade',
   },
 };

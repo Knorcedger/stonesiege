@@ -17,6 +17,7 @@ import {
   ageUpButton, ageUpRequirement, buildMenuButtons, canAffordCost, civUnitCost,
   farmReseedButton, garrisonPanel, hasActiveRally, iconVariant, millAutoReseedButton,
   queueChipModel, queueStacks, researchMenuButtons, trainMenuButtons, unitVerbButtons,
+  unitNameForCiv,
   type PlayerCardView,
 } from './cardModel';
 
@@ -183,12 +184,25 @@ describe('trainMenuButtons', () => {
   });
 
   it('the castle trains only the OWN civ unique unit', () => {
-    const scots = trainMenuButtons(view({ age: 'castle', stockpile: LOADED }), 'castle').map((b) => b.id);
-    expect(scots).toContain('highlandRaider');
-    expect(scots).not.toContain('longbowman');
-    const english = trainMenuButtons(view({ age: 'castle', civ: 'english', stockpile: LOADED }), 'castle').map((b) => b.id);
-    expect(english).toContain('longbowman');
-    expect(english).not.toContain('highlandRaider');
+    for (const civ of Object.values(gameData.civs)) {
+      const ids = trainMenuButtons(
+        view({ age: 'castle', civ: civ.id, stockpile: LOADED }), 'castle',
+      ).map((b) => b.id);
+      expect(ids, civ.id).toContain(civ.uniqueUnit);
+      for (const rival of Object.values(gameData.civs)) {
+        if (rival.id !== civ.id) expect(ids, `${civ.id} hides ${rival.id}`).not.toContain(rival.uniqueUnit);
+      }
+    }
+  });
+
+  it('shared basic lines show their civilization-specific troop names', () => {
+    expect(unitNameForCiv('knight', 'mongols')).toBe('Keshig Lancer');
+    expect(unitNameForCiv('manAtArms', 'byzantines')).toBe('Skoutatos');
+    expect(unitNameForCiv('knight', 'english')).toBe('Knight');
+    const mongolKnight = trainMenuButtons(
+      view({ age: 'castle', civ: 'mongols', stockpile: LOADED }), 'stable',
+    ).find((button) => button.id === 'knight');
+    expect(mongolKnight?.name).toBe('Keshig Lancer');
   });
 
   it('civ tech-tree cuts hide units (Scots have no Paladin)', () => {
@@ -236,13 +250,19 @@ describe('researchMenuButtons', () => {
   });
 
   it('castle unique techs are civ-filtered', () => {
-    const scots = researchMenuButtons(view({ age: 'castle', stockpile: LOADED }), 'castle').map((b) => b.id);
-    expect(scots).toContain('schiltron');
-    expect(scots).not.toContain('yeomanLevy');
-    const english = researchMenuButtons(view({ age: 'imperial', civ: 'english', stockpile: LOADED }), 'castle').map((b) => b.id);
-    expect(english).toContain('yeomanLevy');
-    expect(english).toContain('eliteLongbowmanUpgrade');
-    expect(english).not.toContain('eliteHighlandRaiderUpgrade');
+    for (const civ of Object.values(gameData.civs)) {
+      const ids = researchMenuButtons(
+        view({ age: 'imperial', civ: civ.id, stockpile: LOADED }), 'castle',
+      ).map((b) => b.id);
+      expect(ids, civ.id).toContain(civ.uniqueTechs[0]);
+      expect(ids, civ.id).toContain(civ.uniqueTechs[1]);
+      expect(ids, civ.id).toContain(civ.eliteUniqueTech);
+      for (const rival of Object.values(gameData.civs)) {
+        if (rival.id === civ.id) continue;
+        expect(ids, `${civ.id} hides ${rival.id}`).not.toContain(rival.uniqueTechs[0]);
+        expect(ids, `${civ.id} hides ${rival.id}`).not.toContain(rival.eliteUniqueTech);
+      }
+    }
   });
 
   it('civ tech cuts hide techs (Scots lack Crop Rotation)', () => {

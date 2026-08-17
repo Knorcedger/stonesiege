@@ -258,11 +258,22 @@ export const buildings: Record<string, BuildingDef> = {
     range: 8, minRange: 1, rof: 2, projectileSpeed: 7,
     arrowsBase: 5, arrowsPerGarrison: 1, arrowsMax: 21, garrisonCapacity: 20,
     garrisonHealRate: 0.2, // AoE2: castles heal garrisons twice as fast
-    // Unique units/techs listed for both civs; the sim restricts to the player's civ.
-    trains: ['highlandRaider', 'eliteHighlandRaider', 'longbowman', 'eliteLongbowman', 'trebuchet'],
+    // Every civilization's Castle line is listed here; HUD and sim gates expose only
+    // the local civilization's base/elite pair and unique technologies.
+    trains: [
+      'highlandRaider', 'eliteHighlandRaider', 'longbowman', 'eliteLongbowman',
+      'housecarl', 'eliteHousecarl', 'chevalier', 'eliteChevalier',
+      'mangudai', 'eliteMangudai', 'cataphract', 'eliteCataphract',
+      'mamluk', 'eliteMamluk', 'trebuchet',
+    ],
     researches: [
       'schiltron', 'highlandFury', 'yeomanLevy', 'ludgar',
-      'eliteHighlandRaiderUpgrade', 'eliteLongbowmanUpgrade',
+      'shieldWall', 'jarlsLevy', 'oriflamme', 'compagniesOrdonnance',
+      'nomadRemounts', 'steppeTactics', 'themeSystem', 'lamellarBarding',
+      'furusiyya', 'desertLogistics',
+      'eliteHighlandRaiderUpgrade', 'eliteLongbowmanUpgrade', 'eliteHousecarlUpgrade',
+      'eliteChevalierUpgrade', 'eliteMangudaiUpgrade', 'eliteCataphractUpgrade',
+      'eliteMamlukUpgrade',
     ],
     popProvided: 20, // GDD rule (AoE2 castles give no pop)
     satisfiesAgeUpAlone: true, // GDD: a Castle alone satisfies the Imperial building requirement

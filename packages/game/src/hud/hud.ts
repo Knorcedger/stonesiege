@@ -22,7 +22,7 @@ import {
 import {
   ageUpButton, buildMenuButtons, farmReseedButton, garrisonPanel, hasActiveRally,
   millAutoReseedButton, queueChipModel, queueStacks, researchMenuButtons, trainMenuButtons,
-  unitVerbButtons, WAVE2_REASON,
+  unitNameForCiv, unitVerbButtons, WAVE2_REASON,
   type ArmedVerb, type CardButtonModel, type PlayerCardView,
 } from './cardModel';
 import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
@@ -906,7 +906,10 @@ export class Hud {
     }
     this.selPanel.classList.add('show');
     const def = gameData.units[first.defId] ?? gameData.buildings[first.defId] ?? gameData.resources[first.defId];
-    const name = def?.name ?? first.defId;
+    const ownerCiv = this.host.getState().players[first.player]?.setup.civ ?? '';
+    const name = first.kind === 'unit'
+      ? unitNameForCiv(first.defId, ownerCiv)
+      : def?.name ?? first.defId;
     const typeCounts = selectionTypeCounts(sel);
     const mixed = sel.length > 1 && typeCounts.length > 1;
     if (mixed) {
@@ -1426,7 +1429,7 @@ export class Hud {
     // ---- shared production queue chips. Consecutive identical entries collapse
     // into one stack (×2, ×3...) while preserving the actual 15-slot order.
     for (const stack of queueStacks(b.trainQueue ?? [])) {
-      const model = queueChipModel(stack.item);
+      const model = queueChipModel(stack.item, view.civ);
       const chip = document.createElement('div');
       chip.className = 'bf-qitem';
       const blockedStack = housingBlocked && stack.startIndex === 0;

@@ -90,6 +90,9 @@ describe('id integrity', () => {
         expect(techs[t].unique, `${c.id} uniqueTech ${t} must be flagged unique`).toBe(true);
       }
       for (const id of c.disabled) expect(allIds.has(id), `${c.id} disabled ${id}`).toBe(true);
+      for (const id of Object.keys(c.unitNames ?? {})) {
+        expect(unitIds.has(id), `${c.id} unitNames ${id}`).toBe(true);
+      }
       for (const b of c.bonuses) {
         const refs = effectRefs(b.effect);
         for (const id of refs.entities) expect(entityIds.has(id), `${c.id} bonus ref ${id}`).toBe(true);
@@ -274,6 +277,9 @@ describe('roster completeness', () => {
       'scout', 'lightCavalry', 'knight', 'cavalier', 'paladin',
       'batteringRam', 'cappedRam', 'siegeRam', 'mangonel', 'onager', 'trebuchet', 'monk',
       'highlandRaider', 'eliteHighlandRaider', 'longbowman', 'eliteLongbowman',
+      'housecarl', 'eliteHousecarl', 'chevalier', 'eliteChevalier',
+      'mangudai', 'eliteMangudai', 'cataphract', 'eliteCataphract',
+      'mamluk', 'eliteMamluk',
       'sheep', 'deer', 'wolf',
     ];
     for (const id of expectUnits) expect(unitIds.has(id), id).toBe(true);
@@ -286,7 +292,9 @@ describe('roster completeness', () => {
     for (const id of ['tree', 'goldMine', 'stoneMine', 'berryBush']) {
       expect(id in resources, id).toBe(true);
     }
-    expect(Object.keys(civs).sort()).toEqual(['english', 'scots']);
+    expect(Object.keys(civs).sort()).toEqual([
+      'byzantines', 'english', 'french', 'mongols', 'norse', 'saracens', 'scots',
+    ]);
   });
 
   it('gaia animals carry the gaia fields', () => {

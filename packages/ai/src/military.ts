@@ -727,11 +727,19 @@ export function createMilitary(ctx: Ctx): MilitaryManager {
         cmds.push({ kind: 'train', player, buildingId: b.id, defId: 'monk' });
       }
     }
+    const civ = gameData.civs[p.setup.civ];
+    for (const b of snap.own.castle ?? []) {
+      if ((b.trainQueue?.length ?? 0) !== 0 || !civ) continue;
+      // Research the Castle-age identity tech once the age-up bank is released,
+      // then keep the civ's signature unit in the reinforcement mix.
+      if (tryUpgrade(b, [civ.uniqueTechs[0]])) continue;
+      train(b, [civ.uniqueUnit]);
+    }
 
     // rally fresh troops onto the staging point (re-set when the stage moves)
     const stage = stagePoint(snap);
     const stageKey = `${stage.x}:${stage.y}`;
-    for (const defId of ['barracks', 'archeryRange', 'stable', 'siegeWorkshop'] as const) {
+    for (const defId of ['barracks', 'archeryRange', 'stable', 'siegeWorkshop', 'castle'] as const) {
       for (const b of snap.own[defId] ?? []) {
         if (ralliedTo.get(b.id) === stageKey) continue;
         ralliedTo.set(b.id, stageKey);

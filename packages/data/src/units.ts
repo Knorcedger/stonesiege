@@ -402,6 +402,131 @@ export const units: Record<string, UnitDef> = {
     icon: 'icon/eliteLongbowman',
   },
 
+  // ---------------------------------------------------- unique: Norse Housecarl
+  // A lord's professional retainer: slow enough to screen, exceptionally resistant
+  // to arrows, and dangerous once it closes with archers or light fortifications.
+  housecarl: {
+    id: 'housecarl', name: 'Housecarl', age: 'castle',
+    trainedAt: ['castle'], cost: { food: 65, gold: 35 }, trainTime: 14,
+    hp: 75,
+    attacks: [{ cls: 'melee', amount: 11 }, { cls: 'archer', amount: 8 }, { cls: 'building', amount: 2 }],
+    armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 5 }],
+    range: 0, rof: 2, speed: 1.0, los: 5,
+    classes: ['infantry', 'uniqueUnit'],
+    icon: 'icon/champion', sprite: 'champion',
+  },
+  eliteHousecarl: {
+    id: 'eliteHousecarl', name: 'Elite Housecarl', age: 'imperial',
+    trainedAt: ['castle'], cost: { food: 65, gold: 35 }, trainTime: 14,
+    hp: 90,
+    attacks: [{ cls: 'melee', amount: 15 }, { cls: 'archer', amount: 11 }, { cls: 'building', amount: 3 }],
+    armor: [{ cls: 'melee', amount: 2 }, { cls: 'pierce', amount: 7 }],
+    range: 0, rof: 2, speed: 1.0, los: 5,
+    classes: ['infantry', 'uniqueUnit'],
+    requiresTech: 'eliteHousecarlUpgrade',
+    icon: 'icon/champion', sprite: 'champion',
+  },
+
+  // -------------------------------------------------- unique: French Chevalier
+  // Heavy shock cavalry: expensive and powerful in an open fight, but still checked
+  // by the spear line's cavalry bonus.
+  chevalier: {
+    id: 'chevalier', name: 'Chevalier', age: 'castle',
+    trainedAt: ['castle'], cost: { food: 70, gold: 80 }, trainTime: 28,
+    hp: 125,
+    attacks: [{ cls: 'melee', amount: 15 }],
+    armor: [{ cls: 'melee', amount: 2 }, { cls: 'pierce', amount: 3 }],
+    range: 0, rof: 1.9, speed: 1.4, los: 6,
+    classes: ['cavalry', 'uniqueUnit'],
+    icon: 'icon/paladin', sprite: 'paladin',
+  },
+  eliteChevalier: {
+    id: 'eliteChevalier', name: 'Elite Chevalier', age: 'imperial',
+    trainedAt: ['castle'], cost: { food: 70, gold: 80 }, trainTime: 28,
+    hp: 155,
+    attacks: [{ cls: 'melee', amount: 18 }],
+    armor: [{ cls: 'melee', amount: 3 }, { cls: 'pierce', amount: 4 }],
+    range: 0, rof: 1.8, speed: 1.4, los: 7,
+    classes: ['cavalry', 'uniqueUnit'],
+    requiresTech: 'eliteChevalierUpgrade',
+    icon: 'icon/paladin', sprite: 'paladin',
+  },
+
+  // ------------------------------------------ unique: Mongol Kheshig Horse Archer
+  // Mounted composite-bow cavalry. The existing scout rig supplies the mounted
+  // silhouette; combat remains genuinely ranged and emits arrow projectiles.
+  mangudai: {
+    id: 'mangudai', name: 'Kheshig Horse Archer', age: 'castle',
+    trainedAt: ['castle'], cost: { wood: 40, gold: 65 }, trainTime: 24,
+    hp: 60,
+    attacks: [{ cls: 'pierce', amount: 7 }, { cls: 'spearman', amount: 2 }, { cls: 'siege', amount: 3 }],
+    armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 1 }],
+    range: 4, rof: 1.9, projectileSpeed: 7, accuracy: 75, speed: 1.5, los: 7,
+    classes: ['archer', 'cavalry', 'uniqueUnit'],
+    icon: 'icon/lightCavalry', sprite: 'scout',
+  },
+  eliteMangudai: {
+    id: 'eliteMangudai', name: 'Elite Kheshig Horse Archer', age: 'imperial',
+    trainedAt: ['castle'], cost: { wood: 40, gold: 65 }, trainTime: 24,
+    hp: 75,
+    attacks: [{ cls: 'pierce', amount: 10 }, { cls: 'spearman', amount: 3 }, { cls: 'siege', amount: 5 }],
+    armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 1 }],
+    range: 5, rof: 1.75, projectileSpeed: 7, accuracy: 85, speed: 1.5, los: 8,
+    classes: ['archer', 'cavalry', 'uniqueUnit'],
+    requiresTech: 'eliteMangudaiUpgrade',
+    icon: 'icon/lightCavalry', sprite: 'scout',
+  },
+
+  // ----------------------------------------------- unique: Byzantine Cataphract
+  // Armoured shock cavalry with an infantry-breaking role, reflecting the wedge
+  // formations described in Byzantine military writing.
+  cataphract: {
+    id: 'cataphract', name: 'Cataphract', age: 'castle',
+    trainedAt: ['castle'], cost: { food: 70, gold: 75 }, trainTime: 28,
+    hp: 115,
+    attacks: [{ cls: 'melee', amount: 12 }, { cls: 'infantry', amount: 9 }],
+    armor: [{ cls: 'melee', amount: 2 }, { cls: 'pierce', amount: 2 }],
+    range: 0, rof: 1.9, speed: 1.35, los: 6,
+    classes: ['cavalry', 'uniqueUnit'],
+    icon: 'icon/cavalier', sprite: 'cavalier',
+  },
+  eliteCataphract: {
+    id: 'eliteCataphract', name: 'Elite Cataphract', age: 'imperial',
+    trainedAt: ['castle'], cost: { food: 70, gold: 75 }, trainTime: 28,
+    hp: 145,
+    attacks: [{ cls: 'melee', amount: 15 }, { cls: 'infantry', amount: 13 }],
+    armor: [{ cls: 'melee', amount: 3 }, { cls: 'pierce', amount: 3 }],
+    range: 0, rof: 1.8, speed: 1.35, los: 7,
+    classes: ['cavalry', 'uniqueUnit'],
+    requiresTech: 'eliteCataphractUpgrade',
+    icon: 'icon/cavalier', sprite: 'cavalier',
+  },
+
+  // --------------------------------------------------- unique: Saracen Mamluk
+  // Professional elite cavalry emphasizing disciplined mobility and melee staying
+  // power rather than the super-heavy charge of the French or Byzantines.
+  mamluk: {
+    id: 'mamluk', name: 'Mamluk', age: 'castle',
+    trainedAt: ['castle'], cost: { food: 65, gold: 70 }, trainTime: 24,
+    hp: 100,
+    attacks: [{ cls: 'melee', amount: 13 }, { cls: 'cavalry', amount: 4 }],
+    armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 2 }],
+    range: 0, rof: 1.8, speed: 1.48, los: 7,
+    classes: ['cavalry', 'uniqueUnit'],
+    icon: 'icon/lightCavalry', sprite: 'lightCavalry',
+  },
+  eliteMamluk: {
+    id: 'eliteMamluk', name: 'Elite Mamluk', age: 'imperial',
+    trainedAt: ['castle'], cost: { food: 65, gold: 70 }, trainTime: 24,
+    hp: 130,
+    attacks: [{ cls: 'melee', amount: 16 }, { cls: 'cavalry', amount: 6 }],
+    armor: [{ cls: 'melee', amount: 2 }, { cls: 'pierce', amount: 3 }],
+    range: 0, rof: 1.7, speed: 1.48, los: 7,
+    classes: ['cavalry', 'uniqueUnit'],
+    requiresTech: 'eliteMamlukUpgrade',
+    icon: 'icon/lightCavalry', sprite: 'lightCavalry',
+  },
+
   // ---------------------------------------------------------------- gaia
   sheep: {
     id: 'sheep', name: 'Sheep', age: 'dark',

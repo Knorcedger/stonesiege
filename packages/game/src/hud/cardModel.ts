@@ -65,6 +65,11 @@ export const AGE_LABEL: Record<AgeId, string> = {
 
 export const WAVE2_REASON = 'arrives with the wave-2 sim';
 
+/** Shared simulation lines can carry a civilization-specific historical display name. */
+export function unitNameForCiv(unitId: string, civId: string): string {
+  return gameData.civs[civId]?.unitNames?.[unitId] ?? gameData.units[unitId]?.name ?? unitId;
+}
+
 export function canAffordCost(stockpile: Stockpile, cost: Stockpile): boolean {
   return RESOURCE_KEYS.every((r) => (stockpile[r] ?? 0) >= (cost[r] ?? 0));
 }
@@ -219,7 +224,7 @@ export function trainMenuButtons(view: PlayerCardView, buildingDefId: string): C
         badge: housed
           ? { glyph: '⌂', note: 'housed — starts when a house completes' }
           : undefined,
-        name: u.name,
+        name: unitNameForCiv(u.id, view.civ),
         cost,
         timeSeconds: u.trainTime,
       };
@@ -474,13 +479,16 @@ export function queueStacks(items: readonly TrainQueueItem[]): QueueStack[] {
  * `icon/<techId>` frame (the magenta placeholder). Techs resolve via their
  * TechDef so every chip renders a real atlas icon and a human name.
  */
-export function queueChipModel(item: Pick<TrainQueueItem, 'defId' | 'techId'>): QueueChipModel {
+export function queueChipModel(
+  item: Pick<TrainQueueItem, 'defId' | 'techId'>,
+  civId = '',
+): QueueChipModel {
   if (item.techId !== undefined) {
     const tech = gameData.techs[item.techId];
     return { icon: tech?.icon ?? `icon/tech/${item.techId}`, name: tech?.name ?? item.techId, isTech: true };
   }
   const unit = gameData.units[item.defId];
-  return { icon: unit?.icon ?? `icon/${item.defId}`, name: unit?.name ?? item.defId, isTech: false };
+  return { icon: unit?.icon ?? `icon/${item.defId}`, name: unitNameForCiv(item.defId, civId), isTech: false };
 }
 
 // ------------------------------------------------------------------ farm & mill

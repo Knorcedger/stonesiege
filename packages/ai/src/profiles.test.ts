@@ -2,6 +2,7 @@
 // ScenarioOps hooks (applyAiProfile / attackNow) drive the bot from triggers.
 
 import { describe, expect, it } from 'vitest';
+import { gameData } from '@bf/data';
 import { createGame } from '@bf/sim';
 import type { Command, GameConfig, SimEvent } from '@bf/sim/types';
 import { entitiesOf, grassMap, player, scenarioConfig } from '@bf/sim/testutil';
@@ -23,6 +24,32 @@ const practice = (seed: number): GameConfig => ({
 const isAttackCmd = (c: Command): boolean => c.kind === 'attack' || c.kind === 'attackMove';
 
 describe('ai profiles', () => {
+  it('trains the owning civilization’s unique unit from a completed Castle', () => {
+    for (const civ of Object.values(gameData.civs)) {
+      const game = createGame(scenarioConfig(700, grassMap(48, 48), [
+        { defId: 'townCenter', player: IDLE, tileX: 38, tileY: 38 },
+        { defId: 'townCenter', player: BOT, tileX: 5, tileY: 5 },
+        { defId: 'castle', player: BOT, tileX: 12, tileY: 8, ref: 'castle' },
+      ], [
+        player({ name: 'Idle', isHuman: true }),
+        player({
+          name: 'Bot', civ: civ.id, color: 1, startingAge: 'castle',
+          startingResources: { food: 5000, wood: 5000, gold: 5000, stone: 5000 },
+        }),
+      ]));
+      const bot = createBot(game, BOT, { profile: 'standard', difficulty: 'easy', seed: 1 });
+      const castleId = game.state.refs.get('castle')!;
+      let trained = false;
+      for (let tick = 0; tick < 120 && !trained; tick++) {
+        const commands = bot.tick();
+        trained = commands.some((command) => command.kind === 'train'
+          && command.buildingId === castleId && command.defId === civ.uniqueUnit);
+        game.advance(commands);
+      }
+      expect(trained, civ.id).toBe(true);
+    }
+  });
+
   it('raider launches its first attack before 12 sim-minutes', { timeout: 120000 }, () => {
     const game = createGame(practice(23));
     const bot = createBot(game, BOT, { profile: 'raider', difficulty: 'standard', seed: 4 });

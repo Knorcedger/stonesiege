@@ -179,6 +179,8 @@ export interface CivDef {
   uniqueUnit: string; // unit def id (trained at castle)
   eliteUniqueTech: string; // upgrades unique unit (imperial)
   uniqueTechs: [string, string]; // [castle-age, imperial-age]
+  /** Civilization-specific names for shared roster units (stats still come from the shared line + civ bonuses). */
+  unitNames?: Record<string, string>;
   /** Tech-tree cuts: unit/tech/building ids this civ cannot use. */
   disabled: string[];
 }

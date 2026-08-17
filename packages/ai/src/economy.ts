@@ -244,6 +244,9 @@ export function createEconomy(ctx: Ctx): EconomyManager {
       },
       { defId: 'siegeWorkshop', nx: baseX + 6, ny: baseY + 6, needed: t.siege && castle && has('blacksmith') && !has('siegeWorkshop') },
       { defId: 'monastery', nx: baseX - 6, ny: baseY + 6, needed: t.monks && castle && !has('monastery') },
+      // Standard+ opponents express their civilization identity in real matches:
+      // bank stone for a Castle, then the military manager fields the civ-only unit.
+      { defId: 'castle', nx: baseX - 8, ny: baseY - 6, needed: t.research && castle && !has('castle') && villagers.length >= 20 },
       // castle-age wood surplus becomes production capacity: a second barracks and
       // range double the reinforcement stream behind the big pushes
       { defId: 'barracks', nx: baseX + 6, ny: baseY - 4, needed: castle && t.counters >= 1 && (own.barracks?.length ?? 0) === 1 && snap.stock.wood >= 400 },
@@ -422,7 +425,10 @@ export function createEconomy(ctx: Ctx): EconomyManager {
     // war chest sized to the age: dark-age gold only funds militia (20 g each);
     // feudal+ pays for the next age, techs, and gold-heavy units
     const goldBanked = stock.gold >= (ageIdx === 0 ? 350 : 800);
-    const stoneBanked = stock.stone >= 400;
+    const needsCastle = ageIdx >= 2 && t.research
+      && (snap.own.castle?.length ?? 0) === 0
+      && !snap.foundations.some((f) => f.defId === 'castle');
+    const stoneBanked = stock.stone >= (needsCastle ? 700 : 400);
     const wantStone = ageIdx >= 1 && !stoneBanked && snap.stoneNodes.length > 0 ? t.stoneMiners : 0;
     const targets: Record<Role, number> = {
       // while banking a feudal+/castle age-up — and only once the farm estate is
