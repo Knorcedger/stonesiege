@@ -1,11 +1,12 @@
 # StoneSiege HD art direction
 
-Status: complete runtime contract coverage, active authored migration. All 3,806
-shipping frames have 2× HD overrides, but those overrides intentionally have two
-tiers: 139 frames use newly rendered subject art and 3,667 animation-heavy or
-low-priority frames use the deterministic material renderer. The procedural
-pixel atlases remain source geometry and a safe fallback if an HD sheet cannot
-load.
+Status: complete runtime contract coverage and complete authored world-art
+migration. All 3,908 shipping frames have 2× HD overrides. The 3,557 building,
+resource, animal, unit, construction, and world-entity icon frames use authored
+pre-rendered subject art; the remaining 351 terrain, rubble, interface, command,
+resource, and technology frames use the deterministic HD material renderer. The
+procedural pixel atlases remain source geometry and a safe fallback if an HD
+sheet cannot load.
 
 ## Visual target
 
@@ -48,8 +49,8 @@ the procedural set.
 - Use atlas chunks rather than one global texture. A migration batch can add a
   new sheet without repacking previously approved art.
 - Palette-swapped frames are generated lazily and shelf-packed into shared
-  1,024px runtime pages. This avoids cloning the complete 24 MB HD set for every
-  player while keeping team colors batchable.
+  1,024px runtime pages. This avoids cloning the complete HD set for every player
+  while keeping team colors batchable.
 
 Run `npm run assets:hd` to rebuild HD sheets. `npm run assets` rebuilds both the
 legacy fallback and HD overrides.
@@ -74,18 +75,21 @@ legacy fallback and HD overrides.
 
 1. Buildings: every completed building and age variant is newly rendered;
    construction stages composite the new render with mechanically exact
-   scaffolding. Rubble uses the systemic material pass.
-2. Static resources: trees, berries, gold, stone, and farms are newly rendered.
-   Terrain tiles and transitions use the systemic material pass.
-3. Units: the villager idle/walk direction set is newly rendered and retains the
-   player-color contract. Other unit actions, military units, siege, and animals
-   use animation-safe systemic rendering until their directional sheets land.
-4. UI: typography and panel treatment are refreshed; icons retain their exact
-   silhouettes with HD material rendering and linear sampling.
+   scaffolding. Rubble uses the systemic material pass because it already meets
+   the material and gameplay-readability target.
+2. Static resources: trees, stump, berries, gold, stone, and farms are newly
+   rendered. Terrain tiles and transitions use the systemic material pass.
+3. Units: villagers, infantry, archers, cavalry, monks, siege, sheep, deer, and
+   wolves use authored direction masters. Walk, attack, death, and decay motion
+   stays on stable grounded canvases and retains the player-color contract.
+4. UI: typography and panel treatment are refreshed. Every world-entity icon is
+   derived from the matching authored render; command, resource, and technology
+   symbols retain the legible deterministic material treatment.
 5. The legacy atlas remains intentionally: it is compact fallback art and the
    source geometry for deterministic regeneration.
 
 `tools/hd-art/materialize.ts` applies the approved material library, softened
-contours, natural edge shading, small-unit volume reconstruction, and 2× sampling
-to the remaining mechanical frame contract. Authored renders are packed last and
-therefore override systemic frames without changing their logical names.
+contours, natural edge shading, and 2× sampling to the remaining mechanical
+frame contract. Authored renders are packed last and therefore override systemic
+frames without changing their logical names. Reused source sheets are decoded
+once per build so the full authored contract remains practical to regenerate.

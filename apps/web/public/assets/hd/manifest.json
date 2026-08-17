@@ -3,13 +3,10 @@
  "density": 2,
  "style": "pre-rendered-3d",
  "frameCount": 3908,
- "convertedFrames": 2319,
- "bespokeFrames": 1589,
+ "convertedFrames": 351,
+ "bespokeFrames": 3557,
  "atlases": [
   "terrain-0.json",
-  "objects-0.json",
-  "units-0.json",
-  "units-1.json",
   "buildings-0.json",
   "ui-0.json",
   "icons-0.json",
@@ -20,6 +17,14 @@
   "hero-redrawn-4.json",
   "hero-redrawn-5.json",
   "hero-redrawn-6.json",
-  "hero-redrawn-7.json"
+  "hero-redrawn-7.json",
+  "hero-redrawn-8.json",
+  "hero-redrawn-9.json",
+  "hero-redrawn-10.json",
+  "hero-redrawn-11.json",
+  "hero-redrawn-12.json",
+  "hero-redrawn-13.json",
+  "hero-redrawn-14.json",
+  "hero-redrawn-15.json"
  ]
 }

@@ -26,16 +26,20 @@ footprint while applying those surface responses, softened contours, ambient
 edge shading, and 2× sampling to frames that do not yet have a subject render.
 
 The `source/buildings`, `source/objects`, and `source/units` directories contain
-the second authored batch, also produced with the built-in OpenAI image workflow
-using the approved Town Center as its camera/material reference. The prompt set
-requested individually recognizable medieval production, economic, religious,
-defensive, civic, and age-progression buildings; isolated natural resources;
-and an exact 4×2 villager direction sheet. All sources use a flat green or
-magenta removal background, matching upper-left world light, no baked terrain,
-and no baked player color. Their validated alpha cutouts live under `frames/`.
+the authored production batches, also produced with the built-in OpenAI image
+workflow using the approved Town Center as their camera/material reference. The
+prompt set covers individually recognizable medieval production, economic,
+religious, defensive, civic, and age-progression buildings; isolated natural
+resources and the harvested oak stump; exact direction sheets for villagers,
+scouts, sheep, deer, and wolves; and 6×5 movement grids for every military and
+siege visual family. All sources use a flat green or magenta removal background,
+matching upper-left world light, no baked terrain, and no baked player color.
+Their validated alpha cutouts live under `frames/`.
 
 `tools/hd-art/build.ts` fits those cutouts into the unchanged mechanical frame
-and anchor contract, restores the exact runtime player-color ramp from the base
-frame, derives the three construction stages, and packs the resulting authored
-overrides after the systemic sheets. `slice-direction-sheet.ts` extracts the five
-authored villager directions used by the runtime mirror convention.
+and anchor contract, restores the exact runtime player-color ramp, derives
+grounded action/death poses and the three construction stages, creates matching
+world-entity icons, and packs the resulting authored overrides after the
+systemic sheets. `slice-direction-sheet.ts` extracts the five authored directions
+used by the runtime mirror convention and removes cross-cell fragments from the
+wolf sheet.

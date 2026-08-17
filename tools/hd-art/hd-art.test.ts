@@ -162,4 +162,52 @@ describe('complete HD art override contract', () => {
       }
     }
   });
+
+  it('uses authored action and grounded death motion for every combat family', () => {
+    const combatUnits = [
+      'scout', 'lightCavalry',
+      'militia', 'manAtArms', 'longswordsman', 'champion',
+      'spearman', 'pikeman',
+      'archer', 'longbowman', 'eliteLongbowman',
+      'crossbowman', 'arbalester',
+      'skirmisher', 'eliteSkirmisher',
+      'highlandRaider', 'eliteHighlandRaider',
+      'knight', 'cavalier', 'paladin',
+      'monk', 'batteringRam', 'cappedRam', 'siegeRam',
+      'mangonel', 'onager', 'trebuchet',
+    ] as const;
+
+    for (const id of combatUnits) {
+      for (let dir = 0; dir < 5; dir++) {
+        const attacks = Array.from({ length: 5 }, (_, frame) => framePixelsHash(`unit/${id}/attack/${dir}/${frame}`));
+        const deaths = Array.from({ length: 5 }, (_, frame) => framePixelsHash(`unit/${id}/die/${dir}/${frame}`));
+        const decay = Array.from({ length: 3 }, (_, frame) => framePixelsHash(`unit/${id}/decay/${dir}/${frame}`));
+        expect(new Set(attacks).size, `${id} attack direction ${dir}`).toBeGreaterThanOrEqual(4);
+        expect(new Set(deaths).size, `${id} death direction ${dir}`).toBe(5);
+        expect(new Set(decay).size, `${id} decay direction ${dir}`).toBe(3);
+        expect(frameMaskPixelCount(`unit/${id}/attack/${dir}/2`), `${id} attack team mask`).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('ships authored sheep, deer, and wolf motion in every direction', () => {
+    for (const id of ['sheep', 'deer', 'wolf'] as const) {
+      const directionHashes = Array.from({ length: 5 }, (_, dir) => framePixelsHash(`obj/${id}/idle/${dir}/0`));
+      expect(new Set(directionHashes).size, `${id} authored directions`).toBe(5);
+      for (let dir = 0; dir < 5; dir++) {
+        const walk = Array.from({ length: 4 }, (_, frame) => framePixelsHash(`obj/${id}/walk/${dir}/${frame}`));
+        const death = Array.from({ length: 3 }, (_, frame) => framePixelsHash(`obj/${id}/die/${dir}/${frame}`));
+        const decay = Array.from({ length: 2 }, (_, frame) => framePixelsHash(`obj/${id}/decay/${dir}/${frame}`));
+        expect(new Set(walk).size, `${id} walk direction ${dir}`).toBe(4);
+        expect(new Set(death).size, `${id} death direction ${dir}`).toBe(3);
+        expect(new Set(decay).size, `${id} decay direction ${dir}`).toBe(2);
+      }
+    }
+  });
+
+  it('derives all world-entity icons from authored renders', () => {
+    for (const id of ['militia', 'pikeman', 'archer', 'knight', 'trebuchet', 'deer', 'wolf', 'tree', 'berryBush', 'goldMine', 'stoneMine']) {
+      expect(framePixelsHash(`icon/${id}`)).not.toBe(framePixelsHash(`icon/${id}/gray`));
+    }
+  });
 });

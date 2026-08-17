@@ -24,6 +24,7 @@ const MATERIAL_SOURCE = join(ROOT, 'art/hd/materials/material-atlas.png');
 const OUT = join(ROOT, 'apps/web/public/assets/hd');
 const MAX_ATLAS = 2048;
 const HERO_FRAME = 'bld/townCenter/dark/done';
+const cutoutSourceCache = new Map<string, PNG>();
 
 interface CutoutSpec {
   source: string;
@@ -47,6 +48,12 @@ interface CutoutSpec {
   stableSize?: readonly [number, number];
   /** Convert authored blue cloth to the runtime team ramp, with a sash fallback. */
   teamColor?: 'blue' | 'sash';
+  /** Add authored-raster motion without falling back to the legacy pixel rig. */
+  pose?: {
+    kind: 'attack' | 'die' | 'stride';
+    progress: number;
+    direction: number;
+  };
 }
 
 const AUTHORED_DIRECTIONS = [0, 1, 2, 3, 4] as const;
@@ -60,7 +67,7 @@ interface WalkGridOptions {
   walkFrames?: number;
 }
 
-/** Map a 6x5 authored movement sheet over every tier in a visual family. */
+/** Map a 6x5 authored movement sheet over every animation in a visual family. */
 function walkGridCutouts(
   source: string,
   ids: readonly string[],
@@ -77,24 +84,55 @@ function walkGridCutouts(
     stableSize: options.stableSize,
     teamColor: options.teamColor ?? 'blue',
   } as const;
+  const deathSize: readonly [number, number] = [
+    Math.max(options.stableSize[0], options.stableSize[1] * 2),
+    options.stableSize[1],
+  ];
 
-  return ids.flatMap((id) => AUTHORED_DIRECTIONS.flatMap((dir) => [
-    {
-      ...common,
-      frames: [`unit/${id}/idle/${dir}/0`, `unit/${id}/idle/${dir}/1`],
-      cell: { columns: sourceFrames, rows: AUTHORED_DIRECTIONS.length, column: 0, row: dir },
-    },
-    ...Array.from({ length: walkFrames }, (_, frame): CutoutSpec => ({
-      ...common,
-      frames: [`unit/${id}/walk/${dir}/${frame}`],
-      cell: {
-        columns: sourceFrames,
-        rows: AUTHORED_DIRECTIONS.length,
-        column: frame % sourceFrames,
-        row: dir,
+  return ids.flatMap((id) => AUTHORED_DIRECTIONS.flatMap((dir) => {
+    const cell = (column: number) => ({
+      columns: sourceFrames,
+      rows: AUTHORED_DIRECTIONS.length,
+      column: column % sourceFrames,
+      row: dir,
+    });
+    return [
+      {
+        ...common,
+        frames: [`unit/${id}/idle/${dir}/0`, `unit/${id}/idle/${dir}/1`],
+        cell: cell(0),
       },
-    })),
-  ]));
+      ...Array.from({ length: walkFrames }, (_, frame): CutoutSpec => ({
+        ...common,
+        frames: [`unit/${id}/walk/${dir}/${frame}`],
+        cell: cell(frame),
+      })),
+      ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
+        ...common,
+        frames: [`unit/${id}/attack/${dir}/${frame}`],
+        cell: cell([0, 1, 3, 2, 0][frame]),
+        pose: {
+          kind: 'attack',
+          progress: [0, 0.34, 1, 0.58, 0][frame],
+          direction: dir,
+        },
+      })),
+      ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
+        ...common,
+        stableSize: deathSize,
+        frames: [`unit/${id}/die/${dir}/${frame}`],
+        cell: cell(Math.min(frame, sourceFrames - 1)),
+        pose: { kind: 'die', progress: frame / 4, direction: dir },
+      })),
+      ...Array.from({ length: 3 }, (_, frame): CutoutSpec => ({
+        ...common,
+        stableSize: deathSize,
+        frames: [`unit/${id}/decay/${dir}/${frame}`],
+        cell: cell(sourceFrames - 1),
+        pose: { kind: 'die', progress: 1, direction: dir },
+      })),
+    ];
+  }));
 }
 
 function iconCutouts(
@@ -102,11 +140,81 @@ function iconCutouts(
   ids: readonly string[],
   fitWidth = 0.86,
   fitHeight = 0.86,
+  cell?: CutoutSpec['cell'],
 ): CutoutSpec[] {
   return ids.flatMap((id) => [
-    { source, frames: [`icon/${id}`], fitWidth, fitHeight, bottom: 0.92 },
-    { source, frames: [`icon/${id}/gray`], fitWidth, fitHeight, bottom: 0.92, grayscale: true },
+    { source, frames: [`icon/${id}`], fitWidth, fitHeight, bottom: 0.92, ...(cell ? { cell } : {}) },
+    {
+      source,
+      frames: [`icon/${id}/gray`],
+      fitWidth,
+      fitHeight,
+      bottom: 0.92,
+      grayscale: true,
+      ...(cell ? { cell } : {}),
+    },
   ]);
+}
+
+interface AnimalCutoutOptions {
+  stableSize: readonly [number, number];
+  walkFrames?: number;
+  attackFrames?: number;
+  fitWidth?: number;
+  fitHeight?: number;
+  bottom?: number;
+}
+
+/** Build a complete animal animation family from consistent authored directions. */
+function animalDirectionCutouts(
+  id: string,
+  sourcePattern: string,
+  options: AnimalCutoutOptions,
+): CutoutSpec[] {
+  const walkFrames = options.walkFrames ?? 4;
+  const attackFrames = options.attackFrames ?? 0;
+  const deathSize: readonly [number, number] = [
+    Math.max(options.stableSize[0], options.stableSize[1] * 2),
+    options.stableSize[1],
+  ];
+  return AUTHORED_DIRECTIONS.flatMap((dir) => {
+    const common = {
+      source: sourcePattern.replace('{dir}', String(dir)),
+      fitWidth: options.fitWidth ?? 0.94,
+      fitHeight: options.fitHeight ?? 0.92,
+      bottom: options.bottom ?? 0.94,
+      stableSize: options.stableSize,
+    } as const;
+    return [
+      { ...common, frames: [`obj/${id}/idle/${dir}/0`, `obj/${id}/idle/${dir}/1`] },
+      ...Array.from({ length: walkFrames }, (_, frame): CutoutSpec => ({
+        ...common,
+        frames: [`obj/${id}/walk/${dir}/${frame}`],
+        pose: { kind: 'stride', progress: frame / walkFrames, direction: dir },
+      })),
+      ...Array.from({ length: attackFrames }, (_, frame): CutoutSpec => ({
+        ...common,
+        frames: [`obj/${id}/attack/${dir}/${frame}`],
+        pose: {
+          kind: 'attack',
+          progress: [0, 0.52, 1, 0.22][frame] ?? 0,
+          direction: dir,
+        },
+      })),
+      ...Array.from({ length: 3 }, (_, frame): CutoutSpec => ({
+        ...common,
+        stableSize: deathSize,
+        frames: [`obj/${id}/die/${dir}/${frame}`],
+        pose: { kind: 'die', progress: frame / 2, direction: dir },
+      })),
+      ...Array.from({ length: 2 }, (_, frame): CutoutSpec => ({
+        ...common,
+        stableSize: deathSize,
+        frames: [`obj/${id}/decay/${dir}/${frame}`],
+        pose: { kind: 'die', progress: 1, direction: dir },
+      })),
+    ];
+  });
 }
 
 const CUTOUT_SPECS: readonly CutoutSpec[] = [
@@ -264,6 +372,13 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     bottom: 0.97,
   },
   {
+    source: 'art/hd/frames/objects/tree-stump-cutout-v1.png',
+    frames: ['obj/stump'],
+    fitWidth: 0.98,
+    fitHeight: 0.92,
+    bottom: 0.94,
+  },
+  {
     source: 'art/hd/frames/objects/berries-cutout-v2.png',
     frames: ['obj/berries'],
     fitWidth: 0.98,
@@ -343,10 +458,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
   })),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/scout-dir-${dir}-cutout-v3.png`,
-    frames: [
-      ...Array.from({ length: 2 }, (_, frame) => `unit/scout/idle/${dir}/${frame}`),
-      ...Array.from({ length: 5 }, (_, frame) => `unit/scout/attack/${dir}/${frame}`),
-    ],
+    frames: Array.from({ length: 2 }, (_, frame) => `unit/scout/idle/${dir}/${frame}`),
     fitWidth: 0.96,
     fitHeight: 0.96,
     bottom: 0.97,
@@ -359,6 +471,43 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitHeight: 0.96,
       bottom: 0.97,
     }))),
+  ...(['scout', 'lightCavalry'] as const).flatMap((id) =>
+    AUTHORED_DIRECTIONS.flatMap((dir) => [
+      ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
+        source: `art/hd/frames/units/scout-walk-dir-${dir}-frame-${frame % 4}-cutout-v4.png`,
+        frames: [`unit/${id}/attack/${dir}/${frame}`],
+        fitWidth: 0.96,
+        fitHeight: 0.96,
+        bottom: 0.97,
+        stableSize: [68, 80],
+        teamColor: 'blue',
+        pose: {
+          kind: 'attack',
+          progress: [0, 0.34, 1, 0.58, 0][frame],
+          direction: dir,
+        },
+      })),
+      ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
+        source: `art/hd/frames/units/scout-walk-dir-${dir}-frame-${Math.min(frame, 4)}-cutout-v4.png`,
+        frames: [`unit/${id}/die/${dir}/${frame}`],
+        fitWidth: 0.96,
+        fitHeight: 0.96,
+        bottom: 0.97,
+        stableSize: [160, 80],
+        teamColor: 'blue',
+        pose: { kind: 'die', progress: frame / 4, direction: dir },
+      })),
+      ...Array.from({ length: 3 }, (_, frame): CutoutSpec => ({
+        source: `art/hd/frames/units/scout-walk-dir-${dir}-frame-4-cutout-v4.png`,
+        frames: [`unit/${id}/decay/${dir}/${frame}`],
+        fitWidth: 0.96,
+        fitHeight: 0.96,
+        bottom: 0.97,
+        stableSize: [160, 80],
+        teamColor: 'blue',
+        pose: { kind: 'die', progress: 1, direction: dir },
+      })),
+    ])),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/scout-dir-${dir}-cutout-v3.png`,
     frames: Array.from({ length: 2 }, (_, frame) => `unit/lightCavalry/idle/${dir}/${frame}`),
@@ -448,6 +597,36 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitHeight: 0.9,
       bottom: 0.94,
     }))),
+  ...AUTHORED_DIRECTIONS.flatMap((dir) => [
+    ...Array.from({ length: 3 }, (_, frame): CutoutSpec => ({
+      source: `art/hd/frames/units/sheep-dir-${dir}-cutout-v3.png`,
+      frames: [`obj/sheep/die/${dir}/${frame}`],
+      fitWidth: 0.94,
+      fitHeight: 0.9,
+      bottom: 0.94,
+      stableSize: [128, 64],
+      pose: { kind: 'die', progress: frame / 2, direction: dir },
+    })),
+    ...Array.from({ length: 2 }, (_, frame): CutoutSpec => ({
+      source: `art/hd/frames/units/sheep-dir-${dir}-cutout-v3.png`,
+      frames: [`obj/sheep/decay/${dir}/${frame}`],
+      fitWidth: 0.94,
+      fitHeight: 0.9,
+      bottom: 0.94,
+      stableSize: [128, 64],
+      pose: { kind: 'die', progress: 1, direction: dir },
+    })),
+  ]),
+  ...animalDirectionCutouts(
+    'deer',
+    'art/hd/frames/units/deer-dir-{dir}-cutout-v1.png',
+    { stableSize: [80, 80], fitWidth: 0.96, fitHeight: 0.96 },
+  ),
+  ...animalDirectionCutouts(
+    'wolf',
+    'art/hd/frames/units/wolf-dir-{dir}-cutout-v1.png',
+    { stableSize: [76, 68], attackFrames: 4, fitWidth: 0.96, fitHeight: 0.94 },
+  ),
 
   // Keep HUD and quick-navigation art in the same visual language as the
   // world by deriving icon mini-renders from the approved cutouts.
@@ -471,8 +650,91 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
   ...iconCutouts('art/hd/frames/buildings/castle-cutout-v2.png', ['castle']),
   ...iconCutouts('art/hd/frames/buildings/wonder-cutout-v2.png', ['wonder']),
   ...iconCutouts('art/hd/frames/units/villager-dir-0-cutout-v2.png', ['villager'], 0.72, 0.9),
-  ...iconCutouts('art/hd/frames/units/scout-dir-0-cutout-v3.png', ['scout'], 0.9, 0.86),
+  ...iconCutouts('art/hd/frames/units/scout-dir-0-cutout-v3.png', ['scout', 'lightCavalry', 'heroFraser'], 0.9, 0.86),
+  ...iconCutouts(
+    'art/hd/frames/units/champion-walk-grid-cutout-v1.png',
+    ['militia', 'manAtArms', 'longswordsman', 'champion', 'heroWallace', 'heroGraham', 'heroHeselrig', 'heroCressingham'],
+    0.82,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/pikeman-walk-grid-cutout-v1.png',
+    ['spearman', 'pikeman'],
+    0.88,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/longbowman-walk-grid-cutout-v1.png',
+    ['archer', 'longbowman', 'eliteLongbowman'],
+    0.88,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/crossbowman-walk-grid-cutout-v1.png',
+    ['crossbowman', 'arbalester'],
+    0.86,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/skirmisher-walk-grid-cutout-v1.png',
+    ['skirmisher', 'eliteSkirmisher'],
+    0.88,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/highland-raider-walk-grid-cutout-v1.png',
+    ['highlandRaider', 'eliteHighlandRaider'],
+    0.88,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/paladin-walk-grid-cutout-v1.png',
+    ['knight', 'cavalier', 'paladin', 'heroMoray', 'heroWarenne', 'heroEdward', 'heroValence'],
+    0.94,
+    0.86,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/monk-walk-grid-cutout-v1.png',
+    ['monk'],
+    0.82,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/siege-ram-roll-grid-cutout-v1.png',
+    ['batteringRam', 'cappedRam', 'siegeRam'],
+    0.94,
+    0.82,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/onager-roll-grid-cutout-v1.png',
+    ['mangonel', 'onager'],
+    0.94,
+    0.82,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/trebuchet-roll-grid-cutout-v1.png',
+    ['trebuchet'],
+    0.94,
+    0.82,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
   ...iconCutouts('art/hd/frames/units/sheep-dir-0-cutout-v3.png', ['sheep'], 0.88, 0.78),
+  ...iconCutouts('art/hd/frames/units/deer-dir-0-cutout-v1.png', ['deer'], 0.88, 0.86),
+  ...iconCutouts('art/hd/frames/units/wolf-dir-0-cutout-v1.png', ['wolf'], 0.88, 0.84),
+  ...iconCutouts('art/hd/frames/objects/tree-oak-cutout-v3.png', ['tree'], 0.9, 0.9),
+  ...iconCutouts('art/hd/frames/objects/berries-cutout-v2.png', ['berryBush'], 0.9, 0.78),
+  ...iconCutouts('art/hd/frames/objects/gold-cutout-v2.png', ['goldMine'], 0.9, 0.8),
+  ...iconCutouts('art/hd/frames/objects/stone-cutout-v2.png', ['stoneMine'], 0.9, 0.8),
 ];
 
 interface ConstructionCutout {
@@ -624,9 +886,120 @@ function bilinearPixel(png: PNG, x: number, y: number): readonly [number, number
   ];
 }
 
+function bilinearRasterPixel(raster: Raster, x: number, y: number): readonly [number, number, number, number] {
+  if (x < -1 || y < -1 || x > raster.width || y > raster.height) return [0, 0, 0, 0];
+  const x0 = Math.max(0, Math.min(raster.width - 1, Math.floor(x)));
+  const y0 = Math.max(0, Math.min(raster.height - 1, Math.floor(y)));
+  const x1 = Math.min(raster.width - 1, x0 + 1);
+  const y1 = Math.min(raster.height - 1, y0 + 1);
+  const tx = x - Math.floor(x);
+  const ty = y - Math.floor(y);
+  const weights = [
+    [(1 - tx) * (1 - ty), x0, y0],
+    [tx * (1 - ty), x1, y0],
+    [(1 - tx) * ty, x0, y1],
+    [tx * ty, x1, y1],
+  ] as const;
+  let alpha = 0;
+  let pr = 0;
+  let pg = 0;
+  let pb = 0;
+  for (const [weight, sx, sy] of weights) {
+    const [r, g, b, a8] = raster.get(sx, sy);
+    const a = a8 / 255;
+    alpha += a * weight;
+    pr += r * a * weight;
+    pg += g * a * weight;
+    pb += b * a * weight;
+  }
+  if (alpha <= 0.0001) return [0, 0, 0, 0];
+  return [
+    Math.round(pr / alpha),
+    Math.round(pg / alpha),
+    Math.round(pb / alpha),
+    Math.round(alpha * 255),
+  ];
+}
+
+/** Preserve premium source pixels while adding readable attack, gait, and fall silhouettes. */
+function transformCutoutPose(
+  source: Raster,
+  pose: NonNullable<CutoutSpec['pose']>,
+  groundY: number,
+): Raster {
+  const output = new Raster(source.width, source.height);
+  const pivotX = source.width / 2;
+  const pivotY = groundY;
+  const directionVectors: ReadonlyArray<readonly [number, number]> = [
+    [0, 1], [-0.72, 0.5], [-1, 0], [-0.72, -0.5], [0, -1],
+  ];
+  const [vx, vy] = directionVectors[pose.direction] ?? [0, 1];
+  let offsetX = 0;
+  let offsetY = 0;
+  let angle = 0;
+  let scaleX = 1;
+  let scaleY = 1;
+
+  if (pose.kind === 'attack') {
+    offsetX = vx * pose.progress * 7;
+    offsetY = vy * pose.progress * 3 - pose.progress * 2;
+    angle = -vx * pose.progress * 0.055;
+  } else if (pose.kind === 'stride') {
+    const gait = Math.cos(pose.progress * Math.PI * 2);
+    const stride = Math.sin(pose.progress * Math.PI * 2);
+    scaleX = 1 + gait * 0.035;
+    scaleY = 1 - gait * 0.025;
+    offsetX = stride * 1.25;
+    offsetY = -Math.abs(stride) * 1.5;
+    angle = stride * 0.025;
+  } else {
+    const fallSign = pose.direction <= 2 ? -1 : 1;
+    angle = fallSign * pose.progress * Math.PI * 0.4;
+    scaleY = 1 - pose.progress * 0.16;
+    offsetY = pose.progress * 1.5;
+  }
+
+  const cos = Math.cos(angle);
+  const sin = Math.sin(angle);
+  for (let y = 0; y < output.height; y++) {
+    for (let x = 0; x < output.width; x++) {
+      const dx = x - pivotX - offsetX;
+      const dy = y - pivotY - offsetY;
+      // Inverse of scale-then-rotate around the unit's grounded anchor.
+      const rx = dx * cos + dy * sin;
+      const ry = -dx * sin + dy * cos;
+      const sx = pivotX + rx / scaleX;
+      const sy = pivotY + ry / scaleY;
+      const [r, g, b, a] = bilinearRasterPixel(source, sx, sy);
+      if (a > 0) output.set(x, y, [r, g, b], a);
+    }
+  }
+  return output;
+}
+
+function restoreExactTeamMask(raster: Raster): void {
+  for (let y = 0; y < raster.height; y++) {
+    for (let x = 0; x < raster.width; x++) {
+      const [r, g, b, a] = raster.get(x, y);
+      if (a < 12 || r < 72 || b < 72 || g > 72 || Math.abs(r - b) > 80) continue;
+      const brightness = Math.max(r, b);
+      const mask = brightness >= 176
+        ? [255, 0, 255] as const
+        : brightness >= 112
+          ? [204, 0, 204] as const
+          : [153, 0, 153] as const;
+      raster.set(x, y, mask, a);
+    }
+  }
+}
+
 /** Fit an authored transparent render into the exact mechanical frame contract. */
 function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
-  const png = PNG.sync.read(readFileSync(join(ROOT, spec.source)));
+  let png = cutoutSourceCache.get(spec.source);
+  if (!png) {
+    png = PNG.sync.read(readFileSync(join(ROOT, spec.source)));
+    cutoutSourceCache.set(spec.source, png);
+  }
   const region = cellBounds(png, spec);
   const bounds = alphaBounds(png, region);
   const sourceWidth = bounds.right - bounds.left + 1;
@@ -672,7 +1045,7 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
   const motionBob = motionFrame ? motionCycle[Number(motionFrame[2]) % motionCycle.length] : 0;
   const bottom = Math.round(height * (spec.bottom ?? 0.95)) + motionBob;
   const dy = bottom - drawHeight;
-  const raster = new Raster(width, height);
+  let raster = new Raster(width, height);
   let authoredMaskPixels = 0;
   const decayFrame = name.match(/\/decay\/\d\/(\d+)$/);
   const frameOpacity = decayFrame ? [0.76, 0.52, 0.3][Number(decayFrame[1])] ?? 0.3 : 1;
@@ -740,14 +1113,21 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
       }
     }
   }
+  if (spec.pose) {
+    raster = transformCutoutPose(raster, spec.pose, bottom);
+    if (spec.teamColor) restoreExactTeamMask(raster);
+  }
   const buildingMatch = name.match(/^bld\/([^/]+)\//);
   const buildingSize = buildingMatch ? buildingDefs[buildingMatch[1]]?.size : undefined;
   const farmSize = name.startsWith('obj/farm/') ? buildingDefs.farm?.size : undefined;
   const groundedObject = name.startsWith('obj/tree/')
+    || name === 'obj/stump'
     || name === 'obj/berries'
     || name.startsWith('obj/gold/')
     || name.startsWith('obj/stone/')
-    || name.startsWith('obj/sheep/');
+    || name.startsWith('obj/sheep/')
+    || name.startsWith('obj/deer/')
+    || name.startsWith('obj/wolf/');
   const footprintSize = buildingSize ?? farmSize;
   const anchor = stableUnitSize || groundedObject
     ? { x: Math.round(width / 2), y: bottom }
@@ -851,6 +1231,7 @@ function emitFamily(
   const frames = sourceFrames
     .filter((f) => !BESPOKE_FRAMES.has(f.name))
     .map((f) => materializeFrame(f, materials));
+  if (frames.length === 0) return 0;
   const scaledNineSlice = nineSlice
     ? Object.fromEntries(Object.entries(nineSlice).map(([name, inset]) =>
       [name, inset.map((n) => n * HD_DENSITY) as [number, number, number, number]]))
