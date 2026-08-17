@@ -1,4 +1,4 @@
-// Bot opponents (GDD Practice: skirmish vs bots, Easy / Standard / Hard; campaign
+// Bot opponents (GDD Practice: seven levels from Beginner through Hardcore; campaign
 // bots take an AiProfile from scenario triggers).
 //
 // The bot is an external controller exactly like a human: it reads game.state,
@@ -23,6 +23,7 @@ import { tuningFor } from './tuning';
 import type { AiProfile, Bot, BotDifficulty, BotRect, CreateBotOpts } from './types';
 
 export type { AiProfile, Bot, BotDifficulty, BotRect, CreateBotOpts } from './types';
+export { BOT_DIFFICULTIES } from './types';
 export type { Tuning } from './tuning';
 
 export function createBot(

@@ -37,17 +37,25 @@ async function feudalTick(seed: number): Promise<number> {
   return -1;
 }
 
-async function firstAttackTick(seed: number): Promise<number> {
+async function firstAttackTick(seed: number): Promise<{ at: number; summary: string }> {
   const game = createGame(config(seed));
   const bot = createBot(game, 2, { difficulty: 'hard', seed });
   let events: SimEvent[] = [];
   for (let t = 0; t < 24000; t++) {
     if (t % 4000 === 3999) await new Promise((r) => { setImmediate(r); });
     const commands = bot.tick(events);
-    if (commands.some((cmd) => cmd.kind === 'attack' || cmd.kind === 'attackMove')) return t;
+    if (commands.some((cmd) => cmd.kind === 'attack' || cmd.kind === 'attackMove')) return { at: t, summary: '' };
     events = game.advance(commands);
   }
-  return -1;
+  const own = [...game.state.entities.values()].filter((e) => e.player === 2);
+  const p = game.state.players[2];
+  return {
+    at: -1,
+    summary: `age=${p.age}, pop=${p.pop}/${p.popCap}, villagers=${own.filter((e) => e.defId === 'villager').length}, `
+      + `military=${own.filter((e) => e.kind === 'unit' && e.defId !== 'villager').length}, `
+      + `buildings=${own.filter((e) => e.kind === 'building').map((e) => e.defId).join(',')}, `
+      + `stock=${JSON.stringify(p.stockpile)}`,
+  };
 }
 
 describe('hard dark-age tempo', () => {
@@ -61,9 +69,9 @@ describe('hard dark-age tempo', () => {
 
   it('pressures an idle human before 20 sim-minutes across fresh seeds', { timeout: 300000 }, async () => {
     for (const seed of [5, 12, 23]) {
-      const at = await firstAttackTick(seed);
-      expect(at, `seed ${seed}: hard never launched an attack in the window`).toBeGreaterThan(0);
-      expect(at, `seed ${seed}: hard attacked too late (${(at / 1200).toFixed(1)} min)`).toBeLessThan(24000);
+      const probe = await firstAttackTick(seed);
+      expect(probe.at, `seed ${seed}: hard never launched an attack in the window; ${probe.summary}`).toBeGreaterThan(0);
+      expect(probe.at, `seed ${seed}: hard attacked too late (${(probe.at / 1200).toFixed(1)} min)`).toBeLessThan(24000);
     }
   });
 });

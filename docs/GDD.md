@@ -15,7 +15,8 @@ pause button, plus auto-pause on backgrounding. (Manual save/load UI stays on th
 see Out of scope.)
 
 ## Modes
-- **Practice**: random-map skirmish vs 1–3 bot opponents. Difficulties: Easy / Standard / Hard.
+- **Practice**: random-map skirmish vs 1–3 bot opponents. A seven-step slider runs
+  from Beginner through Hardcore; each opponent can use a different level.
   Victory by conquest — elimination rules are defined in Victory / Defeat below.
 - **Campaign**: scripted scenarios with objectives, briefings, and triggers.
   First campaign: **William Wallace — The Rising of Scotland** (6 scenarios; doubles as the

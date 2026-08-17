@@ -6,7 +6,7 @@
 
 import { gameData } from '@bf/data';
 import { campaigns, scenariosById, type CampaignDef } from '@bf/scenarios';
-import type { BotDifficulty } from '@bf/ai';
+import { BOT_DIFFICULTIES, type BotDifficulty } from '@bf/ai';
 import { FALLBACK_PLAYER_RAMPS } from '../recolor';
 import {
   DEFAULT_PRACTICE_SETUP, MAP_SIZE_TILES,
@@ -62,6 +62,13 @@ const MENU_CSS = `
   color:#DABE8D; background:#241809; border:1px solid #64492B; border-radius:4px; }
 .bf-seg button.on { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border-color:#B99A6B;
   box-shadow:0 1px 0 #8A6414; }
+.bf-difficulty { padding:9px 10px 8px; background:#1d1409; border:1px solid #50391f; border-radius:4px; }
+.bf-diff-head { display:flex; align-items:baseline; justify-content:space-between; gap:8px; }
+.bf-diff-name { color:#E6C04A; font-size:17px; font-weight:600; letter-spacing:.6px; }
+.bf-diff-level { color:#8f7958; font-size:11px; letter-spacing:.7px; }
+.bf-difficulty input[type=range] { display:block; width:100%; margin:8px 0 5px; accent-color:#E6C04A; }
+.bf-diff-scale { display:flex; justify-content:space-between; color:#806b4d; font-size:10px; letter-spacing:.5px; }
+.bf-diff-desc { min-height:31px; margin-top:6px; color:#B99A6B; font-size:11.5px; line-height:1.3; }
 .bf-civ { display:flex; flex-direction:column; gap:6px; }
 .bf-civ-card { text-align:left; padding:9px 12px; cursor:pointer; border:1px solid #64492B; border-radius:4px;
   background:#241809; color:#DABE8D; font-family:inherit; }
@@ -112,11 +119,15 @@ const MENU_CSS = `
 .bf-brief-actions .bf-menu-btn.ghost { flex:1; }
 `;
 
-const DIFFICULTIES: Array<{ id: BotDifficulty; label: string }> = [
-  { id: 'easy', label: 'Easy' },
-  { id: 'standard', label: 'Standard' },
-  { id: 'hard', label: 'Hard' },
-];
+const DIFFICULTY_DETAILS: Record<BotDifficulty, { label: string; description: string }> = {
+  beginner: { label: 'Beginner', description: 'Slow decisions, a small army, and forgiving economic pressure.' },
+  easy: { label: 'Easy', description: 'A relaxed opponent with limited expansion and simple armies.' },
+  standard: { label: 'Standard', description: 'Balanced economy, defenses, research, and organized attacks.' },
+  medium: { label: 'Medium', description: 'The former Hard AI: fast age-ups, counters, siege, and steady pressure.' },
+  hard: { label: 'Hard', description: 'Earlier attacks, a larger economy, rapid reinforcement, and flanking.' },
+  expert: { label: 'Expert', description: 'Sharp reactions, heavy production, adaptive counters, and relentless waves.' },
+  hardcore: { label: 'Hardcore', description: 'Maximum AI tempo: near-continuous pressure, expansion, siege, monks, and multi-front control.' },
+};
 
 const MAP_SIZES: Array<{ id: PracticeMapSize; label: string }> = [
   { id: 'small', label: 'Small' },
@@ -225,6 +236,34 @@ export function showMenu(
       }
       return row;
     };
+    const difficultySlider = (
+      opponent: number, active: BotDifficulty, pick: (id: BotDifficulty) => void,
+    ): HTMLDivElement => {
+      const box = el('div', 'bf-difficulty');
+      const name = el('span', 'bf-diff-name', DIFFICULTY_DETAILS[active].label);
+      const level = el('span', 'bf-diff-level', `LEVEL ${BOT_DIFFICULTIES.indexOf(active) + 1} / ${BOT_DIFFICULTIES.length}`);
+      const head = el('div', 'bf-diff-head');
+      head.append(name, level);
+      const input = document.createElement('input');
+      input.type = 'range';
+      input.min = '0';
+      input.max = String(BOT_DIFFICULTIES.length - 1);
+      input.step = '1';
+      input.value = String(BOT_DIFFICULTIES.indexOf(active));
+      input.setAttribute('aria-label', `Opponent ${opponent} difficulty`);
+      const scale = el('div', 'bf-diff-scale');
+      scale.append(el('span', '', 'Beginner'), el('span', '', 'Hardcore'));
+      const description = el('div', 'bf-diff-desc', DIFFICULTY_DETAILS[active].description);
+      input.addEventListener('input', () => {
+        const next = BOT_DIFFICULTIES[Number(input.value)] ?? 'standard';
+        pick(next);
+        name.textContent = DIFFICULTY_DETAILS[next].label;
+        level.textContent = `LEVEL ${Number(input.value) + 1} / ${BOT_DIFFICULTIES.length}`;
+        description.textContent = DIFFICULTY_DETAILS[next].description;
+      });
+      box.append(head, input, scale, description);
+      return box;
+    };
 
     // ---------------------------------------------------------------- views
     const renderTitle = (): void => {
@@ -276,9 +315,8 @@ export function showMenu(
       ));
       practice.opponents.forEach((diff, i) => {
         settings.appendChild(el('div', 'bf-menu-label', `OPPONENT ${i + 1} DIFFICULTY`));
-        settings.appendChild(segmented(DIFFICULTIES, diff, (id) => {
+        settings.appendChild(difficultySlider(i + 1, diff, (id) => {
           practice.opponents[i] = id;
-          render();
         }));
       });
       panel.appendChild(settings);

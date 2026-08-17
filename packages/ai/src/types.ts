@@ -5,7 +5,10 @@
 
 import type { Command, PlayerId, SimEvent } from '@bf/sim/types';
 
-export type BotDifficulty = 'easy' | 'standard' | 'hard';
+export const BOT_DIFFICULTIES = [
+  'beginner', 'easy', 'standard', 'medium', 'hard', 'expert', 'hardcore',
+] as const;
+export type BotDifficulty = (typeof BOT_DIFFICULTIES)[number];
 
 /**
  * Behavior profile (mirrors AiProfile in @bf/scenarios schema — kept structurally

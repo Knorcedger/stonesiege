@@ -343,7 +343,7 @@ export function createEconomy(ctx: Ctx): EconomyManager {
     const villagerTarget = ageIdx === 0
       ? Math.min(t.villagerTarget, t.ageUpVillagers + 2)
       : ageIdx === 1
-        ? Math.min(t.villagerTarget, Math.max(t.ageUpVillagers + 8, t.villagerTarget - 4))
+        ? Math.min(t.villagerTarget, t.feudalVillagerTarget)
         : t.villagerTarget;
     for (const tc of snap.own.townCenter ?? []) {
       if ((tc.trainQueue?.length ?? 0) !== 0) continue;

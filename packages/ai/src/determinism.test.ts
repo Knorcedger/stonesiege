@@ -5,8 +5,8 @@
 import { describe, expect, it } from 'vitest';
 import { createGame } from '@bf/sim';
 import type { Command, GameConfig, SimEvent } from '@bf/sim/types';
-import type { AiProfile, BotDifficulty } from './index';
-import { createBot } from './index';
+import type { AiProfile } from './index';
+import { BOT_DIFFICULTIES, createBot } from './index';
 
 const config = (): GameConfig => ({
   seed: 17,
@@ -53,9 +53,8 @@ describe('bot determinism', () => {
 
   it('every profile × difficulty constructs and plays without desync', { timeout: 60000 }, () => {
     const profiles: AiProfile[] = ['passive', 'defender', 'raider', 'standard', 'aggressive'];
-    const difficulties: BotDifficulty[] = ['easy', 'standard', 'hard'];
     for (const profile of profiles) {
-      for (const difficulty of difficulties) {
+      for (const difficulty of BOT_DIFFICULTIES) {
         const g1 = createGame(config());
         const g2 = createGame(config());
         const b1 = createBot(g1, 2, { profile, difficulty, seed: 3 });

@@ -20,7 +20,7 @@ describe('unitDisplayStats', () => {
 describe('practiceConfig', () => {
   it('carries map size and 1–3 selected opponent seats into the match', () => {
     const config = practiceConfig({
-      mapSize: 'large', opponents: ['easy', 'standard', 'hard'], civ: 'scots', color: 3,
+      mapSize: 'large', opponents: ['beginner', 'medium', 'hardcore'], civ: 'scots', color: 3,
     }, 123);
     expect(config.map).toEqual({
       type: 'practice-random', width: MAP_SIZE_TILES.large, height: MAP_SIZE_TILES.large,

@@ -637,10 +637,14 @@ export function createMilitary(ctx: Ctx): MilitaryManager {
     // Each floor guards only its OWN resource: an archer (wood+gold) must keep
     // training while the bot banks 800 FOOD for Castle — the all-resource gate froze
     // EVERY military line for the whole saving window (the zero-army standard bug).
-    const spare = (cost: Partial<Record<'food' | 'wood' | 'gold' | 'stone', number>>, foodPad = t.raidEco ? 10 : 40, goldPad = 20 + goldReserve): boolean =>
+    const spare = (
+      cost: Partial<Record<'food' | 'wood' | 'gold' | 'stone', number>>,
+      foodPad = t.raidEco ? 10 : t.unitFoodBuffer,
+      goldPad = t.unitGoldBuffer + goldReserve,
+    ): boolean =>
       ((cost.food ?? 0) === 0 || stock.food >= foodFloor + (cost.food ?? 0) + foodPad)
       // wood buffer (houses!) only matters for units that actually cost wood
-      && stock.wood >= (cost.wood ?? 0) + ((cost.wood ?? 0) > 0 ? 60 + woodReserve : 0)
+      && stock.wood >= (cost.wood ?? 0) + ((cost.wood ?? 0) > 0 ? t.unitWoodBuffer + woodReserve : 0)
       && ((cost.gold ?? 0) === 0 || stock.gold >= goldFloor + (cost.gold ?? 0) + goldPad)
       && stock.stone >= (cost.stone ?? 0);
 

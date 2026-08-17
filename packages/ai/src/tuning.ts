@@ -17,6 +17,8 @@ export interface Tuning {
    * (gating the age-up on the full boom target made hard the SLOWEST to Feudal).
    */
   ageUpVillagers: number;
+  /** Feudal boom pause: upper tiers stop adding workers briefly to fund their opening army. */
+  feudalVillagerTarget: number;
   farmTarget: number;
   maxAge: AgeId;
   /** Eco/blacksmith/line-upgrade research on. */
@@ -72,17 +74,30 @@ export interface Tuning {
   armyCap: number;
   /** Min ticks between army unit trainings (easy trickles; 0 = production-limited). */
   trainCooldown: number;
+  /** Per-unit safety buffers; upper tiers spend leaner to turn income into pressure. */
+  unitFoodBuffer: number;
+  unitWoodBuffer: number;
+  unitGoldBuffer: number;
 }
 
 const BASE: Record<BotDifficulty, Tuning> = {
+  beginner: {
+    interval: 90, batchCap: 3, villagerTarget: 12, ageUpVillagers: 10, feudalVillagerTarget: 12, farmTarget: 3, maxAge: 'feudal',
+    research: false, counters: 0, openingArmy: 10, attackArmy: 10, regroupArmy: 2, waveReissue: 900,
+    waveCooldown: 1800, raidEco: false, constantPressure: false, counterattackOnly: false,
+    neverAttack: false, towers: false, walls: false, stoneMiners: 0, secondTc: false,
+    market: false, monks: false, siege: false, multiFront: false, resignEarly: true,
+    maxFoundations: 1, barracksAt: 10, minArmyBeforeAgeUp: 0, armyCap: 8, trainCooldown: 900,
+    darkMilitia: 2, unitFoodBuffer: 60, unitWoodBuffer: 90, unitGoldBuffer: 30,
+  },
   easy: {
-    interval: 60, batchCap: 4, villagerTarget: 14, ageUpVillagers: 14, farmTarget: 4, maxAge: 'feudal',
+    interval: 60, batchCap: 4, villagerTarget: 14, ageUpVillagers: 14, feudalVillagerTarget: 14, farmTarget: 4, maxAge: 'feudal',
     research: false, counters: 0, openingArmy: 8, attackArmy: 8, regroupArmy: 3, waveReissue: 600,
     waveCooldown: 1200, raidEco: false, constantPressure: false, counterattackOnly: false,
     neverAttack: false, towers: false, walls: false, stoneMiners: 0, secondTc: false,
     market: false, monks: false, siege: false, multiFront: false, resignEarly: true,
     maxFoundations: 2, barracksAt: 9, minArmyBeforeAgeUp: 0, armyCap: 12, trainCooldown: 600,
-    darkMilitia: 3,
+    darkMilitia: 3, unitFoodBuffer: 40, unitWoodBuffer: 60, unitGoldBuffer: 20,
   },
   standard: {
     // ageUpVillagers 14 (was 15): with dark-age militia capped, the feudal climb is
@@ -90,7 +105,7 @@ const BASE: Record<BotDifficulty, Tuning> = {
     // villagerTarget 22 (was 18): real practice games run popCap 100, and an 18-vil
     // economy could not sustain wave replacement — hour-long attrition stalemates
     // (AOE2_REFERENCE: ~25-30 villagers by Castle is the human norm).
-    interval: 30, batchCap: 8, villagerTarget: 22, ageUpVillagers: 14, farmTarget: 8, maxAge: 'castle',
+    interval: 30, batchCap: 8, villagerTarget: 22, ageUpVillagers: 14, feudalVillagerTarget: 22, farmTarget: 8, maxAge: 'castle',
     research: true, counters: 1, openingArmy: 12, attackArmy: 12, regroupArmy: 4, waveReissue: 600,
     waveCooldown: 1200, raidEco: false, constantPressure: false, counterattackOnly: false,
     // towers: cheap standing defense — banking an age-up through harassment is
@@ -98,23 +113,12 @@ const BASE: Record<BotDifficulty, Tuning> = {
     neverAttack: false, towers: true, walls: false, stoneMiners: 1, secondTc: false,
     market: false, monks: false, siege: true, multiFront: false, resignEarly: false,
     maxFoundations: 2, barracksAt: 9, minArmyBeforeAgeUp: 0, armyCap: 999, trainCooldown: 0,
-    darkMilitia: 2,
+    darkMilitia: 2, unitFoodBuffer: 40, unitWoodBuffer: 60, unitGoldBuffer: 20,
   },
-  // hard tops out at Castle: there is no Imperial building script yet, so saving for
-  // Imperial would deadlock the army economy behind the age-up piggy bank
-  hard: {
-    // ageUpVillagers 12 (was 16, then 14): the boom ceiling (villagerTarget) is
-    // untouched — this only starts the Feudal bank earlier. Together with
-    // darkMilitia 0 and no dark gold miners (economy skips them when no dark
-    // militia will spend the gold), every dark-age hand gathers the Feudal bank:
-    // hard is the FASTEST up, not the slowest. (At 14 hard still trailed easy to
-    // Feudal by ~3 minutes on the same map — headless seed-12 measurement.)
-    // Hard used to out-boom Standard but wait for a 16-unit ball before its
-    // first attack (25:42 in the seed-12 idle-player probe). A human could boom
-    // untouched and meet that single late army fully prepared. A four-unit opening raid,
-    // tighter regrouping, and persistent pressure make its tempo challenging;
-    // its superior economy/counters still scale those attacks into the late game.
-    interval: 14, batchCap: 12, villagerTarget: 28, ageUpVillagers: 12, farmTarget: 9, maxAge: 'castle',
+  // The former three-choice Hard preset is now Medium. Keeping these exact values
+  // makes the user's assessment concrete and gives the new upper tiers room to grow.
+  medium: {
+    interval: 14, batchCap: 12, villagerTarget: 28, ageUpVillagers: 12, feudalVillagerTarget: 24, farmTarget: 9, maxAge: 'castle',
     research: true, counters: 2, openingArmy: 4, attackArmy: 10, regroupArmy: 4, waveReissue: 300,
     waveCooldown: 300, raidEco: false, constantPressure: true, counterattackOnly: false,
     neverAttack: false, towers: true, walls: false, stoneMiners: 1, secondTc: true,
@@ -122,7 +126,37 @@ const BASE: Record<BotDifficulty, Tuning> = {
     // Field the first pressure wave before opening the Castle-Age piggy bank;
     // otherwise the bank freezes military production from Feudal until ~25 min.
     maxFoundations: 3, barracksAt: 9, minArmyBeforeAgeUp: 4, armyCap: 999, trainCooldown: 0,
-    darkMilitia: 0,
+    darkMilitia: 0, unitFoodBuffer: 40, unitWoodBuffer: 60, unitGoldBuffer: 20,
+  },
+  // Upper tiers remain Castle-capped until the Imperial build script exists, but
+  // scale real controller skill: reaction rate, parallel actions, economy size,
+  // opening timing, reinforcement cadence, production, counters, siege and flanks.
+  hard: {
+    interval: 10, batchCap: 16, villagerTarget: 32, ageUpVillagers: 12, feudalVillagerTarget: 18, farmTarget: 11, maxAge: 'castle',
+    research: true, counters: 2, openingArmy: 2, attackArmy: 10, regroupArmy: 2, waveReissue: 240,
+    waveCooldown: 120, raidEco: false, constantPressure: true, counterattackOnly: false,
+    neverAttack: false, towers: true, walls: false, stoneMiners: 2, secondTc: true,
+    market: true, monks: true, siege: true, multiFront: true, resignEarly: false,
+    maxFoundations: 4, barracksAt: 8, minArmyBeforeAgeUp: 2, armyCap: 999, trainCooldown: 0,
+    darkMilitia: 0, unitFoodBuffer: 10, unitWoodBuffer: 20, unitGoldBuffer: 0,
+  },
+  expert: {
+    interval: 6, batchCap: 24, villagerTarget: 36, ageUpVillagers: 11, feudalVillagerTarget: 17, farmTarget: 13, maxAge: 'castle',
+    research: true, counters: 2, openingArmy: 2, attackArmy: 12, regroupArmy: 2, waveReissue: 180,
+    waveCooldown: 0, raidEco: false, constantPressure: true, counterattackOnly: false,
+    neverAttack: false, towers: true, walls: false, stoneMiners: 2, secondTc: true,
+    market: true, monks: true, siege: true, multiFront: true, resignEarly: false,
+    maxFoundations: 5, barracksAt: 7, minArmyBeforeAgeUp: 2, armyCap: 999, trainCooldown: 0,
+    darkMilitia: 0, unitFoodBuffer: 5, unitWoodBuffer: 10, unitGoldBuffer: 0,
+  },
+  hardcore: {
+    interval: 3, batchCap: 36, villagerTarget: 40, ageUpVillagers: 10, feudalVillagerTarget: 16, farmTarget: 15, maxAge: 'castle',
+    research: true, counters: 2, openingArmy: 3, attackArmy: 14, regroupArmy: 3, waveReissue: 120,
+    waveCooldown: 0, raidEco: false, constantPressure: true, counterattackOnly: false,
+    neverAttack: false, towers: true, walls: false, stoneMiners: 3, secondTc: true,
+    market: true, monks: true, siege: true, multiFront: true, resignEarly: false,
+    maxFoundations: 6, barracksAt: 6, minArmyBeforeAgeUp: 2, armyCap: 999, trainCooldown: 0,
+    darkMilitia: 0, unitFoodBuffer: 0, unitWoodBuffer: 0, unitGoldBuffer: 0,
   },
 };
 

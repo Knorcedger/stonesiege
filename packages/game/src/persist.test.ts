@@ -107,6 +107,17 @@ describe('decodeSnapshot (defensive intake)', () => {
     expect(decodeSnapshot(encodeSnapshot(withTallies))).toEqual(withTallies);
   });
 
+  it('migrates version-2 Hard saves to the equivalent new Medium AI', () => {
+    const legacy = {
+      ...valid(), version: 2,
+      setup: { ...makeSetup(), opponents: ['easy', 'standard', 'hard'] },
+    };
+    expect(decodeSnapshot(JSON.stringify(legacy))).toMatchObject({
+      version: SNAPSHOT_VERSION,
+      setup: { opponents: ['easy', 'standard', 'medium'] },
+    });
+  });
+
   it('rejects null, garbage, and non-JSON', () => {
     expect(decodeSnapshot(null)).toBeNull();
     expect(decodeSnapshot('')).toBeNull();
