@@ -1,13 +1,13 @@
 // Input controller: binds pointer/keyboard/wheel events, runs the gesture
 // reducer (gestures.ts) and maps gestures to game intents per GDD "Mobile UX":
-//  - touch tap = instant select / target interaction; tapping empty ground with
-//    units selected clears them, while the Move card button arms a destination
-//    tap; second tap in the double-tap window = select all of type on screen
+//  - touch tap = instant select / context command; tapping empty ground with
+//    units selected moves them there; second tap in the double-tap window =
+//    select all of type on screen
 //  - two-finger drag ALWAYS pans; one-finger drag pans too (touch); pinch = zoom steps
 //  - long-press then drag = band select; long-press released in place with a
 //    selection = alternate command (arms attack-move for the next tap)
-//  - tap a target with a selection = context command with slop + snap priority
-//    (enemy > resource/Gaia > own building) and a ~2 s undo toast
+//  - tap with a selection = context command with slop + snap priority
+//    (enemy > resource/Gaia > own building > ground) and a ~2 s undo toast
 //  - two-finger tap = deselect (or cancels placement mode)
 //  - touch building placement: taps/drags move the ghost; confirm/cancel live in the HUD
 // Desktop equivalents: left click selects (empty ground clears), left drag
@@ -76,7 +76,7 @@ export interface InputHost {
   releasePlacementModifier(): void;
   isAttackMoveArmed(): boolean;
   setAttackMoveArmed(v: boolean): void;
-  /** Armed "next tap = target" verb (move / rally / attack-move / garrison / convert / heal). */
+  /** Armed "next tap = target" verb (rally / attack-move / garrison / convert / heal). */
   getArmedVerb(): ArmedVerb | null;
   clearArmedVerb(): void;
   /** Current group arrangement selected in the command card. */
@@ -184,8 +184,8 @@ export function isContextAttackTarget(e: Entity, human: PlayerId): boolean {
 /**
  * Decide what a plain tap does. `picks` is distance-ordered (nearest first).
  * GDD intent inference:
- * - With units selected, empty ground deselects. An enemy anywhere in the tap
- *   slop outranks everything
+ * - With units selected, empty ground issues a move command. An enemy anywhere
+ *   in the tap slop outranks everything
  *   (taps-with-selection are attacks in melee); an own unit only steals the tap
  *   as a reselect when it is the NEAREST pick and no enemy is in the slop.
  *   Exception: with villagers selected, an own herdable/huntable (a captured
@@ -205,11 +205,6 @@ export function resolveTapAction(picks: Entity[], sel: TapSelection, human: Play
     // own sheep are food, not a reselect, while villagers hold the selection
     !(sel.units > 0 && villagersSelected && isFoodAnimal(p)));
   if (sel.units > 0) {
-    // A normal mobile tap on empty ground is selection-only. Movement is an
-    // explicit two-step action (Move button, then destination), so a stray tap
-    // can never drag a villager around indefinitely or make it feel impossible
-    // to clear the selection.
-    if (picks.length === 0) return { type: 'deselect' };
     const enemy = picks.find((p) => isContextAttackTarget(p, human));
     if (!enemy && ownUnit && picks[0]?.id === ownUnit.id) return { type: 'select', id: ownUnit.id };
     return { type: 'command' };
@@ -535,9 +530,8 @@ export class InputController {
       buildings: sel.filter((e) => e.kind === 'building').length,
       villagers: sel.filter((e) => e.kind === 'unit' && e.defId === 'villager').length,
     };
-    // An explicitly armed verb owns the destination tap, including empty
-    // ground. Without this guard the new empty-ground deselect behavior would
-    // consume the destination before the command resolver sees it.
+    // An explicitly armed verb owns the next tap, even when normal context
+    // inference would reselect the own unit under the pointer.
     if (sel.length > 0 && this.host.getArmedVerb() !== null) {
       this.contextCommand(w.x, w.y, picks, sel);
       return;
@@ -714,20 +708,6 @@ export class InputController {
     const armed = armedVerb === 'attackMove';
     const formation = military.length >= 3 ? this.host.getFormation() : undefined;
     this.host.clearArmedVerb();
-
-    // Move is deliberately explicit on touch: tap Move in the command card,
-    // then tap the destination. It must remain a move even when the generous
-    // touch pick radius also catches an enemy/resource/building nearby.
-    if (armedVerb === 'move') {
-      const t = worldToTile(wx, wy);
-      const clampX = Math.max(0, Math.min(st.map.width - 0.01, t.x));
-      const clampY = Math.max(0, Math.min(st.map.height - 0.01, t.y));
-      this.host.issueWithUndo(
-        { kind: 'move', player: human, units: unitIds, x: fp(clampX), y: fp(clampY), formation },
-        'Move', undoStop,
-      );
-      return;
-    }
 
     // Wave-2 verbs the sim would silently drop are downgraded to an HONEST move
     // toward the target — the toast confirms exactly what happened, never a no-op.

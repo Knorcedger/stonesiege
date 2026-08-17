@@ -66,7 +66,7 @@ export interface HudHost {
   stopSelection(): void;
   /** Trebuchets: pack (fold to move) or unpack (deploy to fire) the selected trebs. */
   packSelection(pack: boolean): void;
-  /** Toggle an armed "next tap = target" verb (move / rally / attack-move / garrison / convert / heal). */
+  /** Toggle an armed "next tap = target" verb (rally / attack-move / garrison / convert / heal). */
   armVerb(verb: ArmedVerb): void;
   getArmedVerb(): ArmedVerb | null;
   setFormation(formation: Formation): void;
@@ -1138,7 +1138,7 @@ export class Hud {
 
     if (units.length > 0) {
       if (villagers.length === 0) this.cardTitle.textContent = 'Commands';
-      // move / attack-move / stop / garrison / convert / heal / pack (cardModel decides
+      // attack-move / stop / garrison / convert / heal / pack (cardModel decides
       // visibility per selection contents and wave-2 enabled-ness)
       for (const vb of unitVerbButtons(units, this.host.getArmedVerb())) {
         const onClick = vb.id === 'stop'
