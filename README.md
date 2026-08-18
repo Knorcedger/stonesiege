@@ -7,6 +7,7 @@
     <a href="https://stonesiegegame.com">Website</a> ·
     <a href="https://play.stonesiegegame.com">Play in browser</a> ·
     <a href="CONTRIBUTING.md">Contributing</a> ·
+    <a href="#start-a-contribution-with-an-ai-coding-agent">AI agent prompt</a> ·
     <a href="ROADMAP.md">Roadmap</a> ·
     <a href="https://github.com/Knorcedger/stonesiege/discussions">Discussions</a> ·
     <a href="https://github.com/Knorcedger/stonesiege/issues/new?template=bug_report.yml">Report a bug</a>
@@ -82,6 +83,53 @@ Desktop controls:
 - The mouse wheel zooms.
 
 On touch devices, tap to select or command, drag to pan, pinch to zoom, and long-press then drag to group-select.
+
+## Start a contribution with an AI coding agent
+
+Replace the `TASK` placeholder below, then give the complete prompt to your AI coding agent. The desired outcome is a focused pull request against StoneSiege—not merely a local experiment or a repository copy.
+
+```text
+You are contributing to StoneSiege, an open-source historical RTS. Do not stop after setup: complete the task and prepare a focused pull request.
+
+TASK
+[Describe the bug, feature, campaign, artwork, animation, balance change, or documentation improvement here.]
+
+WORKFLOW
+1. If StoneSiege is not already checked out, run:
+   git clone https://github.com/Knorcedger/stonesiege.git
+   cd stonesiege
+
+2. Read README.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/ARCHITECTURE.md, and the documentation relevant to the task. Follow every AGENTS.md file that applies to files you touch.
+
+3. Inspect git status before editing. Preserve existing work; never reset, overwrite, or discard changes you did not create.
+
+4. Use Node.js 22.12+ or 24+, then install and run the project:
+   npm ci
+   npm run dev
+   Verify the game at http://localhost:5199.
+
+5. Work on a dedicated branch unless the user already prepared one:
+   git switch -c contrib/<short-description>
+   Never commit directly to main.
+
+6. Implement only the requested change. Keep simulation code deterministic, keep presentation out of packages/sim, avoid unnecessary dependencies, and follow the existing architecture and visual language. New or AI-assisted assets must include provenance and licence information required by CONTRIBUTING.md and ASSET_LICENSE.md.
+
+7. Add or update focused tests. For visible changes, capture before/after screenshots or a short recording.
+
+8. Run the complete quality gate and fix failures caused by the change:
+   npm run check
+
+9. Review the diff for correctness, secrets, unrelated formatting, accidental generated files, and undocumented asset provenance.
+
+10. Commit with the Developer Certificate of Origin sign-off:
+    git commit -s -m "<imperative summary>"
+
+11. Publish the branch to a Git remote you can write to and open a pull request against Knorcedger/stonesiege:main. Never push directly to main. If GitHub authentication or write access is unavailable, do not invent credentials—leave the branch ready and give the owner the exact commands needed to publish it and open the PR.
+
+12. The pull-request description must cover the problem, solution and tradeoffs, tests performed, visual evidence when relevant, material AI assistance, and asset provenance or licensing considerations.
+
+Return a concise summary with the changed files, verification results, commit, and pull-request URL (or the exact remaining publication commands).
+```
 
 ## How it is built
 
