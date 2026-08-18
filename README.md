@@ -47,6 +47,7 @@ StoneSiege is an **alpha**. The web build is public, while Android and iOS build
 - A deterministic simulation designed for replays and future lockstep multiplayer
 
 Expect rough edges, balance changes, and save incompatibilities while the project is in alpha. See [project status](docs/PROJECT_STATUS.md) for the honest snapshot.
+Contributors can browse every playable chapter in the [campaign and chapter index](docs/CAMPAIGN_INDEX.md).
 
 ## Quick start
 
@@ -164,13 +165,17 @@ Read [the architecture guide](docs/ARCHITECTURE.md), [game design document](docs
 npm run typecheck       # strict TypeScript checks
 npm test                # deterministic unit and integration tests
 npm run build           # production web bundle
-npm run check           # run the same three quality gates as CI
+npm run bundle:check    # report and enforce raw/gzip JavaScript budgets for dist/
+npm run bundle:self-test # deterministic self-test for the budget checker
+npm run check           # run the complete local/CI quality gate
 npm run assets          # rebuild generated art atlases
 npm run mobile:sync     # build web and synchronize native wrappers
 npm run release:mobile  # sign, validate, and upload both internal mobile builds
 ```
 
 Simulation changes must preserve determinism: no wall clock, platform APIs, floating-point gameplay state, or unstable iteration in `packages/sim`. Same seed plus the same command stream must produce the same result.
+
+The web bundle limits live in `BUNDLE_BUDGET` inside [`tools/bundle-budget.mjs`](tools/bundle-budget.mjs). When an intentional feature needs more headroom, run `npm run build && npm run bundle:check`, review the generated chunks, update only the necessary limit, and explain the measured increase in the pull request. The checker guards regressions; it is not a substitute for profiling or deliberate code splitting.
 
 ## Contributing
 

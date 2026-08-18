@@ -44,5 +44,5 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Typecheck, test, and build
+      - name: Typecheck, test, build, and enforce bundle budget
         run: npm run check

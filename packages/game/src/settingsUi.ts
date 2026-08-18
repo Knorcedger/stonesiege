@@ -21,6 +21,9 @@ const SETTINGS_CSS = `
   cursor:pointer; color:#DABE8D; background:#241809; border:1px solid #64492B; border-radius:4px; }
 .bf-set-seg button.on { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border-color:#B99A6B;
   box-shadow:0 1px 0 #8A6414; }
+.bf-set-seg button:focus-visible { outline:3px solid #FFE98A; outline-offset:2px;
+  box-shadow:0 0 0 2px #16100a; }
+.bf-set-row input[type=range]:focus-visible { outline:3px solid #FFE98A; outline-offset:3px; }
 .bf-set-hint { margin:5px 0 7px; color:#8F7A59; font:13px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif; }
 `;
 

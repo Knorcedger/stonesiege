@@ -28,11 +28,13 @@ The current store builds collect no user data through accounts, analytics, adver
 - Touch-first mobile controls and desktop mouse/keyboard controls
 - Landscape-native Capacitor wrappers with generated icons, splashes, safe-area handling, and offline fonts/assets
 
+See the [campaign and chapter index](CAMPAIGN_INDEX.md) for every selectable chapter, its chronology, protagonist, civilization, mission type, and source file.
+
 ## Technical health
 
 - Strict TypeScript typecheck passes
 - Production Vite build passes
-- 730 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
+- 750 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
 - The simulation uses a fixed 20 Hz timestep, integer state, seeded randomness, and stable command processing
 - Headless bot games, campaign loading, asset contracts, and determinism checks are part of the normal test suite
 - Pull requests must pass typecheck, tests, production build, review, and DCO sign-off checks before merge

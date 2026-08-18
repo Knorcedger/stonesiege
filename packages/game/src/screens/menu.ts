@@ -7,7 +7,7 @@
 import { gameData } from '@bf/data';
 import { campaigns, scenariosById, type CampaignDef } from '@bf/scenarios';
 import { BOT_DIFFICULTIES, type BotDifficulty } from '@bf/ai';
-import { FALLBACK_PLAYER_RAMPS } from '../recolor';
+import { FALLBACK_PLAYER_COLOR_NAMES, FALLBACK_PLAYER_RAMPS } from '../recolor';
 import {
   DEFAULT_PRACTICE_SETUP, MAP_SIZE_TILES,
   type PracticeMapSize, type PracticeSetup,
@@ -53,6 +53,10 @@ const MENU_CSS = `
 .bf-menu-btn:disabled { color:#7a7266; background:#4a3a26; border-color:#3a2d1c; box-shadow:none; cursor:default; }
 .bf-menu-btn.ghost { background:none; color:#DABE8D; border-color:#64492B; box-shadow:none; }
 .bf-menu-btn.primary { font-size:22px; }
+.bf-menu :where(.bf-menu-btn,.bf-seg button,.bf-set-seg button,.bf-civ-card,.bf-camp-card,.bf-scn,.bf-color):focus-visible {
+  outline:3px solid #FFE98A; outline-offset:2px; box-shadow:0 0 0 2px #16100a;
+}
+.bf-menu input[type=range]:focus-visible { outline:3px solid #FFE98A; outline-offset:3px; }
 .bf-menu-note { font-size:12px; color:#B99A6B; display:block; margin-top:2px; }
 .bf-menu-label { text-align:left; font-size:13px; color:#B99A6B; letter-spacing:1px; margin:14px 0 5px; }
 .bf-setup-box { margin:0 0 16px; padding:12px 14px 14px; text-align:left; background:#241809; border:1px solid #8A6414; border-radius:5px; box-shadow:0 0 0 1px #1A1208 inset; }
@@ -363,7 +367,8 @@ export function showMenu(
       FALLBACK_PLAYER_RAMPS.forEach((ramp, i) => {
         const sw = el('button', `bf-color${i === practice.color ? ' on' : ''}`);
         sw.style.background = `linear-gradient(160deg, ${ramp[0]}, ${ramp[1]} 55%, ${ramp[2]})`;
-        setGameTooltip(sw, `Banner color ${i + 1}`);
+        sw.setAttribute('aria-pressed', String(i === practice.color));
+        setGameTooltip(sw, `${FALLBACK_PLAYER_COLOR_NAMES[i] ?? `Color ${i + 1}`} banner`);
         sw.addEventListener('click', () => { practice.color = i; render(); });
         colors.appendChild(sw);
       });

@@ -67,6 +67,11 @@ export const FALLBACK_PLAYER_RAMPS: readonly (readonly [string, string, string])
   ['#F0A04E', '#D26A1E', '#8C4212'], // 7 orange
 ];
 
+/** Human-readable names kept in the same order as the player-color ramps. */
+export const FALLBACK_PLAYER_COLOR_NAMES = [
+  'Blue', 'Red', 'Green', 'Yellow', 'Cyan', 'Purple', 'Gray', 'Orange',
+] as const;
+
 export const FALLBACK_MASK_PALETTE: readonly [string, string, string] = ['#FF00FF', '#CC00CC', '#990099'];
 
 /**

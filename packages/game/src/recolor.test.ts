@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'vitest';
-import { containsMask, hexToRgb, swapPalette, FALLBACK_MASK_PALETTE, type Rgb } from './recolor';
+import {
+  containsMask, hexToRgb, swapPalette, FALLBACK_MASK_PALETTE,
+  FALLBACK_PLAYER_COLOR_NAMES, FALLBACK_PLAYER_RAMPS, type Rgb,
+} from './recolor';
 
 const MASK: Rgb[] = FALLBACK_MASK_PALETTE.map(hexToRgb);
 const BLUE: Rgb[] = [hexToRgb('#5C8CD6'), hexToRgb('#2F5FB5'), hexToRgb('#1C3B76')];
@@ -42,5 +45,15 @@ describe('containsMask', () => {
   it('detects mask pixels and ignores transparent ones', () => {
     expect(containsMask(px([204, 0, 204, 255]), MASK)).toBe(true);
     expect(containsMask(px([204, 0, 204, 0], [10, 20, 30, 255]), MASK)).toBe(false);
+  });
+});
+
+describe('player color accessibility names', () => {
+  it('provides one distinct readable name for every banner ramp', () => {
+    expect(FALLBACK_PLAYER_COLOR_NAMES).toHaveLength(FALLBACK_PLAYER_RAMPS.length);
+    expect(new Set(FALLBACK_PLAYER_COLOR_NAMES).size).toBe(FALLBACK_PLAYER_RAMPS.length);
+    expect(FALLBACK_PLAYER_COLOR_NAMES).toEqual([
+      'Blue', 'Red', 'Green', 'Yellow', 'Cyan', 'Purple', 'Gray', 'Orange',
+    ]);
   });
 });
