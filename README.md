@@ -5,21 +5,24 @@
   <p>An AI-native, open-source historical real-time strategy game for browser, Android, and iOS.</p>
   <p>
     <a href="https://stonesiegegame.com">Website</a> ·
+    <a href="https://play.stonesiegegame.com">Play in browser</a> ·
     <a href="CONTRIBUTING.md">Contributing</a> ·
     <a href="ROADMAP.md">Roadmap</a> ·
+    <a href="https://github.com/Knorcedger/stonesiege/discussions">Discussions</a> ·
     <a href="https://github.com/Knorcedger/stonesiege/issues/new?template=bug_report.yml">Report a bug</a>
   </p>
   <p>
+    <a href="https://github.com/Knorcedger/stonesiege/actions/workflows/ci.yml"><img src="https://github.com/Knorcedger/stonesiege/actions/workflows/ci.yml/badge.svg" alt="Quality gates"></a>
     <img src="https://img.shields.io/badge/code-MPL--2.0-8b5cf6" alt="License: MPL 2.0">
     <img src="https://img.shields.io/badge/TypeScript-strict-3178c6" alt="TypeScript strict">
     <img src="https://img.shields.io/badge/platforms-web%20%7C%20Android%20%7C%20iOS-c9a15b" alt="Platforms: web, Android, iOS">
-    <img src="https://img.shields.io/badge/status-internal%20alpha-b45309" alt="Status: internal alpha">
+    <img src="https://img.shields.io/badge/status-alpha-b45309" alt="Status: alpha">
   </p>
 </div>
 
 ![StoneSiege battle](art/store/screenshots/05-gameplay-intro-store.jpg)
 
-StoneSiege is a mobile-first RTS inspired by the depth and clarity of classic historical strategy games. Gather resources, advance through the ages, build fortified settlements, command counter-based armies, and fight through an original six-mission campaign.
+StoneSiege is a mobile-first RTS inspired by the depth and clarity of classic historical strategy games. Gather resources, advance through the ages, build fortified settlements, command historically distinct armies, and fight through 48 playable campaign chapters.
 
 The game is built in public and welcomes both traditional and AI-assisted contributors. The current single-player game will remain free. If an official multiplayer edition becomes viable, the present direction is a fair one-time purchase—no subscriptions, loot boxes, or pay-to-win mechanics.
 
@@ -29,30 +32,47 @@ StoneSiege began as a fully vibe-coded experiment and grew into a tested game wi
 
 ## Current state
 
-StoneSiege is an **alpha**, available to invited internal testers on Android and iOS. It already includes:
+StoneSiege is an **alpha**. The web build is public, while Android and iOS builds are available to invited internal testers. It already includes:
 
-- Practice matches against deterministic easy, standard, and hard bots
-- A six-scenario campaign, *William Wallace: The Rising of Scotland*
+- Public browser play at [play.stonesiegegame.com](https://play.stonesiegegame.com)
+- Practice matches against one to three deterministic bots across seven difficulty levels, from Beginner to Hardcore
+- Seven historical campaigns with 48 chapters, including the twelve-chapter *William Wallace: The Rising of Scotland*
+- Seven civilizations: Scots, English, Vikings, French, Mongols, Byzantines, and Saracens
 - Villagers, resources, construction, production, technology, conversion, garrisoning, and fog of war
-- Counter-based combat with ranged projectiles, siege, armor classes, and multiple victory conditions
+- Counter-based combat with ranged projectiles, siege, gates, fortifications, armor classes, and multiple victory conditions
+- Procedurally connected rivers and cliffs that preserve map accessibility
 - Touch-first controls plus complete mouse and keyboard support
 - Offline web, Android, and iOS builds from one codebase
 - A deterministic simulation designed for replays and future lockstep multiplayer
 
 Expect rough edges, balance changes, and save incompatibilities while the project is in alpha. See [project status](docs/PROJECT_STATUS.md) for the honest snapshot.
 
-## Play locally
+## Quick start
 
 You need [Node.js 22.12+ or 24+](https://nodejs.org/) and npm.
 
 ```bash
-git clone https://github.com/Knorcedger/stonesiege.git
+git clone --depth 1 https://github.com/Knorcedger/stonesiege.git
 cd stonesiege
 npm ci
 npm run dev
 ```
 
 Open <http://localhost:5199>.
+
+The repository includes HD source art, generated frames, native wrappers, and store media. Contributors working only on the web game can avoid downloading most non-runtime media:
+
+```bash
+git clone --filter=blob:none --no-checkout https://github.com/Knorcedger/stonesiege.git
+cd stonesiege
+git sparse-checkout init --cone
+git sparse-checkout set apps packages docs tools
+git checkout main
+npm ci
+npm run dev
+```
+
+Use a normal, non-sparse clone when working on native builds, source art, or store publishing. Run `git fetch --unshallow` if a shallow checkout later needs the complete history.
 
 Desktop controls:
 
@@ -93,6 +113,7 @@ Read [the architecture guide](docs/ARCHITECTURE.md), [game design document](docs
 npm run typecheck       # strict TypeScript checks
 npm test                # deterministic unit and integration tests
 npm run build           # production web bundle
+npm run check           # run the same three quality gates as CI
 npm run assets          # rebuild generated art atlases
 npm run mobile:sync     # build web and synchronize native wrappers
 npm run release:mobile  # sign, validate, and upload both internal mobile builds
@@ -105,6 +126,8 @@ Simulation changes must preserve determinism: no wall clock, platform APIs, floa
 Contributions are welcome, including carefully reviewed AI-assisted work. Start with [CONTRIBUTING.md](CONTRIBUTING.md), read the [Code of Conduct](CODE_OF_CONDUCT.md), and look through [open issues](https://github.com/Knorcedger/stonesiege/issues). Please discuss large gameplay or architecture changes before building them.
 
 Every contributor remains responsible for understanding, testing, and licensing what they submit. A generated patch is welcome; an unexplained prompt dump is not.
+
+See the [changelog](CHANGELOG.md) for release-level changes and the [project status](docs/PROJECT_STATUS.md) for current limitations.
 
 ## Project principles
 

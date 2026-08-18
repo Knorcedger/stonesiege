@@ -1,5 +1,8 @@
 blank_issues_enabled: false
 contact_links:
+  - name: Questions and community discussion
+    url: https://github.com/Knorcedger/stonesiege/discussions
+    about: Ask for help, share ideas, or discuss the project without opening an issue.
   - name: StoneSiege website
     url: https://stonesiegegame.com
     about: Visit the official game website and support information.

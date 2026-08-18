@@ -1,29 +1,30 @@
 # StoneSiege project status
 
-_Last updated: 2026-08-16_
+_Last updated: 2026-08-18_
 
-StoneSiege is a playable single-player RTS in **internal alpha**. The browser, Android, and iOS versions share one offline game bundle and the same deterministic simulation.
+StoneSiege is a playable single-player RTS in **alpha**. The public browser build and internal Android and iOS builds share one offline game bundle and the same deterministic simulation.
 
 ## Release snapshot
 
 | Area | State |
 |---|---|
-| Browser build | Playable locally; public deployment is not yet the primary test channel |
-| Android | Version 1.0, build 2 active on Google Play internal testing |
-| iOS | Build 1 processed in TestFlight and available to internal testers |
+| Browser build | Public at [play.stonesiegegame.com](https://play.stonesiegegame.com) |
+| Android | Version 0.1.1, build 6 configured for Google Play internal testing |
+| iOS | Version 0.1.1, build 5 configured for TestFlight internal testing |
 | Website | Live at [stonesiegegame.com](https://stonesiegegame.com) |
-| Repository | Being prepared for public open-source contributions |
+| Repository | Public at [github.com/Knorcedger/stonesiege](https://github.com/Knorcedger/stonesiege) |
 | Accounts, ads, purchases | None in the current build |
 
 The current store builds collect no user data through accounts, analytics, advertising, tracking, purchases, push notifications, or project-operated network services. Campaign progress, settings, and resumable matches remain on-device. This must be reassessed before any online feature or SDK is added.
 
 ## What is playable
 
-- Practice/skirmish matches against easy, standard, and hard AI
-- Six original William Wallace campaign scenarios, including tutorial progression
+- Practice/skirmish matches against one to three AI opponents, each selectable across seven difficulty levels from Beginner to Hardcore
+- Seven historical campaigns with 48 chapters: twelve for William Wallace and six each for Henry V, Harald Hardrada, Joan of Arc, Chinggis Khan, Alexios Komnenos, and Saladin
+- Seven playable civilizations: Scots, English, Vikings, French, Mongols, Byzantines, and Saracens, with distinct bonuses, rosters, Castle units, and technologies
 - Full economy loop: villagers, four resources, farms, drop-offs, construction, production, market, and age advancement
-- Counter-based combat: melee, ranged, cavalry, siege, monks, conversion, projectiles, garrisoning, and fortifications
-- Fog of war, scenario triggers, objectives, multiple victory conditions, snapshots, and interrupted-match recovery
+- Counter-based combat: melee, ranged, cavalry, siege, monks, conversion, projectiles, garrisoning, gates, and fortifications
+- Fog of war, rivers, cliffs, scenario triggers, objectives, multiple victory conditions, snapshots, and interrupted-match recovery
 - Touch-first mobile controls and desktop mouse/keyboard controls
 - Landscape-native Capacitor wrappers with generated icons, splashes, safe-area handling, and offline fonts/assets
 
@@ -31,16 +32,17 @@ The current store builds collect no user data through accounts, analytics, adver
 
 - Strict TypeScript typecheck passes
 - Production Vite build passes
-- 605 deterministic unit and integration tests pass; 11 optional heavy-sweep tests are skipped by default
+- 730 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
 - The simulation uses a fixed 20 Hz timestep, integer state, seeded randomness, and stable command processing
-- Headless bot games and determinism checks are part of the normal test suite
+- Headless bot games, campaign loading, asset contracts, and determinism checks are part of the normal test suite
+- Pull requests must pass typecheck, tests, production build, review, and DCO sign-off checks before merge
 
 ## Current priorities
 
-1. Finish the public repository, licenses, contributor workflow, and continuous integration.
-2. Run structured playtests on representative phones and tablets, including all campaign scenarios.
-3. Fix high-impact input, accessibility, safe-area, resume, performance, and balance findings.
-4. Improve onboarding, help, settings, and contributor-facing documentation.
+1. Run structured playtests on representative phones and tablets, including every campaign.
+2. Fix high-impact input, accessibility, safe-area, resume, performance, and balance findings.
+3. Maintain scoped public issues and responsive review for new contributors.
+4. Improve onboarding, help, settings, localization, and accessibility infrastructure.
 5. Promote stable builds from internal testing toward broader opt-in testing.
 
 ## Known gaps
@@ -49,7 +51,8 @@ The current store builds collect no user data through accounts, analytics, adver
 - Device coverage is still small; performance and usability need measurement on lower-end hardware.
 - Replays are enabled by the deterministic core but do not yet have a player-facing interface.
 - Save compatibility is not guaranteed between alpha builds.
-- Public store listings, final screenshots, localization, accessibility review, and production release operations are not complete.
+- Mobile production approval, localization, a complete accessibility review, and production release operations are not complete.
+- The full repository includes large HD source-art and store-media archives; a lightweight sparse-checkout path is documented for ordinary web contributors.
 - Multiplayer remains research, not a committed release.
 
 ## Direction after alpha

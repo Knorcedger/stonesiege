@@ -11,12 +11,15 @@ Thank you for helping build StoneSiege. Traditional coding, visual tools, and AI
 
 Good first contributions include tests, accessibility fixes, mobile UX polish, documentation, small deterministic simulation bugs, and clearly scoped scenario improvements.
 
+Issues labeled [`good first issue`](https://github.com/Knorcedger/stonesiege/labels/good%20first%20issue) are intended to be independently reviewable and include acceptance criteria. Issues labeled [`help wanted`](https://github.com/Knorcedger/stonesiege/labels/help%20wanted) need community input or implementation.
+
 ## Local setup
 
-Prerequisite: Node.js 22.12+ or 24+.
+Prerequisite: Node.js 22.12+ or 24+. Clone the repository using either the normal or lightweight web-only setup in [README.md](README.md), then create a focused branch:
 
 ```bash
 npm ci
+git switch -c your-name/short-description
 npm run dev
 ```
 
@@ -26,6 +29,8 @@ Before submitting:
 npm run typecheck
 npm test
 npm run build
+# or run all three:
+npm run check
 ```
 
 Add focused tests for behavior changes. Include before/after screenshots or a short recording for visible changes. Native changes should identify the devices or simulators used.
@@ -55,6 +60,8 @@ AI assistance is welcome, but the human contributor is accountable for the resul
 
 For generated or AI-assisted art, include provenance, source references, model/tool, material edits, and a statement that you reasonably believe the contribution can be dedicated under [ASSET_LICENSE.md](ASSET_LICENSE.md). Recognizable copies of third-party game art will not be accepted.
 
+Do not edit generated atlases in `apps/web/public/assets/hd/` by hand. Source renders, validated frames, generation steps, and licensing provenance belong under `art/hd/`; see [art/hd/README.md](art/hd/README.md). Store screenshots and native release media are intentionally part of the full checkout but are not required for ordinary web development.
+
 ## Commits and pull requests
 
 Write an imperative, specific commit subject, such as `Fix villagers losing queued drop-off orders`. The pull request should explain:
@@ -73,6 +80,8 @@ git commit -s -m "Describe the change"
 ```
 
 This adds `Signed-off-by: Your Name <you@example.com>` to the commit. It is a statement about provenance and your right to contribute, not an assignment of copyright.
+
+Pull-request CI checks every non-bot commit for this trailer. If you forgot it on your latest commit, use `git commit --amend --signoff`; for several local commits, use an interactive rebase and add a sign-off to each one. Historical maintainer commits created before automated DCO enforcement are not being rewritten.
 
 ## Review and acceptance
 

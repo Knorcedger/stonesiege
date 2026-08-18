@@ -1,10 +1,18 @@
 # StoneSiege roadmap
 
-StoneSiege is in internal alpha. This roadmap communicates direction, not guaranteed dates. Issues and measured playtests determine the order within each stage.
+StoneSiege is in alpha. The browser build and source repository are public; Android and iOS remain in internal testing. This roadmap communicates direction, not guaranteed dates. Issues and measured playtests determine the order within each stage.
 
-## Now — make the single-player alpha excellent
+## Alpha foundation delivered
 
-- Open the repository and make contribution paths welcoming
+- Public browser build and reproducible web, Android, and iOS codebase
+- Seven historically distinct civilizations and seven AI difficulty levels
+- Seven campaigns containing 48 playable historical chapters
+- Gates, rivers, cliffs, fog of war, formations, saves, touch controls, and configurable HUD
+- Public licensing, governance, security reporting, contribution guides, and automated quality gates
+
+## Now — harden the single-player alpha
+
+- Triage public issues and maintain approachable, well-scoped contributor tasks
 - Complete device QA across representative Android phones, iPhones, and tablets
 - Fix campaign blockers, input friction, safe-area issues, and accessibility gaps
 - Measure and improve battle performance, memory use, load time, and bundle size
@@ -17,7 +25,7 @@ StoneSiege is in internal alpha. This roadmap communicates direction, not guaran
 - More maps, scenarios, and campaign content
 - Better AI personalities, scouting, difficulty tuning, and team behavior
 - Replays and a player-facing save/load flow
-- Formations, stances, richer terrain, and additional civilizations
+- Deeper formations and stances, more terrain interactions, and civilization-specific tuning
 - Community translation and accessibility infrastructure
 - Supported mod/data workflows where they can remain safe and deterministic
 

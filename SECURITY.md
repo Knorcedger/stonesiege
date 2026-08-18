@@ -2,7 +2,7 @@
 
 Please do not open a public issue for a suspected vulnerability.
 
-Email [support@flarmio.com](mailto:support@flarmio.com) with:
+Use GitHub's [private vulnerability reporting form](https://github.com/Knorcedger/stonesiege/security/advisories/new). If that form is unavailable, email [support@flarmio.com](mailto:support@flarmio.com) with:
 
 - A concise description and likely impact
 - Reproduction steps or a proof of concept

@@ -1,5 +1,7 @@
 node_modules/
 dist/
+apps/web/dist-qa/
+coverage/
 *.log
 .DS_Store
 .vite/
