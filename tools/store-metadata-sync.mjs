@@ -246,7 +246,8 @@ async function syncAppleMetadata() {
   const localizations = await appleRequest(
     `/appStoreVersions/${appVersion.id}/appStoreVersionLocalizations?limit=50`,
   );
-  let english = (localizations.data ?? []).find((item) => item.attributes.locale === 'en-US');
+  const targetLocales = ['en-GB', 'en-US'];
+  const versionLocalizations = [];
   const versionAttributes = {
     description: metadata.description,
     keywords: metadata.keywords,
@@ -254,26 +255,36 @@ async function syncAppleMetadata() {
     promotionalText: metadata.promotionalText,
     supportUrl: metadata.supportUrl,
   };
-  if (english) {
-    english = (await appleRequest(`/appStoreVersionLocalizations/${english.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        data: { type: 'appStoreVersionLocalizations', id: english.id, attributes: versionAttributes },
-      }),
-    })).data;
-  } else {
-    english = (await appleRequest('/appStoreVersionLocalizations', {
-      method: 'POST',
-      body: JSON.stringify({
-        data: {
-          type: 'appStoreVersionLocalizations',
-          attributes: { locale: 'en-US', ...versionAttributes },
-          relationships: {
-            appStoreVersion: { data: { type: 'appStoreVersions', id: appVersion.id } },
+  for (const locale of targetLocales) {
+    let localization = (localizations.data ?? []).find(
+      (item) => item.attributes.locale === locale,
+    );
+    if (localization) {
+      localization = (await appleRequest(`/appStoreVersionLocalizations/${localization.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          data: {
+            type: 'appStoreVersionLocalizations',
+            id: localization.id,
+            attributes: versionAttributes,
           },
-        },
-      }),
-    })).data;
+        }),
+      })).data;
+    } else {
+      localization = (await appleRequest('/appStoreVersionLocalizations', {
+        method: 'POST',
+        body: JSON.stringify({
+          data: {
+            type: 'appStoreVersionLocalizations',
+            attributes: { locale, ...versionAttributes },
+            relationships: {
+              appStoreVersion: { data: { type: 'appStoreVersions', id: appVersion.id } },
+            },
+          },
+        }),
+      })).data;
+    }
+    versionLocalizations.push(localization);
   }
 
   const infos = await appleRequest(`/apps/${APPLE_APP_ID}/appInfos?limit=50`);
@@ -291,27 +302,33 @@ async function syncAppleMetadata() {
       }),
     });
     const infoLocalizations = await appleRequest(`/appInfos/${info.id}/appInfoLocalizations?limit=50`);
-    const infoEnglish = (infoLocalizations.data ?? []).find((item) => item.attributes.locale === 'en-US');
-    if (!infoEnglish) continue;
-    await appleRequest(`/appInfoLocalizations/${infoEnglish.id}`, {
-      method: 'PATCH',
-      body: JSON.stringify({
-        data: {
-          type: 'appInfoLocalizations', id: infoEnglish.id,
-          attributes: { subtitle: metadata.subtitle, privacyPolicyUrl: metadata.privacyPolicyUrl },
-        },
-      }),
-    });
-    infoLocalizationUpdated = true;
+    for (const locale of targetLocales) {
+      const infoEnglish = (infoLocalizations.data ?? []).find(
+        (item) => item.attributes.locale === locale,
+      );
+      if (!infoEnglish) continue;
+      await appleRequest(`/appInfoLocalizations/${infoEnglish.id}`, {
+        method: 'PATCH',
+        body: JSON.stringify({
+          data: {
+            type: 'appInfoLocalizations', id: infoEnglish.id,
+            attributes: { subtitle: metadata.subtitle, privacyPolicyUrl: metadata.privacyPolicyUrl },
+          },
+        }),
+      });
+      infoLocalizationUpdated = true;
+    }
   }
-  if (!infoLocalizationUpdated) throw new Error('No en-US App Store app-info localization exists.');
+  if (!infoLocalizationUpdated) throw new Error('No English App Store app-info localization exists.');
 
-  await replaceAppleScreenshotSet(
-    english.id, 'APP_IPHONE_67', pngs('store/screenshots/ios/iphone-6.9'),
-  );
-  await replaceAppleScreenshotSet(
-    english.id, 'APP_IPAD_PRO_3GEN_129', pngs('store/screenshots/ios/ipad-13'),
-  );
+  for (const localization of versionLocalizations) {
+    await replaceAppleScreenshotSet(
+      localization.id, 'APP_IPHONE_65', pngs('store/screenshots/ios/iphone-6.5'),
+    );
+    await replaceAppleScreenshotSet(
+      localization.id, 'APP_IPAD_PRO_3GEN_129', pngs('store/screenshots/ios/ipad-12.9'),
+    );
+  }
   console.log(`App Store Connect: synced StoneSiege ${version} metadata, content rights, age rating, and privacy URL.`);
 }
 

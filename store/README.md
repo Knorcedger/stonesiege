@@ -31,3 +31,7 @@ or Google Play's Designed for Families program.
    and TestFlight before promoting it to production review.
 5. Recheck the App Store age-rating questionnaire introduced in 2026 and every Play Console item
    under App content immediately before submission.
+
+For the first iOS release, keep the `APP_IPHONE_65` and `APP_IPAD_PRO_3GEN_129` screenshot sets
+populated. App Store Connect's submission validator requires these legacy display slots even when
+newer 6.9-inch iPhone and 13-inch iPad screenshots are also available.

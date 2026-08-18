@@ -141,16 +141,25 @@ async function appleAudit(version, buildNumber) {
       const localizations = await appleRequest(
         `/appStoreVersions/${current.id}/appStoreVersionLocalizations?limit=50`,
       );
-      const english = localizations.data?.find((item) => item.attributes?.locale === 'en-US');
-      requireCheck(Boolean(english?.attributes?.description), 'App Store en-US description is populated');
-      requireCheck(Boolean(english?.attributes?.supportUrl), 'App Store support URL is populated');
+      const primaryLocale = app.data?.attributes?.primaryLocale ?? 'en-US';
+      const english = localizations.data?.find(
+        (item) => item.attributes?.locale === primaryLocale,
+      );
+      requireCheck(
+        Boolean(english?.attributes?.description),
+        `App Store ${primaryLocale} description is populated`,
+      );
+      requireCheck(
+        Boolean(english?.attributes?.supportUrl),
+        `App Store ${primaryLocale} support URL is populated`,
+      );
       if (english) {
         const sets = await appleRequest(
           `/appStoreVersionLocalizations/${english.id}/appScreenshotSets?limit=50`,
         );
-        // App Store Connect retains APP_IPHONE_67 as the API identifier for the
-        // largest iPhone screenshot set, including current 6.9-inch devices.
-        const required = new Set(['APP_IPHONE_67', 'APP_IPAD_PRO_3GEN_129']);
+        // First-release validation still requires Apple's legacy 6.5-inch iPhone
+        // and 12.9-inch iPad display slots even when newer device sets exist.
+        const required = new Set(['APP_IPHONE_65', 'APP_IPAD_PRO_3GEN_129']);
         for (const set of sets.data ?? []) {
           const shots = await appleRequest(`/appScreenshotSets/${set.id}/appScreenshots?limit=50`);
           const processed = (shots.data ?? []).filter(
@@ -158,7 +167,7 @@ async function appleAudit(version, buildNumber) {
           );
           if (processed.length >= 4) required.delete(set.attributes?.screenshotDisplayType);
         }
-        requireCheck(required.size === 0, 'App Store has four processed iPhone 6.9-inch and four processed iPad 13-inch screenshots');
+        requireCheck(required.size === 0, 'App Store primary locale has four processed iPhone 6.5-inch and four processed iPad 12.9-inch screenshots');
       }
       const linkage = await appleRequest(
         `/appStoreVersions/${current.id}/relationships/build`,
@@ -199,7 +208,10 @@ async function appleAudit(version, buildNumber) {
         'App Store age-rating declaration matches the repository source of truth',
       );
       const localizations = await appleRequest(`/appInfos/${info.id}/appInfoLocalizations?limit=50`);
-      const english = localizations.data?.find((item) => item.attributes?.locale === 'en-US');
+      const primaryLocale = app.data?.attributes?.primaryLocale ?? 'en-US';
+      const english = localizations.data?.find(
+        (item) => item.attributes?.locale === primaryLocale,
+      );
       requireCheck(Boolean(english?.attributes?.privacyPolicyUrl), 'App Store privacy-policy URL is populated');
     } else blockers.push('App Store app information exists');
 
@@ -318,8 +330,8 @@ requireCheck(metadata.shortDescription.length <= 80, 'Google short description i
 requireCheck(metadata.description.length <= 4000, 'Store description is at most 4,000 characters');
 requireCheck(metadata.privacy.dataCollected === false && metadata.privacy.tracking === false, 'Store privacy source declares no collection or tracking');
 
-checkScreenshotSet('store/screenshots/ios/iphone-6.9', [[2796, 1290], [2736, 1260], [2868, 1320]], 'iPhone 6.9-inch');
-checkScreenshotSet('store/screenshots/ios/ipad-13', [[2752, 2064], [2732, 2048]], 'iPad 13-inch');
+checkScreenshotSet('store/screenshots/ios/iphone-6.5', [[2688, 1242]], 'iPhone 6.5-inch');
+checkScreenshotSet('store/screenshots/ios/ipad-12.9', [[2732, 2048]], 'iPad 12.9-inch');
 checkScreenshotSet('store/screenshots/android/phone', [[1920, 1080], [2796, 1290], [2736, 1260], [2868, 1320]], 'Google Play phone');
 checkScreenshotSet('store/screenshots/android/tablet', [[2752, 2064], [2732, 2048]], 'Google Play tablet');
 for (const image of imagesIn('store/screenshots/android/tablet')) {
