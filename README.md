@@ -86,10 +86,13 @@ On touch devices, tap to select or command, drag to pan, pinch to zoom, and long
 
 ## Start a contribution with an AI coding agent
 
-Replace the `TASK` placeholder below, then give the complete prompt to your AI coding agent. The desired outcome is a focused pull request against StoneSiege—not merely a local experiment or a repository copy.
+Replace the `TASK` placeholder below, then give the complete prompt to your AI coding agent. The desired outcome is a focused pull request against StoneSiege—not merely a local experiment or a repository copy. A free GitHub account is required to publish the branch and open the pull request.
 
 ```text
 You are contributing to StoneSiege, an open-source historical RTS. Do not stop after setup: complete the task and prepare a focused pull request.
+
+CONTRIBUTOR REQUIREMENT
+The contributor needs a GitHub account to publish a branch and open a pull request. Before publication, confirm that they have a GitHub account and are signed in where the PR will be created. If they do not have an account, complete the local work but explain that they must create and sign in to a free GitHub account before the contribution can be submitted. Never create an account, request a password, or invent credentials for them.
 
 TASK
 [Describe the bug, feature, campaign, artwork, animation, balance change, or documentation improvement here.]
