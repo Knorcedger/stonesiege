@@ -10,6 +10,14 @@ export const fpToTiles = (v: Fixed): number => v / FP;
 export const TICKS_PER_SECOND = 20;
 export const secondsToTicks = (s: number): number => Math.round(s * TICKS_PER_SECOND);
 
+/** Global construction/training/research rate. Movement and combat never use this. */
+export const PRODUCTION_SPEEDS = [1, 2, 4] as const;
+export type ProductionSpeed = (typeof PRODUCTION_SPEEDS)[number];
+
+export function isProductionSpeed(value: unknown): value is ProductionSpeed {
+  return typeof value === 'number' && PRODUCTION_SPEEDS.includes(value as ProductionSpeed);
+}
+
 export type EntityId = number;
 export type PlayerId = number; // 0 = Gaia (neutral: trees, mines, wildlife)
 export const GAIA: PlayerId = 0;
@@ -192,6 +200,8 @@ export type Command =
   | { kind: 'marketTrade'; player: PlayerId; sell: ResourceType; buy: ResourceType; amount: number }
   | { kind: 'reseedFarm'; player: PlayerId; farmId: EntityId } // GDD: reseed a fallow farm at full wood cost
   | { kind: 'queueReseed'; player: PlayerId; enabled: boolean } // GDD: Mill/TC auto-reseed toggle
+  /** Global match production rate; accepted only from a human player. */
+  | { kind: 'setProductionSpeed'; player: PlayerId; multiplier: ProductionSpeed }
   | { kind: 'pack'; player: PlayerId; units: EntityId[] } // trebuchets: fold up to move
   | { kind: 'unpack'; player: PlayerId; units: EntityId[] } // trebuchets: deploy to fire
   | { kind: 'resign'; player: PlayerId };
@@ -242,6 +252,8 @@ export interface GameConfig {
   map: MapGenConfig | ScenarioStart;
   players: PlayerSetup[]; // index + 1 = PlayerId (0 is Gaia)
   popCap: number;
+  /** Global construction/training/research rate. Defaults to 2×. */
+  productionSpeed?: ProductionSpeed;
   /**
    * Scenario tech ceiling (OPS_NEEDED.md gap 3, loader meta.maxAge): researching INTO
    * any age beyond this is blocked for every player (e.g. 'dark' = no Feudal in
@@ -258,6 +270,8 @@ export interface GameState {
   /** Entity ids by scenario ref name (empty for practice games). */
   refs: ReadonlyMap<string, EntityId>;
   finished: boolean;
+  /** Global construction/training/research rate. Real games always expose it. */
+  productionSpeed?: ProductionSpeed;
   /**
    * True when the GDD conquest rules (per-tick elimination check) decide this match —
    * practice games; scenario defeat is trigger-scripted. Additive/optional so mock

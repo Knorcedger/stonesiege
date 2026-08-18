@@ -10,7 +10,10 @@
 // (farm reseed, mill auto-reseed, trebuchet pack/unpack) are modeled here but
 // always disabled; wiring them is a one-line change when the sim grows them.
 
-import { AGES, FP, type AgeId, type Entity, type EntityId, type ResourceType, type TrainQueueItem } from '@bf/sim/types';
+import {
+  AGES, FP, type AgeId, type Entity, type EntityId, type ProductionSpeed, type ResourceType,
+  type TrainQueueItem,
+} from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { buildAgeIndex } from '@bf/sim/construction';
 import { buildModifierTable } from '@bf/sim/stats';
@@ -28,6 +31,8 @@ export interface PlayerCardView {
   researchedTechs: readonly string[];
   pop: number;
   popCap: number;
+  /** Optional for lightweight callers; live HUD views always provide it. */
+  productionSpeed?: ProductionSpeed;
 }
 
 export interface CardButtonModel {
@@ -58,6 +63,9 @@ export interface VerbButtonModel extends CardButtonModel {
 }
 
 const RESOURCE_KEYS: ResourceType[] = ['food', 'wood', 'gold', 'stone'];
+
+const productionSeconds = (baseSeconds: number, speed: ProductionSpeed | undefined): number =>
+  baseSeconds / (speed ?? 1);
 
 export const AGE_LABEL: Record<AgeId, string> = {
   dark: 'Dark Age', feudal: 'Feudal Age', castle: 'Castle Age', imperial: 'Imperial Age',
@@ -158,6 +166,7 @@ export function buildMenuButtons(
   age: AgeId,
   researchedTechs: readonly string[] = [],
   completedBuildingDefIds: readonly string[] = [],
+  productionSpeed: ProductionSpeed = 1,
 ): CardButtonModel[] {
   const ageIdx = AGES.indexOf(age);
   const pending = PENDING_COMMAND_KINDS.has('build');
@@ -183,7 +192,7 @@ export function buildMenuButtons(
               : 'not enough resources',
         name: bd.name,
         cost: bd.cost,
-        timeSeconds: bd.buildTime,
+        timeSeconds: productionSeconds(bd.buildTime, productionSpeed),
       };
     });
 }
@@ -226,7 +235,7 @@ export function trainMenuButtons(view: PlayerCardView, buildingDefId: string): C
           : undefined,
         name: unitNameForCiv(u.id, view.civ),
         cost,
-        timeSeconds: u.trainTime,
+        timeSeconds: productionSeconds(u.trainTime, view.productionSpeed),
       };
     });
 }
@@ -272,7 +281,7 @@ export function researchMenuButtons(
                 : 'not enough resources',
         name: t.name,
         cost: t.cost,
-        timeSeconds: t.researchTime,
+        timeSeconds: productionSeconds(t.researchTime, view.productionSpeed),
       };
     });
 }
@@ -347,7 +356,7 @@ export function ageUpButton(
     requirementMet: met,
     name: tech.name,
     cost: tech.cost,
-    timeSeconds: tech.researchTime,
+    timeSeconds: productionSeconds(tech.researchTime, view.productionSpeed),
   };
 }
 

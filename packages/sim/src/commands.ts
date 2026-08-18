@@ -4,7 +4,7 @@
 // (no TC + no villagers + no production buildings = defeated), and victory detection.
 
 import { gameData } from '@bf/data';
-import { AGES, GAIA } from './types';
+import { AGES, GAIA, isProductionSpeed } from './types';
 import type { Command, Entity, EntityId, PlayerId, SimEvent } from './types';
 import type { SimState } from './internal';
 import { removeEntity } from './entities';
@@ -35,7 +35,10 @@ function validPlayer(state: SimState, player: PlayerId): boolean {
   );
 }
 
-const NUMERIC_FIELDS = ['x', 'y', 'tileX', 'tileY', 'targetId', 'buildingId', 'entityId', 'farmId', 'index', 'amount'] as const;
+const NUMERIC_FIELDS = [
+  'x', 'y', 'tileX', 'tileY', 'targetId', 'buildingId', 'entityId', 'farmId', 'index',
+  'amount', 'multiplier',
+] as const;
 const RESOURCE_FIELDS = ['sell', 'buy'] as const;
 const RESOURCES = new Set(['food', 'wood', 'gold', 'stone']);
 const own = (table: object, key: unknown): boolean =>
@@ -51,6 +54,7 @@ const REQUIRED: Record<Command['kind'], readonly string[]> = {
   research: ['buildingId', 'techId'], cancelResearch: ['buildingId'],
   setRally: ['buildingId', 'x', 'y'], townBell: ['buildingId'], ungarrison: ['buildingId'],
   deleteEntity: ['entityId'], reseedFarm: ['farmId'], queueReseed: [],
+  setProductionSpeed: ['multiplier'],
   marketTrade: ['sell', 'buy', 'amount'], resign: [],
 };
 
@@ -86,6 +90,7 @@ function wellFormedCommand(kind: Command['kind'], cmd: Record<string, unknown>):
   for (const f of RESOURCE_FIELDS) {
     if (f in cmd && !RESOURCES.has(cmd[f] as string)) return false;
   }
+  if (kind === 'setProductionSpeed' && !isProductionSpeed(cmd.multiplier)) return false;
   return true;
 }
 
@@ -250,6 +255,13 @@ const handleResign: Handler<'resign'> = (state, cmd, events) => {
   checkVictory(state, events);
 };
 
+const handleSetProductionSpeed: Handler<'setProductionSpeed'> = (state, cmd) => {
+  // This is a single-player host setting, not an AI strategy command. Keeping it
+  // in the deterministic command stream makes pause-menu changes replayable.
+  if (!state.players[cmd.player]?.setup.isHuman) return;
+  state.productionSpeed = cmd.multiplier;
+};
+
 /** GDD defeat cleanup: mark defeated and destroy everything they own (no Gaia conversion). */
 function defeatPlayer(state: SimState, playerId: PlayerId, events: SimEvent[]): void {
   state.players[playerId].defeated = true;
@@ -333,6 +345,7 @@ const handlers: { [K in Command['kind']]: Handler<K> } = {
   marketTrade: handleMarketTrade,
   reseedFarm: (state, cmd) => handleReseedFarm(state, cmd),
   queueReseed: (state, cmd) => handleQueueReseed(state, cmd),
+  setProductionSpeed: handleSetProductionSpeed,
   pack: (state, cmd) => handlePackCommand(state, cmd),
   unpack: (state, cmd) => handlePackCommand(state, cmd),
   resign: handleResign,

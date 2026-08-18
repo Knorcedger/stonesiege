@@ -91,6 +91,7 @@ export function hashState(state: GameState): number {
   let h = 0x811c9dc5;
   h = mix(h, state.tick);
   h = mix(h, state.finished ? 1 : 0);
+  h = mix(h, state.productionSpeed ?? 2);
   for (const p of state.players) {
     h = mix(h, p.id);
     h = mix(h, p.stockpile.food);

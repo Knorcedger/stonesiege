@@ -30,7 +30,7 @@ export function tickProduction(state: SimState, events: SimEvent[]): void {
     if (item.techId) {
       // research occupies the queue: no pop reservation, ticks straight down
       item.started = true;
-      if (item.ticksLeft > 0) item.ticksLeft--;
+      if (item.ticksLeft > 0) item.ticksLeft = Math.max(0, item.ticksLeft - state.productionSpeed);
       if (item.ticksLeft > 0) {
         e.research = { techId: item.techId, ticksLeft: item.ticksLeft, totalTicks: item.totalTicks };
         continue;
@@ -49,7 +49,7 @@ export function tickProduction(state: SimState, events: SimEvent[]): void {
       player.pop += stats.pop; // reserve
     }
 
-    if (item.ticksLeft > 0) item.ticksLeft--;
+    if (item.ticksLeft > 0) item.ticksLeft = Math.max(0, item.ticksLeft - state.productionSpeed);
     if (item.ticksLeft > 0) continue;
 
     // spawn (retries every tick if the building is fully ringed)

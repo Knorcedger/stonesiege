@@ -23,11 +23,14 @@ export function scenarioConfig(
   players: PlayerSetup[],
   popCap = 200,
 ): GameConfig {
-  return { seed, map: { type: 'scenario', map, entities }, players, popCap };
+  return { seed, map: { type: 'scenario', map, entities }, players, popCap, productionSpeed: 1 };
 }
 
 export function practiceConfig(seed: number, players: PlayerSetup[], size = 120, popCap = 100): GameConfig {
-  return { seed, map: { type: 'practice-random', width: size, height: size }, players, popCap };
+  return {
+    seed, map: { type: 'practice-random', width: size, height: size }, players, popCap,
+    productionSpeed: 1,
+  };
 }
 
 export function entitiesOf(

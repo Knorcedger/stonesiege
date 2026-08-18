@@ -376,7 +376,9 @@ export function tickConstruction(state: SimState, events: SimEvent[]): void {
     }
     const n = ratesOf.get(id) ?? 0;
     if (n === 0) continue;
-    info.acc += n + 2 * RATE_SCALE; // AoE2: rate with N builders ~ (N + 2) / 3T
+    // Production speed scales only active build work. Builder approach still uses
+    // normal movement timing, so this setting can never make units walk faster.
+    info.acc += (n + 2 * RATE_SCALE) * state.productionSpeed; // AoE2: rate with N builders ~ (N + 2) / 3T
     const previousProgress = site.buildProgress ?? 0;
     const nextProgress = info.acc >= info.accNeeded
       ? 1000

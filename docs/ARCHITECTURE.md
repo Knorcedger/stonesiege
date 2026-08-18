@@ -20,6 +20,9 @@ apps/web  ──► @bf/game (Pixi renderer + input + HUD + menus)
   future lockstep multiplayer.
 - **Command pattern**: all player/AI intent enters as `Command` objects applied at tick
   boundaries. Human and bot players are indistinguishable to the sim.
+- **Production speed**: a deterministic 1×/2×/4× match setting scales only active
+  construction and the shared training/research queue. Changes are commands, so replays and
+  snapshots reproduce them without altering movement or combat timing.
 - **Entities**: single `Entity` record (units, buildings, resource objects) in an insertion-
   ordered Map + spatial hash grid for range queries. Scale target: ≤ ~600 live entities.
 - **Systems** (each its own module, registered in the tick pipeline):

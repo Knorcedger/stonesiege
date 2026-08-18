@@ -5,7 +5,7 @@
 // byte-identically (state restore lives in serialize.ts; both paths share finalizeGame).
 
 import { gameData } from '@bf/data';
-import { AGES, GAIA } from './types';
+import { AGES, GAIA, isProductionSpeed } from './types';
 import type {
   Command, Game, GameConfig, GameMap, GameSnapshot, GameState, PlayerState, ScenarioStart,
   SimEvent, Stockpile,
@@ -109,6 +109,7 @@ export function createGame(config: GameConfig): Game {
     players,
     refs: new Map(),
     finished: false,
+    productionSpeed: isProductionSpeed(config.productionSpeed) ? config.productionSpeed : 2,
     rng,
     nextId: 1,
     conquest: !scenario, // practice = conquest; campaign defeat comes from triggers (GDD)

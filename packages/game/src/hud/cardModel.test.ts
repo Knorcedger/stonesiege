@@ -142,6 +142,18 @@ describe('trainMenuButtons', () => {
     expect(vill).toMatchObject({ enabled: true, icon: gameData.units.villager.icon });
   });
 
+  it('shows real construction, training, research, and age-up times at the selected speed', () => {
+    const fast = view({ productionSpeed: 2, stockpile: LOADED });
+    expect(buildMenuButtons(LOADED, 'dark', [], ALL_PREREQS, 2)
+      .find((b) => b.id === 'house')?.timeSeconds).toBe(12.5);
+    expect(trainMenuButtons(fast, 'townCenter')
+      .find((b) => b.id === 'villager')?.timeSeconds).toBe(12.5);
+    expect(researchMenuButtons(fast, 'townCenter')
+      .find((b) => b.id === 'loom')?.timeSeconds).toBe(12.5);
+    expect(ageUpButton(fast, ['barracks', 'mill'])?.timeSeconds)
+      .toBe(gameData.techs.feudalAge.researchTime / 2);
+  });
+
   it('unaffordable units render the /gray companion', () => {
     for (const b of trainMenuButtons(view({ stockpile: BROKE }), 'townCenter')) {
       expect(b.enabled).toBe(false);

@@ -12,7 +12,8 @@
 // buttons get an invisible centered ::after hit-area expansion.
 
 import {
-  type Entity, type EntityId, type Formation, type GameState, type PlayerId, type ResourceType,
+  type Entity, type EntityId, type Formation, type GameState, type PlayerId,
+  type ProductionSpeed, type ResourceType,
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from '../assets';
@@ -78,6 +79,8 @@ export interface HudHost {
   togglePause(): void;
   isPaused(): boolean;
   resumeGame(): void;
+  /** Change construction/training/research timing without changing movement speed. */
+  setProductionSpeed(speed: ProductionSpeed): void;
   resign(): void;
   /** Audible preview for the pause-overlay volume sliders (uiTap on release). */
   playUiSound(): void;
@@ -648,7 +651,10 @@ export class Hud {
     // Slider release plays a uiTap so the player HEARS the level they set.
     const settings = document.createElement('div');
     settings.className = 'bf-pausesettings';
-    buildSettingsControls(settings, { onSliderRelease: () => this.host.playUiSound() });
+    buildSettingsControls(settings, {
+      onSliderRelease: () => this.host.playUiSound(),
+      onProductionSpeedChange: (speed) => this.host.setProductionSpeed(speed),
+    });
 
     const saveSection = document.createElement('div');
     saveSection.className = 'bf-pausesection';
@@ -1032,6 +1038,7 @@ export class Hud {
       researchedTechs: p.researchedTechs,
       pop: p.pop,
       popCap: p.popCap,
+      productionSpeed: state.productionSpeed ?? 2,
     };
   }
 
@@ -1068,7 +1075,7 @@ export class Hud {
   private cardButtonsKey(state: GameState, sel: Entity[]): string {
     const view = this.playerView(state);
     if (!view) return '';
-    const parts: string[] = [];
+    const parts: string[] = [`speed=${view.productionSpeed ?? 1}`];
     const push = (btns: readonly CardButtonModel[]): void => {
       for (const b of btns) {
         parts.push(`${b.id}=${b.enabled ? 1 : 0}${b.badge ? 'b' : ''}${b.reason ? `(${b.reason})` : ''}`);
@@ -1109,7 +1116,10 @@ export class Hud {
       if (hasActiveRally(b)) parts.push('rallyset');
     }
     if (villagers.length > 0) {
-      push(buildMenuButtons(view.stockpile, view.age, view.researchedTechs, this.completedBuildingDefIds(state)));
+      push(buildMenuButtons(
+        view.stockpile, view.age, view.researchedTechs, this.completedBuildingDefIds(state),
+        view.productionSpeed,
+      ));
     }
     return parts.join(',');
   }
@@ -1210,7 +1220,10 @@ export class Hud {
       // cardModel decides enabled/gray: only genuinely unavailable actions
       // (unaffordable, unmet building prereq, or a verb the sim would silently
       // drop) render disabled — mirroring the sim's hasBuildPrereqs.
-      for (const bb of buildMenuButtons(view.stockpile, view.age, view.researchedTechs, this.completedBuildingDefIds(state))) {
+      for (const bb of buildMenuButtons(
+        view.stockpile, view.age, view.researchedTechs, this.completedBuildingDefIds(state),
+        view.productionSpeed,
+      )) {
         this.addButton(
           bb.icon,
           `${bb.name}\n${costText(bb.cost ?? {})} • ${bb.timeSeconds}s`,
