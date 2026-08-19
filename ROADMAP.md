@@ -76,6 +76,9 @@ can share.
   mobile memory, initial load, minimap, fog, rendering, and pathfinding budgets pass.
 - Profile 600, 800, 1,000, and 1,500-entity battles. Choose a supported cap from measurements,
   not appearance.
+- The initial headless 192×192 sweep and report format are available through
+  `npm run benchmark:huge`; renderer and representative mobile-device measurements are still
+  required before exposing a Huge tier. See [performance benchmarks](docs/PERFORMANCE_BENCHMARKS.md).
 - Introduce hierarchical or region-aware pathfinding if a flat search cannot meet the budget.
 - Investigate deterministic dormant regions for distant imperial provinces rather than running
   every remote villager and patrol at full frequency.

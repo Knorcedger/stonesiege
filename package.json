@@ -26,6 +26,7 @@
     "typecheck": "tsc --noEmit",
     "bundle:check": "node tools/bundle-budget.mjs",
     "bundle:self-test": "node tools/bundle-budget.mjs --self-test",
+    "benchmark:huge": "node --expose-gc tools/run-huge-map-benchmark.mjs",
     "assets": "node tools/assetgen/src/main.ts && npm run assets:hd",
     "assets:hd": "node tools/hd-art/slice-direction-sheet.ts && node tools/hd-art/slice-animation-sheets.ts && node tools/hd-art/slice-work-sheets.ts && node tools/hd-art/normalize-civilization-unit-sheets.ts && node tools/hd-art/build.ts",
     "mobile:sync": "npm run build && npx cap sync",
