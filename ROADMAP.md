@@ -83,7 +83,9 @@ can share.
 - Investigate deterministic dormant regions for distant imperial provinces rather than running
   every remote villager and patrol at full frequency.
 - Add map validation reports for starting safety, resources, buildable space, chokepoints, and
-  movement-component connectivity.
+  movement-component connectivity. The deterministic Practice land profile and contributor sweep
+  are available through `npm run validate:maps`; new terrain families still need purpose-built
+  profiles. See [map validation reports](docs/MAP_VALIDATION.md).
 
 ### Terrain
 
