@@ -313,4 +313,36 @@ describe('complete HD art override contract', () => {
       expect(framePixelsHash(`icon/${id}`)).not.toBe(framePixelsHash(`icon/${id}/gray`));
     }
   });
+
+  it('keeps every troop and sheep walk cycle at a stable scale and ground line', () => {
+    const atlasEntries = hdAtlases().flatMap(({ atlas }) =>
+      Object.entries(atlas.frames).map(([name, frame]) => ({ name, frame: frame as any })));
+    const groups = new Map<string, Array<{ name: string; frame: any }>>();
+    for (const entry of atlasEntries) {
+      const match = entry.name.match(/^(unit\/[^/]+|obj\/sheep)\/walk\/([0-4])\/(\d+)$/);
+      if (!match) continue;
+      const key = `${match[1]}/${match[2]}`;
+      const group = groups.get(key) ?? [];
+      group.push(entry);
+      groups.set(key, group);
+    }
+
+    expect(groups.size).toBeGreaterThan(20);
+    for (const [groupName, entries] of groups) {
+      entries.sort((a, b) => Number(a.name.split('/').at(-1)) - Number(b.name.split('/').at(-1)));
+      const first = entries[0].frame;
+      const heights: number[] = [];
+      for (const { name, frame } of entries) {
+        expect(frame.frame.w, `${name} canvas width`).toBe(first.frame.w);
+        expect(frame.frame.h, `${name} canvas height`).toBe(first.frame.h);
+        expect(frame.anchor, `${name} anchor`).toEqual(first.anchor);
+        const visible = frameVisibleBounds(name);
+        heights.push(visible.height);
+        const anchorY = Math.round(frame.anchor.y * frame.frame.h);
+        expect(Math.abs(visible.bottom - anchorY), `${name} ground contact`).toBeLessThanOrEqual(2);
+      }
+      const heightRatio = Math.max(...heights) / Math.min(...heights);
+      expect(heightRatio, `${groupName} apparent scale`).toBeLessThanOrEqual(1.15);
+    }
+  });
 });

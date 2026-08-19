@@ -405,7 +405,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/archer/attack/4/0": {
@@ -477,7 +477,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9778
+    "y": 0.9667
    }
   },
   "unit/batteringRam/attack/1/1": {
@@ -549,7 +549,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/cappedRam/attack/1/0": {
@@ -645,7 +645,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9554
+    "y": 0.9732
    }
   },
   "unit/cataphract/die/2/4": {
@@ -717,7 +717,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9828
+    "y": 0.9741
    }
   },
   "unit/cavalier/die/0/2": {
@@ -765,7 +765,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9808
+    "y": 0.9712
    }
   },
   "unit/cavalier/walk/4/5": {
@@ -789,7 +789,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9808
+    "y": 0.9712
    }
   },
   "unit/champion/attack/4/4": {
@@ -885,7 +885,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9545
+    "y": 0.9659
    }
   },
   "unit/chevalier/attack/4/2": {
@@ -957,7 +957,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/chevalier/walk/4/3": {
@@ -981,7 +981,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/crossbowman/attack/4/3": {
@@ -1077,7 +1077,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9444
+    "y": 0.9667
    }
   },
   "unit/eliteHighlandRaider/attack/1/2": {
@@ -1173,7 +1173,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9479
+    "y": 0.9688
    }
   },
   "unit/eliteLongbowman/attack/3/4": {
@@ -1317,7 +1317,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/highlandRaider/attack/4/2": {
@@ -1389,7 +1389,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9583
+    "y": 0.9688
    }
   },
   "unit/housecarl/attack/4/1": {
@@ -1557,7 +1557,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9519
+    "y": 0.9712
    }
   },
   "unit/lightCavalry/attack/3/1": {
@@ -1677,7 +1677,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9875
+    "y": 0.975
    }
   },
   "unit/longbowman/attack/3/2": {
@@ -1749,7 +1749,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9444
+    "y": 0.9667
    }
   },
   "unit/longswordsman/attack/4/3": {
@@ -1821,7 +1821,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9432
+    "y": 0.9659
    }
   },
   "unit/mamluk/die/0/2": {
@@ -1965,7 +1965,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9545
+    "y": 0.9659
    }
   },
   "unit/mangonel/attack/0/4": {
@@ -2037,7 +2037,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/mangudai/attack/3/1": {
@@ -2133,7 +2133,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9821
+    "y": 0.9732
    }
   },
   "unit/militia/attack/4/1": {
@@ -2565,7 +2565,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/scout/attack/4/1": {
@@ -2637,7 +2637,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.95
+    "y": 0.975
    }
   },
   "unit/siegeRam/attack/0/2": {
@@ -2853,7 +2853,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9778
+    "y": 0.9667
    }
   },
   "unit/trebuchet/decay/2/2": {

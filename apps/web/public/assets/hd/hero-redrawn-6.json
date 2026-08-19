@@ -285,7 +285,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9063
+    "y": 0.9375
    }
   },
   "obj/wolf/die/0/1": {
@@ -333,7 +333,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9118
+    "y": 0.9412
    }
   },
   "unit/arbalester/attack/2/4": {
@@ -429,7 +429,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9778
+    "y": 0.9667
    }
   },
   "unit/archer/attack/3/3": {
@@ -501,7 +501,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/batteringRam/attack/3/1": {
@@ -573,7 +573,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/cappedRam/attack/3/0": {
@@ -861,7 +861,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9545
+    "y": 0.9659
    }
   },
   "unit/chevalier/attack/0/0": {
@@ -957,7 +957,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9821
+    "y": 0.9732
    }
   },
   "unit/crossbowman/attack/2/3": {
@@ -1173,7 +1173,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9444
+    "y": 0.9667
    }
   },
   "unit/eliteSkirmisher/attack/3/1": {
@@ -1269,7 +1269,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/highlandRaider/attack/4/0": {
@@ -1341,7 +1341,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9792
+    "y": 0.9688
    }
   },
   "unit/housecarl/attack/3/4": {
@@ -1725,7 +1725,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9432
+    "y": 0.9659
    }
   },
   "unit/mamluk/attack/4/1": {
@@ -1821,7 +1821,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9554
+    "y": 0.9732
    }
   },
   "unit/manAtArms/attack/3/1": {
@@ -1893,7 +1893,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9545
+    "y": 0.9659
    }
   },
   "unit/mangonel/attack/2/4": {
@@ -1965,7 +1965,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9821
+    "y": 0.9732
    }
   },
   "unit/mangudai/attack/2/0": {
@@ -2349,7 +2349,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9615
+    "y": 0.9712
    }
   },
   "unit/paladin/walk/4/1": {
@@ -2373,7 +2373,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9615
+    "y": 0.9712
    }
   },
   "unit/pikeman/attack/2/4": {
@@ -2445,7 +2445,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9778
+    "y": 0.9667
    }
   },
   "unit/scout/attack/1/2": {
@@ -2661,7 +2661,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/skirmisher/attack/2/3": {
@@ -2829,7 +2829,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/trebuchet/attack/0/3": {
