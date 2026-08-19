@@ -518,10 +518,6 @@ export class InputController {
       this.movePlacementToWorld(w.x, w.y);
       return;
     }
-    if (this.host.getArmedVerb() !== null) {
-      this.el.style.cursor = 'crosshair';
-      return;
-    }
     const w = this.host.camera.screenToWorld(sx, sy);
     const picks = this.pickAt(w.x, w.y);
     const sel = this.commandableSelection();
@@ -531,7 +527,9 @@ export class InputController {
       villagers: sel.filter((e) => e.kind === 'unit' && e.defId === 'villager').length,
     };
     // An explicitly armed verb owns the next tap, even when normal context
-    // inference would reselect the own unit under the pointer.
+    // inference would reselect the own unit under the pointer. Do not stop at
+    // the crosshair presentation here: touch has no hover phase, so this is
+    // the only event that can actually deliver the promised target tap.
     if (sel.length > 0 && this.host.getArmedVerb() !== null) {
       this.contextCommand(w.x, w.y, picks, sel);
       return;
