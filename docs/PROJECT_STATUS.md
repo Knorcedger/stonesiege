@@ -34,7 +34,7 @@ See the [campaign and chapter index](CAMPAIGN_INDEX.md) for every selectable cha
 
 - Strict TypeScript typecheck passes
 - Production Vite build passes
-- 759 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
+- 768 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
 - The simulation uses a fixed 20 Hz timestep, integer state, seeded randomness, and stable command processing
 - Headless bot games, campaign loading, asset contracts, and determinism checks are part of the normal test suite
 - Pull requests must pass typecheck, tests, production build, review, and DCO sign-off checks before merge

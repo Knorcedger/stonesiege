@@ -183,6 +183,7 @@ npm run build           # production web bundle
 npm run bundle:check    # report and enforce raw/gzip JavaScript budgets for dist/
 npm run bundle:self-test # deterministic self-test for the budget checker
 npm run benchmark:huge # optional 192x192 / 600-1500 entity simulation sweep
+npm run validate:maps # deterministic Practice map safety/connectivity/resource sweep
 npm run check           # run the complete local/CI quality gate
 npm run assets          # rebuild generated art atlases
 npm run mobile:sync     # build web and synchronize native wrappers
@@ -192,6 +193,8 @@ npm run release:mobile  # sign, validate, and upload both internal mobile builds
 Simulation changes must preserve determinism: no wall clock, platform APIs, floating-point gameplay state, or unstable iteration in `packages/sim`. Same seed plus the same command stream must produce the same result.
 
 The optional Huge-map harness is documented in [performance benchmarks](docs/PERFORMANCE_BENCHMARKS.md).
+The deterministic map-report command and profile thresholds are documented in
+[map validation reports](docs/MAP_VALIDATION.md).
 
 The web bundle limits live in `BUNDLE_BUDGET` inside [`tools/bundle-budget.mjs`](tools/bundle-budget.mjs). When an intentional feature needs more headroom, run `npm run build && npm run bundle:check`, review the generated chunks, update only the necessary limit, and explain the measured increase in the pull request. The checker guards regressions; it is not a substitute for profiling or deliberate code splitting.
 
