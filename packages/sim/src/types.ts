@@ -134,8 +134,8 @@ export interface Entity {
   // hero progression (additive; present only on units whose data def has an ability)
   heroLevel?: number;
   heroXp?: number;
-  /** First simulation tick on which the active ability may be cast again. */
-  abilityReadyTick?: Tick;
+  /** Per-ability first simulation tick on which that ability may be cast again. */
+  abilityReadyTicks?: Record<string, Tick>;
 }
 
 // ---------- players ----------
@@ -209,7 +209,7 @@ export type Command =
   | { kind: 'setProductionSpeed'; player: PlayerId; multiplier: ProductionSpeed }
   | { kind: 'pack'; player: PlayerId; units: EntityId[] } // trebuchets: fold up to move
   | { kind: 'unpack'; player: PlayerId; units: EntityId[] } // trebuchets: deploy to fire
-  | { kind: 'castAbility'; player: PlayerId; unitId: EntityId; x: Fixed; y: Fixed }
+  | { kind: 'castAbility'; player: PlayerId; unitId: EntityId; abilityId: string; x: Fixed; y: Fixed }
   | { kind: 'resign'; player: PlayerId };
 
 // ---------- events (for renderer, audio, triggers, AI) ----------

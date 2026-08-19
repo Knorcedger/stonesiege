@@ -30,8 +30,9 @@ export const arenaTrial: ScenarioDef = {
       'Defend the Banner Core',
     ],
     hints: [
-      'Select the Banner Warden and arm Bannerfall from the command card, then target the lane.',
-      'Bannerfall damages clustered enemy units and gains damage as the Warden levels up.',
+      'You control only the Banner Warden. Left-click or right-click the lane to move; click an enemy to attack.',
+      'Use Q, W, E, and R to arm an ability, then click its target area. Every ability causes damage.',
+      'Kills grant experience. New levels add health and increase every ability’s damage.',
       'Friendly and enemy warbands march automatically every sixteen seconds.',
     ],
   },
@@ -143,4 +144,3 @@ export const arenaTrial: ScenarioDef = {
   startCamera: { x: 13, y: 16 },
   maxAge: 'castle',
 };
-

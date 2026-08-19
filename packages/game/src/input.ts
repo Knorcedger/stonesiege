@@ -65,6 +65,8 @@ export interface InputHost {
   getSelection(): Entity[];
   setSelection(ids: EntityId[]): void;
   deselect(): void;
+  /** Hero modes keep one unit selected and accept left-click movement. */
+  isHeroControl(): boolean;
   issue(cmd: Command): void;
   issueWithUndo(cmd: Command, label: string, undo: (() => void) | null): void;
   isPlacing(): boolean;
@@ -356,6 +358,7 @@ export class InputController {
       ev.preventDefault();
     };
     const keydown = (ev: KeyboardEvent) => {
+      if (ev.defaultPrevented) return; // HUD consumed a hero ability hotkey (including W)
       const target = ev.target;
       if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement
         || target instanceof HTMLSelectElement || (target instanceof HTMLElement && target.isContentEditable)) return;
@@ -567,6 +570,10 @@ export class InputController {
       this.contextCommand(w.x, w.y, picks, selected);
       return;
     }
+    if (selected.length > 0 && this.host.isHeroControl()) {
+      this.contextCommand(w.x, w.y, picks, selected);
+      return;
+    }
     const action = resolveDesktopPrimaryAction(picks, this.host.humanPlayer);
     if (action.type === 'select' || action.type === 'inspect') {
       this.host.setSelection([action.id]);
@@ -667,19 +674,22 @@ export class InputController {
       ? () => this.host.issue({ kind: 'stop', player: human, units: unitIds })
       : null;
 
-    if (armedVerb === 'ability') {
-      const hero = units.find((unit) => gameData.units[unit.defId]?.ability);
+    if (armedVerb?.startsWith('ability:')) {
+      const hero = units.find((unit) => gameData.units[unit.defId]?.abilities?.length);
       if (!hero || units.length !== 1) {
         this.host.showToast('Select one hero to cast an ability');
         return;
       }
-      const ability = gameData.units[hero.defId].ability!;
+      const abilityId = armedVerb.slice('ability:'.length);
+      const ability = gameData.units[hero.defId].abilities?.find((candidate) =>
+        candidate.id === abilityId);
+      if (!ability) return;
       const target = worldToTile(wx, wy);
       const x = Math.max(0, Math.min(st.map.width - 0.01, target.x));
       const y = Math.max(0, Math.min(st.map.height - 0.01, target.y));
       this.host.clearArmedVerb();
       this.host.issueWithUndo({
-        kind: 'castAbility', player: human, unitId: hero.id, x: fp(x), y: fp(y),
+        kind: 'castAbility', player: human, unitId: hero.id, abilityId, x: fp(x), y: fp(y),
       }, ability.name, null);
       return;
     }

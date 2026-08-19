@@ -20,6 +20,7 @@ export interface HeroAbilityDef {
   id: string;
   name: string;
   description: string;
+  hotkey: 'q' | 'w' | 'e' | 'r';
   cooldownSeconds: number;
   range: number;
   radius: number;
@@ -83,8 +84,8 @@ export interface UnitDef {
     /** Replaces `armor` while packed/moving (AoE2: packed trebs are arrow-vulnerable). */
     packedArmor?: ClassValue[];
   };
-  /** Optional active ability. Scenario heroes are the first users of this additive hook. */
-  ability?: HeroAbilityDef;
+  /** Optional active kit. Scenario heroes are the first users of this additive hook. */
+  abilities?: HeroAbilityDef[];
   icon: string; // atlas frame name
   /**
    * World-sprite atlas id to render with, when it differs from `id` (frame names are

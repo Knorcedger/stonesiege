@@ -266,6 +266,10 @@ const HUD_CSS = `
 @media (max-width: 480px) {
   .bf-mini > canvas { width:112px !important; height:112px !important; image-rendering:auto; }
   .bf-rightcluster { right:4px; bottom:4px; }
+  /* A locked hero needs all four touch abilities exposed at once. Lift the
+     compact kit above the minimap and remove the duplicate stat inspector. */
+  .bf-rightcluster.hero-control { bottom:122px; }
+  .bf-rightcluster.hero-control .bf-selpanel { display:none !important; }
 }
 `;
 
@@ -1142,7 +1146,8 @@ export class Hud {
         `:${e.hp}/${e.maxHp}:${e.buildProgress ?? ''}:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
         `:${e.rally ? `${e.rally.x},${e.rally.y},${e.rally.targetId ?? ''}` : ''}` +
         `:${e.amountLeft !== undefined ? (e.amountLeft > 0 ? 'r' : 'x') : ''}` +
-        `:${e.heroLevel ?? ''}:${e.heroXp ?? ''}:${e.abilityReadyTick ?? ''}`,
+        `:${e.heroLevel ?? ''}:${e.heroXp ?? ''}:` +
+        `${e.abilityReadyTicks ? Object.entries(e.abilityReadyTicks).map(([id, tick]) => `${id}=${tick}`).join(',') : ''}`,
       ).join('|'),
       this.host.getArmedVerb() ?? '',
       this.host.getFormation(),
@@ -1242,7 +1247,14 @@ export class Hud {
     }
 
     if (units.length > 0) {
-      if (villagers.length === 0) this.cardTitle.textContent = 'Commands';
+      if (villagers.length === 0) {
+        const hero = units.length === 1 && gameData.units[units[0].defId]?.abilities?.length
+          ? units[0] : null;
+        this.rightCluster.classList.toggle('hero-control', hero !== null);
+        this.cardTitle.textContent = hero
+          ? `${gameData.units[hero.defId]?.name ?? hero.defId} · Lv ${hero.heroLevel ?? 1} · HP ${Math.max(0, hero.hp)}/${hero.maxHp}`
+          : 'Commands';
+      }
       // attack-move / stop / garrison / convert / heal / pack (cardModel decides
       // visibility per selection contents and wave-2 enabled-ness)
       for (const vb of unitVerbButtons(units, this.host.getArmedVerb(), state.tick)) {
@@ -1253,7 +1265,10 @@ export class Hud {
             : vb.verb !== undefined
               ? () => this.host.armVerb(vb.verb!)
               : () => undefined;
-        this.addButton(vb.icon, vb.tip, vb.enabled, vb.active ?? false, onClick, vb.reason);
+        this.addButton(
+          vb.icon, vb.tip, vb.enabled, vb.active ?? false, onClick, vb.reason,
+          undefined, undefined, 1, vb.hotkey,
+        );
       }
       const soldiers = units.filter((e) => {
         const def = gameData.units[e.defId];
@@ -1630,6 +1645,7 @@ export class Hud {
     badge?: string,
     direction?: 'in' | 'out',
     shiftRepeat = 1,
+    preferredHotkey?: string,
   ): void {
     const btn = document.createElement('button');
     let lastPointerType: string | null = null;
@@ -1650,7 +1666,7 @@ export class Hud {
       span.textContent = direction === 'in' ? '↓ IN' : '↑ OUT';
       btn.appendChild(span);
     }
-    const hotkey = this.registerCommandHotkey(btn);
+    const hotkey = this.registerCommandHotkey(btn, preferredHotkey);
     if (hotkey) {
       const key = document.createElement('span');
       key.className = 'bf-cmdkey';
@@ -1691,11 +1707,18 @@ export class Hud {
     this.cardGrid.appendChild(section);
   }
 
-  private registerCommandHotkey(btn: HTMLButtonElement): string | null {
-    const key = COMMAND_HOTKEYS[this.nextCommandHotkey++];
-    if (!key) return null;
-    this.commandHotkeys.set(key, btn);
-    return key;
+  private registerCommandHotkey(btn: HTMLButtonElement, preferred?: string): string | null {
+    if (preferred && !this.commandHotkeys.has(preferred)) {
+      this.commandHotkeys.set(preferred, btn);
+      return preferred;
+    }
+    while (this.nextCommandHotkey < COMMAND_HOTKEYS.length) {
+      const key = COMMAND_HOTKEYS[this.nextCommandHotkey++];
+      if (this.commandHotkeys.has(key)) continue;
+      this.commandHotkeys.set(key, btn);
+      return key;
+    }
+    return null;
   }
 
   private addFormationButton(formation: Formation, active: boolean): void {

@@ -76,10 +76,10 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
     };
     const unitDef = gameData.units[init.defId];
     if (unitDef.pack) e.packed = true; // trebuchets arrive packed
-    if (unitDef.ability) {
+    if (unitDef.abilities?.length) {
       e.heroLevel = 1;
       e.heroXp = 0;
-      e.abilityReadyTick = 0;
+      e.abilityReadyTicks = Object.fromEntries(unitDef.abilities.map((ability) => [ability.id, 0]));
     }
     if (init.player !== GAIA) {
       const player = state.players[init.player];

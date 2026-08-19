@@ -1,5 +1,5 @@
 // Deterministic hero abilities and progression for custom modes. The first Arena
-// ability is deliberately data-driven: adding another hero does not add a new command.
+// kit is deliberately data-driven: adding another spell does not add a new command.
 
 import { gameData } from '@bf/data';
 import { FP, fp, secondsToTicks } from './types';
@@ -16,7 +16,7 @@ const xpNeeded = (level: number): number => level * 100;
 
 function deathXp(defId: string): number {
   if (gameData.buildings[defId]) return 60;
-  if (gameData.units[defId]?.ability) return 100;
+  if (gameData.units[defId]?.abilities?.length) return 100;
   return 25;
 }
 
@@ -29,8 +29,9 @@ export function handleCastAbility(
   const hero = state.entities.get(cmd.unitId);
   if (!hero || hero.kind !== 'unit' || hero.player !== cmd.player || hero.hp <= 0) return;
   if (hero.garrisonedIn !== undefined) return;
-  const ability = gameData.units[hero.defId]?.ability;
-  if (!ability || state.tick < (hero.abilityReadyTick ?? 0)) return;
+  const ability = gameData.units[hero.defId]?.abilities?.find((candidate) =>
+    candidate.id === cmd.abilityId);
+  if (!ability || state.tick < (hero.abilityReadyTicks?.[ability.id] ?? 0)) return;
 
   const range = fp(ability.range);
   const dx = cmd.x - hero.x;
@@ -47,7 +48,8 @@ export function handleCastAbility(
 
   const cooldownTicks = secondsToTicks(ability.cooldownSeconds);
   const radius = fp(ability.radius);
-  hero.abilityReadyTick = state.tick + cooldownTicks;
+  hero.abilityReadyTicks ??= {};
+  hero.abilityReadyTicks[ability.id] = state.tick + cooldownTicks;
   if (dx !== 0 || dy !== 0) hero.facing = facingFromDelta(dx, dy);
   events.push({
     kind: 'abilityCast', unitId: hero.id, player: hero.player, abilityId: ability.id,
@@ -76,7 +78,7 @@ export function tickHeroProgression(state: SimState, events: SimEvent[]): void {
     event.kind === 'entityDied' && event.killerId !== undefined);
   for (const death of deaths) {
     const hero = state.entities.get(death.killerId!);
-    if (!hero || hero.hp <= 0 || !gameData.units[hero.defId]?.ability) continue;
+    if (!hero || hero.hp <= 0 || !gameData.units[hero.defId]?.abilities?.length) continue;
     if (!isEnemy(state, hero.player, death.player)) continue;
     hero.heroXp = (hero.heroXp ?? 0) + deathXp(death.defId);
     while ((hero.heroLevel ?? 1) < MAX_HERO_LEVEL && hero.heroXp >= xpNeeded(hero.heroLevel ?? 1)) {

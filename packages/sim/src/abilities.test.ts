@@ -32,11 +32,25 @@ function arenaGame(): Game {
   return createGame(config);
 }
 
-const cast = (game: Game, x = fp(20), y = fp(7)): Command => ({
-  kind: 'castAbility', player: 1, unitId: game.state.refs.get('hero')!, x, y,
+const cast = (
+  game: Game, abilityId = 'bannerfall', x = fp(20), y = fp(7),
+): Command => ({
+  kind: 'castAbility', player: 1, unitId: game.state.refs.get('hero')!, abilityId, x, y,
 });
 
 describe('hero abilities', () => {
+  it.each([
+    'bannerfall', 'shieldbreaker', 'lionCharge', 'crownstorm',
+  ])('%s targets an area and damages another character', (abilityId) => {
+    const game = arenaGame();
+    const [targetId] = game.ops!.spawn([
+      { defId: 'militia', player: 2, tileX: 4, tileY: 7, ref: `target-${abilityId}` },
+    ]);
+    const events = game.advance([cast(game, abilityId, fp(4.5), fp(7.5))]);
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'abilityCast', abilityId }));
+    expect(events).toContainEqual(expect.objectContaining({ kind: 'entityDied', id: targetId }));
+  });
+
   it('clamps the target, deals hostile-only area damage, starts cooldown, and levels', () => {
     const game = arenaGame();
     const hero = game.state.entities.get(game.state.refs.get('hero')!)!;
@@ -54,28 +68,37 @@ describe('hero abilities', () => {
     expect(hero.heroLevel).toBe(2);
     expect(hero.heroXp).toBe(0);
     expect(events).toContainEqual({ kind: 'heroLeveled', unitId: hero.id, player: 1, level: 2 });
-    expect(hero.abilityReadyTick).toBe(120);
+    expect(hero.abilityReadyTicks?.bannerfall).toBe(80);
+    expect(hero.abilityReadyTicks?.shieldbreaker).toBe(0);
   });
 
-  it('drops casts during cooldown and preserves hero state through snapshot restore', () => {
+  it('tracks cooldowns independently and preserves the complete kit through snapshot restore', () => {
     const game = arenaGame();
     game.advance([cast(game)]);
-    const blocked = game.advance([cast(game, fp(5), fp(5))]);
+    const blocked = game.advance([cast(game, 'bannerfall', fp(5), fp(5))]);
     expect(blocked.some((event) => event.kind === 'abilityCast')).toBe(false);
+    const secondAbility = game.advance([cast(game, 'shieldbreaker', fp(5), fp(5))]);
+    expect(secondAbility.some((event) =>
+      event.kind === 'abilityCast' && event.abilityId === 'shieldbreaker')).toBe(true);
 
     const restored = createGameFromSnapshot(JSON.parse(JSON.stringify(game.serialize())));
     const heroId = game.state.refs.get('hero')!;
     expect(restored.state.entities.get(heroId)?.heroLevel).toBe(2);
     expect(restored.state.entities.get(heroId)?.heroXp).toBe(0);
-    expect(restored.state.entities.get(heroId)?.abilityReadyTick).toBe(120);
+    expect(restored.state.entities.get(heroId)?.abilityReadyTicks).toEqual({
+      bannerfall: 80, shieldbreaker: 142, lionCharge: 0, crownstorm: 0,
+    });
     expect(restored.hash()).toBe(game.hash());
   });
 
   it('silently rejects malformed or unowned casts', () => {
     const game = arenaGame();
     expect(() => game.advance([
-      { kind: 'castAbility', player: 1, unitId: 9999, x: fp(4), y: fp(4) },
-      { kind: 'castAbility', player: 2, unitId: game.state.refs.get('hero')!, x: fp(4), y: fp(4) },
+      { kind: 'castAbility', player: 1, unitId: 9999, abilityId: 'bannerfall', x: fp(4), y: fp(4) },
+      {
+        kind: 'castAbility', player: 2, unitId: game.state.refs.get('hero')!,
+        abilityId: 'bannerfall', x: fp(4), y: fp(4),
+      },
     ])).not.toThrow();
   });
 });

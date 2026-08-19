@@ -396,12 +396,23 @@ describe('queueStacks', () => {
 
 describe('unitVerbButtons', () => {
   it('shows the selected Arena hero ability and its live cooldown state', () => {
-    const hero = ent({ defId: 'arenaWarden', abilityReadyTick: 120, heroLevel: 2 });
-    const cooling = unitVerbButtons([hero], null, 60)[0];
-    expect(cooling).toMatchObject({ id: 'bannerfall', verb: 'ability', enabled: false });
-    expect(cooling.reason).toBe('3s cooldown');
-    const ready = unitVerbButtons([hero], 'ability', 120)[0];
+    const hero = ent({
+      defId: 'arenaWarden', heroLevel: 2,
+      abilityReadyTicks: { bannerfall: 120, shieldbreaker: 0, lionCharge: 0, crownstorm: 0 },
+    });
+    const cooling = unitVerbButtons([hero], null, 60);
+    expect(cooling.slice(0, 4).map((button) => button.id)).toEqual([
+      'bannerfall', 'shieldbreaker', 'lionCharge', 'crownstorm',
+    ]);
+    expect(cooling[0]).toMatchObject({
+      id: 'bannerfall', verb: 'ability:bannerfall', hotkey: 'q', enabled: false,
+    });
+    expect(cooling[0].reason).toBe('3s cooldown');
+    const ready = unitVerbButtons([hero], 'ability:bannerfall', 120)[0];
     expect(ready).toMatchObject({ id: 'bannerfall', enabled: true, active: true });
+    expect(unitVerbButtons([hero], null).map((button) => button.id)).toEqual([
+      'bannerfall', 'shieldbreaker', 'lionCharge', 'crownstorm', 'stop',
+    ]);
   });
 
   it('military selection: attack-move toggle, stop, garrison', () => {

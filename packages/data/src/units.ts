@@ -603,16 +603,32 @@ export const units: Record<string, UnitDef> = {
   arenaWarden: {
     ...heroDef('arenaWarden', 'Banner Warden', 650, 20, 'champion', ['infantry', 'uniqueUnit'], 1.08),
     armor: [{ cls: 'melee', amount: 3 }, { cls: 'pierce', amount: 3 }],
-    ability: {
-      id: 'bannerfall',
-      name: 'Bannerfall',
-      description: 'Strike a target area, damaging every enemy unit caught in the blast.',
-      cooldownSeconds: 6,
-      range: 5,
-      radius: 1.75,
-      damage: 60,
-      icon: 'icon/tech/forging',
-    },
+    abilities: [
+      {
+        id: 'bannerfall', hotkey: 'q', name: 'Bannerfall',
+        description: 'Fast area strike for clearing clustered enemies.',
+        cooldownSeconds: 4, range: 5, radius: 1.5, damage: 60,
+        icon: 'icon/tech/forging',
+      },
+      {
+        id: 'shieldbreaker', hotkey: 'w', name: 'Shieldbreaker',
+        description: 'Heavy close-range blast that crushes a tight group.',
+        cooldownSeconds: 7, range: 3.5, radius: 1.1, damage: 105,
+        icon: 'icon/tech/ironCasting',
+      },
+      {
+        id: 'lionCharge', hotkey: 'e', name: "Lion's Charge",
+        description: 'Long-range targeted impact for reaching the back line.',
+        cooldownSeconds: 10, range: 7, radius: 1.4, damage: 85,
+        icon: 'icon/tech/chainMailArmor',
+      },
+      {
+        id: 'crownstorm', hotkey: 'r', name: 'Crownstorm',
+        description: 'Ultimate strike over a wide area.',
+        cooldownSeconds: 24, range: 5.5, radius: 3, damage: 150,
+        icon: 'icon/tech/blastFurnace',
+      },
+    ],
   },
   arenaUsurper: heroDef(
     'arenaUsurper', 'Ashen Usurper', 440, 17, 'paladin', ['cavalry', 'uniqueUnit'], 1.12,

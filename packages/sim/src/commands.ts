@@ -56,7 +56,7 @@ const REQUIRED: Record<Command['kind'], readonly string[]> = {
   setRally: ['buildingId', 'x', 'y'], townBell: ['buildingId'], ungarrison: ['buildingId'],
   deleteEntity: ['entityId'], reseedFarm: ['farmId'], queueReseed: [],
   setProductionSpeed: ['multiplier'],
-  marketTrade: ['sell', 'buy', 'amount'], castAbility: ['unitId', 'x', 'y'], resign: [],
+  marketTrade: ['sell', 'buy', 'amount'], castAbility: ['unitId', 'abilityId', 'x', 'y'], resign: [],
 };
 
 /**
@@ -88,6 +88,7 @@ function wellFormedCommand(kind: Command['kind'], cmd: Record<string, unknown>):
   // def ids must name a real def (own-property lookup blocks prototype pollution).
   if ('defId' in cmd && !(own(gameData.units, cmd.defId) || own(gameData.buildings, cmd.defId))) return false;
   if ('techId' in cmd && !own(gameData.techs, cmd.techId)) return false;
+  if ('abilityId' in cmd && typeof cmd.abilityId !== 'string') return false;
   for (const f of RESOURCE_FIELDS) {
     if (f in cmd && !RESOURCES.has(cmd[f] as string)) return false;
   }

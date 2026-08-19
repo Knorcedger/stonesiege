@@ -376,7 +376,12 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   });
 
   // --------------------------------------------------------------- state
-  let selection: EntityId[] = [];
+  const controlledHeroId = [...game.state.entities.values()].find((entity) =>
+    entity.kind === 'unit' && entity.player === humanPlayer
+    && !!gameData.units[entity.defId]?.abilities?.length)?.id;
+  const heroControlMode = controlledHeroId !== undefined;
+  let selection: EntityId[] = controlledHeroId !== undefined ? [controlledHeroId] : [];
+  world.selection = new Set(selection);
   let armedVerb: ArmedVerb | null = null;
   let formation: Formation = 'rectangle';
   let placement: { defId: string; tileX: number; tileY: number } | null = null;
@@ -396,8 +401,12 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     return out;
   };
   const setSelection = (ids: EntityId[]): void => {
-    selection = ids;
-    world.selection = new Set(ids);
+    const hero = controlledHeroId !== undefined ? getState().entities.get(controlledHeroId) : undefined;
+    const next = heroControlMode && !endShown && hero && hero.hp > 0
+      ? [controlledHeroId!]
+      : ids;
+    selection = next;
+    world.selection = new Set(next);
     armedVerb = null;
   };
   const deselect = (): void => setSelection([]);
@@ -947,6 +956,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     getSelection: liveSelection,
     setSelection,
     deselect,
+    isHeroControl: () => heroControlMode,
     issue,
     issueWithUndo,
     isPlacing: () => placement !== null,

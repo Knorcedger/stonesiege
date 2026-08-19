@@ -53,7 +53,12 @@ function mixEntity(h: number, e: Entity): number {
   if (e.packed !== undefined) h = mix(h, e.packed ? 3 : 2);
   if (e.heroLevel !== undefined) h = mix(h, e.heroLevel);
   if (e.heroXp !== undefined) h = mix(h, e.heroXp);
-  if (e.abilityReadyTick !== undefined) h = mix(h, e.abilityReadyTick);
+  if (e.abilityReadyTicks !== undefined) {
+    for (const id of Object.keys(e.abilityReadyTicks).sort()) {
+      h = mix(h, hashString(id));
+      h = mix(h, e.abilityReadyTicks[id]);
+    }
+  }
   if (e.targetId !== undefined) h = mix(h, e.targetId);
   if (e.carrying !== undefined) {
     h = mix(h, RESOURCE_INDEX[e.carrying.type] ?? 0);

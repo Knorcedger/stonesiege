@@ -54,12 +54,15 @@ export interface CardButtonModel {
 }
 
 /** Verbs that arm a "next tap = target" flow (GDD alternate-command semantics). */
-export type ArmedVerb = 'rally' | 'attackMove' | 'garrison' | 'convert' | 'heal' | 'ability';
+export type ArmedVerb =
+  | 'rally' | 'attackMove' | 'garrison' | 'convert' | 'heal'
+  | `ability:${string}`;
 
 export interface VerbButtonModel extends CardButtonModel {
   verb?: ArmedVerb;
   active?: boolean;
   tip: string;
+  hotkey?: string;
 }
 
 const RESOURCE_KEYS: ResourceType[] = ['food', 'wood', 'gold', 'stone'];
@@ -389,22 +392,32 @@ export function unitVerbButtons(
 
   if (units.length === 1) {
     const hero = units[0];
-    const ability = gameData.units[hero.defId]?.ability;
-    if (ability) {
-      const readyTick = hero.abilityReadyTick ?? 0;
+    const abilities = gameData.units[hero.defId]?.abilities ?? [];
+    for (const ability of abilities) {
+      const verb: ArmedVerb = `ability:${ability.id}`;
+      const readyTick = hero.abilityReadyTicks?.[ability.id] ?? 0;
       const enabled = nowTick >= readyTick;
       const secondsLeft = Math.ceil(Math.max(0, readyTick - nowTick) / TICKS_PER_SECOND);
       out.push({
         id: ability.id,
-        verb: 'ability',
+        verb,
+        hotkey: ability.hotkey,
         icon: iconVariant(ability.icon, enabled),
         enabled,
-        active: armed === 'ability',
+        active: armed === verb,
         reason: enabled ? undefined : `${secondsLeft}s cooldown`,
         tip:
           `${ability.name}\n${ability.description}\n` +
           `${ability.range} tile range • ${ability.radius} tile blast • ${ability.cooldownSeconds}s cooldown`,
       });
+    }
+    // Hero-control units expose their kit instead of RTS group-management verbs.
+    if (abilities.length > 0) {
+      out.push({
+        id: 'stop', icon: 'icon/cmd/stop', enabled: true,
+        tip: 'Stop\nCancel movement and attacks',
+      });
+      return out;
     }
   }
 
