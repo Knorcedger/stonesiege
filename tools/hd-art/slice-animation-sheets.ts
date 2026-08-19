@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
+import { clearMinorAlphaComponents } from './alpha-components.ts';
 
 const root = join(import.meta.dirname, '../..');
 const unitDir = join(root, 'art/hd/frames/units');
@@ -44,6 +45,7 @@ for (const sheet of SHEETS) {
           out.data[outputIndex + 3] = source.data[sourceIndex + 3];
         }
       }
+      if (sheet.kind !== 'scout') clearMinorAlphaComponents(out);
       const outputName = `${sheet.kind}-walk-dir-${dir}-frame-${frame}-cutout-v4.png`;
       writeFileSync(join(unitDir, outputName), PNG.sync.write(out));
     }
