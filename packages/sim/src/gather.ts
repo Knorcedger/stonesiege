@@ -20,7 +20,7 @@ import { gameData } from '@bf/data';
 import type { GatherTask } from '@bf/data';
 import { FP, GAIA, TICKS_PER_SECOND } from './types';
 import type { Command, Entity, EntityId, PlayerId, ResourceType, SimEvent } from './types';
-import { adjacentToFootprint, facingFromDelta } from './internal';
+import { adjacentToFootprint, distToFootprintFp, facingFromDelta } from './internal';
 import type { GatherInfo, SimState } from './internal';
 import { removeEntity, stumpify } from './entities';
 import { resolveUnitStats } from './stats';
@@ -51,6 +51,8 @@ const NODE_SLOTS = 8;
 /** Farmers stay crouched for a while, then briefly stand and relocate within the plot. */
 const FARM_SHIFT_MIN_SECONDS = 3;
 const FARM_SHIFT_SECONDS_SPAN = 8; // inclusive range: 3..10 seconds
+/** Static-node workers must visibly reach the resource instead of stopping at a diagonal tile edge. */
+export const STATIC_RESOURCE_WORK_REACH = 3 * FP / 8;
 
 type GatherCmd = Extract<Command, { kind: 'gather' }>;
 
@@ -96,6 +98,17 @@ function freshInfo(task: GatherTask | null, target: Entity | null): GatherInfo {
   };
 }
 
+/** Route static-node workers to the interaction ring, then toward the node itself. */
+function orderGatherApproach(
+  state: SimState, unitIds: readonly EntityId[], target: Entity, view: TargetView,
+): void {
+  if (view.kind === 'node') {
+    orderMoveToFootprint(state, unitIds, target.tileX, target.tileY, view.size);
+    return;
+  }
+  orderMove(state, [...unitIds], target.x, target.y);
+}
+
 /** gather command: task every selected worker onto the target and send them walking. */
 export function handleGather(state: SimState, cmd: GatherCmd, cancelBuildQueue = true): void {
   const target = state.entities.get(cmd.targetId);
@@ -132,7 +145,7 @@ export function handleGather(state: SimState, cmd: GatherCmd, cancelBuildQueue =
   }
   if (movers.length > 0) {
     if (cancelBuildQueue) cancelQueuedBuilds(state, movers);
-    orderMove(state, movers, target.x, target.y);
+    orderGatherApproach(state, movers, target, view);
   }
 }
 
@@ -252,7 +265,7 @@ function onTargetLost(state: SimState, e: Entity, info: GatherInfo): void {
     e.intent = { kind: 'gather', targetId: next.id };
     info.retries = 0;
     info.depositing = false;
-    orderMove(state, [e.id], next.x, next.y);
+    orderGatherApproach(state, [e.id], next, classifyGatherTarget(state, next, e.player)!);
     return;
   }
   if (e.carrying && e.carrying.amount > 0) {
@@ -299,8 +312,9 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
     // head back to the node (revalidated — retarget path runs if it died meanwhile)
     const intent = e.intent;
     const target = intent?.kind === 'gather' ? state.entities.get(intent.targetId) : undefined;
-    if (target && classifyGatherTarget(state, target, e.player)) {
-      orderMove(state, [e.id], target.x, target.y);
+    const targetView = target ? classifyGatherTarget(state, target, e.player) : null;
+    if (target && targetView) {
+      orderGatherApproach(state, [e.id], target, targetView);
     } else if (isFallowOwnFarm(state, target, e.player)) {
       orderMove(state, [e.id], target.x, target.y); // walk back and wait for the reseed
     } else {
@@ -351,7 +365,7 @@ function approach(state: SimState, e: Entity, info: GatherInfo, target: Entity, 
   const cap = view.kind === 'prey' ? PREY_RETRIES : STATIC_RETRIES;
   if (info.retries >= cap) { release(state, e); return; }
   info.retries++;
-  orderMove(state, [e.id], target.x, target.y);
+  orderGatherApproach(state, [e.id], target, view);
 }
 
 /** Completed farms are walkable; harvesting must still happen on their own plot. */
@@ -454,7 +468,10 @@ function stepWorker(
 
   const atWorkFace = view.kind === 'farm'
     ? insideFootprint(e, target, view.size)
-    : adjacentToFootprint(e, target.tileX, target.tileY, view.size);
+    : view.kind === 'node'
+      ? distToFootprintFp(e.x, e.y, target.tileX, target.tileY, view.size)
+        <= STATIC_RESOURCE_WORK_REACH
+      : adjacentToFootprint(e, target.tileX, target.tileY, view.size);
   if (!atWorkFace) {
     approach(state, e, info, target, view);
     return;
@@ -474,7 +491,7 @@ function stepWorker(
       if (next && next.id !== target.id) {
         e.intent = { kind: 'gather', targetId: next.id };
         info.retries = 0;
-        orderMove(state, [e.id], next.x, next.y);
+        orderGatherApproach(state, [e.id], next, classifyGatherTarget(state, next, e.player)!);
         return;
       }
     }

@@ -7,6 +7,8 @@ import { describe, expect, it } from 'vitest';
 import type { Game, SimEvent } from './types';
 import type { SimState } from './internal';
 import { createGame, createGameFromSnapshot } from './game';
+import { distToFootprintFp } from './internal';
+import { STATIC_RESOURCE_WORK_REACH } from './gather';
 import { grassMap, player, scenarioConfig } from './testutil';
 
 const HUMAN = 1;
@@ -69,6 +71,36 @@ describe('gather rates match AOE2_REFERENCE within rounding (time to fill a 10 c
 });
 
 describe('gather loop: carry to drop-off, deposit, return', () => {
+  it('walks close to a diagonally adjacent berry bush before gathering', () => {
+    const game = createGame(scenarioConfig(73, grassMap(30, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 11, ref: 'v' },
+      { defId: 'berryBush', player: 0, tileX: 10, tileY: 10, ref: 'bush' },
+    ], [player()]));
+    const villagerId = game.state.refs.get('v')!;
+    const bushId = game.state.refs.get('bush')!;
+    const bush = game.state.entities.get(bushId)!;
+
+    game.advance([{
+      kind: 'gather', player: HUMAN, units: [villagerId], targetId: bushId,
+    }]);
+
+    let startedGathering = false;
+    for (let tick = 0; tick < 200; tick++) {
+      const villager = game.state.entities.get(villagerId)!;
+      if (villager.activity === 'gathering') {
+        const distance = distToFootprintFp(
+          villager.x, villager.y, bush.tileX, bush.tileY, 1,
+        );
+        expect(distance).toBeLessThanOrEqual(STATIC_RESOURCE_WORK_REACH);
+        startedGathering = true;
+        break;
+      }
+      game.advance([]);
+    }
+
+    expect(startedGathering, 'worker reached the bush and began foraging').toBe(true);
+  });
+
   it('deposits 10 food at the TC and keeps cycling (resourceDropped + stockpile)', () => {
     const game = createGame(scenarioConfig(6, grassMap(30, 30), [
       { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v' },
@@ -82,6 +114,12 @@ describe('gather loop: carry to drop-off, deposit, return', () => {
     for (let t = 0; t < 1600; t++) {
       for (const ev of game.advance([])) {
         if (ev.kind === 'resourceDropped') drops.push(ev);
+      }
+      const villager = game.state.entities.get(vid)!;
+      const bush = game.state.entities.get(game.state.refs.get('bush')!)!;
+      if (villager.activity === 'gathering') {
+        expect(distToFootprintFp(villager.x, villager.y, bush.tileX, bush.tileY, 1))
+          .toBeLessThanOrEqual(STATIC_RESOURCE_WORK_REACH);
       }
     }
     expect(drops.length).toBeGreaterThanOrEqual(2);
@@ -235,6 +273,9 @@ describe('depletion: stump + tile unblock + auto-continue', () => {
     const v = game.state.entities.get(vid)!;
     expect(v.intent).toEqual({ kind: 'gather', targetId: t2 });
     expect(v.activity).toBe('gathering');
+    const nextTree = game.state.entities.get(t2)!;
+    expect(distToFootprintFp(v.x, v.y, nextTree.tileX, nextTree.tileY, 1))
+      .toBeLessThanOrEqual(STATIC_RESOURCE_WORK_REACH);
   });
 
   it('continues into a tree elsewhere in the same local forest', () => {
