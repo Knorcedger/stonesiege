@@ -30,7 +30,7 @@ import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
-import { HUD_NARROW_MAX_PX } from './layout';
+import { HUD_NARROW_MAX_PX, hudStageExtentPercent } from './layout';
 import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
 import type { UnitDisplayStats } from '../simBridge';
@@ -226,15 +226,15 @@ const HUD_CSS = `
 .bf-pausebox { margin:auto; display:flex; align-items:center; flex-direction:column; gap:14px; padding:24px 16px; }
 .bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:42px; color:#E6C04A; margin:0; }
 /* in-match settings (same controls as the menu screen — see settingsUi.ts) */
-.bf-pausesettings { width:min(320px, 88vw); text-align:left; }
-.bf-pausesection { box-sizing:border-box; width:min(320px,88vw); padding:10px 12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
+.bf-pausesettings { width:min(320px, 88%); text-align:left; }
+.bf-pausesection { box-sizing:border-box; width:min(320px,88%); padding:10px 12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
 .bf-pausetitle { color:#E6C04A; font:15px/1 "Pixelify Sans",monospace; letter-spacing:1px; }
 .bf-pausehint { margin-top:5px; font:14px/1.25 "VT323",monospace; }
 .bf-pausesaverow { display:flex; align-items:center; gap:10px; margin-top:8px; }
 .bf-pausestate { color:#E6C04A; font:15px/1 "VT323",monospace; }
 .bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }
 .bf-help.show { display:flex; }
-.bf-helpbox { box-sizing:border-box; width:min(430px,calc(100vw - 24px)); margin:auto; padding:20px; }
+.bf-helpbox { box-sizing:border-box; width:min(430px,calc(100% - 24px)); margin:auto; padding:20px; }
 .bf-helphead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
 .bf-helphead h2 { margin:0; color:#E6C04A; font:32px/1 "Jacquard 12","Pixelify Sans",monospace; }
 .bf-helptext { color:#DABE8D; font:15px/1.35 "Pixelify Sans",monospace; }
@@ -387,8 +387,9 @@ export class Hud {
   }
 
   private applyHudScale(scale: number): void {
-    this.stage.style.width = `${100 / scale}%`;
-    this.stage.style.height = `${100 / scale}%`;
+    const extent = hudStageExtentPercent(scale);
+    this.stage.style.width = `${extent}%`;
+    this.stage.style.height = `${extent}%`;
     this.stage.style.transform = `scale(${scale})`;
   }
 

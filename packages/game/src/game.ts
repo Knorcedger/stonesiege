@@ -39,6 +39,7 @@ import {
   copyTallies, deriveMatchSummary, emptyTallies, formatMatchTime,
   recordMatchEvent, recordPopulation,
 } from './hud/summary';
+import { HUD_SAFE_AREA_ROOT_STYLE } from './hud/layout';
 import {
   createGame, gameFromSerialized, practiceConfig, scenarioConfig, unitDisplayStats,
   DEFAULT_PRACTICE_SETUP, type PracticeSetup,
@@ -897,11 +898,19 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     saveGroup,
     selectGroup,
   };
-  const hud = new Hud(root, hudHost);
-  const overlays = new Overlays(root);
+  // Keep the battlefield full-bleed while every DOM control shares one safe
+  // containing block. This parent stays unscaled, so the HUD size preference
+  // cannot multiply or shrink the physical notch/system-gesture insets.
+  const hudRoot = document.createElement('div');
+  hudRoot.className = 'bf-hud-safe-root';
+  hudRoot.style.cssText = HUD_SAFE_AREA_ROOT_STYLE;
+  root.appendChild(hudRoot);
+
+  const hud = new Hud(hudRoot, hudHost);
+  const overlays = new Overlays(hudRoot);
   if (meta && meta.id !== SHOWCASE_SCENARIO_ID) {
-    objectivesPanel = new ObjectivesPanel(root);
-    messageBanner = new MessageBanner(root);
+    objectivesPanel = new ObjectivesPanel(hudRoot);
+    messageBanner = new MessageBanner(hudRoot);
     for (const op of pendingObjectiveOps) op(objectivesPanel); // resume-replayed state
     pendingObjectiveOps.length = 0;
   }
@@ -998,7 +1007,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     }
     btns[0].style.background = '#DABE8D';
     btns[0].style.color = '#1A1208';
-    root.appendChild(bar);
+    hudRoot.appendChild(bar);
   }
 
   // Dev-only QA handle: lets automated browser sessions locate entities on screen and
