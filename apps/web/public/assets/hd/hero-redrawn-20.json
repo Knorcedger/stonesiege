@@ -213,7 +213,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.925
+    "y": 0.9375
    }
   },
   "obj/sheep/decay/1/1": {
@@ -285,7 +285,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9219
+    "y": 0.9375
    }
   },
   "obj/tree/1": {
@@ -381,7 +381,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9265
+    "y": 0.9412
    }
   },
   "unit/arbalester/attack/1/0": {
@@ -453,7 +453,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9444
+    "y": 0.9667
    }
   },
   "unit/archer/attack/3/2": {
@@ -525,7 +525,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9444
+    "y": 0.9667
    }
   },
   "unit/batteringRam/attack/1/4": {
@@ -669,7 +669,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9821
+    "y": 0.9732
    }
   },
   "unit/cataphract/attack/0/2": {
@@ -837,7 +837,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9519
+    "y": 0.9712
    }
   },
   "unit/champion/attack/0/3": {
@@ -1029,7 +1029,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9821
+    "y": 0.9732
    }
   },
   "unit/crossbowman/attack/0/4": {
@@ -1101,7 +1101,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/eliteHighlandRaider/attack/2/2": {
@@ -1173,7 +1173,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9583
+    "y": 0.9688
    }
   },
   "unit/eliteLongbowman/attack/3/1": {
@@ -1269,7 +1269,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/eliteSkirmisher/attack/3/0": {
@@ -1413,7 +1413,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9479
+    "y": 0.9688
    }
   },
   "unit/housecarl/attack/2/0": {
@@ -1509,7 +1509,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9583
+    "y": 0.9688
    }
   },
   "unit/knight/attack/0/2": {
@@ -1749,7 +1749,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9778
+    "y": 0.9667
    }
   },
   "unit/longswordsman/attack/0/2": {
@@ -1893,7 +1893,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/manAtArms/attack/0/1": {
@@ -2229,7 +2229,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9773
+    "y": 0.9659
    }
   },
   "unit/monk/attack/4/0": {
@@ -2301,7 +2301,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/onager/attack/1/1": {
@@ -2397,7 +2397,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9643
+    "y": 0.9732
    }
   },
   "unit/paladin/attack/4/3": {
@@ -2661,7 +2661,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9875
+    "y": 0.975
    }
   },
   "unit/siegeRam/attack/1/0": {
@@ -2733,7 +2733,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9554
+    "y": 0.9732
    }
   },
   "unit/skirmisher/attack/2/2": {
@@ -2805,7 +2805,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9556
+    "y": 0.9667
    }
   },
   "unit/spearman/attack/2/1": {
@@ -2877,7 +2877,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9444
+    "y": 0.9667
    }
   },
   "unit/trebuchet/idle/1/1": {
@@ -2925,7 +2925,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9609
+    "y": 0.9688
    }
   },
   "unit/villager/attack/2/2": {
@@ -3093,7 +3093,7 @@
    },
    "anchor": {
     "x": 0.5,
-    "y": 0.9531
+    "y": 0.9688
    }
   }
  },

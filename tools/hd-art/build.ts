@@ -47,6 +47,10 @@ interface CutoutSpec {
   };
   /** Keep every pose in a visual family on the same animation canvas. */
   stableSize?: readonly [number, number];
+  /** Fit an animation family once so individual poses cannot pulse in size. */
+  scaleGroup?: string;
+  /** Ignore disconnected sheet bleed when measuring and cropping this pose. */
+  dominantComponent?: boolean;
   /** Convert authored blue cloth to the runtime team ramp, with a sash fallback. */
   teamColor?: 'blue' | 'sash';
   /** Add authored-raster motion without falling back to the legacy pixel rig. */
@@ -107,6 +111,8 @@ function walkGridCutouts(
         ...common,
         frames: [`unit/${id}/walk/${dir}/${frame}`],
         cell: cell(frame),
+        scaleGroup: `walk:${source}:${dir}`,
+        dominantComponent: true,
       })),
       ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
         ...common,
@@ -425,6 +431,10 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.92,
       fitHeight: 0.96,
       bottom: 0.97,
+      preserveSourceCenter: true,
+      stableSize: [52, 64],
+      scaleGroup: `walk:villager:${dir}`,
+      dominantComponent: true,
     }))),
   ...([0, 1, 2, 3, 4] as const).flatMap((dir) =>
     [0, 0.42, 1, 0.38].map((progress, frame): CutoutSpec => ({
@@ -473,6 +483,10 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.96,
       fitHeight: 0.96,
       bottom: 0.97,
+      preserveSourceCenter: true,
+      stableSize: [68, 80],
+      scaleGroup: `walk:scout:${dir}`,
+      dominantComponent: true,
     }))),
   ...(['scout', 'lightCavalry'] as const).flatMap((id) =>
     AUTHORED_DIRECTIONS.flatMap((dir) => [
@@ -529,6 +543,9 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       bottom: 0.97,
       stableSize: [68, 80],
       teamColor: 'blue',
+      preserveSourceCenter: true,
+      scaleGroup: `walk:scout:${dir}`,
+      dominantComponent: true,
     }))),
   ...walkGridCutouts(
     'art/hd/frames/units/champion-walk-grid-cutout-v1.png',
@@ -624,6 +641,10 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.94,
       fitHeight: 0.9,
       bottom: 0.94,
+      preserveSourceCenter: true,
+      stableSize: [64, 64],
+      scaleGroup: `walk:sheep:${dir}`,
+      dominantComponent: true,
     }))),
   ...AUTHORED_DIRECTIONS.flatMap((dir) => [
     ...Array.from({ length: 3 }, (_, frame): CutoutSpec => ({
@@ -920,6 +941,66 @@ function alphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
   return { left, top, right, bottom };
 }
 
+/** Bounds of the main connected silhouette inside one animation-sheet cell. */
+function dominantAlphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
+  const width = region.right - region.left + 1;
+  const height = region.bottom - region.top + 1;
+  const seen = new Uint8Array(width * height);
+  let bestSize = 0;
+  let best: AlphaBounds | null = null;
+
+  for (let start = 0; start < seen.length; start++) {
+    if (seen[start]) continue;
+    const startX = start % width;
+    const startY = Math.floor(start / width);
+    if (png.data[((region.top + startY) * png.width + region.left + startX) * 4 + 3] < 8) {
+      seen[start] = 1;
+      continue;
+    }
+    const queue = [start];
+    seen[start] = 1;
+    let size = 0;
+    let left = startX;
+    let right = startX;
+    let top = startY;
+    let bottom = startY;
+    for (let cursor = 0; cursor < queue.length; cursor++) {
+      const index = queue[cursor];
+      const x = index % width;
+      const y = Math.floor(index / width);
+      size++;
+      left = Math.min(left, x);
+      right = Math.max(right, x);
+      top = Math.min(top, y);
+      bottom = Math.max(bottom, y);
+      for (let oy = -1; oy <= 1; oy++) {
+        for (let ox = -1; ox <= 1; ox++) {
+          if (ox === 0 && oy === 0) continue;
+          const nx = x + ox;
+          const ny = y + oy;
+          if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
+          const next = ny * width + nx;
+          if (seen[next]) continue;
+          if (png.data[((region.top + ny) * png.width + region.left + nx) * 4 + 3] < 8) continue;
+          seen[next] = 1;
+          queue.push(next);
+        }
+      }
+    }
+    if (size > bestSize) {
+      bestSize = size;
+      best = {
+        left: region.left + left,
+        right: region.left + right,
+        top: region.top + top,
+        bottom: region.top + bottom,
+      };
+    }
+  }
+  if (!best) throw new Error('generated cutout contains no visible component');
+  return best;
+}
+
 function bilinearPixel(png: PNG, x: number, y: number): readonly [number, number, number, number] {
   const x0 = Math.max(0, Math.min(png.width - 1, Math.floor(x)));
   const y0 = Math.max(0, Math.min(png.height - 1, Math.floor(y)));
@@ -1071,20 +1152,36 @@ function restoreExactTeamMask(raster: Raster): void {
   }
 }
 
-/** Fit an authored transparent render into the exact mechanical frame contract. */
-function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
+interface CutoutMetrics {
+  png: PNG;
+  region: AlphaBounds;
+  bounds: AlphaBounds;
+  sourceWidth: number;
+  sourceHeight: number;
+  width: number;
+  height: number;
+  fittedScale: number;
+  authoredVillager: boolean;
+  authoredScout: boolean;
+}
+
+const cutoutMetricsCache = new WeakMap<CutoutSpec, Map<string, CutoutMetrics>>();
+
+/** Geometry shared by the family-scale pass and final cutout rasterization. */
+function cutoutMetrics(spec: CutoutSpec, name: string, base: FrameDef): CutoutMetrics {
+  const cached = cutoutMetricsCache.get(spec)?.get(name);
+  if (cached) return cached;
   let png = cutoutSourceCache.get(spec.source);
   if (!png) {
     png = PNG.sync.read(readFileSync(join(ROOT, spec.source)));
     cutoutSourceCache.set(spec.source, png);
   }
   const region = cellBounds(png, spec);
-  const bounds = alphaBounds(png, region);
+  const bounds = spec.dominantComponent
+    ? dominantAlphaBounds(png, region)
+    : alphaBounds(png, region);
   const sourceWidth = bounds.right - bounds.left + 1;
   const sourceHeight = bounds.bottom - bounds.top + 1;
-  // Mechanical source animations are aggressively trimmed per pose. Authored
-  // renders need a stable live-unit canvas or carry/gather frames visibly
-  // shrink compared with idle frames.
   const authoredVillager = name.startsWith('unit/villager/');
   const authoredScout = name.startsWith('unit/scout/');
   const authoredTree = name.startsWith('obj/tree/');
@@ -1096,7 +1193,7 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
       : name.includes('/die/') || name.includes('/decay/')
         ? [72, 52]
         : [52, 64]
-    : name.startsWith('unit/scout/')
+    : authoredScout
       ? [68, 80]
       : null);
   const width = stableUnitSize?.[0] ?? (authoredTree ? 144 : base.raster.width * HD_DENSITY);
@@ -1104,8 +1201,31 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
   const fittedScale = Math.min(
     (width * (spec.fitWidth ?? 0.94)) / sourceWidth,
     (height * (spec.fitHeight ?? 0.92)) / sourceHeight,
+    spec.maxScale ?? Number.POSITIVE_INFINITY,
   );
-  const scale = Math.min(fittedScale, spec.maxScale ?? Number.POSITIVE_INFINITY);
+  const metrics = {
+    png, region, bounds, sourceWidth, sourceHeight, width, height, fittedScale,
+    authoredVillager, authoredScout,
+  };
+  let byName = cutoutMetricsCache.get(spec);
+  if (!byName) {
+    byName = new Map();
+    cutoutMetricsCache.set(spec, byName);
+  }
+  byName.set(name, metrics);
+  return metrics;
+}
+
+/** Fit an authored transparent render into the exact mechanical frame contract. */
+function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef, sharedScale?: number): FrameDef {
+  const {
+    png, region, bounds, sourceWidth, sourceHeight, width, height, fittedScale,
+    authoredVillager, authoredScout,
+  } = cutoutMetrics(spec, name, base);
+  // A grouped walk cycle uses its most restrictive pose for every frame. This
+  // preserves authored proportions instead of independently zooming each pose
+  // until it touches the canvas bounds.
+  const scale = sharedScale ?? fittedScale;
   const drawWidth = Math.max(1, Math.round(sourceWidth * scale));
   const drawHeight = Math.max(1, Math.round(sourceHeight * scale));
   const centeredDx = Math.round((width - drawWidth) / 2);
@@ -1119,7 +1239,11 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
     ? [0, -1, -2, -1, 0]
     : motionFrame?.[1] === 'gather'
       ? [0, -2, -1, 1]
-      : [0, -1, -2, -1, 0, 1, 1, 0];
+      // Authored walk sources already contain their gait. A second generated
+      // bob made the grounded anchor jump even after the source pose was stable.
+      : motionFrame?.[1] === 'walk'
+        ? [0]
+        : [0, -1, -2, -1, 0, 1, 1, 0];
   const motionBob = motionFrame ? motionCycle[Number(motionFrame[2]) % motionCycle.length] : 0;
   const bottom = Math.round(height * (spec.bottom ?? 0.95)) + motionBob;
   const dy = bottom - drawHeight;
@@ -1207,7 +1331,7 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef): FrameDef {
     || name.startsWith('obj/deer/')
     || name.startsWith('obj/wolf/');
   const footprintSize = buildingSize ?? farmSize;
-  const anchor = stableUnitSize || groundedObject
+  const anchor = spec.stableSize || authoredVillager || authoredScout || groundedObject
     ? { x: Math.round(width / 2), y: bottom }
     : footprintSize !== undefined
       ? {
@@ -1454,11 +1578,19 @@ const sourceByName = new Map(
   [...terrain, ...objects.frames, ...units.frames, ...buildings.frames, ...ui.frames, ...icons]
     .map((frame) => [frame.name, frame] as const),
 );
-const cutouts = CUTOUT_SPECS.flatMap((spec) => spec.frames.map((name) => {
+const cutoutEntries = CUTOUT_SPECS.flatMap((spec) => spec.frames.map((name) => {
   const base = sourceByName.get(name);
   if (!base) throw new Error(`missing mechanical source frame for cutout ${name}`);
-  return cutoutFrame(spec, name, base);
+  return { spec, name, base };
 }));
+const scaleByGroup = new Map<string, number>();
+for (const { spec, name, base } of cutoutEntries) {
+  if (!spec.scaleGroup) continue;
+  const fitted = cutoutMetrics(spec, name, base).fittedScale;
+  scaleByGroup.set(spec.scaleGroup, Math.min(scaleByGroup.get(spec.scaleGroup) ?? fitted, fitted));
+}
+const cutouts = cutoutEntries.map(({ spec, name, base }) =>
+  cutoutFrame(spec, name, base, spec.scaleGroup ? scaleByGroup.get(spec.scaleGroup) : undefined));
 const doneCutoutByConstructionPrefix = new Map<string, FrameDef>();
 for (const frame of cutouts) {
   if (!frame.name.startsWith('bld/') || !frame.name.endsWith('/done')) continue;

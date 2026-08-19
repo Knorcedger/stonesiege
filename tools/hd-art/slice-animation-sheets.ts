@@ -45,7 +45,10 @@ for (const sheet of SHEETS) {
           out.data[outputIndex + 3] = source.data[sourceIndex + 3];
         }
       }
-      if (sheet.kind !== 'scout') clearMinorAlphaComponents(out);
+      // Generated grids can bleed a sliver of the neighboring pose into a
+      // cell. Those fragments distort alpha bounds and make the real subject
+      // shrink or jump when the atlas fitter processes the next walk frame.
+      clearMinorAlphaComponents(out);
       const outputName = `${sheet.kind}-walk-dir-${dir}-frame-${frame}-cutout-v4.png`;
       writeFileSync(join(unitDir, outputName), PNG.sync.write(out));
     }
