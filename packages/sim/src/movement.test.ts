@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { createGame } from './game';
+import { createGame, createGameFromSnapshot } from './game';
 import { FP, fp } from './types';
 import type { Entity, ScenarioStart } from './types';
 import type { SimState } from './internal';
@@ -226,6 +226,70 @@ describe('movement', () => {
     for (let t = 0; t < 20; t++) game.advance([]);
     expect(unit.tileX).toBe(2);
     expect(unit.tileY).toBe(2);
+  });
+
+  it('drops superseded path searches during repeated command churn', () => {
+    const entities: ScenarioStart['entities'] = [];
+    for (let i = 0; i < 40; i++) {
+      entities.push({
+        defId: 'militia',
+        player: 1,
+        tileX: 4 + (i % 8),
+        tileY: 6 + Math.floor(i / 8),
+      });
+    }
+    const game = createGame(scenarioConfig(11, grassMap(192, 192), entities, [player()]));
+    const ids = entitiesOf(game.state.entities, 1, 'militia').map((unit) => unit.id);
+    const redirected = ids.slice(0, ids.length / 2);
+    const stillOnFirstOrder = ids.slice(ids.length / 2);
+
+    game.advance([{
+      kind: 'move', player: 1, units: ids,
+      x: fp(180) + FP / 2, y: fp(180) + FP / 2,
+    }]);
+    const firstGroup = (game.state as SimState).motion.get(stillOnFirstOrder[0])!.groupId;
+    game.advance([{
+      kind: 'move', player: 1, units: redirected,
+      x: fp(180) + FP / 2, y: fp(14) + FP / 2,
+    }]);
+    const secondGroup = (game.state as SimState).motion.get(redirected[0])!.groupId;
+    expect((game.state as SimState).pathSearches.map((search) => search.groupId))
+      .toEqual([firstGroup, secondGroup]);
+    expect((game.state as SimState).pathSearches.map((search) => search.waitingCount))
+      .toEqual([stillOnFirstOrder.length, redirected.length]);
+
+    for (let tick = 0; tick < 14; tick++) {
+      game.advance([{
+        kind: 'move',
+        player: 1,
+        units: redirected,
+        x: fp(180) + FP / 2,
+        y: fp(tick % 2 === 0 ? 180 : 14) + FP / 2,
+      }]);
+    }
+
+    const state = game.state as SimState;
+    const liveGroups = new Set(
+      [...state.motion.values()].map((motion) => motion.groupId).filter((groupId) => groupId >= 0),
+    );
+    expect(state.pathSearches.length).toBeLessThanOrEqual(liveGroups.size);
+    expect(state.pathSearches.reduce((total, search) => total + search.waitingCount, 0))
+      .toBeLessThanOrEqual(ids.length);
+    for (const search of state.pathSearches) {
+      expect(liveGroups.has(search.groupId)).toBe(true);
+      for (const waiting of search.waitingByTile.values()) {
+        for (const id of waiting) expect(state.motion.get(id)?.groupId).toBe(search.groupId);
+      }
+    }
+
+    const resumed = createGameFromSnapshot(game.serialize());
+    expect(resumed.hash()).toBe(game.hash());
+    for (let tick = 0; tick < 100; tick++) {
+      game.advance([]);
+      resumed.advance([]);
+      if (tick % 10 === 0) expect(resumed.hash()).toBe(game.hash());
+    }
+    expect(resumed.serialize()).toEqual(game.serialize());
   });
 });
 
