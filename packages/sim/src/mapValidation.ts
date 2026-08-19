@@ -394,23 +394,31 @@ function analyzeResources(
   const radius2 = profile.resourceRadiusTiles ** 2;
 
   for (const resource of RESOURCE_TYPES) {
-    const nodes: ResourceNode[] = [];
+    const allNodes: ResourceNode[] = [];
     for (const entity of game.state.entities.values()) {
       if (entity.player !== GAIA || entity.stump) continue;
       const unitFood = entity.kind === 'unit' ? gameData.units[entity.defId]?.foodAmount : undefined;
       const resourceType = entity.resourceType ?? (unitFood !== undefined ? 'food' : undefined);
       const amount = entity.amountLeft ?? unitFood ?? 0;
       if (resourceType !== resource || amount <= 0) continue;
-      const dx = entity.tileX - center.x, dy = entity.tileY - center.y;
-      if (dx * dx + dy * dy > radius2) continue;
-      nodes.push({ entity, x: entity.tileX, y: entity.tileY });
+      allNodes.push({ entity, x: entity.tileX, y: entity.tileY });
     }
-    const clusters = resourceClusters(nodes);
+    // Form physical clusters before applying the player's nearby radius. A
+    // forest is progressively harvestable: a villager reaches the exposed
+    // outer tree, then opens the trees behind it. Clipping first can turn one
+    // accessible edge forest into an artificial one-tree "sealed cluster" at
+    // the radius boundary even though that tree belongs to the same woodline.
+    const clusters = resourceClusters(allNodes);
     const report = work.report.resources[resource];
-    report.nearbyClusters = clusters.length;
     for (const cluster of clusters) {
-      const nodeCount = cluster.length;
-      const amount = cluster.reduce((total, node) => total + (
+      const nearby = cluster.filter((node) => {
+        const dx = node.x - center.x, dy = node.y - center.y;
+        return dx * dx + dy * dy <= radius2;
+      });
+      if (nearby.length === 0) continue;
+      report.nearbyClusters++;
+      const nodeCount = nearby.length;
+      const amount = nearby.reduce((total, node) => total + (
         node.entity.amountLeft ?? (node.entity.kind === 'unit'
           ? gameData.units[node.entity.defId]?.foodAmount ?? 0
           : 0)
@@ -422,7 +430,7 @@ function analyzeResources(
         report.reachableNodes += nodeCount;
         report.reachableAmount += amount;
       } else {
-        const first = cluster[0];
+        const first = nearby[0];
         issues.push({
           severity: 'warning', code: 'SEALED_RESOURCE_CLUSTER',
           message: `Player ${work.report.playerId} cannot reach the ${resource} cluster at ${first.x},${first.y}`,

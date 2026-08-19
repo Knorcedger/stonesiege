@@ -51,6 +51,23 @@ describe('map validation reports', () => {
     expect(JSON.stringify(game.serialize())).toBe(before);
   });
 
+  it('keeps forests and river-adjacent mine clusters reachable on reported seeds', () => {
+    for (const testCase of [{ seed: 5, players: 4 }, { seed: 6, players: 2 }]) {
+      const players = Array.from({ length: testCase.players }, (_, index) => player({
+        name: `P${index + 1}`,
+        civ: index % 2 === 0 ? 'scots' : 'english',
+        color: index,
+      }));
+      const game = createGame(practiceConfig(testCase.seed, players, 96));
+
+      const report = validateMap(game);
+      expect(
+        report.issues.filter((issue) => issue.code === 'SEALED_RESOURCE_CLUSTER'),
+        `seed ${testCase.seed}, ${testCase.players} players`,
+      ).toEqual([]);
+    }
+  });
+
   it('reports unsafe starts that are closer than the selected profile permits', () => {
     const game = createGame(scenarioConfig(1, grassMap(48, 48), [
       { defId: 'townCenter', player: 1, tileX: 6, tileY: 18 },

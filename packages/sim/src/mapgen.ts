@@ -83,15 +83,38 @@ function tileFree(state: SimState, x: number, y: number): boolean {
 
 /** Collect `count` free tiles clustered around (cx, cy), spiraling outward. */
 function clusterTiles(state: SimState, cx: number, cy: number, count: number): Array<{ x: number; y: number }> | null {
-  const out: Array<{ x: number; y: number }> = [];
-  for (let r = 0; r <= 3 && out.length < count; r++) {
-    for (let dy = -r; dy <= r && out.length < count; dy++) {
-      for (let dx = -r; dx <= r && out.length < count; dx++) {
+  let start: { x: number; y: number } | null = null;
+  for (let r = 0; r <= 3 && !start; r++) {
+    for (let dy = -r; dy <= r && !start; dy++) {
+      for (let dx = -r; dx <= r && !start; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== r) continue;
         const x = cx + dx, y = cy + dy;
         if (!inBounds(state.map, x, y) || !tileFree(state, x, y)) continue;
-        if (out.some((t) => t.x === x && t.y === y)) continue;
-        out.push({ x, y });
+        start = { x, y };
+      }
+    }
+  }
+  if (!start) return null;
+
+  // Grow only through adjacent free tiles. The old ring collector could skip a
+  // strip of water and put one mine on the far bank while returning it as part
+  // of the same logical cluster; only the reachable half then received a gate.
+  const out: Array<{ x: number; y: number }> = [];
+  const queue = [start];
+  const seen = new Set([`${start.x},${start.y}`]);
+  for (let index = 0; index < queue.length && out.length < count; index++) {
+    const tile = queue[index];
+    out.push(tile);
+    for (let dy = -1; dy <= 1; dy++) {
+      for (let dx = -1; dx <= 1; dx++) {
+        if (dx === 0 && dy === 0) continue;
+        const x = tile.x + dx, y = tile.y + dy;
+        if (Math.max(Math.abs(x - cx), Math.abs(y - cy)) > 3) continue;
+        const key = `${x},${y}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        if (!inBounds(state.map, x, y) || !tileFree(state, x, y)) continue;
+        queue.push({ x, y });
       }
     }
   }
@@ -421,6 +444,9 @@ function floodReach(state: SimState, sx: number, sy: number): Uint8Array {
         if (dx === 0 && dy === 0) continue;
         const x = tx + dx, y = ty + dy;
         if (!isTileWalkable(state, x, y)) continue;
+        if (dx !== 0 && dy !== 0
+          && (!isTileWalkable(state, tx + dx, ty)
+            || !isTileWalkable(state, tx, ty + dy))) continue;
         const nt = y * width + x;
         if (!seen[nt]) { seen[nt] = 1; queue.push(nt); }
       }
@@ -429,45 +455,94 @@ function floodReach(state: SimState, sx: number, sy: number): Uint8Array {
   return seen;
 }
 
-/** Clear trees along a corridor between two points (Bresenham, radius 1). */
-function carveCorridor(state: SimState, x0: number, y0: number, x1: number, y1: number): void {
-  const treesAt = new Map<number, number>(); // tile -> entity id
-  for (const e of state.entities.values()) {
-    if (e.kind === 'resource' && e.defId === 'tree') {
-      treesAt.set(tileIndex(state.map, e.tileX, e.tileY), e.id);
-    }
+/** 8-connected tile clusters for one gaia entity definition. */
+function gaiaDefClusters(
+  state: SimState, defId: string,
+): Array<Array<{ x: number; y: number }>> {
+  const byTile = new Map<string, { x: number; y: number }>();
+  for (const entity of state.entities.values()) {
+    if (entity.player !== 0 || entity.defId !== defId || entity.hp <= 0) continue;
+    byTile.set(`${entity.tileX},${entity.tileY}`, { x: entity.tileX, y: entity.tileY });
   }
-  let x = x0, y = y0;
-  const dx = Math.abs(x1 - x0), dy = Math.abs(y1 - y0);
-  const stepX = x0 < x1 ? 1 : -1, stepY = y0 < y1 ? 1 : -1;
-  let err = dx - dy;
-  for (;;) {
-    for (let oy = -1; oy <= 1; oy++) {
-      for (let ox = -1; ox <= 1; ox++) {
-        const id = treesAt.get(tileIndex(state.map, x + ox, y + oy));
-        if (id !== undefined && inBounds(state.map, x + ox, y + oy)) removeEntity(state, id);
+  const remaining = new Set(byTile.keys());
+  const clusters: Array<Array<{ x: number; y: number }>> = [];
+  while (remaining.size > 0) {
+    const first = remaining.values().next().value as string;
+    const queue = [byTile.get(first)!];
+    const cluster: Array<{ x: number; y: number }> = [];
+    remaining.delete(first);
+    for (let index = 0; index < queue.length; index++) {
+      const tile = queue[index];
+      cluster.push(tile);
+      for (let dy = -1; dy <= 1; dy++) {
+        for (let dx = -1; dx <= 1; dx++) {
+          if (dx === 0 && dy === 0) continue;
+          const key = `${tile.x + dx},${tile.y + dy}`;
+          if (!remaining.delete(key)) continue;
+          queue.push(byTile.get(key)!);
+        }
       }
     }
-    if (x === x1 && y === y1) break;
-    const e2 = 2 * err;
-    if (e2 > -dy) { err -= dy; x += stepX; }
-    if (e2 < dx) { err += dx; y += stepY; }
+    clusters.push(cluster);
   }
+  return clusters;
 }
 
-/** Nearest reached walkable tile to (x, y) — the shortest corridor target. */
-function nearestReachedTile(
-  state: SimState, reach: Uint8Array, x: number, y: number,
-): { x: number; y: number } | null {
-  const { width } = state.map;
-  let best = -1, bestD = Infinity;
-  for (let i = 0; i < reach.length; i++) {
-    if (!reach[i]) continue;
-    const dx = (i % width) - x, dy = ((i / width) | 0) - y;
-    const d = dx * dx + dy * dy;
-    if (d < bestD) { bestD = d; best = i; }
+/**
+ * Find a deterministic 4-way route from an unreached gate to the reached
+ * region through open ground and removable trees, then clear a three-tile
+ * woodland corridor. Permanent blockers (mines, buildings, water, cliffs)
+ * are routed around instead of letting a Bresenham line repeatedly hit them.
+ */
+function carveTreePathToReach(
+  state: SimState, sx: number, sy: number, reach: Uint8Array,
+): boolean {
+  const { map } = state;
+  const treesAt = new Map<number, number>();
+  for (const e of state.entities.values()) {
+    if (e.kind === 'resource' && e.defId === 'tree') {
+      treesAt.set(tileIndex(map, e.tileX, e.tileY), e.id);
+    }
   }
-  return best < 0 ? null : { x: best % width, y: (best / width) | 0 };
+  const start = tileIndex(map, sx, sy);
+  const previous = new Int32Array(map.width * map.height).fill(-1);
+  const queue = [start];
+  previous[start] = start;
+  let target = -1;
+  for (let qi = 0; qi < queue.length && target < 0; qi++) {
+    const tile = queue[qi];
+    const x = tile % map.width, y = (tile / map.width) | 0;
+    for (const [dx, dy] of [[0, -1], [1, 0], [0, 1], [-1, 0]] as const) {
+      const nx = x + dx, ny = y + dy;
+      if (!inBounds(map, nx, ny)) continue;
+      const next = tileIndex(map, nx, ny);
+      if (previous[next] >= 0) continue;
+      if (!reach[next] && !isTileWalkable(state, nx, ny) && !treesAt.has(next)) continue;
+      previous[next] = tile;
+      if (reach[next]) { target = next; break; }
+      queue.push(next);
+    }
+  }
+  if (target < 0) return false;
+
+  const path: number[] = [];
+  for (let tile = target; tile !== start; tile = previous[tile]) path.push(tile);
+  path.push(start);
+  for (const tile of path) {
+    const x = tile % map.width, y = (tile / map.width) | 0;
+    for (let oy = -1; oy <= 1; oy++) {
+      for (let ox = -1; ox <= 1; ox++) {
+        const nx = x + ox, ny = y + oy;
+        if (!inBounds(map, nx, ny)) continue;
+        const treeTile = tileIndex(map, nx, ny);
+        const id = treesAt.get(treeTile);
+        if (id === undefined) continue;
+        removeEntity(state, id);
+        treesAt.delete(treeTile);
+      }
+    }
+  }
+  return true;
 }
 
 /**
@@ -483,8 +558,7 @@ function ensureReachability(state: SimState, gates: Array<{ x: number; y: number
     for (let i = 1; i < gates.length; i++) {
       if (!reach[tileIndex(state.map, gates[i].x, gates[i].y)]) {
         allReached = false;
-        const target = nearestReachedTile(state, reach, gates[i].x, gates[i].y) ?? gates[0];
-        carveCorridor(state, gates[i].x, gates[i].y, target.x, target.y);
+        carveTreePathToReach(state, gates[i].x, gates[i].y, reach);
       }
     }
     if (allReached) return;
@@ -574,6 +648,10 @@ export function generatePracticeMap(state: SimState, rng: SimRng): void {
   addCluster(placeCluster(state, midRng, mx, my, 4, 14, 4, 'goldMine'));
 
   growForests(state, rng.fork(104), anchors);
+  // Forests are resources too. Give every connected woodline at least one
+  // harvest edge connected to the playable region, including edge belts and
+  // blobs that happen to grow inside a narrow river/cliff pocket.
+  for (const forest of gaiaDefClusters(state, 'tree')) addCluster(forest);
 
   // animals AFTER forests (they don't block tiles, so trees must not grow over them)
   for (let p = 1; p <= playerCount; p++) {
@@ -583,10 +661,16 @@ export function generatePracticeMap(state: SimState, rng: SimRng): void {
     placeAnimals(state, ra, a.x, a.y, 11, 16, 3, 'deer'); // scattered deer
     placeAnimals(state, ra, a.x, a.y, 22, 30, 2, 'wolf'); // 2 distant wolves
   }
+  // Huntable/herdable food can spawn inside a forest pocket. Its tile is open,
+  // but the surrounding treeline still needs a route for the player's workers.
+  for (const defId of ['sheep', 'deer']) {
+    for (const herd of gaiaDefClusters(state, defId)) addCluster(herd);
+  }
 
-  // gates: a free tile beside each TC plus one harvest tile per resource cluster
-  // (players' berries/gold/stone AND the mid golds), then guarantee mutual reachability —
-  // forests must never wall off one player's resources while the opponent's stay open
+  // Gates: a free tile beside each TC plus one harvest tile per mine, berry,
+  // forest, sheep, and deer cluster. Guarantee mutual reachability after every
+  // blocker exists so rivers, cliffs, and woodlines stay strategic without
+  // sealing one player's economy while the opponent's remains open.
   const gates: Array<{ x: number; y: number }> = [];
   for (const e of state.entities.values()) {
     if (e.kind === 'building' && e.defId === 'townCenter') {
