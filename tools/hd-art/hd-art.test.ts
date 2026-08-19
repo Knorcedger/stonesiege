@@ -67,6 +67,33 @@ function frameMaskPixelCount(name: string): number {
   return count;
 }
 
+function frameVisibleBounds(name: string): { width: number; height: number; bottom: number } {
+  const match = hdAtlases().find(({ atlas }) => atlas.frames[name]);
+  if (!match) throw new Error(`missing HD frame ${name}`);
+  const frame = match.atlas.frames[name].frame;
+  const image = match.atlas.meta.image as string;
+  let png = pngCache.get(image);
+  if (!png) {
+    png = PNG.sync.read(readFileSync(join(HD, image)));
+    pngCache.set(image, png);
+  }
+  let left = frame.w;
+  let top = frame.h;
+  let right = -1;
+  let bottom = -1;
+  for (let y = 0; y < frame.h; y++) {
+    for (let x = 0; x < frame.w; x++) {
+      if (png.data[((frame.y + y) * png.width + frame.x + x) * 4 + 3] < 8) continue;
+      left = Math.min(left, x);
+      top = Math.min(top, y);
+      right = Math.max(right, x);
+      bottom = Math.max(bottom, y);
+    }
+  }
+  if (right < left || bottom < top) throw new Error(`empty HD frame ${name}`);
+  return { width: right - left + 1, height: bottom - top + 1, bottom };
+}
+
 describe('complete HD art override contract', () => {
   it('covers every shipping frame exactly once at 2x', () => {
     const baseNames = baselineFrameNames();
@@ -188,6 +215,28 @@ describe('complete HD art override contract', () => {
       for (const [sprite, count] of [['unit/villager', 6], ['unit/scout', 8], ['obj/sheep', 4]] as const) {
         const hashes = Array.from({ length: count }, (_, frame) => framePixelsHash(`${sprite}/walk/${dir}/${frame}`));
         expect(new Set(hashes).size, `${sprite} direction ${dir}`).toBe(count);
+      }
+    }
+  });
+
+  it('keeps rear-facing villagers and sheep at the same grounded visual scale', () => {
+    for (const sprite of ['unit/villager', 'obj/sheep'] as const) {
+      const front = frameVisibleBounds(`${sprite}/idle/0/0`);
+      const rear = frameVisibleBounds(`${sprite}/idle/4/0`);
+      expect(rear.height, `${sprite} rear height`).toBeGreaterThanOrEqual(front.height * 0.94);
+      expect(rear.height, `${sprite} rear height`).toBeLessThanOrEqual(front.height * 1.06);
+    }
+  });
+
+  it('shows a distinct, grounded four-frame villager gather cycle', () => {
+    const frames = Object.assign({}, ...hdAtlases().map(({ atlas }) => atlas.frames));
+    for (let dir = 0; dir < 5; dir++) {
+      const names = Array.from({ length: 4 }, (_, frame) => `unit/villager/gather/${dir}/${frame}`);
+      expect(new Set(names.map(framePixelsHash)).size, `gather direction ${dir}`).toBe(4);
+      for (const name of names) {
+        const visible = frameVisibleBounds(name);
+        const anchorY = frames[name].anchor.y * frames[name].frame.h;
+        expect(Math.abs(visible.bottom - anchorY), `${name} feet`).toBeLessThanOrEqual(3);
       }
     }
   });

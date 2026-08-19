@@ -112,6 +112,31 @@ export const COMMAND_HOTKEYS = ['q', 'e', 'r', 't', 'y', 'f', 'g', 'h', 'j', 'k'
 export function commandRepeatCount(shiftKey: boolean, shiftRepeat: number): number {
   return shiftKey ? Math.max(1, shiftRepeat) : 1;
 }
+
+export interface PausePresentationTarget {
+  button: {
+    textContent: string | null;
+    setAttribute(name: string, value: string): void;
+  };
+  overlay: {
+    classList: { toggle(token: string, force?: boolean): boolean };
+    setAttribute(name: string, value: string): void;
+  };
+}
+
+/** Keep the visible pause state synchronous with the action that changed it. */
+export function syncPausePresentation(
+  target: PausePresentationTarget,
+  matchFinished: boolean,
+  paused: boolean,
+): void {
+  target.button.textContent = matchFinished ? 'MENU' : paused ? '▶' : 'II';
+  target.button.setAttribute('aria-label', matchFinished ? 'Return to menu' : paused ? 'Resume game' : 'Pause game');
+  target.button.setAttribute('aria-pressed', String(!matchFinished && paused));
+  target.overlay.classList.toggle('show', paused);
+  target.overlay.setAttribute('aria-hidden', String(!paused));
+}
+
 /**
  * Full production-queue block height (TRAIN_QUEUE_CAP chips wrapped at 5/row),
  * reserved up front for any building that can queue: the card is bottom-anchored,
@@ -416,8 +441,7 @@ export class Hud {
       this.matchFinished = state.finished;
       this.resetResign();
     }
-    this.pauseBtn.textContent = this.matchFinished ? 'MENU' : this.host.isPaused() ? '▶' : 'II';
-    this.pauseOverlay.classList.toggle('show', this.host.isPaused());
+    this.syncPauseUi();
     if (!this.host.isPaused() && this.resignArmed) this.resetResign();
     this.updateQuickNavigation(state);
     this.updateIdleButtons();
@@ -492,9 +516,14 @@ export class Hud {
     this.pauseBtn = document.createElement('button');
     this.pauseBtn.className = 'bf-btn';
     this.pauseBtn.textContent = 'II';
+    this.pauseBtn.setAttribute('aria-label', 'Pause game');
+    this.pauseBtn.setAttribute('aria-pressed', 'false');
     this.pauseBtn.addEventListener('click', () => {
       if (this.matchFinished) this.host.returnToTitle();
-      else this.host.togglePause();
+      else {
+        this.host.togglePause();
+        this.syncPauseUi();
+      }
     });
     bar.appendChild(this.pauseBtn);
     this.stage.appendChild(bar);
@@ -638,6 +667,10 @@ export class Hud {
   private buildPauseOverlay(): void {
     this.pauseOverlay = document.createElement('div');
     this.pauseOverlay.className = 'bf-pause';
+    this.pauseOverlay.setAttribute('role', 'dialog');
+    this.pauseOverlay.setAttribute('aria-modal', 'true');
+    this.pauseOverlay.setAttribute('aria-label', 'Paused game menu');
+    this.pauseOverlay.setAttribute('aria-hidden', 'true');
     const box = document.createElement('div');
     box.className = 'bf-pausebox';
     const h = document.createElement('h2');
@@ -646,7 +679,7 @@ export class Hud {
     btn.className = 'bf-btn';
     btn.style.fontSize = '18px';
     btn.textContent = 'Resume';
-    btn.addEventListener('click', () => this.host.resumeGame());
+    btn.addEventListener('click', () => this.resumeGame());
     // In-match settings (shared builder with the menu screen): volume, camera
     // speed and HP bars were otherwise only reachable by resigning the match.
     // Slider release plays a uiTap so the player HEARS the level they set.
@@ -714,9 +747,22 @@ export class Hud {
     box.append(h, btn, saveSection, this.pauseGroups, settings, this.resignBtn);
     this.pauseOverlay.appendChild(box);
     this.pauseOverlay.addEventListener('click', (e) => {
-      if (e.target === this.pauseOverlay) this.host.resumeGame();
+      if (e.target === this.pauseOverlay) this.resumeGame();
     });
     this.el.appendChild(this.pauseOverlay);
+  }
+
+  private syncPauseUi(): void {
+    syncPausePresentation(
+      { button: this.pauseBtn, overlay: this.pauseOverlay },
+      this.matchFinished,
+      this.host.isPaused(),
+    );
+  }
+
+  private resumeGame(): void {
+    this.host.resumeGame();
+    this.syncPauseUi();
   }
 
   private buildHelpOverlay(): void {

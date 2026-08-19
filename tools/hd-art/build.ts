@@ -51,7 +51,7 @@ interface CutoutSpec {
   teamColor?: 'blue' | 'sash';
   /** Add authored-raster motion without falling back to the legacy pixel rig. */
   pose?: {
-    kind: 'attack' | 'die' | 'stride';
+    kind: 'attack' | 'die' | 'stride' | 'gather';
     progress: number;
     direction: number;
   };
@@ -426,13 +426,15 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitHeight: 0.96,
       bottom: 0.97,
     }))),
-  ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
-    source: `art/hd/frames/units/villager-gather-dir-${dir}-cutout-v3.png`,
-    frames: Array.from({ length: 4 }, (_, frame) => `unit/villager/gather/${dir}/${frame}`),
-    fitWidth: 0.92,
-    fitHeight: 0.96,
-    bottom: 0.97,
-  })),
+  ...([0, 1, 2, 3, 4] as const).flatMap((dir) =>
+    [0, 0.42, 1, 0.38].map((progress, frame): CutoutSpec => ({
+      source: `art/hd/frames/units/villager-gather-dir-${dir}-cutout-v3.png`,
+      frames: [`unit/villager/gather/${dir}/${frame}`],
+      fitWidth: 0.92,
+      fitHeight: 0.96,
+      bottom: 0.97,
+      pose: { kind: 'gather', progress, direction: dir },
+    }))),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/villager-carry-dir-${dir}-cutout-v3.png`,
     frames: Array.from({ length: 6 }, (_, frame) => `unit/villager/carry/${dir}/${frame}`),
@@ -1018,6 +1020,16 @@ function transformCutoutPose(
     offsetX = stride * 1.25;
     offsetY = -Math.abs(stride) * 1.5;
     angle = stride * 0.025;
+  } else if (pose.kind === 'gather') {
+    // Rock the approved worker/tool silhouette around grounded feet. The full
+    // downstroke is intentionally pronounced at game scale, where a static
+    // high-detail pose otherwise reads as an idle villager.
+    const swingSign = pose.direction <= 2 ? -1 : 1;
+    angle = swingSign * pose.progress * 0.085;
+    scaleX = 1 + pose.progress * 0.025;
+    scaleY = 1 - pose.progress * 0.055;
+    offsetX = vx * pose.progress * 2;
+    offsetY = vy * pose.progress - pose.progress * 2.5;
   } else {
     const fallSign = pose.direction <= 2 ? -1 : 1;
     angle = fallSign * pose.progress * Math.PI * 0.4;
