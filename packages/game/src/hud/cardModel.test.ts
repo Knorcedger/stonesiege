@@ -417,6 +417,17 @@ describe('unitVerbButtons', () => {
     expect(buttons.find((b) => b.id === 'garrison')?.tip).toContain('friendly building');
   });
 
+  it('names every unfamiliar command in its tap-accessible help text', () => {
+    const military = unitVerbButtons([ent({ defId: 'militia' })], null);
+    expect(military.find((b) => b.id === 'attackMove')?.tip).toMatch(/^Attack-move\n/);
+    expect(military.find((b) => b.id === 'stop')?.tip).toMatch(/^Stop\n/);
+    expect(military.find((b) => b.id === 'garrison')?.tip).toMatch(/^Garrison\n/);
+
+    const monk = unitVerbButtons([ent({ defId: 'monk' })], null);
+    expect(monk.find((b) => b.id === 'convert')?.tip).toMatch(/^Convert\n/);
+    expect(monk.find((b) => b.id === 'heal')?.tip).toMatch(/^Heal\n/);
+  });
+
   it('monks add convert + heal', () => {
     const ids = unitVerbButtons([ent({ defId: 'monk' })], null).map((b) => b.id);
     expect(ids).toContain('convert');

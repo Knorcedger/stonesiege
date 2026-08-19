@@ -15,6 +15,7 @@ import {
 } from './input';
 import { tileToWorld } from './camera';
 import type { Command, GameState } from '@bf/sim/types';
+import type { ArmedVerb } from './hud/cardModel';
 
 const HUMAN = 1 as PlayerId;
 const ENEMY = 2 as PlayerId;
@@ -73,36 +74,55 @@ describe('resolveTapAction — units selected', () => {
 });
 
 describe('InputController touch command dispatch', () => {
-  function touchController(selection: Entity[], initialVerb: 'rally' | null) {
+  function controllerHarness(
+    selection: Entity[],
+    initialVerb: ArmedVerb | null,
+    picks: Entity[] = [],
+  ) {
     const issued: Command[] = [];
-    let armedVerb: 'rally' | null = initialVerb;
+    const selectionChanges: EntityId[][] = [];
+    const toasts: string[] = [];
+    let deselects = 0;
+    let armedVerb: ArmedVerb | null = initialVerb;
     const host = {
       humanPlayer: HUMAN,
       camera: {
         zoom: 1,
         screenToWorld: () => tileToWorld(20, 20),
       },
-      world: { pickAt: () => [] },
+      world: { pickAt: () => picks.map((entity) => ({ entity })) },
       getState: () => ({ map: { width: 64, height: 64 } }) as GameState,
       getSelection: () => selection,
-      setSelection: () => {},
-      deselect: () => {},
+      setSelection: (ids: EntityId[]) => selectionChanges.push(ids),
+      deselect: () => { deselects += 1; },
       issue: (cmd: Command) => issued.push(cmd),
       issueWithUndo: (cmd: Command) => issued.push(cmd),
       isPlacing: () => false,
       getArmedVerb: () => armedVerb,
       clearArmedVerb: () => { armedVerb = null; },
       getFormation: () => 'line',
+      showToast: (message: string) => toasts.push(message),
     };
     const controller = Object.create(InputController.prototype) as InputController;
     Object.assign(controller, { host, el: { style: {} } });
     const tap = () => (controller as unknown as { handleTap(x: number, y: number): void }).handleTap(20, 20);
-    return { issued, tap, armedVerb: () => armedVerb };
+    const desktopTap = () => (controller as unknown as {
+      handleDesktopPrimaryTap(x: number, y: number): void;
+    }).handleDesktopPrimaryTap(20, 20);
+    return {
+      issued,
+      tap,
+      desktopTap,
+      armedVerb: () => armedVerb,
+      deselects: () => deselects,
+      selectionChanges,
+      toasts,
+    };
   }
 
   it('consumes an armed Rally tap and sets the selected production building rally', () => {
     const barracks = ent({ kind: 'building', defId: 'barracks', player: HUMAN, x: 10, y: 10 });
-    const { issued, tap, armedVerb } = touchController([barracks], 'rally');
+    const { issued, tap, armedVerb } = controllerHarness([barracks], 'rally');
 
     tap();
 
@@ -113,12 +133,90 @@ describe('InputController touch command dispatch', () => {
 
   it('moves a selected villager on an unarmed ground tap without deselecting it', () => {
     const villager = ent({ defId: 'villager', player: HUMAN });
-    const { issued, tap } = touchController([villager], null);
+    const { issued, tap, deselects, selectionChanges } = controllerHarness([villager], null);
 
     tap();
 
     expect(issued).toHaveLength(1);
     expect(issued[0]).toMatchObject({ kind: 'move', units: [villager.id] });
+    expect(deselects()).toBe(0);
+    expect(selectionChanges).toEqual([]);
+  });
+
+  it('orders a selected villager toward a completed building without replacing the selection', () => {
+    const villager = ent({ defId: 'villager', player: HUMAN });
+    const house = ent({
+      kind: 'building', defId: 'house', player: HUMAN,
+      hp: 750, maxHp: 750, buildProgress: 1000,
+    });
+    const { issued, tap, deselects, selectionChanges } = controllerHarness([villager], null, [house]);
+
+    tap();
+
+    expect(issued).toHaveLength(1);
+    expect(issued[0]).toMatchObject({ kind: 'move', units: [villager.id] });
+    expect(deselects()).toBe(0);
+    expect(selectionChanges).toEqual([]);
+  });
+
+  it('deselects an unarmed production building on ground without changing its rally', () => {
+    const barracks = ent({ kind: 'building', defId: 'barracks', player: HUMAN });
+    const { issued, tap, deselects, armedVerb } = controllerHarness([barracks], null);
+
+    tap();
+
+    expect(issued).toEqual([]);
+    expect(deselects()).toBe(1);
+    expect(armedVerb()).toBeNull();
+  });
+
+  it.each([
+    {
+      verb: 'attackMove' as const,
+      selection: () => [ent({ defId: 'militia', player: HUMAN })],
+      picks: () => [],
+      expected: 'attackMove' as const,
+    },
+    {
+      verb: 'garrison' as const,
+      selection: () => [ent({ defId: 'militia', player: HUMAN })],
+      picks: () => [ent({
+        kind: 'building', defId: 'townCenter', player: HUMAN,
+        hp: 2400, maxHp: 2400, buildProgress: 1000,
+      })],
+      expected: 'garrison' as const,
+    },
+    {
+      verb: 'convert' as const,
+      selection: () => [ent({ defId: 'monk', player: HUMAN })],
+      picks: () => [ent({ defId: 'militia', player: ENEMY })],
+      expected: 'convert' as const,
+    },
+    {
+      verb: 'heal' as const,
+      selection: () => [ent({ defId: 'monk', player: HUMAN })],
+      picks: () => [ent({ defId: 'militia', player: HUMAN, hp: 12, maxHp: 40 })],
+      expected: 'heal' as const,
+    },
+  ])('consumes an armed $verb touch tap and issues $expected', ({ verb, selection, picks, expected }) => {
+    const { issued, tap, armedVerb } = controllerHarness(selection(), verb, picks());
+
+    tap();
+
+    expect(issued).toHaveLength(1);
+    expect(issued[0].kind).toBe(expected);
+    expect(armedVerb()).toBeNull();
+  });
+
+  it('honors an armed Rally on mouse primary click as well as touch', () => {
+    const barracks = ent({ kind: 'building', defId: 'barracks', player: HUMAN });
+    const { issued, desktopTap, armedVerb } = controllerHarness([barracks], 'rally');
+
+    desktopTap();
+
+    expect(issued).toHaveLength(1);
+    expect(issued[0]).toMatchObject({ kind: 'setRally', buildingId: barracks.id });
+    expect(armedVerb()).toBeNull();
   });
 });
 

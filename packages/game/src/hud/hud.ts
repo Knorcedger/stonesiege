@@ -124,6 +124,25 @@ export interface PausePresentationTarget {
   };
 }
 
+export interface PauseControlHost {
+  togglePause(): void;
+  returnToTitle(): void;
+}
+
+/** Pause button intent stays testable independently of the DOM event binding. */
+export function activatePauseControl(host: PauseControlHost, matchFinished: boolean): void {
+  if (matchFinished) host.returnToTitle();
+  else host.togglePause();
+}
+
+export type ResignControlAction = 'arm' | 'resign' | 'returnToTitle';
+
+/** A destructive resign always requires a second activation; finished matches exit directly. */
+export function resignControlAction(matchFinished: boolean, armed: boolean): ResignControlAction {
+  if (matchFinished) return 'returnToTitle';
+  return armed ? 'resign' : 'arm';
+}
+
 /** Keep the visible pause state synchronous with the action that changed it. */
 export function syncPausePresentation(
   target: PausePresentationTarget,
@@ -305,6 +324,36 @@ function costText(cost: Partial<Record<ResourceType, number>>): string {
 
 function formatStat(value: number): string {
   return Number.isInteger(value) ? String(value) : value.toFixed(2).replace(/0+$/, '').replace(/\.$/, '');
+}
+
+export interface UnitStatRow {
+  label: string;
+  value: string;
+  explanation: string;
+}
+
+/** Player-facing unit statistics use full names and define unfamiliar RTS terms. */
+export function unitStatRows(stats: UnitDisplayStats): UnitStatRow[] {
+  return [
+    { label: 'Attack', value: formatStat(stats.attack), explanation: 'Damage dealt by each hit before armor and bonuses.' },
+    {
+      label: 'Armor',
+      value: `${formatStat(stats.meleeArmor)}/${formatStat(stats.pierceArmor)}`,
+      explanation: 'Melee armor / pierce armor. Each number reduces that damage type per hit.',
+    },
+    { label: 'Range', value: formatStat(stats.range), explanation: 'Maximum attack distance, measured in tiles.' },
+    { label: 'Speed', value: formatStat(stats.speed), explanation: 'Movement speed, measured in tiles per second.' },
+    {
+      label: 'Line of Sight',
+      value: formatStat(stats.los),
+      explanation: 'How far this unit can see through fog, measured in tiles.',
+    },
+    {
+      label: 'Rate of Fire',
+      value: `${formatStat(stats.rofSeconds)}s`,
+      explanation: 'Seconds between attacks. Lower is faster.',
+    },
+  ];
 }
 
 export class Hud {
@@ -519,11 +568,8 @@ export class Hud {
     this.pauseBtn.setAttribute('aria-label', 'Pause game');
     this.pauseBtn.setAttribute('aria-pressed', 'false');
     this.pauseBtn.addEventListener('click', () => {
-      if (this.matchFinished) this.host.returnToTitle();
-      else {
-        this.host.togglePause();
-        this.syncPauseUi();
-      }
+      activatePauseControl(this.host, this.matchFinished);
+      if (!this.matchFinished) this.syncPauseUi();
     });
     bar.appendChild(this.pauseBtn);
     this.stage.appendChild(bar);
@@ -730,19 +776,21 @@ export class Hud {
     this.resignBtn.style.cssText = 'font-size:16px;color:#DABE8D;';
     this.resignBtn.textContent = 'Resign';
     this.resignBtn.addEventListener('click', () => {
-      if (this.matchFinished) {
-        // post-match spectating: the sim would drop a resign — leave instead
-        this.host.returnToTitle();
-        return;
+      switch (resignControlAction(this.matchFinished, this.resignArmed)) {
+        case 'returnToTitle':
+          // post-match spectating: the sim would drop a resign — leave instead
+          this.host.returnToTitle();
+          return;
+        case 'arm':
+          this.resignArmed = true;
+          this.resignBtn.textContent = 'Tap again to resign';
+          this.resignBtn.style.color = '#C05B4E';
+          return;
+        case 'resign':
+          this.resetResign();
+          this.host.resign();
+          return;
       }
-      if (!this.resignArmed) {
-        this.resignArmed = true;
-        this.resignBtn.textContent = 'Tap again to resign';
-        this.resignBtn.style.color = '#C05B4E';
-        return;
-      }
-      this.resetResign();
-      this.host.resign();
     });
     box.append(h, btn, saveSection, this.pauseGroups, settings, this.resignBtn);
     this.pauseOverlay.appendChild(box);
@@ -1023,22 +1071,11 @@ export class Hud {
     } else if (first.kind === 'unit') {
       const stats = this.host.getUnitStats(first.player, first.defId);
       if (stats) {
-        const values: Array<[label: string, value: string, explanation: string]> = [
-          ['Attack', formatStat(stats.attack), 'Damage dealt by each hit before armor and bonuses.'],
-          [
-            'Armor',
-            `${formatStat(stats.meleeArmor)}/${formatStat(stats.pierceArmor)}`,
-            'Melee armor / pierce armor. Each number reduces that damage type per hit.',
-          ],
-          ['Range', formatStat(stats.range), 'Maximum attack distance, measured in tiles.'],
-          ['Speed', formatStat(stats.speed), 'Movement speed, measured in tiles per second.'],
-          ['Line of Sight', formatStat(stats.los), 'How far this unit can see through fog, measured in tiles.'],
-          ['Rate of Fire', `${formatStat(stats.rofSeconds)}s`, 'Seconds between attacks. Lower is faster.'],
-        ];
-        const key = values.flatMap(([label, value]) => [label, value]).join('|');
+        const values = unitStatRows(stats);
+        const key = values.flatMap(({ label, value }) => [label, value]).join('|');
         if (this.selStats.dataset.key !== key) {
           this.selStats.dataset.key = key;
-          this.selStats.replaceChildren(...values.map(([label, value, explanation]) => {
+          this.selStats.replaceChildren(...values.map(({ label, value, explanation }) => {
             const item = document.createElement('span');
             item.className = 'bf-selstat';
             item.tabIndex = 0;
