@@ -30,7 +30,7 @@ const OVERLAY_CSS = `
 .bf-end { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
   background:rgba(10,8,5,0.82); pointer-events:auto; z-index:50; font-family:"Pixelify Sans",monospace; }
 .bf-end.show { display:flex; }
-.bf-end-panel { width:min(520px, 88vw); max-height:92vh; overflow-y:auto; padding:24px 26px 20px;
+.bf-end-panel { width:min(520px, 88%); max-height:92%; overflow-y:auto; padding:24px 26px 20px;
   box-sizing:border-box; text-align:center; color:#EFDDB5;
   background:linear-gradient(#3a2a18,#2C1F12); border:2px solid #1A1208; border-radius:6px;
   box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.65); }

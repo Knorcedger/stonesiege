@@ -5,10 +5,13 @@ native application id is the permanent `com.stonesiege.app`. Forks and redistrib
 choose a distinct id in `capacitor.config.ts`, Android Gradle, and the Xcode target, as well as a
 distinct name and icon under `TRADEMARK.md`.
 
-The wrappers are landscape-only and edge-to-edge. CSS safe-area insets protect the HUD around
-notches, native pause/background events snapshot the current match, and Android Back opens the
-in-game pause state instead of discarding a match. Fonts, game art, sounds, icons, and splash
-screens are bundled, so gameplay does not depend on a network connection.
+The wrappers are landscape-only and edge-to-edge. The battlefield canvas remains full-bleed, while
+one unscaled DOM container applies the four CSS safe-area insets to the HUD and all in-match
+overlays. Keeping that boundary outside the adjustable HUD stage prevents HUD scaling from also
+scaling notch or system-gesture clearance. Native pause/background events snapshot the current
+match, and Android Back opens the in-game pause state instead of discarding a match. Fonts, game
+art, sounds, icons, and splash screens are bundled, so gameplay does not depend on a network
+connection.
 
 ## Rebuild and synchronize
 

@@ -6,6 +6,7 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Changed
 
+- Kept the in-match HUD and overlays inside device safe areas without shrinking the battlefield.
 - Refreshed public project, contribution, release-status, and roadmap documentation.
 - Added automated Developer Certificate of Origin checks for pull requests.
 - Added a lightweight sparse-checkout path for web contributors.

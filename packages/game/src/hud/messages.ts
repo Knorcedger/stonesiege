@@ -57,7 +57,7 @@ const MSG_CSS = `
 /* Sits below the responsive resource bar; tap-to-dismiss stays limited to the
    banner's own rect. */
 .bf-msgbanner { position:absolute; left:50%; top:${belowTopBarPx(false)}px; transform:translateX(-50%);
-  width:min(560px, 92vw); padding:9px 14px 10px; z-index:28; cursor:pointer; display:none;
+  width:min(560px, 92%); padding:9px 14px 10px; z-index:28; cursor:pointer; display:none;
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
   border:1px solid #64492B; border-radius:5px; box-shadow:0 0 0 1px #1A1208, 0 4px 16px rgba(0,0,0,0.5);
   font-family:"Pixelify Sans",monospace; pointer-events:auto; }
