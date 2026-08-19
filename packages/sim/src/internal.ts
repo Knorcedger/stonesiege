@@ -62,6 +62,8 @@ export interface GatherInfo {
   depositing: boolean;
   /** Chosen drop-off building; revalidated every tick. */
   dropoffId?: EntityId;
+  /** Drop-offs proven unreachable for the current carried load, in failure order. */
+  failedDropoffIds?: EntityId[];
   /** Hunters: next tick this villager may strike a live animal. */
   nextAttackTick: number;
   /** Task + last known target tile (auto-continue retargets near the depleted node). */

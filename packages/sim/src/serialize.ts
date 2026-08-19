@@ -170,6 +170,7 @@ const gatherPairs = (m: ReadonlyMap<number, GatherInfo>): Array<[number, GatherI
     retries: g.retries,
     depositing: g.depositing,
     ...(g.dropoffId !== undefined ? { dropoffId: g.dropoffId } : {}),
+    ...(g.failedDropoffIds !== undefined ? { failedDropoffIds: [...g.failedDropoffIds] } : {}),
     nextAttackTick: g.nextAttackTick,
     task: g.task,
     lastX: g.lastX,

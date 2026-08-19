@@ -146,12 +146,15 @@ export function depleteResource(state: SimState, e: Entity, events: SimEvent[]):
   removeEntity(state, e.id);
 }
 
-/** Nearest own completed drop-off accepting `type` (TC + the matching camp/mill). */
-function nearestDropoff(state: SimState, e: Entity, type: ResourceType): Entity | null {
+/** Nearest own completed, not-yet-failed drop-off accepting `type`. */
+function nearestDropoff(
+  state: SimState, e: Entity, type: ResourceType, excluded: readonly EntityId[] = [],
+): Entity | null {
   let best: Entity | null = null;
   let bestD = Infinity;
   for (const b of state.entities.values()) {
     if (b.kind !== 'building' || b.player !== e.player || b.hp <= 0) continue;
+    if (excluded.includes(b.id)) continue;
     if ((b.buildProgress ?? 1000) < 1000) continue;
     const def = gameData.buildings[b.defId];
     if (!def?.dropOffFor?.includes(type)) continue;
@@ -228,6 +231,9 @@ function release(state: SimState, e: Entity): void {
 
 function startDeposit(state: SimState, e: Entity, info: GatherInfo): void {
   if (!e.carrying || e.carrying.amount <= 0) return;
+  // A fresh carried load gets a fresh set of routing candidates. Failed choices
+  // are remembered only while finding a bank for this load.
+  info.failedDropoffIds = undefined;
   const drop = nearestDropoff(state, e, e.carrying.type);
   if (!drop) { release(state, e); return; } // nowhere to bank it: hold the load, idle
   info.depositing = true;
@@ -268,7 +274,7 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
   const valid = drop && def && drop.kind === 'building' && drop.player === e.player &&
     drop.hp > 0 && (drop.buildProgress ?? 1000) >= 1000 && def.dropOffFor?.includes(e.carrying.type);
   if (!valid) {
-    const next = nearestDropoff(state, e, e.carrying.type);
+    const next = nearestDropoff(state, e, e.carrying.type, info.failedDropoffIds);
     if (!next) { release(state, e); return; }
     info.dropoffId = next.id;
     info.retries = 0;
@@ -287,6 +293,7 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
     e.carrying = undefined;
     info.depositing = false;
     info.dropoffId = undefined;
+    info.failedDropoffIds = undefined;
     info.retries = 0;
     if (info.finishAfterDeposit) { release(state, e); return; }
     // head back to the node (revalidated — retarget path runs if it died meanwhile)
@@ -302,7 +309,19 @@ function stepDeposit(state: SimState, e: Entity, info: GatherInfo, events: SimEv
     return;
   }
   if (!state.motion.has(e.id)) {
-    if (info.retries >= STATIC_RETRIES) { release(state, e); return; }
+    if (info.retries >= STATIC_RETRIES) {
+      const failed = info.failedDropoffIds ?? [];
+      if (!failed.includes(drop.id)) failed.push(drop.id);
+      info.failedDropoffIds = failed;
+      const next = nearestDropoff(state, e, e.carrying.type, failed);
+      if (!next) { release(state, e); return; }
+      info.dropoffId = next.id;
+      info.retries = 0;
+      const nextSize = gameData.buildings[next.defId]?.size ?? 1;
+      orderMoveToFootprint(state, [e.id], next.tileX, next.tileY, nextSize);
+      e.activity = 'carrying';
+      return;
+    }
     info.retries++;
     orderMoveToFootprint(state, [e.id], drop.tileX, drop.tileY, size);
   }
