@@ -10,10 +10,11 @@ import { GAIA, type Entity, type EntityId, type PlayerId } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import {
   edgePanVector, enemyContextTarget, isContextAttackTarget, isVillagerGatherTarget, isVillagerGatherTargetAt, keyboardPanVector,
-  resolveDesktopPrimaryAction, resolveTapAction,
+  InputController, resolveDesktopPrimaryAction, resolveTapAction,
   type TapSelection,
 } from './input';
 import { tileToWorld } from './camera';
+import type { Command, GameState } from '@bf/sim/types';
 
 const HUMAN = 1 as PlayerId;
 const ENEMY = 2 as PlayerId;
@@ -68,6 +69,56 @@ describe('resolveTapAction — units selected', () => {
   it('own buildings do not preempt the context command when units are selected (rally/repair)', () => {
     const bld = ent({ kind: 'building', defId: 'townCenter', player: HUMAN });
     expect(resolveTapAction([bld], UNIT_SEL, HUMAN)).toEqual({ type: 'command' });
+  });
+});
+
+describe('InputController touch command dispatch', () => {
+  function touchController(selection: Entity[], initialVerb: 'rally' | null) {
+    const issued: Command[] = [];
+    let armedVerb: 'rally' | null = initialVerb;
+    const host = {
+      humanPlayer: HUMAN,
+      camera: {
+        zoom: 1,
+        screenToWorld: () => tileToWorld(20, 20),
+      },
+      world: { pickAt: () => [] },
+      getState: () => ({ map: { width: 64, height: 64 } }) as GameState,
+      getSelection: () => selection,
+      setSelection: () => {},
+      deselect: () => {},
+      issue: (cmd: Command) => issued.push(cmd),
+      issueWithUndo: (cmd: Command) => issued.push(cmd),
+      isPlacing: () => false,
+      getArmedVerb: () => armedVerb,
+      clearArmedVerb: () => { armedVerb = null; },
+      getFormation: () => 'line',
+    };
+    const controller = Object.create(InputController.prototype) as InputController;
+    Object.assign(controller, { host, el: { style: {} } });
+    const tap = () => (controller as unknown as { handleTap(x: number, y: number): void }).handleTap(20, 20);
+    return { issued, tap, armedVerb: () => armedVerb };
+  }
+
+  it('consumes an armed Rally tap and sets the selected production building rally', () => {
+    const barracks = ent({ kind: 'building', defId: 'barracks', player: HUMAN, x: 10, y: 10 });
+    const { issued, tap, armedVerb } = touchController([barracks], 'rally');
+
+    tap();
+
+    expect(issued).toHaveLength(1);
+    expect(issued[0]).toMatchObject({ kind: 'setRally', buildingId: barracks.id });
+    expect(armedVerb()).toBeNull();
+  });
+
+  it('moves a selected villager on an unarmed ground tap without deselecting it', () => {
+    const villager = ent({ defId: 'villager', player: HUMAN });
+    const { issued, tap } = touchController([villager], null);
+
+    tap();
+
+    expect(issued).toHaveLength(1);
+    expect(issued[0]).toMatchObject({ kind: 'move', units: [villager.id] });
   });
 });
 
