@@ -53,5 +53,7 @@ body:
       options:
         - label: I searched existing issues and the roadmap.
           required: true
+        - label: I searched active pull requests and checked that no contributor is already implementing this proposal.
+          required: true
         - label: This proposal respects the free single-player and fair-monetization principles, or clearly explains why they should change.
           required: true

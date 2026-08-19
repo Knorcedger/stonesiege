@@ -5,9 +5,34 @@ Thank you for helping build StoneSiege. Traditional coding, visual tools, and AI
 ## Before you start
 
 1. Read the [Code of Conduct](CODE_OF_CONDUCT.md), [architecture guide](docs/ARCHITECTURE.md), and the relevant design document.
-2. Search existing issues and pull requests.
-3. Open an issue before a large feature, balance overhaul, new dependency, public API change, or architectural rewrite. Small fixes can go straight to a pull request.
-4. Keep a change focused. Separate unrelated fixes.
+2. Follow the issue-first coordination workflow below.
+3. Keep a change focused. Separate unrelated fixes.
+
+## Coordinate through an issue before implementation
+
+Every code, test, campaign, map, balance, art, audio, build, or documentation contribution must
+have one GitHub issue before files are changed. This includes small fixes. Read-only investigation
+needed to reproduce, search, or describe a problem is fine before the issue exists.
+
+1. Search [open and closed issues](https://github.com/Knorcedger/stonesiege/issues) using the
+   feature, system, error, and player-facing terms—not only your proposed solution.
+2. Search [active pull requests](https://github.com/Knorcedger/stonesiege/pulls) for overlapping
+   implementation.
+3. When a matching issue exists, inspect its assignees, recent comments, and linked pull requests.
+   If someone is actively working on it, coordinate in the issue and do not start a parallel
+   implementation. If it is available, comment with your intended scope and ask to be assigned or
+   assign yourself when permitted. Ask before taking over work that might merely be paused.
+4. When no matching issue exists, create a focused bug report or feature request. Explain the
+   player or contributor problem, proposed scope, acceptance criteria, dependencies, and important
+   tradeoffs. Do not create a duplicate issue merely to satisfy the process.
+5. Record the issue number and create an issue branch, for example
+   `your-name/123-short-description`.
+6. Put `Closes #123` in the pull-request description. Use `Refs #123` only when the PR deliberately
+   delivers part of a larger accepted issue and should not close it.
+
+A free GitHub account is therefore required before implementation begins. If you cannot create or
+comment on the coordination issue, prepare a read-only problem report and ask for help rather than
+starting untracked work.
 
 Good first contributions include tests, accessibility fixes, mobile UX polish, documentation, small deterministic simulation bugs, and clearly scoped scenario improvements.
 
