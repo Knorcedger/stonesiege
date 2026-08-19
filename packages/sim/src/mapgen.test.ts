@@ -28,6 +28,8 @@ function floodFrom(game: Game, from: { x: number; y: number }): Uint8Array {
         const x = tx + dx, y = ty + dy;
         if (x < 0 || y < 0 || x >= width || y >= height) continue;
         if (!game.isWalkable(x, y)) continue;
+        if (dx !== 0 && dy !== 0
+          && (!game.isWalkable(tx + dx, ty) || !game.isWalkable(tx, ty + dy))) continue;
         const nt = y * width + x;
         if (!seen[nt]) { seen[nt] = 1; queue.push(nt); }
       }
