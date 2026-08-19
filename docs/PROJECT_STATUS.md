@@ -1,6 +1,6 @@
 # StoneSiege project status
 
-_Last updated: 2026-08-18_
+_Last updated: 2026-08-19_
 
 StoneSiege is a playable single-player RTS in **alpha**. The public browser build and internal Android and iOS builds share one offline game bundle and the same deterministic simulation.
 
@@ -34,7 +34,7 @@ See the [campaign and chapter index](CAMPAIGN_INDEX.md) for every selectable cha
 
 - Strict TypeScript typecheck passes
 - Production Vite build passes
-- 750 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
+- 758 deterministic unit, integration, scenario, and performance checks pass in the default suite; 11 optional heavy-sweep tests remain skipped by default
 - The simulation uses a fixed 20 Hz timestep, integer state, seeded randomness, and stable command processing
 - Headless bot games, campaign loading, asset contracts, and determinism checks are part of the normal test suite
 - Pull requests must pass typecheck, tests, production build, review, and DCO sign-off checks before merge

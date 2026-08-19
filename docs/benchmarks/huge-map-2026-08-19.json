@@ -1,0 +1,219 @@
+{
+  "schemaVersion": 1,
+  "generatedAt": "2026-08-19T16:09:08.386Z",
+  "environment": {
+    "node": "v26.6.0",
+    "platform": "darwin",
+    "release": "24.6.0",
+    "arch": "arm64",
+    "cpuModel": "Apple M4",
+    "logicalCpuCount": 10,
+    "totalMemoryBytes": 25769803776,
+    "gcExposed": true
+  },
+  "config": {
+    "mapSize": 192,
+    "entityCounts": [
+      600,
+      800,
+      1000,
+      1500
+    ],
+    "ticksPerCase": 400,
+    "seed": 16019
+  },
+  "cases": [
+    {
+      "entityCount": 600,
+      "mapSize": 192,
+      "ticks": 400,
+      "seed": 16019,
+      "initialHash": 2005385721,
+      "finalHash": 2434988664,
+      "restoredHash": 2434988664,
+      "timingsMs": {
+        "create": 2.974,
+        "averageTickCpu": 2.676,
+        "averageTickWall": 1.82,
+        "p50TickWall": 1.729,
+        "p95TickWall": 3.177,
+        "maxTickWall": 7.637,
+        "serialize": 1162.567,
+        "stringify": 0.438,
+        "restore": 633.941
+      },
+      "memoryBytes": {
+        "heapBefore": 22985704,
+        "heapAfterCreate": 23990776,
+        "peakHeap": 56451840,
+        "peakRss": 572719104,
+        "heapDelta": 33466136,
+        "visibilityBuffers": 221184
+      },
+      "pathfinding": {
+        "maxActiveSearches": 738,
+        "maxQueuedAssignments": 738,
+        "maxUniqueWaitingUnits": 557,
+        "ticksWithPendingSearches": 322,
+        "drainedAtTick": 5,
+        "activeSearchesAtEnd": 732,
+        "queuedAssignmentsAtEnd": 732
+      },
+      "outcome": {
+        "liveEntities": 583,
+        "survivingAttackers": 408,
+        "survivingDefenders": 165,
+        "attackersAcrossRidge": 0,
+        "defendersAcrossRidge": 0,
+        "unitsMovedAtLeastTwoTiles": 583,
+        "peakProjectiles": 29
+      },
+      "snapshotBytes": 386229,
+      "snapshotRestored": true
+    },
+    {
+      "entityCount": 800,
+      "mapSize": 192,
+      "ticks": 400,
+      "seed": 16019,
+      "initialHash": 1624319261,
+      "finalHash": 3435425297,
+      "restoredHash": 3435425297,
+      "timingsMs": {
+        "create": 2.525,
+        "averageTickCpu": 2.583,
+        "averageTickWall": 2.087,
+        "p50TickWall": 2.086,
+        "p95TickWall": 3.079,
+        "maxTickWall": 7.152,
+        "serialize": 1971.192,
+        "stringify": 0.509,
+        "restore": 828.277
+      },
+      "memoryBytes": {
+        "heapBefore": 21860976,
+        "heapAfterCreate": 22871280,
+        "peakHeap": 55695728,
+        "peakRss": 879755264,
+        "heapDelta": 33834752,
+        "visibilityBuffers": 221184
+      },
+      "pathfinding": {
+        "maxActiveSearches": 1220,
+        "maxQueuedAssignments": 1220,
+        "maxUniqueWaitingUnits": 749,
+        "ticksWithPendingSearches": 324,
+        "drainedAtTick": 5,
+        "activeSearchesAtEnd": 1220,
+        "queuedAssignmentsAtEnd": 1220
+      },
+      "outcome": {
+        "liveEntities": 778,
+        "survivingAttackers": 543,
+        "survivingDefenders": 221,
+        "attackersAcrossRidge": 0,
+        "defendersAcrossRidge": 0,
+        "unitsMovedAtLeastTwoTiles": 778,
+        "peakProjectiles": 36
+      },
+      "snapshotBytes": 583121,
+      "snapshotRestored": true
+    },
+    {
+      "entityCount": 1000,
+      "mapSize": 192,
+      "ticks": 400,
+      "seed": 16019,
+      "initialHash": 2822078617,
+      "finalHash": 3017356687,
+      "restoredHash": 3017356687,
+      "timingsMs": {
+        "create": 2.297,
+        "averageTickCpu": 3.259,
+        "averageTickWall": 2.669,
+        "p50TickWall": 2.658,
+        "p95TickWall": 4.043,
+        "maxTickWall": 8.699,
+        "serialize": 2667.347,
+        "stringify": 0.67,
+        "restore": 1140.064
+      },
+      "memoryBytes": {
+        "heapBefore": 21848688,
+        "heapAfterCreate": 23235288,
+        "peakHeap": 56556616,
+        "peakRss": 1094221824,
+        "heapDelta": 34707928,
+        "visibilityBuffers": 221184
+      },
+      "pathfinding": {
+        "maxActiveSearches": 1588,
+        "maxQueuedAssignments": 1588,
+        "maxUniqueWaitingUnits": 944,
+        "ticksWithPendingSearches": 328,
+        "drainedAtTick": 5,
+        "activeSearchesAtEnd": 1588,
+        "queuedAssignmentsAtEnd": 1588
+      },
+      "outcome": {
+        "liveEntities": 974,
+        "survivingAttackers": 682,
+        "survivingDefenders": 277,
+        "attackersAcrossRidge": 0,
+        "defendersAcrossRidge": 0,
+        "unitsMovedAtLeastTwoTiles": 974,
+        "peakProjectiles": 38
+      },
+      "snapshotBytes": 722303,
+      "snapshotRestored": true
+    },
+    {
+      "entityCount": 1500,
+      "mapSize": 192,
+      "ticks": 400,
+      "seed": 16019,
+      "initialHash": 706431777,
+      "finalHash": 4238384840,
+      "restoredHash": 4238384840,
+      "timingsMs": {
+        "create": 2.818,
+        "averageTickCpu": 4.873,
+        "averageTickWall": 4.196,
+        "p50TickWall": 4.147,
+        "p95TickWall": 6.187,
+        "maxTickWall": 11.043,
+        "serialize": 3236.562,
+        "stringify": 1.702,
+        "restore": 1381.387
+      },
+      "memoryBytes": {
+        "heapBefore": 21934984,
+        "heapAfterCreate": 23679984,
+        "peakHeap": 55139016,
+        "peakRss": 1349812224,
+        "heapDelta": 33204032,
+        "visibilityBuffers": 221184
+      },
+      "pathfinding": {
+        "maxActiveSearches": 1922,
+        "maxQueuedAssignments": 1922,
+        "maxUniqueWaitingUnits": 1444,
+        "ticksWithPendingSearches": 330,
+        "drainedAtTick": 6,
+        "activeSearchesAtEnd": 1922,
+        "queuedAssignmentsAtEnd": 1922
+      },
+      "outcome": {
+        "liveEntities": 1480,
+        "survivingAttackers": 1031,
+        "survivingDefenders": 435,
+        "attackersAcrossRidge": 0,
+        "defendersAcrossRidge": 0,
+        "unitsMovedAtLeastTwoTiles": 1480,
+        "peakProjectiles": 45
+      },
+      "snapshotBytes": 1006936,
+      "snapshotRestored": true
+    }
+  ]
+}
