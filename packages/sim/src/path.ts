@@ -384,8 +384,35 @@ function rerouteRemaining(state: SimState, s: GroupSearch): void {
   requestGroupPath(state, bestTile, units);
 }
 
+/**
+ * Drop waiters whose motion has moved on to a newer command, then compact the search
+ * queue without changing the FIFO order of surviving searches or waiters. Repeated
+ * command churn can otherwise leave obsolete whole-map floods consuming expansion
+ * budget and bloating snapshots long after none of their original units needs them.
+ */
+function pruneSupersededSearches(state: SimState): void {
+  let nextSearch = 0;
+  for (const search of state.pathSearches) {
+    let liveCount = 0;
+    for (const [tile, waiting] of search.waitingByTile) {
+      let nextWaiter = 0;
+      for (const id of waiting) {
+        if (state.motion.get(id)?.groupId !== search.groupId) continue;
+        waiting[nextWaiter++] = id;
+      }
+      waiting.length = nextWaiter;
+      if (nextWaiter === 0) search.waitingByTile.delete(tile);
+      else liveCount += nextWaiter;
+    }
+    search.waitingCount = liveCount;
+    if (liveCount > 0) state.pathSearches[nextSearch++] = search;
+  }
+  state.pathSearches.length = nextSearch;
+}
+
 /** Advance all active searches within this tick's expansion budget. */
 export function tickPathfinding(state: SimState): void {
+  pruneSupersededSearches(state);
   let budget = PATH_BUDGET_PER_TICK;
   while (budget > 0 && state.pathSearches.length > 0) {
     const s = state.pathSearches[0];

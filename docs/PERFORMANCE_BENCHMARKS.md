@@ -83,6 +83,34 @@ pending at the snapshot boundary. Those in-flight searches make serialization an
 slow. Before proposing a supported Huge tier, the next performance task should measure and safely
 retire superseded path searches while preserving deterministic routing and snapshot equivalence.
 
+## Superseded-search pruning — 2026-08-19
+
+Issue [#17](https://github.com/Knorcedger/stonesiege/issues/17) bounds command-churn buildup by
+removing only waiting assignments whose unit has moved to a newer motion group. Surviving searches
+and waiters retain their original FIFO order. The same default sweep and machine produced the raw
+follow-up report in
+[`benchmarks/huge-map-2026-08-19-path-pruning.json`](benchmarks/huge-map-2026-08-19-path-pruning.json).
+
+| Entities | CPU/tick avg | Wall/tick p95 | Searches pending at end | Snapshot | Serialize | Parse + restore |
+|---:|---:|---:|---:|---:|---:|---:|
+| 600 | 3.427 ms | 3.796 ms | 106 | 0.24 MiB | 152 ms | 59 ms |
+| 800 | 3.983 ms | 4.602 ms | 105 | 0.32 MiB | 151 ms | 38 ms |
+| 1,000 | 4.625 ms | 5.738 ms | 184 | 0.42 MiB | 267 ms | 79 ms |
+| 1,500 | 6.941 ms | 8.761 ms | 445 | 0.63 MiB | 651 ms | 222 ms |
+
+Compared with the initial report, pending searches at the snapshot boundary fell by 77–91%,
+snapshot size by 34–43%, serialization time by 80–92%, and restoration time by 84–95%. All four
+restored hashes still matched. A deterministic regression also snapshots while a newest search is
+in flight and verifies exact serialized-state equality after both simulations advance.
+
+This is not a blanket tick-time optimization. Average CPU per tick rose by 28–54% and wall p95 by
+20–50% because the current combat searches now receive the budget that obsolete floods previously
+consumed. That changes the fixture from path-starved combat into active routing: attackers cross
+the ridge in every case, projectile peaks rise from 29–45 to 74–187, and more casualties resolve.
+Three post-change runs produced consistent search counts and similar tick timings. The highest
+recorded p95 here remains 8.761 ms, but the player-facing Huge tier stays blocked on renderer and
+representative-device evidence.
+
 ## Coverage boundaries
 
 This harness measures the deterministic headless simulation. It does **not** measure PixiJS
