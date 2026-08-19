@@ -19,6 +19,15 @@ function hdAtlases(): Array<{ file: string; atlas: any }> {
   }));
 }
 
+function baselineFrameNames(): Set<string> {
+  const names = new Set<string>();
+  for (const family of ['terrain', 'objects', 'units', 'buildings', 'ui', 'icons']) {
+    const atlas = JSON.parse(readFileSync(join(BASE, `${family}.json`), 'utf8'));
+    for (const name of Object.keys(atlas.frames)) names.add(name);
+  }
+  return names;
+}
+
 function framePixelsHash(name: string): string {
   const match = hdAtlases().find(({ atlas }) => atlas.frames[name]);
   if (!match) throw new Error(`missing HD frame ${name}`);
@@ -59,10 +68,11 @@ function frameMaskPixelCount(name: string): number {
 }
 
 describe('complete HD art override contract', () => {
-  it('covers every one of the 3,943 shipping frames exactly once at 2x', () => {
+  it('covers every shipping frame exactly once at 2x', () => {
+    const baseNames = baselineFrameNames();
     expect(manifest.bespokeFrames).toBeGreaterThanOrEqual(90);
-    expect(manifest.convertedFrames + manifest.bespokeFrames).toBe(3943);
-    expect(manifest.frameCount).toBe(3943);
+    expect(manifest.convertedFrames + manifest.bespokeFrames).toBe(baseNames.size);
+    expect(manifest.frameCount).toBe(baseNames.size);
 
     const hdNames = new Set<string>();
     for (const { atlas } of hdAtlases()) {
@@ -76,12 +86,28 @@ describe('complete HD art override contract', () => {
       }
     }
 
-    const baseNames = new Set<string>();
-    for (const family of ['terrain', 'objects', 'units', 'buildings', 'ui', 'icons']) {
-      const atlas = JSON.parse(readFileSync(join(BASE, `${family}.json`), 'utf8'));
-      for (const name of Object.keys(atlas.frames)) baseNames.add(name);
-    }
     expect([...hdNames].sort()).toEqual([...baseNames].sort());
+  });
+
+  it('ships dedicated directional rigs and icons for every civilization unique unit', () => {
+    const names = new Set(hdAtlases().flatMap(({ atlas }) => Object.keys(atlas.frames)));
+    for (const [id, walkFrames, eliteId] of [
+      ['housecarl', 6, 'eliteHousecarl'],
+      ['chevalier', 8, 'eliteChevalier'],
+      ['mangudai', 8, 'eliteMangudai'],
+      ['cataphract', 8, 'eliteCataphract'],
+      ['mamluk', 8, 'eliteMamluk'],
+    ] as const) {
+      for (let direction = 0; direction < 5; direction++) {
+        for (let frame = 0; frame < walkFrames; frame++) {
+          expect(names.has(`unit/${id}/walk/${direction}/${frame}`)).toBe(true);
+        }
+      }
+      for (const iconId of [id, eliteId]) {
+        expect(names.has(`icon/${iconId}`)).toBe(true);
+        expect(names.has(`icon/${iconId}/gray`)).toBe(true);
+      }
+    }
   });
 
   it('keeps the gatehouse present while splitting its door into a moving layer', () => {

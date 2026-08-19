@@ -1,0 +1,3219 @@
+{
+ "frames": {
+  "bld/archeryRange/construct1": {
+   "frame": {
+    "x": 386,
+    "y": 1,
+    "w": 384,
+    "h": 268
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 268
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 268
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5933
+   }
+  },
+  "bld/guardTower/construct1": {
+   "frame": {
+    "x": 771,
+    "y": 1,
+    "w": 128,
+    "h": 220
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 220
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 220
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.8045
+   }
+  },
+  "bld/monastery/construct1": {
+   "frame": {
+    "x": 1,
+    "y": 1,
+    "w": 384,
+    "h": 332
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 384,
+    "h": 332
+   },
+   "sourceSize": {
+    "w": 384,
+    "h": 332
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.6596
+   }
+  },
+  "icon/archer/gray": {
+   "frame": {
+    "x": 525,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/berryBush/gray": {
+   "frame": {
+    "x": 606,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/eliteMangudai/gray": {
+   "frame": {
+    "x": 687,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/house/gray": {
+   "frame": {
+    "x": 768,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/monastery/gray": {
+   "frame": {
+    "x": 849,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tree/gray": {
+   "frame": {
+    "x": 930,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "obj/deer/die/2/2": {
+   "frame": {
+    "x": 1011,
+    "y": 1061,
+    "w": 160,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9375
+   }
+  },
+  "obj/deer/walk/2/3": {
+   "frame": {
+    "x": 1172,
+    "y": 1061,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.925
+   }
+  },
+  "obj/sheep/die/4/1": {
+   "frame": {
+    "x": 155,
+    "y": 1150,
+    "w": 128,
+    "h": 64
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 64
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 64
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9375
+   }
+  },
+  "obj/sheep/idle/4/1": {
+   "frame": {
+    "x": 284,
+    "y": 1150,
+    "w": 64,
+    "h": 64
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 64
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 64
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9375
+   }
+  },
+  "obj/sheep/walk/1/3": {
+   "frame": {
+    "x": 349,
+    "y": 1150,
+    "w": 64,
+    "h": 64
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 64
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 64
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9219
+   }
+  },
+  "obj/wolf/attack/3/3": {
+   "frame": {
+    "x": 1,
+    "y": 1150,
+    "w": 76,
+    "h": 68
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 76,
+    "h": 68
+   },
+   "sourceSize": {
+    "w": 76,
+    "h": 68
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9265
+   }
+  },
+  "obj/wolf/walk/4/1": {
+   "frame": {
+    "x": 78,
+    "y": 1150,
+    "w": 76,
+    "h": 68
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 76,
+    "h": 68
+   },
+   "sourceSize": {
+    "w": 76,
+    "h": 68
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9265
+   }
+  },
+  "unit/arbalester/attack/0/1": {
+   "frame": {
+    "x": 492,
+    "y": 782,
+    "w": 92,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 92,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 92,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9556
+   }
+  },
+  "unit/arbalester/die/1/1": {
+   "frame": {
+    "x": 585,
+    "y": 782,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/arbalester/idle/0/0": {
+   "frame": {
+    "x": 766,
+    "y": 782,
+    "w": 92,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 92,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 92,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/arbalester/walk/3/4": {
+   "frame": {
+    "x": 859,
+    "y": 782,
+    "w": 92,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 92,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 92,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/archer/attack/1/0": {
+   "frame": {
+    "x": 952,
+    "y": 782,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/archer/decay/4/1": {
+   "frame": {
+    "x": 1057,
+    "y": 782,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/archer/walk/0/2": {
+   "frame": {
+    "x": 1238,
+    "y": 782,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9444
+   }
+  },
+  "unit/batteringRam/attack/1/0": {
+   "frame": {
+    "x": 500,
+    "y": 334,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/batteringRam/decay/4/2": {
+   "frame": {
+    "x": 645,
+    "y": 334,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/batteringRam/walk/0/2": {
+   "frame": {
+    "x": 870,
+    "y": 334,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9554
+   }
+  },
+  "unit/cappedRam/attack/0/4": {
+   "frame": {
+    "x": 1015,
+    "y": 334,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/cappedRam/decay/2/0": {
+   "frame": {
+    "x": 1160,
+    "y": 334,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/cappedRam/die/4/3": {
+   "frame": {
+    "x": 1385,
+    "y": 334,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/cappedRam/walk/0/1": {
+   "frame": {
+    "x": 1610,
+    "y": 334,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9643
+   }
+  },
+  "unit/cataphract/die/2/1": {
+   "frame": {
+    "x": 1,
+    "y": 334,
+    "w": 232,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 232,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 232,
+    "h": 116
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9741
+   }
+  },
+  "unit/cataphract/idle/2/1": {
+   "frame": {
+    "x": 234,
+    "y": 334,
+    "w": 132,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 132,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 132,
+    "h": 116
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9741
+   }
+  },
+  "unit/cataphract/walk/3/3": {
+   "frame": {
+    "x": 367,
+    "y": 334,
+    "w": 132,
+    "h": 116
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 132,
+    "h": 116
+   },
+   "sourceSize": {
+    "w": 132,
+    "h": 116
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9655
+   }
+  },
+  "unit/cavalier/attack/1/4": {
+   "frame": {
+    "x": 1385,
+    "y": 564,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/cavalier/die/0/1": {
+   "frame": {
+    "x": 1506,
+    "y": 564,
+    "w": 208,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 208,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/cavalier/walk/0/6": {
+   "frame": {
+    "x": 1715,
+    "y": 564,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9808
+   }
+  },
+  "unit/cavalier/walk/4/6": {
+   "frame": {
+    "x": 1836,
+    "y": 564,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9808
+   }
+  },
+  "unit/champion/decay/0/0": {
+   "frame": {
+    "x": 888,
+    "y": 970,
+    "w": 176,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 176,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 176,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/champion/die/3/0": {
+   "frame": {
+    "x": 1065,
+    "y": 970,
+    "w": 176,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 176,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 176,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/champion/walk/0/4": {
+   "frame": {
+    "x": 1242,
+    "y": 970,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/chevalier/attack/2/3": {
+   "frame": {
+    "x": 1755,
+    "y": 334,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9643
+   }
+  },
+  "unit/chevalier/die/3/0": {
+   "frame": {
+    "x": 1,
+    "y": 451,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/chevalier/walk/1/2": {
+   "frame": {
+    "x": 226,
+    "y": 451,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9554
+   }
+  },
+  "unit/crossbowman/attack/4/4": {
+   "frame": {
+    "x": 1343,
+    "y": 782,
+    "w": 92,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 92,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 92,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/crossbowman/decay/1/2": {
+   "frame": {
+    "x": 1436,
+    "y": 782,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/crossbowman/die/4/2": {
+   "frame": {
+    "x": 1617,
+    "y": 782,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/crossbowman/walk/3/3": {
+   "frame": {
+    "x": 1798,
+    "y": 782,
+    "w": 92,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 92,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 92,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9556
+   }
+  },
+  "unit/eliteHighlandRaider/attack/1/3": {
+   "frame": {
+    "x": 1112,
+    "y": 677,
+    "w": 104,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9583
+   }
+  },
+  "unit/eliteHighlandRaider/die/0/2": {
+   "frame": {
+    "x": 1217,
+    "y": 677,
+    "w": 192,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 192,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 192,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/eliteHighlandRaider/walk/0/5": {
+   "frame": {
+    "x": 1410,
+    "y": 677,
+    "w": 104,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9792
+   }
+  },
+  "unit/eliteLongbowman/attack/0/4": {
+   "frame": {
+    "x": 1891,
+    "y": 782,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/eliteLongbowman/die/2/4": {
+   "frame": {
+    "x": 1,
+    "y": 879,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/eliteLongbowman/walk/0/1": {
+   "frame": {
+    "x": 182,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9556
+   }
+  },
+  "unit/eliteSkirmisher/attack/0/3": {
+   "frame": {
+    "x": 287,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9556
+   }
+  },
+  "unit/eliteSkirmisher/die/1/1": {
+   "frame": {
+    "x": 392,
+    "y": 879,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/eliteSkirmisher/walk/0/0": {
+   "frame": {
+    "x": 573,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/highlandRaider/attack/1/2": {
+   "frame": {
+    "x": 1515,
+    "y": 677,
+    "w": 104,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9479
+   }
+  },
+  "unit/highlandRaider/decay/3/0": {
+   "frame": {
+    "x": 1620,
+    "y": 677,
+    "w": 192,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 192,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 192,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/highlandRaider/walk/0/4": {
+   "frame": {
+    "x": 1813,
+    "y": 677,
+    "w": 104,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/housecarl/attack/1/1": {
+   "frame": {
+    "x": 1918,
+    "y": 677,
+    "w": 104,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9583
+   }
+  },
+  "unit/housecarl/decay/0/1": {
+   "frame": {
+    "x": 1,
+    "y": 782,
+    "w": 192,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 192,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 192,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/housecarl/die/3/3": {
+   "frame": {
+    "x": 194,
+    "y": 782,
+    "w": 192,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 192,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 192,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/housecarl/walk/0/3": {
+   "frame": {
+    "x": 387,
+    "y": 782,
+    "w": 104,
+    "h": 96
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 96
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 96
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9583
+   }
+  },
+  "unit/knight/decay/2/2": {
+   "frame": {
+    "x": 1,
+    "y": 677,
+    "w": 208,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 208,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/knight/idle/2/1": {
+   "frame": {
+    "x": 210,
+    "y": 677,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/knight/walk/3/3": {
+   "frame": {
+    "x": 331,
+    "y": 677,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9615
+   }
+  },
+  "unit/lightCavalry/die/2/0": {
+   "frame": {
+    "x": 1253,
+    "y": 1061,
+    "w": 160,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/lightCavalry/walk/0/4": {
+   "frame": {
+    "x": 1414,
+    "y": 1061,
+    "w": 68,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 68,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 68,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/lightCavalry/walk/4/4": {
+   "frame": {
+    "x": 1483,
+    "y": 1061,
+    "w": 68,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 68,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 68,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/longbowman/attack/0/2": {
+   "frame": {
+    "x": 678,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9444
+   }
+  },
+  "unit/longbowman/decay/4/1": {
+   "frame": {
+    "x": 783,
+    "y": 879,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/longbowman/idle/4/1": {
+   "frame": {
+    "x": 964,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/longswordsman/attack/1/1": {
+   "frame": {
+    "x": 1327,
+    "y": 970,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9545
+   }
+  },
+  "unit/longswordsman/die/1/2": {
+   "frame": {
+    "x": 1412,
+    "y": 970,
+    "w": 176,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 176,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 176,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/longswordsman/walk/0/3": {
+   "frame": {
+    "x": 1589,
+    "y": 970,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9545
+   }
+  },
+  "unit/mamluk/attack/0/2": {
+   "frame": {
+    "x": 355,
+    "y": 451,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9554
+   }
+  },
+  "unit/mamluk/die/1/2": {
+   "frame": {
+    "x": 484,
+    "y": 451,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/mamluk/idle/4/1": {
+   "frame": {
+    "x": 709,
+    "y": 451,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/mamluk/walk/3/7": {
+   "frame": {
+    "x": 838,
+    "y": 451,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/manAtArms/attack/1/0": {
+   "frame": {
+    "x": 1674,
+    "y": 970,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/manAtArms/decay/4/2": {
+   "frame": {
+    "x": 1759,
+    "y": 970,
+    "w": 176,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 176,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 176,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/manAtArms/walk/0/2": {
+   "frame": {
+    "x": 1936,
+    "y": 970,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9432
+   }
+  },
+  "unit/mangonel/attack/0/3": {
+   "frame": {
+    "x": 967,
+    "y": 451,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9643
+   }
+  },
+  "unit/mangonel/decay/4/2": {
+   "frame": {
+    "x": 1112,
+    "y": 451,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/mangonel/walk/0/0": {
+   "frame": {
+    "x": 1337,
+    "y": 451,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/mangudai/attack/4/3": {
+   "frame": {
+    "x": 1482,
+    "y": 451,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9643
+   }
+  },
+  "unit/mangudai/decay/2/0": {
+   "frame": {
+    "x": 1611,
+    "y": 451,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/mangudai/die/4/3": {
+   "frame": {
+    "x": 1,
+    "y": 564,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/mangudai/walk/2/4": {
+   "frame": {
+    "x": 226,
+    "y": 564,
+    "w": 128,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 128,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 128,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/militia/attack/0/4": {
+   "frame": {
+    "x": 1,
+    "y": 1061,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/militia/decay/2/0": {
+   "frame": {
+    "x": 86,
+    "y": 1061,
+    "w": 176,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 176,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 176,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/militia/die/4/3": {
+   "frame": {
+    "x": 263,
+    "y": 1061,
+    "w": 176,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 176,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 176,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9659
+   }
+  },
+  "unit/militia/walk/0/1": {
+   "frame": {
+    "x": 440,
+    "y": 1061,
+    "w": 84,
+    "h": 88
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 88
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 88
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9545
+   }
+  },
+  "unit/monk/decay/1/2": {
+   "frame": {
+    "x": 1069,
+    "y": 879,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/monk/die/4/2": {
+   "frame": {
+    "x": 1250,
+    "y": 879,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/monk/idle/3/1": {
+   "frame": {
+    "x": 1431,
+    "y": 879,
+    "w": 84,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/monk/walk/4/5": {
+   "frame": {
+    "x": 1516,
+    "y": 879,
+    "w": 84,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 84,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 84,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9778
+   }
+  },
+  "unit/onager/attack/0/2": {
+   "frame": {
+    "x": 355,
+    "y": 564,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9554
+   }
+  },
+  "unit/onager/die/3/0": {
+   "frame": {
+    "x": 500,
+    "y": 564,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/onager/idle/4/1": {
+   "frame": {
+    "x": 725,
+    "y": 564,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/paladin/attack/3/4": {
+   "frame": {
+    "x": 452,
+    "y": 677,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/paladin/decay/0/0": {
+   "frame": {
+    "x": 573,
+    "y": 677,
+    "w": 208,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 208,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/paladin/die/3/2": {
+   "frame": {
+    "x": 782,
+    "y": 677,
+    "w": 208,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 208,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 208,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/paladin/walk/2/0": {
+   "frame": {
+    "x": 991,
+    "y": 677,
+    "w": 120,
+    "h": 104
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 120,
+    "h": 104
+   },
+   "sourceSize": {
+    "w": 120,
+    "h": 104
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9712
+   }
+  },
+  "unit/pikeman/attack/0/1": {
+   "frame": {
+    "x": 1601,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9556
+   }
+  },
+  "unit/pikeman/die/2/4": {
+   "frame": {
+    "x": 1706,
+    "y": 879,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/pikeman/idle/4/0": {
+   "frame": {
+    "x": 1887,
+    "y": 879,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/scout/die/0/2": {
+   "frame": {
+    "x": 1552,
+    "y": 1061,
+    "w": 160,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/scout/idle/1/1": {
+   "frame": {
+    "x": 1713,
+    "y": 1061,
+    "w": 68,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 68,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 68,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/scout/walk/3/1": {
+   "frame": {
+    "x": 1782,
+    "y": 1061,
+    "w": 68,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 68,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 68,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9625
+   }
+  },
+  "unit/siegeRam/attack/0/1": {
+   "frame": {
+    "x": 870,
+    "y": 564,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9643
+   }
+  },
+  "unit/siegeRam/die/1/2": {
+   "frame": {
+    "x": 1015,
+    "y": 564,
+    "w": 224,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 224,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 224,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/siegeRam/idle/4/0": {
+   "frame": {
+    "x": 1240,
+    "y": 564,
+    "w": 144,
+    "h": 112
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 144,
+    "h": 112
+   },
+   "sourceSize": {
+    "w": 144,
+    "h": 112
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9732
+   }
+  },
+  "unit/skirmisher/attack/0/0": {
+   "frame": {
+    "x": 1,
+    "y": 970,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/skirmisher/die/1/1": {
+   "frame": {
+    "x": 106,
+    "y": 970,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/skirmisher/idle/3/1": {
+   "frame": {
+    "x": 287,
+    "y": 970,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/skirmisher/walk/4/5": {
+   "frame": {
+    "x": 392,
+    "y": 970,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9778
+   }
+  },
+  "unit/spearman/decay/4/1": {
+   "frame": {
+    "x": 497,
+    "y": 970,
+    "w": 180,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 180,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 180,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/spearman/idle/3/0": {
+   "frame": {
+    "x": 678,
+    "y": 970,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/spearman/walk/4/4": {
+   "frame": {
+    "x": 783,
+    "y": 970,
+    "w": 104,
+    "h": 90
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 104,
+    "h": 90
+   },
+   "sourceSize": {
+    "w": 104,
+    "h": 90
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9667
+   }
+  },
+  "unit/trebuchet/attack/4/4": {
+   "frame": {
+    "x": 900,
+    "y": 1,
+    "w": 160,
+    "h": 128
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 128
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 128
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/trebuchet/decay/0/1": {
+   "frame": {
+    "x": 1061,
+    "y": 1,
+    "w": 256,
+    "h": 128
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 128
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 128
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/trebuchet/decay/4/1": {
+   "frame": {
+    "x": 1318,
+    "y": 1,
+    "w": 256,
+    "h": 128
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 128
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 128
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/trebuchet/die/2/4": {
+   "frame": {
+    "x": 1575,
+    "y": 1,
+    "w": 256,
+    "h": 128
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 256,
+    "h": 128
+   },
+   "sourceSize": {
+    "w": 256,
+    "h": 128
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9688
+   }
+  },
+  "unit/trebuchet/walk/3/3": {
+   "frame": {
+    "x": 1832,
+    "y": 1,
+    "w": 160,
+    "h": 128
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 160,
+    "h": 128
+   },
+   "sourceSize": {
+    "w": 160,
+    "h": 128
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9609
+   }
+  },
+  "unit/villager/chop/2/0": {
+   "frame": {
+    "x": 1851,
+    "y": 1061,
+    "w": 64,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/villager/die/4/0": {
+   "frame": {
+    "x": 520,
+    "y": 1150,
+    "w": 72,
+    "h": 52
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 72,
+    "h": 52
+   },
+   "sourceSize": {
+    "w": 72,
+    "h": 52
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9615
+   }
+  },
+  "unit/villager/forage/0/0": {
+   "frame": {
+    "x": 1916,
+    "y": 1061,
+    "w": 64,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/villager/gather/1/1": {
+   "frame": {
+    "x": 414,
+    "y": 1150,
+    "w": 52,
+    "h": 64
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 52,
+    "h": 64
+   },
+   "sourceSize": {
+    "w": 52,
+    "h": 64
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9375
+   }
+  },
+  "unit/villager/mine/3/0": {
+   "frame": {
+    "x": 1981,
+    "y": 1061,
+    "w": 64,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.975
+   }
+  },
+  "unit/villager/walk/1/1": {
+   "frame": {
+    "x": 467,
+    "y": 1150,
+    "w": 52,
+    "h": 64
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 52,
+    "h": 64
+   },
+   "sourceSize": {
+    "w": 52,
+    "h": 64
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.9531
+   }
+  }
+ },
+ "meta": {
+  "app": "stonesiege-assetgen",
+  "version": "1.0",
+  "image": "hero-redrawn-17.png",
+  "format": "RGBA8888",
+  "size": {
+   "w": 2048,
+   "h": 1219
+  },
+  "scale": 2,
+  "bannerfall": {
+   "playerColorStrategy": "runtime-swap",
+   "maskPalette": [
+    "#ff00ff",
+    "#cc00cc",
+    "#990099"
+   ],
+   "playerRamps": [
+    {
+     "name": "blue",
+     "light": "#5c8cd6",
+     "mid": "#2f5fb5",
+     "dark": "#1c3b76"
+    },
+    {
+     "name": "red",
+     "light": "#e06050",
+     "mid": "#b3261e",
+     "dark": "#711512"
+    },
+    {
+     "name": "green",
+     "light": "#6cbf5c",
+     "mid": "#3e8c34",
+     "dark": "#24591e"
+    },
+    {
+     "name": "yellow",
+     "light": "#f2d45c",
+     "mid": "#d4a82a",
+     "dark": "#8e6e14"
+    },
+    {
+     "name": "cyan",
+     "light": "#7ad2d2",
+     "mid": "#38a6aa",
+     "dark": "#1d6c70"
+    },
+    {
+     "name": "purple",
+     "light": "#b07cd6",
+     "mid": "#7e44a8",
+     "dark": "#4c2370"
+    },
+    {
+     "name": "gray",
+     "light": "#c9c9cf",
+     "mid": "#92929b",
+     "dark": "#5a5a64"
+    },
+    {
+     "name": "orange",
+     "light": "#f0a04e",
+     "mid": "#d26a1e",
+     "dark": "#8c4212"
+    }
+   ],
+   "impactFrame": {},
+   "artStyle": "pre-rendered-3d"
+  }
+ }
+}

@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
   animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
-  placementGhostFrames, resolveFrameName,
+  placementGhostFrames, resolveFrameName, unitRig,
 } from './frames';
 
 describe('resolveFrameName (mirrored dirs per ASSET_CONTRACT)', () => {
@@ -34,6 +34,28 @@ describe('bakedColorName', () => {
   it('inserts the @p token after the defId segment', () => {
     expect(bakedColorName('unit/villager/walk/0/0', 2)).toBe('unit/villager@p2/walk/0/0');
     expect(bakedColorName('obj/sheep/idle/0/0', 7)).toBe('obj/sheep@p7/idle/0/0');
+  });
+});
+
+describe('unitRig (civilization unique units)', () => {
+  it('keeps every civilization unique unit on its dedicated runtime rig', () => {
+    for (const id of ['housecarl', 'chevalier', 'mangudai', 'cataphract', 'mamluk']) {
+      expect(unitRig(id)).toEqual({ spriteId: id, prefix: 'unit' });
+      expect(gameData.units[id].icon).toBe(`icon/${id}`);
+    }
+  });
+
+  it('reuses each civilization rig for its elite without reusing its icon', () => {
+    for (const [eliteId, baseId] of [
+      ['eliteHousecarl', 'housecarl'],
+      ['eliteChevalier', 'chevalier'],
+      ['eliteMangudai', 'mangudai'],
+      ['eliteCataphract', 'cataphract'],
+      ['eliteMamluk', 'mamluk'],
+    ]) {
+      expect(unitRig(eliteId)).toEqual({ spriteId: baseId, prefix: 'unit' });
+      expect(gameData.units[eliteId].icon).toBe(`icon/${eliteId}`);
+    }
   });
 });
 

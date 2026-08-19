@@ -36,6 +36,17 @@ siege visual family. All sources use a flat green or magenta removal background,
 matching upper-left world light, no baked terrain, and no baked player color.
 Their validated alpha cutouts live under `frames/`.
 
+The civilization-unique runtime sheets are documented in
+[`source/units/CIVILIZATION_UNITS.md`](source/units/CIVILIZATION_UNITS.md).
+They give the Viking housecarl, French chevalier, Mongol Kheshig horse archer,
+Byzantine cataphract, and Saracen mamluk distinct movement silhouettes instead
+of aliasing generic infantry or cavalry. The base and elite definitions share
+their civilization's authored sheet while retaining separate data and icon
+names. Elite definitions intentionally alias their civilization's unique base
+animation to avoid shipping identical image data twice; their icons stay
+separate so an elite visual treatment can be introduced without changing the UI
+contract.
+
 `tools/hd-art/build.ts` fits those cutouts into the unchanged mechanical frame
 and anchor contract, restores the exact runtime player-color ramp, derives
 grounded action/death poses and the three construction stages, creates matching

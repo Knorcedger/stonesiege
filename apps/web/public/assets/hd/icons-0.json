@@ -576,7 +576,7 @@
     "y": 0
    }
   },
-  "icon/res/food": {
+  "icon/heroAlexios": {
    "frame": {
     "x": 1945,
     "y": 1,
@@ -600,9 +600,297 @@
     "y": 0
    }
   },
-  "icon/res/food/gray": {
+  "icon/heroAlexios/gray": {
    "frame": {
     "x": 1,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroGenghis": {
+   "frame": {
+    "x": 82,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroGenghis/gray": {
+   "frame": {
+    "x": 163,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroHardrada": {
+   "frame": {
+    "x": 244,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroHardrada/gray": {
+   "frame": {
+    "x": 325,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroHenryV": {
+   "frame": {
+    "x": 406,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroHenryV/gray": {
+   "frame": {
+    "x": 487,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroJoan": {
+   "frame": {
+    "x": 568,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroJoan/gray": {
+   "frame": {
+    "x": 649,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroSaladin": {
+   "frame": {
+    "x": 730,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/heroSaladin/gray": {
+   "frame": {
+    "x": 811,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/res/food": {
+   "frame": {
+    "x": 892,
+    "y": 82,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/res/food/gray": {
+   "frame": {
+    "x": 973,
     "y": 82,
     "w": 80,
     "h": 80
@@ -626,7 +914,7 @@
   },
   "icon/res/gold": {
    "frame": {
-    "x": 82,
+    "x": 1054,
     "y": 82,
     "w": 80,
     "h": 80
@@ -650,7 +938,7 @@
   },
   "icon/res/gold/gray": {
    "frame": {
-    "x": 163,
+    "x": 1135,
     "y": 82,
     "w": 80,
     "h": 80
@@ -674,7 +962,7 @@
   },
   "icon/res/stone": {
    "frame": {
-    "x": 244,
+    "x": 1216,
     "y": 82,
     "w": 80,
     "h": 80
@@ -698,7 +986,7 @@
   },
   "icon/res/stone/gray": {
    "frame": {
-    "x": 325,
+    "x": 1297,
     "y": 82,
     "w": 80,
     "h": 80
@@ -722,7 +1010,7 @@
   },
   "icon/res/wood": {
    "frame": {
-    "x": 406,
+    "x": 1378,
     "y": 82,
     "w": 80,
     "h": 80
@@ -746,7 +1034,7 @@
   },
   "icon/res/wood/gray": {
    "frame": {
-    "x": 487,
+    "x": 1459,
     "y": 82,
     "w": 80,
     "h": 80
@@ -770,7 +1058,7 @@
   },
   "icon/tech/arbalesterUpgrade": {
    "frame": {
-    "x": 568,
+    "x": 1540,
     "y": 82,
     "w": 80,
     "h": 80
@@ -794,7 +1082,7 @@
   },
   "icon/tech/arbalesterUpgrade/gray": {
    "frame": {
-    "x": 649,
+    "x": 1621,
     "y": 82,
     "w": 80,
     "h": 80
@@ -818,7 +1106,7 @@
   },
   "icon/tech/architecture": {
    "frame": {
-    "x": 730,
+    "x": 1702,
     "y": 82,
     "w": 80,
     "h": 80
@@ -842,7 +1130,7 @@
   },
   "icon/tech/architecture/gray": {
    "frame": {
-    "x": 811,
+    "x": 1783,
     "y": 82,
     "w": 80,
     "h": 80
@@ -866,7 +1154,7 @@
   },
   "icon/tech/ballistics": {
    "frame": {
-    "x": 892,
+    "x": 1864,
     "y": 82,
     "w": 80,
     "h": 80
@@ -890,7 +1178,7 @@
   },
   "icon/tech/ballistics/gray": {
    "frame": {
-    "x": 973,
+    "x": 1945,
     "y": 82,
     "w": 80,
     "h": 80
@@ -914,8 +1202,8 @@
   },
   "icon/tech/blastFurnace": {
    "frame": {
-    "x": 1054,
-    "y": 82,
+    "x": 1,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -938,8 +1226,8 @@
   },
   "icon/tech/blastFurnace/gray": {
    "frame": {
-    "x": 1135,
-    "y": 82,
+    "x": 82,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -962,8 +1250,8 @@
   },
   "icon/tech/blockPrinting": {
    "frame": {
-    "x": 1216,
-    "y": 82,
+    "x": 163,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -986,8 +1274,8 @@
   },
   "icon/tech/blockPrinting/gray": {
    "frame": {
-    "x": 1297,
-    "y": 82,
+    "x": 244,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1010,8 +1298,8 @@
   },
   "icon/tech/bodkinArrow": {
    "frame": {
-    "x": 1378,
-    "y": 82,
+    "x": 325,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1034,8 +1322,8 @@
   },
   "icon/tech/bodkinArrow/gray": {
    "frame": {
-    "x": 1459,
-    "y": 82,
+    "x": 406,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1058,8 +1346,8 @@
   },
   "icon/tech/bowSaw": {
    "frame": {
-    "x": 1540,
-    "y": 82,
+    "x": 487,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1082,8 +1370,8 @@
   },
   "icon/tech/bowSaw/gray": {
    "frame": {
-    "x": 1621,
-    "y": 82,
+    "x": 568,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1106,8 +1394,8 @@
   },
   "icon/tech/bracer": {
    "frame": {
-    "x": 1702,
-    "y": 82,
+    "x": 649,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1130,8 +1418,8 @@
   },
   "icon/tech/bracer/gray": {
    "frame": {
-    "x": 1783,
-    "y": 82,
+    "x": 730,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1154,8 +1442,8 @@
   },
   "icon/tech/cappedRamUpgrade": {
    "frame": {
-    "x": 1864,
-    "y": 82,
+    "x": 811,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1178,8 +1466,8 @@
   },
   "icon/tech/cappedRamUpgrade/gray": {
    "frame": {
-    "x": 1945,
-    "y": 82,
+    "x": 892,
+    "y": 163,
     "w": 80,
     "h": 80
    },
@@ -1202,7 +1490,7 @@
   },
   "icon/tech/castleAge": {
    "frame": {
-    "x": 1,
+    "x": 973,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1226,7 +1514,7 @@
   },
   "icon/tech/castleAge/gray": {
    "frame": {
-    "x": 82,
+    "x": 1054,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1250,7 +1538,7 @@
   },
   "icon/tech/cavalierUpgrade": {
    "frame": {
-    "x": 163,
+    "x": 1135,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1274,7 +1562,7 @@
   },
   "icon/tech/cavalierUpgrade/gray": {
    "frame": {
-    "x": 244,
+    "x": 1216,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1298,7 +1586,7 @@
   },
   "icon/tech/chainBardingArmor": {
    "frame": {
-    "x": 325,
+    "x": 1297,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1322,7 +1610,7 @@
   },
   "icon/tech/chainBardingArmor/gray": {
    "frame": {
-    "x": 406,
+    "x": 1378,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1346,7 +1634,7 @@
   },
   "icon/tech/chainMailArmor": {
    "frame": {
-    "x": 487,
+    "x": 1459,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1370,7 +1658,7 @@
   },
   "icon/tech/chainMailArmor/gray": {
    "frame": {
-    "x": 568,
+    "x": 1540,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1394,7 +1682,7 @@
   },
   "icon/tech/championUpgrade": {
    "frame": {
-    "x": 649,
+    "x": 1621,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1418,7 +1706,7 @@
   },
   "icon/tech/championUpgrade/gray": {
    "frame": {
-    "x": 730,
+    "x": 1702,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1442,7 +1730,7 @@
   },
   "icon/tech/chemistry": {
    "frame": {
-    "x": 811,
+    "x": 1783,
     "y": 163,
     "w": 80,
     "h": 80
@@ -1466,8 +1754,56 @@
   },
   "icon/tech/chemistry/gray": {
    "frame": {
-    "x": 892,
+    "x": 1864,
     "y": 163,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/compagniesOrdonnance": {
+   "frame": {
+    "x": 1945,
+    "y": 163,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/compagniesOrdonnance/gray": {
+   "frame": {
+    "x": 1,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1490,8 +1826,8 @@
   },
   "icon/tech/cropRotation": {
    "frame": {
-    "x": 973,
-    "y": 163,
+    "x": 82,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1514,8 +1850,8 @@
   },
   "icon/tech/cropRotation/gray": {
    "frame": {
-    "x": 1054,
-    "y": 163,
+    "x": 163,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1538,8 +1874,8 @@
   },
   "icon/tech/crossbowmanUpgrade": {
    "frame": {
-    "x": 1135,
-    "y": 163,
+    "x": 244,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1562,8 +1898,56 @@
   },
   "icon/tech/crossbowmanUpgrade/gray": {
    "frame": {
-    "x": 1216,
-    "y": 163,
+    "x": 325,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/desertLogistics": {
+   "frame": {
+    "x": 406,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/desertLogistics/gray": {
+   "frame": {
+    "x": 487,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1586,8 +1970,8 @@
   },
   "icon/tech/doubleBitAxe": {
    "frame": {
-    "x": 1297,
-    "y": 163,
+    "x": 568,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1610,8 +1994,104 @@
   },
   "icon/tech/doubleBitAxe/gray": {
    "frame": {
-    "x": 1378,
-    "y": 163,
+    "x": 649,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteCataphractUpgrade": {
+   "frame": {
+    "x": 730,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteCataphractUpgrade/gray": {
+   "frame": {
+    "x": 811,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteChevalierUpgrade": {
+   "frame": {
+    "x": 892,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteChevalierUpgrade/gray": {
+   "frame": {
+    "x": 973,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1634,8 +2114,8 @@
   },
   "icon/tech/eliteHighlandRaiderUpgrade": {
    "frame": {
-    "x": 1459,
-    "y": 163,
+    "x": 1054,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1658,8 +2138,56 @@
   },
   "icon/tech/eliteHighlandRaiderUpgrade/gray": {
    "frame": {
-    "x": 1540,
-    "y": 163,
+    "x": 1135,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteHousecarlUpgrade": {
+   "frame": {
+    "x": 1216,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteHousecarlUpgrade/gray": {
+   "frame": {
+    "x": 1297,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1682,8 +2210,8 @@
   },
   "icon/tech/eliteLongbowmanUpgrade": {
    "frame": {
-    "x": 1621,
-    "y": 163,
+    "x": 1378,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1706,8 +2234,104 @@
   },
   "icon/tech/eliteLongbowmanUpgrade/gray": {
    "frame": {
+    "x": 1459,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteMamlukUpgrade": {
+   "frame": {
+    "x": 1540,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteMamlukUpgrade/gray": {
+   "frame": {
+    "x": 1621,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteMangudaiUpgrade": {
+   "frame": {
     "x": 1702,
-    "y": 163,
+    "y": 244,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/eliteMangudaiUpgrade/gray": {
+   "frame": {
+    "x": 1783,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1730,8 +2354,8 @@
   },
   "icon/tech/eliteSkirmisherUpgrade": {
    "frame": {
-    "x": 1783,
-    "y": 163,
+    "x": 1864,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1754,8 +2378,8 @@
   },
   "icon/tech/eliteSkirmisherUpgrade/gray": {
    "frame": {
-    "x": 1864,
-    "y": 163,
+    "x": 1945,
+    "y": 244,
     "w": 80,
     "h": 80
    },
@@ -1778,8 +2402,8 @@
   },
   "icon/tech/faith": {
    "frame": {
-    "x": 1945,
-    "y": 163,
+    "x": 1,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1802,8 +2426,8 @@
   },
   "icon/tech/faith/gray": {
    "frame": {
-    "x": 1,
-    "y": 244,
+    "x": 82,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1826,8 +2450,8 @@
   },
   "icon/tech/fervor": {
    "frame": {
-    "x": 82,
-    "y": 244,
+    "x": 163,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1850,8 +2474,8 @@
   },
   "icon/tech/fervor/gray": {
    "frame": {
-    "x": 163,
-    "y": 244,
+    "x": 244,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1874,8 +2498,8 @@
   },
   "icon/tech/feudalAge": {
    "frame": {
-    "x": 244,
-    "y": 244,
+    "x": 325,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1898,8 +2522,8 @@
   },
   "icon/tech/feudalAge/gray": {
    "frame": {
-    "x": 325,
-    "y": 244,
+    "x": 406,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1922,8 +2546,8 @@
   },
   "icon/tech/fletching": {
    "frame": {
-    "x": 406,
-    "y": 244,
+    "x": 487,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1946,8 +2570,8 @@
   },
   "icon/tech/fletching/gray": {
    "frame": {
-    "x": 487,
-    "y": 244,
+    "x": 568,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1970,8 +2594,8 @@
   },
   "icon/tech/forging": {
    "frame": {
-    "x": 568,
-    "y": 244,
+    "x": 649,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -1994,8 +2618,56 @@
   },
   "icon/tech/forging/gray": {
    "frame": {
-    "x": 649,
-    "y": 244,
+    "x": 730,
+    "y": 325,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/furusiyya": {
+   "frame": {
+    "x": 811,
+    "y": 325,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/furusiyya/gray": {
+   "frame": {
+    "x": 892,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2018,8 +2690,8 @@
   },
   "icon/tech/goldMining": {
    "frame": {
-    "x": 730,
-    "y": 244,
+    "x": 973,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2042,8 +2714,8 @@
   },
   "icon/tech/goldMining/gray": {
    "frame": {
-    "x": 811,
-    "y": 244,
+    "x": 1054,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2066,8 +2738,8 @@
   },
   "icon/tech/goldShaftMining": {
    "frame": {
-    "x": 892,
-    "y": 244,
+    "x": 1135,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2090,8 +2762,8 @@
   },
   "icon/tech/goldShaftMining/gray": {
    "frame": {
-    "x": 973,
-    "y": 244,
+    "x": 1216,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2114,8 +2786,8 @@
   },
   "icon/tech/guardTowerUpgrade": {
    "frame": {
-    "x": 1054,
-    "y": 244,
+    "x": 1297,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2138,8 +2810,8 @@
   },
   "icon/tech/guardTowerUpgrade/gray": {
    "frame": {
-    "x": 1135,
-    "y": 244,
+    "x": 1378,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2162,8 +2834,8 @@
   },
   "icon/tech/handCart": {
    "frame": {
-    "x": 1216,
-    "y": 244,
+    "x": 1459,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2186,8 +2858,8 @@
   },
   "icon/tech/handCart/gray": {
    "frame": {
-    "x": 1297,
-    "y": 244,
+    "x": 1540,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2210,8 +2882,8 @@
   },
   "icon/tech/heavyPlow": {
    "frame": {
-    "x": 1378,
-    "y": 244,
+    "x": 1621,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2234,8 +2906,8 @@
   },
   "icon/tech/heavyPlow/gray": {
    "frame": {
-    "x": 1459,
-    "y": 244,
+    "x": 1702,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2258,8 +2930,8 @@
   },
   "icon/tech/highlandFury": {
    "frame": {
-    "x": 1540,
-    "y": 244,
+    "x": 1783,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2282,8 +2954,8 @@
   },
   "icon/tech/highlandFury/gray": {
    "frame": {
-    "x": 1621,
-    "y": 244,
+    "x": 1864,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2306,8 +2978,8 @@
   },
   "icon/tech/horseCollar": {
    "frame": {
-    "x": 1702,
-    "y": 244,
+    "x": 1945,
+    "y": 325,
     "w": 80,
     "h": 80
    },
@@ -2330,8 +3002,8 @@
   },
   "icon/tech/horseCollar/gray": {
    "frame": {
-    "x": 1783,
-    "y": 244,
+    "x": 1,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2354,8 +3026,8 @@
   },
   "icon/tech/imperialAge": {
    "frame": {
-    "x": 1864,
-    "y": 244,
+    "x": 82,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2378,8 +3050,8 @@
   },
   "icon/tech/imperialAge/gray": {
    "frame": {
-    "x": 1945,
-    "y": 244,
+    "x": 163,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2402,8 +3074,8 @@
   },
   "icon/tech/ironCasting": {
    "frame": {
-    "x": 1,
-    "y": 325,
+    "x": 244,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2426,8 +3098,56 @@
   },
   "icon/tech/ironCasting/gray": {
    "frame": {
-    "x": 82,
-    "y": 325,
+    "x": 325,
+    "y": 406,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/jarlsLevy": {
+   "frame": {
+    "x": 406,
+    "y": 406,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/jarlsLevy/gray": {
+   "frame": {
+    "x": 487,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2450,8 +3170,8 @@
   },
   "icon/tech/keepUpgrade": {
    "frame": {
-    "x": 163,
-    "y": 325,
+    "x": 568,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2474,8 +3194,56 @@
   },
   "icon/tech/keepUpgrade/gray": {
    "frame": {
-    "x": 244,
-    "y": 325,
+    "x": 649,
+    "y": 406,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/lamellarBarding": {
+   "frame": {
+    "x": 730,
+    "y": 406,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/lamellarBarding/gray": {
+   "frame": {
+    "x": 811,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2498,8 +3266,8 @@
   },
   "icon/tech/leatherArcherArmor": {
    "frame": {
-    "x": 325,
-    "y": 325,
+    "x": 892,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2522,8 +3290,8 @@
   },
   "icon/tech/leatherArcherArmor/gray": {
    "frame": {
-    "x": 406,
-    "y": 325,
+    "x": 973,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2546,8 +3314,8 @@
   },
   "icon/tech/lightCavalryUpgrade": {
    "frame": {
-    "x": 487,
-    "y": 325,
+    "x": 1054,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2570,8 +3338,8 @@
   },
   "icon/tech/lightCavalryUpgrade/gray": {
    "frame": {
-    "x": 568,
-    "y": 325,
+    "x": 1135,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2594,8 +3362,8 @@
   },
   "icon/tech/longswordsmanUpgrade": {
    "frame": {
-    "x": 649,
-    "y": 325,
+    "x": 1216,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2618,8 +3386,8 @@
   },
   "icon/tech/longswordsmanUpgrade/gray": {
    "frame": {
-    "x": 730,
-    "y": 325,
+    "x": 1297,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2642,8 +3410,8 @@
   },
   "icon/tech/loom": {
    "frame": {
-    "x": 811,
-    "y": 325,
+    "x": 1378,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2666,8 +3434,8 @@
   },
   "icon/tech/loom/gray": {
    "frame": {
-    "x": 892,
-    "y": 325,
+    "x": 1459,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2690,8 +3458,8 @@
   },
   "icon/tech/ludgar": {
    "frame": {
-    "x": 973,
-    "y": 325,
+    "x": 1540,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2714,8 +3482,8 @@
   },
   "icon/tech/ludgar/gray": {
    "frame": {
-    "x": 1054,
-    "y": 325,
+    "x": 1621,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2738,8 +3506,8 @@
   },
   "icon/tech/manAtArmsUpgrade": {
    "frame": {
-    "x": 1135,
-    "y": 325,
+    "x": 1702,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2762,8 +3530,8 @@
   },
   "icon/tech/manAtArmsUpgrade/gray": {
    "frame": {
-    "x": 1216,
-    "y": 325,
+    "x": 1783,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2786,8 +3554,8 @@
   },
   "icon/tech/masonry": {
    "frame": {
-    "x": 1297,
-    "y": 325,
+    "x": 1864,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2810,8 +3578,8 @@
   },
   "icon/tech/masonry/gray": {
    "frame": {
-    "x": 1378,
-    "y": 325,
+    "x": 1945,
+    "y": 406,
     "w": 80,
     "h": 80
    },
@@ -2834,8 +3602,8 @@
   },
   "icon/tech/murderHoles": {
    "frame": {
-    "x": 1459,
-    "y": 325,
+    "x": 1,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -2858,8 +3626,56 @@
   },
   "icon/tech/murderHoles/gray": {
    "frame": {
-    "x": 1540,
-    "y": 325,
+    "x": 82,
+    "y": 487,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/nomadRemounts": {
+   "frame": {
+    "x": 163,
+    "y": 487,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/nomadRemounts/gray": {
+   "frame": {
+    "x": 244,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -2882,8 +3698,8 @@
   },
   "icon/tech/onagerUpgrade": {
    "frame": {
-    "x": 1621,
-    "y": 325,
+    "x": 325,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -2906,8 +3722,56 @@
   },
   "icon/tech/onagerUpgrade/gray": {
    "frame": {
-    "x": 1702,
-    "y": 325,
+    "x": 406,
+    "y": 487,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/oriflamme": {
+   "frame": {
+    "x": 487,
+    "y": 487,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/oriflamme/gray": {
+   "frame": {
+    "x": 568,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -2930,8 +3794,8 @@
   },
   "icon/tech/paddedArcherArmor": {
    "frame": {
-    "x": 1783,
-    "y": 325,
+    "x": 649,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -2954,8 +3818,8 @@
   },
   "icon/tech/paddedArcherArmor/gray": {
    "frame": {
-    "x": 1864,
-    "y": 325,
+    "x": 730,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -2978,8 +3842,8 @@
   },
   "icon/tech/paladinUpgrade": {
    "frame": {
-    "x": 1945,
-    "y": 325,
+    "x": 811,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3002,8 +3866,8 @@
   },
   "icon/tech/paladinUpgrade/gray": {
    "frame": {
-    "x": 1,
-    "y": 406,
+    "x": 892,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3026,8 +3890,8 @@
   },
   "icon/tech/pikemanUpgrade": {
    "frame": {
-    "x": 82,
-    "y": 406,
+    "x": 973,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3050,8 +3914,8 @@
   },
   "icon/tech/pikemanUpgrade/gray": {
    "frame": {
-    "x": 163,
-    "y": 406,
+    "x": 1054,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3074,8 +3938,8 @@
   },
   "icon/tech/plateBardingArmor": {
    "frame": {
-    "x": 244,
-    "y": 406,
+    "x": 1135,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3098,8 +3962,8 @@
   },
   "icon/tech/plateBardingArmor/gray": {
    "frame": {
-    "x": 325,
-    "y": 406,
+    "x": 1216,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3122,8 +3986,8 @@
   },
   "icon/tech/plateMailArmor": {
    "frame": {
-    "x": 406,
-    "y": 406,
+    "x": 1297,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3146,8 +4010,8 @@
   },
   "icon/tech/plateMailArmor/gray": {
    "frame": {
-    "x": 487,
-    "y": 406,
+    "x": 1378,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3170,8 +4034,8 @@
   },
   "icon/tech/ringArcherArmor": {
    "frame": {
-    "x": 568,
-    "y": 406,
+    "x": 1459,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3194,8 +4058,8 @@
   },
   "icon/tech/ringArcherArmor/gray": {
    "frame": {
-    "x": 649,
-    "y": 406,
+    "x": 1540,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3218,8 +4082,8 @@
   },
   "icon/tech/sanctity": {
    "frame": {
-    "x": 730,
-    "y": 406,
+    "x": 1621,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3242,8 +4106,8 @@
   },
   "icon/tech/sanctity/gray": {
    "frame": {
-    "x": 811,
-    "y": 406,
+    "x": 1702,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3266,8 +4130,8 @@
   },
   "icon/tech/scaleBardingArmor": {
    "frame": {
-    "x": 892,
-    "y": 406,
+    "x": 1783,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3290,8 +4154,8 @@
   },
   "icon/tech/scaleBardingArmor/gray": {
    "frame": {
-    "x": 973,
-    "y": 406,
+    "x": 1864,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3314,8 +4178,8 @@
   },
   "icon/tech/scaleMailArmor": {
    "frame": {
-    "x": 1054,
-    "y": 406,
+    "x": 1945,
+    "y": 487,
     "w": 80,
     "h": 80
    },
@@ -3338,8 +4202,8 @@
   },
   "icon/tech/scaleMailArmor/gray": {
    "frame": {
-    "x": 1135,
-    "y": 406,
+    "x": 1,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3362,8 +4226,8 @@
   },
   "icon/tech/schiltron": {
    "frame": {
-    "x": 1216,
-    "y": 406,
+    "x": 82,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3386,8 +4250,56 @@
   },
   "icon/tech/schiltron/gray": {
    "frame": {
-    "x": 1297,
-    "y": 406,
+    "x": 163,
+    "y": 568,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/shieldWall": {
+   "frame": {
+    "x": 244,
+    "y": 568,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/shieldWall/gray": {
+   "frame": {
+    "x": 325,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3410,8 +4322,8 @@
   },
   "icon/tech/siegeEngineers": {
    "frame": {
-    "x": 1378,
-    "y": 406,
+    "x": 406,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3434,8 +4346,8 @@
   },
   "icon/tech/siegeEngineers/gray": {
    "frame": {
-    "x": 1459,
-    "y": 406,
+    "x": 487,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3458,8 +4370,8 @@
   },
   "icon/tech/siegeRamUpgrade": {
    "frame": {
-    "x": 1540,
-    "y": 406,
+    "x": 568,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3482,8 +4394,56 @@
   },
   "icon/tech/siegeRamUpgrade/gray": {
    "frame": {
-    "x": 1621,
-    "y": 406,
+    "x": 649,
+    "y": 568,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/steppeTactics": {
+   "frame": {
+    "x": 730,
+    "y": 568,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/steppeTactics/gray": {
+   "frame": {
+    "x": 811,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3506,8 +4466,8 @@
   },
   "icon/tech/stoneMining": {
    "frame": {
-    "x": 1702,
-    "y": 406,
+    "x": 892,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3530,8 +4490,8 @@
   },
   "icon/tech/stoneMining/gray": {
    "frame": {
-    "x": 1783,
-    "y": 406,
+    "x": 973,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3554,8 +4514,8 @@
   },
   "icon/tech/stoneShaftMining": {
    "frame": {
-    "x": 1864,
-    "y": 406,
+    "x": 1054,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3578,8 +4538,56 @@
   },
   "icon/tech/stoneShaftMining/gray": {
    "frame": {
-    "x": 1945,
-    "y": 406,
+    "x": 1135,
+    "y": 568,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/themeSystem": {
+   "frame": {
+    "x": 1216,
+    "y": 568,
+    "w": 80,
+    "h": 80
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 80,
+    "h": 80
+   },
+   "sourceSize": {
+    "w": 80,
+    "h": 80
+   },
+   "anchor": {
+    "x": 0,
+    "y": 0
+   }
+  },
+  "icon/tech/themeSystem/gray": {
+   "frame": {
+    "x": 1297,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3602,8 +4610,8 @@
   },
   "icon/tech/twoManSaw": {
    "frame": {
-    "x": 1,
-    "y": 487,
+    "x": 1378,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3626,8 +4634,8 @@
   },
   "icon/tech/twoManSaw/gray": {
    "frame": {
-    "x": 82,
-    "y": 487,
+    "x": 1459,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3650,8 +4658,8 @@
   },
   "icon/tech/wheelbarrow": {
    "frame": {
-    "x": 163,
-    "y": 487,
+    "x": 1540,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3674,8 +4682,8 @@
   },
   "icon/tech/wheelbarrow/gray": {
    "frame": {
-    "x": 244,
-    "y": 487,
+    "x": 1621,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3698,8 +4706,8 @@
   },
   "icon/tech/yeomanLevy": {
    "frame": {
-    "x": 325,
-    "y": 487,
+    "x": 1702,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3722,8 +4730,8 @@
   },
   "icon/tech/yeomanLevy/gray": {
    "frame": {
-    "x": 406,
-    "y": 487,
+    "x": 1783,
+    "y": 568,
     "w": 80,
     "h": 80
    },
@@ -3752,7 +4760,7 @@
   "format": "RGBA8888",
   "size": {
    "w": 2048,
-   "h": 568
+   "h": 649
   },
   "scale": 2,
   "bannerfall": {

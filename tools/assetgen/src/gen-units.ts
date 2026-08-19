@@ -99,6 +99,10 @@ const HUMANS: Record<string, HumanSpec> = {
     id: 'eliteLongbowman', height: 26, torsoW: 6, tunic: CLOTH, legsC: P.woodDark,
     helmet: 'hood', weapon: 'longbow', quiver: true, sashRows: 4, metal: 1,
   },
+  housecarl: {
+    id: 'housecarl', height: 27, torsoW: 8, tunic: CLOTH, legsC: P.woodDark,
+    helmet: 'helm', weapon: 'axe2h', shield: 'round', sashRows: 3, metal: 1,
+  },
 };
 
 // ---------------------------------------------------------------- cavalry specs
@@ -112,6 +116,10 @@ const CAVALRY: Record<string, CavSpec> = {
     id: 'paladin', coat: 'bay', caparison: true, blanket: false, riderMetal: 2,
     kite: true, plumeMask: true,
   },
+  chevalier: { id: 'chevalier', coat: 'bay', caparison: true, blanket: false, riderMetal: 2, kite: true },
+  mangudai: { id: 'mangudai', coat: 'dun', caparison: false, blanket: true, riderMetal: 1 },
+  cataphract: { id: 'cataphract', coat: 'bay', caparison: true, blanket: false, riderMetal: 2, kite: true },
+  mamluk: { id: 'mamluk', coat: 'dun', caparison: false, blanket: true, riderMetal: 1 },
 };
 
 // ---------------------------------------------------------------- ram
@@ -543,7 +551,9 @@ export function genUnits(): UnitsResult {
   const frames: FrameDef[] = [];
   const impactFrames: Record<string, number> = {};
 
-  const trainable = Object.values(units).filter((u) => u.trainedAt.length > 0);
+  // Sprite aliases render through their target rig and must not duplicate an
+  // otherwise unreachable frame family in the fallback atlas.
+  const trainable = Object.values(units).filter((u) => u.trainedAt.length > 0 && u.sprite === undefined);
   for (const u of trainable) {
     const plan = animPlanFor(u.id);
     for (const { anim, count } of plan) {

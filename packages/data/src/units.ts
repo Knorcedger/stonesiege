@@ -413,7 +413,7 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 5 }],
     range: 0, rof: 2, speed: 1.0, los: 5,
     classes: ['infantry', 'uniqueUnit'],
-    icon: 'icon/champion', sprite: 'champion',
+    icon: 'icon/housecarl',
   },
   eliteHousecarl: {
     id: 'eliteHousecarl', name: 'Elite Housecarl', age: 'imperial',
@@ -424,7 +424,7 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 2, speed: 1.0, los: 5,
     classes: ['infantry', 'uniqueUnit'],
     requiresTech: 'eliteHousecarlUpgrade',
-    icon: 'icon/champion', sprite: 'champion',
+    icon: 'icon/eliteHousecarl', sprite: 'housecarl',
   },
 
   // -------------------------------------------------- unique: French Chevalier
@@ -438,7 +438,7 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 2 }, { cls: 'pierce', amount: 3 }],
     range: 0, rof: 1.9, speed: 1.4, los: 6,
     classes: ['cavalry', 'uniqueUnit'],
-    icon: 'icon/paladin', sprite: 'paladin',
+    icon: 'icon/chevalier',
   },
   eliteChevalier: {
     id: 'eliteChevalier', name: 'Elite Chevalier', age: 'imperial',
@@ -449,12 +449,11 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 1.8, speed: 1.4, los: 7,
     classes: ['cavalry', 'uniqueUnit'],
     requiresTech: 'eliteChevalierUpgrade',
-    icon: 'icon/paladin', sprite: 'paladin',
+    icon: 'icon/eliteChevalier', sprite: 'chevalier',
   },
 
   // ------------------------------------------ unique: Mongol Kheshig Horse Archer
-  // Mounted composite-bow cavalry. The existing scout rig supplies the mounted
-  // silhouette; combat remains genuinely ranged and emits arrow projectiles.
+  // Mounted composite-bow cavalry with its own historically grounded Kheshig rig.
   mangudai: {
     id: 'mangudai', name: 'Kheshig Horse Archer', age: 'castle',
     trainedAt: ['castle'], cost: { wood: 40, gold: 65 }, trainTime: 24,
@@ -463,7 +462,7 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 0 }, { cls: 'pierce', amount: 1 }],
     range: 4, rof: 1.9, projectileSpeed: 7, accuracy: 75, speed: 1.5, los: 7,
     classes: ['archer', 'cavalry', 'uniqueUnit'],
-    icon: 'icon/lightCavalry', sprite: 'scout',
+    icon: 'icon/mangudai',
   },
   eliteMangudai: {
     id: 'eliteMangudai', name: 'Elite Kheshig Horse Archer', age: 'imperial',
@@ -474,7 +473,7 @@ export const units: Record<string, UnitDef> = {
     range: 5, rof: 1.75, projectileSpeed: 7, accuracy: 85, speed: 1.5, los: 8,
     classes: ['archer', 'cavalry', 'uniqueUnit'],
     requiresTech: 'eliteMangudaiUpgrade',
-    icon: 'icon/lightCavalry', sprite: 'scout',
+    icon: 'icon/eliteMangudai', sprite: 'mangudai',
   },
 
   // ----------------------------------------------- unique: Byzantine Cataphract
@@ -488,7 +487,7 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 2 }, { cls: 'pierce', amount: 2 }],
     range: 0, rof: 1.9, speed: 1.35, los: 6,
     classes: ['cavalry', 'uniqueUnit'],
-    icon: 'icon/cavalier', sprite: 'cavalier',
+    icon: 'icon/cataphract',
   },
   eliteCataphract: {
     id: 'eliteCataphract', name: 'Elite Cataphract', age: 'imperial',
@@ -499,7 +498,7 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 1.8, speed: 1.35, los: 7,
     classes: ['cavalry', 'uniqueUnit'],
     requiresTech: 'eliteCataphractUpgrade',
-    icon: 'icon/cavalier', sprite: 'cavalier',
+    icon: 'icon/eliteCataphract', sprite: 'cataphract',
   },
 
   // --------------------------------------------------- unique: Saracen Mamluk
@@ -513,7 +512,7 @@ export const units: Record<string, UnitDef> = {
     armor: [{ cls: 'melee', amount: 1 }, { cls: 'pierce', amount: 2 }],
     range: 0, rof: 1.8, speed: 1.48, los: 7,
     classes: ['cavalry', 'uniqueUnit'],
-    icon: 'icon/lightCavalry', sprite: 'lightCavalry',
+    icon: 'icon/mamluk',
   },
   eliteMamluk: {
     id: 'eliteMamluk', name: 'Elite Mamluk', age: 'imperial',
@@ -524,7 +523,7 @@ export const units: Record<string, UnitDef> = {
     range: 0, rof: 1.7, speed: 1.48, los: 7,
     classes: ['cavalry', 'uniqueUnit'],
     requiresTech: 'eliteMamlukUpgrade',
-    icon: 'icon/lightCavalry', sprite: 'lightCavalry',
+    icon: 'icon/eliteMamluk', sprite: 'mamluk',
   },
 
   // ---------------------------------------------------------------- gaia

@@ -559,6 +559,31 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     { stableSize: [104, 96] },
   ),
   ...walkGridCutouts(
+    'art/hd/frames/units/housecarl-walk-grid-cutout-v1.png',
+    ['housecarl'],
+    { stableSize: [104, 96] },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/chevalier-walk-grid-cutout-v1.png',
+    ['chevalier'],
+    { stableSize: [128, 112], walkFrames: 8 },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/mangudai-walk-grid-cutout-v1.png',
+    ['mangudai'],
+    { stableSize: [128, 112], walkFrames: 8 },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/cataphract-walk-grid-cutout-v1.png',
+    ['cataphract'],
+    { stableSize: [132, 116], walkFrames: 8 },
+  ),
+  ...walkGridCutouts(
+    'art/hd/frames/units/mamluk-walk-grid-cutout-v1.png',
+    ['mamluk'],
+    { stableSize: [128, 112], walkFrames: 8 },
+  ),
+  ...walkGridCutouts(
     'art/hd/frames/units/paladin-walk-grid-cutout-v1.png',
     ['knight', 'cavalier', 'paladin'],
     { stableSize: [120, 104], walkFrames: 8 },
@@ -692,6 +717,41 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     ['highlandRaider', 'eliteHighlandRaider'],
     0.88,
     0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/housecarl-walk-grid-cutout-v1.png',
+    ['housecarl', 'eliteHousecarl'],
+    0.88,
+    0.9,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/chevalier-walk-grid-cutout-v1.png',
+    ['chevalier', 'eliteChevalier'],
+    0.94,
+    0.86,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/mangudai-walk-grid-cutout-v1.png',
+    ['mangudai', 'eliteMangudai'],
+    0.94,
+    0.86,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/cataphract-walk-grid-cutout-v1.png',
+    ['cataphract', 'eliteCataphract'],
+    0.94,
+    0.86,
+    { columns: 6, rows: 5, column: 0, row: 0 },
+  ),
+  ...iconCutouts(
+    'art/hd/frames/units/mamluk-walk-grid-cutout-v1.png',
+    ['mamluk', 'eliteMamluk'],
+    0.94,
+    0.86,
     { columns: 6, rows: 5, column: 0, row: 0 },
   ),
   ...iconCutouts(
