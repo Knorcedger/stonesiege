@@ -5,7 +5,8 @@
 
 import { describe, expect, it } from 'vitest';
 import type { Game, SimEvent } from './types';
-import { createGame } from './game';
+import type { SimState } from './internal';
+import { createGame, createGameFromSnapshot } from './game';
 import { grassMap, player, scenarioConfig } from './testutil';
 
 const HUMAN = 1;
@@ -143,6 +144,66 @@ describe('gather loop: carry to drop-off, deposit, return', () => {
     expect(crossedFarmWithStone).toBe(true);
     expect(deposited).toBe(true);
     expect(game.state.players[HUMAN].stockpile.stone).toBe(210);
+  });
+
+  it('retargets an unreachable nearby drop-off and resumes deterministically', () => {
+    // The completed mill is geometrically nearest, but every interaction tile around
+    // its 2x2 footprint is sealed. The farther Town Center remains reachable.
+    const walls = [];
+    for (let y = 8; y <= 11; y++) {
+      for (let x = 11; x <= 14; x++) {
+        if (x >= 12 && x <= 13 && y >= 9 && y <= 10) continue;
+        walls.push({ defId: 'stoneWall', player: HUMAN, tileX: x, tileY: y });
+      }
+    }
+    const original = createGame(scenarioConfig(72, grassMap(40, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'v' },
+      { defId: 'berryBush', player: 0, tileX: 10, tileY: 10, ref: 'bush' },
+      { defId: 'mill', player: HUMAN, tileX: 12, tileY: 9, ref: 'sealedMill' },
+      ...walls,
+      { defId: 'townCenter', player: HUMAN, tileX: 24, tileY: 8, ref: 'townCenter' },
+    ], [player()]));
+    const villagerId = original.state.refs.get('v')!;
+    const millId = original.state.refs.get('sealedMill')!;
+    const townCenterId = original.state.refs.get('townCenter')!;
+    original.advance([{
+      kind: 'gather', player: HUMAN, units: [villagerId],
+      targetId: original.state.refs.get('bush')!,
+    }]);
+
+    let retargeted = false;
+    for (let tick = 0; tick < 900; tick++) {
+      original.advance([]);
+      const info = (original.state as SimState).gather.get(villagerId);
+      if (info?.failedDropoffIds?.includes(millId)) {
+        expect(info.dropoffId).toBe(townCenterId);
+        retargeted = true;
+        break;
+      }
+    }
+    expect(retargeted, 'worker rejected the sealed mill instead of abandoning its load').toBe(true);
+
+    // Persist the failed candidate while the alternate route is in flight. Without
+    // this state, a resumed worker could select the sealed mill and repeat forever.
+    const resumed = createGameFromSnapshot(original.serialize());
+    expect((resumed.state as SimState).gather.get(villagerId)?.failedDropoffIds).toEqual([millId]);
+    expect(resumed.hash()).toBe(original.hash());
+
+    let deposited = false;
+    for (let tick = 0; tick < 1_200; tick++) {
+      const originalEvents = original.advance([]);
+      const resumedEvents = resumed.advance([]);
+      expect(resumedEvents).toEqual(originalEvents);
+      if (tick % 50 === 0) expect(resumed.hash()).toBe(original.hash());
+      if (originalEvents.some((event) => event.kind === 'resourceDropped' && event.type === 'food')) {
+        deposited = true;
+        break;
+      }
+    }
+    expect(deposited, 'worker banked the load at the reachable Town Center').toBe(true);
+    expect(original.state.players[HUMAN].stockpile.food).toBe(210);
+    expect(resumed.state.players[HUMAN].stockpile.food).toBe(210);
+    expect(JSON.stringify(resumed.serialize())).toBe(JSON.stringify(original.serialize()));
   });
 });
 
