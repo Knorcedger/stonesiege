@@ -133,6 +133,19 @@ export class FxLayer {
           }
           break;
         }
+        case 'abilityCast': {
+          const p = tileToWorld(ev.x / FP, ev.y / FP);
+          const radius = ev.radius / FP;
+          const gfx = new Graphics();
+          gfx.ellipse(0, 0, radius * 32, radius * 16)
+            .fill({ color: 0xe6c04a, alpha: 0.12 })
+            .stroke({ width: 2, color: 0xffdf70, alpha: 0.95 });
+          gfx.position.set(p.x, p.y);
+          this.air.addChild(gfx);
+          this.flashes.push({ gfx, startTick: tick, ticks: 12, color: 0xffdf70 });
+          this.spawnFlash(p.x, p.y - 8, tick, 0xffdf70, 14);
+          break;
+        }
         default:
           break;
       }

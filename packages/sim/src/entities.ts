@@ -74,7 +74,13 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
       hp: init.hp ?? maxHp, maxHp,
       activity: 'idle',
     };
-    if (gameData.units[init.defId].pack) e.packed = true; // trebuchets arrive packed
+    const unitDef = gameData.units[init.defId];
+    if (unitDef.pack) e.packed = true; // trebuchets arrive packed
+    if (unitDef.ability) {
+      e.heroLevel = 1;
+      e.heroXp = 0;
+      e.abilityReadyTick = 0;
+    }
     if (init.player !== GAIA) {
       const player = state.players[init.player];
       if (player && init.countsPop !== false) player.pop += stats.pop;

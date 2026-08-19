@@ -524,6 +524,11 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
           if (ev.fromPlayer === humanPlayer) hud.showUndoToast('A unit was converted away!', null);
           else if (ev.toPlayer === humanPlayer) hud.showUndoToast('Enemy unit converted!', null);
           break;
+        case 'heroLeveled':
+          if (ev.player === humanPlayer) {
+            hud.showUndoToast(`Banner Warden reached level ${ev.level}`, null);
+          }
+          break;
         case 'playerDefeated':
           if (ev.player === humanPlayer) showEnd(false);
           break;

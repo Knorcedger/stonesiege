@@ -131,6 +131,11 @@ export interface Entity {
    * unpacked/immobile (can fire). Undefined for everything else (additive).
    */
   packed?: boolean;
+  // hero progression (additive; present only on units whose data def has an ability)
+  heroLevel?: number;
+  heroXp?: number;
+  /** First simulation tick on which the active ability may be cast again. */
+  abilityReadyTick?: Tick;
 }
 
 // ---------- players ----------
@@ -204,12 +209,13 @@ export type Command =
   | { kind: 'setProductionSpeed'; player: PlayerId; multiplier: ProductionSpeed }
   | { kind: 'pack'; player: PlayerId; units: EntityId[] } // trebuchets: fold up to move
   | { kind: 'unpack'; player: PlayerId; units: EntityId[] } // trebuchets: deploy to fire
+  | { kind: 'castAbility'; player: PlayerId; unitId: EntityId; x: Fixed; y: Fixed }
   | { kind: 'resign'; player: PlayerId };
 
 // ---------- events (for renderer, audio, triggers, AI) ----------
 export type SimEvent =
   | { kind: 'entitySpawned'; id: EntityId; defId: string; player: PlayerId }
-  | { kind: 'entityDied'; id: EntityId; defId: string; player: PlayerId; x: Fixed; y: Fixed; killer?: PlayerId }
+  | { kind: 'entityDied'; id: EntityId; defId: string; player: PlayerId; x: Fixed; y: Fixed; killer?: PlayerId; killerId?: EntityId }
   | { kind: 'buildingComplete'; id: EntityId; defId: string; player: PlayerId }
   | { kind: 'buildingPlaced'; id: EntityId; defId: string; player: PlayerId }
   | { kind: 'projectileFired'; fromId: EntityId; targetId: EntityId; x0: Fixed; y0: Fixed; x1: Fixed; y1: Fixed; flightTicks: number; arc: 'flat' | 'high'; hit: boolean }
@@ -228,7 +234,9 @@ export type SimEvent =
   // wonder victory countdown stream (started/once-per-second/cancelled)
   | { kind: 'wonderStarted'; player: PlayerId; secondsLeft: number }
   | { kind: 'wonderCountdown'; player: PlayerId; secondsLeft: number }
-  | { kind: 'wonderDestroyed'; player: PlayerId };
+  | { kind: 'wonderDestroyed'; player: PlayerId }
+  | { kind: 'abilityCast'; unitId: EntityId; player: PlayerId; abilityId: string; x: Fixed; y: Fixed; radius: Fixed; cooldownTicks: number }
+  | { kind: 'heroLeveled'; unitId: EntityId; player: PlayerId; level: number };
 
 // ---------- game ----------
 export interface MapGenConfig {

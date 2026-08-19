@@ -66,6 +66,9 @@ export class GameAudio {
           else this.engine.play('monkChant', 0.7);
           break;
         }
+        case 'abilityCast':
+          this.playAt('swordClash', ev.x, ev.y, 1.2);
+          break;
         default:
           break;
       }

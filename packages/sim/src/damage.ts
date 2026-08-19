@@ -174,7 +174,10 @@ export function tickCorpses(state: SimState): void {
 }
 
 /** A dead huntable stays on the map as food; other units become corpses. */
-function killUnit(state: SimState, target: Entity, killer: PlayerId | undefined, events: SimEvent[]): void {
+function killUnit(
+  state: SimState, target: Entity, killer: PlayerId | undefined,
+  killerId: EntityId | undefined, events: SimEvent[],
+): void {
   const def = gameData.units[target.defId];
   if (def?.huntable && (def.foodAmount ?? 0) > 0) {
     // become a carcass: inert, gatherable ('hunt'), rots via animals.ts.
@@ -191,14 +194,17 @@ function killUnit(state: SimState, target: Entity, killer: PlayerId | undefined,
   }
   events.push({
     kind: 'entityDied', id: target.id, defId: target.defId, player: target.player,
-    x: target.x, y: target.y, killer,
+    x: target.x, y: target.y, killer, killerId,
   });
   if (def?.garrisonCapacity) ejectGarrison(state, target); // GDD: dead rams eject alive
   toCorpse(state, target);
 }
 
 /** Destroyed building: garrison dies with it (GDD), reserved queue pop is released. */
-function killBuilding(state: SimState, target: Entity, killer: PlayerId | undefined, events: SimEvent[]): void {
+function killBuilding(
+  state: SimState, target: Entity, killer: PlayerId | undefined,
+  killerId: EntityId | undefined, events: SimEvent[],
+): void {
   const player = state.players[target.player];
   if (player && target.trainQueue) {
     for (const item of target.trainQueue) {
@@ -215,11 +221,12 @@ function killBuilding(state: SimState, target: Entity, killer: PlayerId | undefi
   removeEntity(state, target.id); // kills the garrison recursively
   events.push({
     kind: 'entityDied', id: target.id, defId: target.defId, player: target.player,
-    x: target.x, y: target.y, killer,
+    x: target.x, y: target.y, killer, killerId,
   });
   for (const g of garrisoned) {
     events.push({
-      kind: 'entityDied', id: g.id, defId: g.defId, player: g.player, x: target.x, y: target.y, killer,
+      kind: 'entityDied', id: g.id, defId: g.defId, player: g.player,
+      x: target.x, y: target.y, killer, killerId,
     });
   }
 }
@@ -306,8 +313,11 @@ export function applyDamage(state: SimState, ctx: HitContext, target: Entity, da
   }
 
   if (target.hp <= 0) {
-    if (target.kind === 'building') killBuilding(state, target, ctx.attackerPlayer, events);
-    else killUnit(state, target, ctx.attackerPlayer, events);
+    if (target.kind === 'building') {
+      killBuilding(state, target, ctx.attackerPlayer, ctx.attackerId, events);
+    } else {
+      killUnit(state, target, ctx.attackerPlayer, ctx.attackerId, events);
+    }
     return;
   }
 

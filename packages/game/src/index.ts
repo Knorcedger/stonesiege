@@ -7,6 +7,7 @@ import { flowAtScenarioList } from './screens/flow';
 import { takeNavHint } from './screens/nav';
 import { hasSnapshot } from './persist';
 import type { RunGameOptions } from './game';
+import { grandConquests } from '@bf/scenarios';
 
 export { resolveFrameName, facingFromDelta, animForActivity } from './frames';
 export { Camera, tileToWorld, worldToTile } from './camera';
@@ -26,7 +27,12 @@ export async function startApp(root: HTMLElement): Promise<void> {
       // Resume is offered when a backgrounded/killed match left a snapshot
       // (GDD: a phone call at minute 90 never loses a game)
       canResume: hasSnapshot(),
-      ...(hint?.kind === 'scenarioList' ? { flow: flowAtScenarioList(hint.campaignId) } : {}),
+      ...(hint?.kind === 'scenarioList' ? {
+        flow: flowAtScenarioList(
+          hint.campaignId,
+          hint.campaignId in grandConquests ? 'grandConquests' : 'campaigns',
+        ),
+      } : {}),
     });
   }
 

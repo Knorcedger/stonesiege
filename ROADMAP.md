@@ -12,8 +12,10 @@ Castle Age on a very large map while an established empire controls roughly half
 The player must build a viable state, take fortified provinces, break the empire's economy, and
 defeat its capital.
 
-Grand Conquests is a design target, not yet an implementation task. The world, scale, AI, save,
-and scenario-tool foundations below come first.
+The full province-scale Grand Conquests design remains a target rather than an implementation
+task. A deliberately smaller **Trial of Banners** Arena experiment now exercises the menu,
+hero progression, targeted abilities, automatic waves, towers, and core victory rules without
+claiming that the large-world foundations below are complete.
 
 ## What already exists
 
@@ -27,6 +29,8 @@ and scenario-tool foundations below come first.
   profiles
 - One local resumable match with autosave, explicit “Save now,” and deterministic restoration
 - Touch-first controls, native mobile wrappers, HD runtime art, and automated quality gates
+- An experimental one-lane Grand Conquest with an original hero, automatic warbands, leveling,
+  a targeted area ability, defensive towers, and rival cores
 
 ## Gap audit
 

@@ -596,6 +596,27 @@ export const units: Record<string, UnitDef> = {
   heroGenghis: heroDef('heroGenghis', 'Temüjin (Chinggis Khan)', 230, 15, 'scout', ['cavalry', 'archer', 'uniqueUnit'], 1.45, 4),
   heroAlexios: heroDef('heroAlexios', 'Alexios I Komnenos', 260, 16, 'cavalier', ['cavalry', 'uniqueUnit'], 1.32),
   heroSaladin: heroDef('heroSaladin', 'Saladin', 250, 16, 'lightCavalry', ['cavalry', 'uniqueUnit'], 1.4),
+
+  // --------------------------------------------- Grand Conquest: Trial of Banners
+  // Original, setting-native heroes for the experimental one-lane Arena. Their
+  // existing rigs keep the slice asset-light while the sim gains reusable hero rules.
+  arenaWarden: {
+    ...heroDef('arenaWarden', 'Banner Warden', 650, 20, 'champion', ['infantry', 'uniqueUnit'], 1.08),
+    armor: [{ cls: 'melee', amount: 3 }, { cls: 'pierce', amount: 3 }],
+    ability: {
+      id: 'bannerfall',
+      name: 'Bannerfall',
+      description: 'Strike a target area, damaging every enemy unit caught in the blast.',
+      cooldownSeconds: 6,
+      range: 5,
+      radius: 1.75,
+      damage: 60,
+      icon: 'icon/tech/forging',
+    },
+  },
+  arenaUsurper: heroDef(
+    'arenaUsurper', 'Ashen Usurper', 440, 17, 'paladin', ['cavalry', 'uniqueUnit'], 1.12,
+  ),
 };
 
 /** Campaign hero scaffold: boosted infantry-class stats, unconvertible, untrainable. */

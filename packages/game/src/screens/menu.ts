@@ -5,7 +5,7 @@
 // parchment buttons, Jacquard display face, gold accents.
 
 import { gameData } from '@bf/data';
-import { campaigns, scenariosById, type CampaignDef } from '@bf/scenarios';
+import { campaigns, grandConquests, scenariosById, type CampaignDef } from '@bf/scenarios';
 import { BOT_DIFFICULTIES, type BotDifficulty } from '@bf/ai';
 import { FALLBACK_PLAYER_COLOR_NAMES, FALLBACK_PLAYER_RAMPS } from '../recolor';
 import {
@@ -311,6 +311,10 @@ export function showMenu(
         el('h1', 'bf-menu-h', 'Play'),
         button('Practice', '', () => dispatch({ kind: 'openPractice' }), 'skirmish vs bots on a random map'),
         button('Campaign', '', () => dispatch({ kind: 'openCampaigns' }), 'the story of William Wallace'),
+        button(
+          'Grand Conquests', '', () => dispatch({ kind: 'openGrandConquests' }),
+          'experimental adventures and custom battle modes',
+        ),
         backButton(),
       );
     };
@@ -395,6 +399,29 @@ export function showMenu(
           el('div', 'bf-camp-progress', `${doneCount} / ${campaign.scenarioIds.length} chapters complete`),
         );
         card.addEventListener('click', () => dispatch({ kind: 'openScenarios', campaignId: campaign.id }));
+        panel.appendChild(card);
+      }
+      panel.appendChild(backButton());
+    };
+
+    const renderGrandConquests = (): void => {
+      panel.append(
+        el('h1', 'bf-menu-h', 'Grand Conquests'),
+        el(
+          'p', 'bf-menu-sub',
+          'Original, replayable adventures that bend StoneSiege into new kinds of battle.',
+        ),
+      );
+      const progress = loadProgress();
+      for (const conquest of Object.values(grandConquests)) {
+        const doneCount = conquest.scenarioIds.filter((id) => progress.completed.includes(id)).length;
+        const card = el('button', 'bf-camp-card');
+        card.append(
+          el('div', 'bf-camp-title', conquest.title),
+          el('div', 'bf-camp-desc', conquest.description),
+          el('div', 'bf-camp-progress', `${doneCount} / ${conquest.scenarioIds.length} trials conquered`),
+        );
+        card.addEventListener('click', () => dispatch({ kind: 'openScenarios', campaignId: conquest.id }));
         panel.appendChild(card);
       }
       panel.appendChild(backButton());
@@ -505,9 +532,11 @@ export function showMenu(
         case 'play': renderPlay(); break;
         case 'practiceSetup': renderPracticeSetup(); break;
         case 'campaigns': renderCampaigns(); break;
+        case 'grandConquests': renderGrandConquests(); break;
         case 'scenarioList': {
-          const campaign = campaigns[top.campaignId];
+          const campaign = campaigns[top.campaignId] ?? grandConquests[top.campaignId];
           if (campaign) renderScenarioList(campaign);
+          else if (top.campaignId in grandConquests) renderGrandConquests();
           else renderCampaigns();
           break;
         }

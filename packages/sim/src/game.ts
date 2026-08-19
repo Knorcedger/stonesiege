@@ -39,6 +39,7 @@ import { tickWonders } from './victory';
 import { MARKET_START_RATES } from './market';
 import { makeSimOps } from './ops';
 import { hashState } from './hash';
+import { tickHeroProgression } from './abilities';
 
 /** AoE2 standard starting kit (see docs/AOE2_REFERENCE.md). */
 const DEFAULT_STOCKPILE: Stockpile = { food: 200, wood: 200, gold: 100, stone: 200 };
@@ -212,6 +213,7 @@ function finalizeGame(state: SimState): Game {
       tickGarrison(state, events); // explicit garrison entries + garrison healing
       tickFlee(state); // damaged villagers reach + enter garrisons
       tickWonders(state, events); // wonder countdown / victory
+      tickHeroProgression(state, events); // after every system that can produce a kill
       checkEliminations(state, events); // GDD conquest elimination — after all removals this tick
     }
     state.tick++;

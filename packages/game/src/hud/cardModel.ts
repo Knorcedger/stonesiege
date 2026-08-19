@@ -11,8 +11,8 @@
 // always disabled; wiring them is a one-line change when the sim grows them.
 
 import {
-  AGES, FP, type AgeId, type Entity, type EntityId, type ProductionSpeed, type ResourceType,
-  type TrainQueueItem,
+  AGES, FP, TICKS_PER_SECOND,
+  type AgeId, type Entity, type EntityId, type ProductionSpeed, type ResourceType, type TrainQueueItem,
 } from '@bf/sim/types';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { buildAgeIndex } from '@bf/sim/construction';
@@ -54,7 +54,7 @@ export interface CardButtonModel {
 }
 
 /** Verbs that arm a "next tap = target" flow (GDD alternate-command semantics). */
-export type ArmedVerb = 'rally' | 'attackMove' | 'garrison' | 'convert' | 'heal';
+export type ArmedVerb = 'rally' | 'attackMove' | 'garrison' | 'convert' | 'heal' | 'ability';
 
 export interface VerbButtonModel extends CardButtonModel {
   verb?: ArmedVerb;
@@ -371,7 +371,9 @@ const pendingVerb = (kind: 'attack' | 'garrison' | 'convert' | 'heal'): boolean 
  * trebuchet pack/unpack, per GDD Mobile UX. Arming verbs stay disabled while
  * their sim command is wave-2-pending (the armed tap would be dropped).
  */
-export function unitVerbButtons(sel: readonly Entity[], armed: ArmedVerb | null): VerbButtonModel[] {
+export function unitVerbButtons(
+  sel: readonly Entity[], armed: ArmedVerb | null, nowTick = 0,
+): VerbButtonModel[] {
   const units = sel.filter((e) => e.kind === 'unit');
   if (units.length === 0) return [];
   // herdables/huntables (captured sheep) are livestock, not military — a sheep
@@ -384,6 +386,27 @@ export function unitVerbButtons(sel: readonly Entity[], armed: ArmedVerb | null)
   const monks = units.filter((e) => gameData.units[e.defId]?.converts || gameData.units[e.defId]?.heals);
   const packers = units.filter((e) => !!gameData.units[e.defId]?.pack);
   const out: VerbButtonModel[] = [];
+
+  if (units.length === 1) {
+    const hero = units[0];
+    const ability = gameData.units[hero.defId]?.ability;
+    if (ability) {
+      const readyTick = hero.abilityReadyTick ?? 0;
+      const enabled = nowTick >= readyTick;
+      const secondsLeft = Math.ceil(Math.max(0, readyTick - nowTick) / TICKS_PER_SECOND);
+      out.push({
+        id: ability.id,
+        verb: 'ability',
+        icon: iconVariant(ability.icon, enabled),
+        enabled,
+        active: armed === 'ability',
+        reason: enabled ? undefined : `${secondsLeft}s cooldown`,
+        tip:
+          `${ability.name}\n${ability.description}\n` +
+          `${ability.range} tile range • ${ability.radius} tile blast • ${ability.cooldownSeconds}s cooldown`,
+      });
+    }
+  }
 
   if (military.length > 0) {
     out.push({

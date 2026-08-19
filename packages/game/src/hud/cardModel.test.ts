@@ -395,6 +395,15 @@ describe('queueStacks', () => {
 });
 
 describe('unitVerbButtons', () => {
+  it('shows the selected Arena hero ability and its live cooldown state', () => {
+    const hero = ent({ defId: 'arenaWarden', abilityReadyTick: 120, heroLevel: 2 });
+    const cooling = unitVerbButtons([hero], null, 60)[0];
+    expect(cooling).toMatchObject({ id: 'bannerfall', verb: 'ability', enabled: false });
+    expect(cooling.reason).toBe('3s cooldown');
+    const ready = unitVerbButtons([hero], 'ability', 120)[0];
+    expect(ready).toMatchObject({ id: 'bannerfall', enabled: true, active: true });
+  });
+
   it('military selection: attack-move toggle, stop, garrison', () => {
     const sel = [ent({ defId: 'militia' })];
     const idle = unitVerbButtons(sel, null);

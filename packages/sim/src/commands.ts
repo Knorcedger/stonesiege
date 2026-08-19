@@ -22,6 +22,7 @@ import { handleCancelResearch, handleResearch, isUnitEnabled, isUpgradedAway } f
 import { handleMarketTrade } from './market';
 import { ejectGarrison } from './damage';
 import { orderFormationMove } from './formations';
+import { handleCastAbility } from './abilities';
 
 type Handler<K extends Command['kind']> =
   (state: SimState, cmd: Extract<Command, { kind: K }>, events: SimEvent[]) => void;
@@ -37,7 +38,7 @@ function validPlayer(state: SimState, player: PlayerId): boolean {
 
 const NUMERIC_FIELDS = [
   'x', 'y', 'tileX', 'tileY', 'targetId', 'buildingId', 'entityId', 'farmId', 'index',
-  'amount', 'multiplier',
+  'amount', 'multiplier', 'unitId',
 ] as const;
 const RESOURCE_FIELDS = ['sell', 'buy'] as const;
 const RESOURCES = new Set(['food', 'wood', 'gold', 'stone']);
@@ -55,7 +56,7 @@ const REQUIRED: Record<Command['kind'], readonly string[]> = {
   setRally: ['buildingId', 'x', 'y'], townBell: ['buildingId'], ungarrison: ['buildingId'],
   deleteEntity: ['entityId'], reseedFarm: ['farmId'], queueReseed: [],
   setProductionSpeed: ['multiplier'],
-  marketTrade: ['sell', 'buy', 'amount'], resign: [],
+  marketTrade: ['sell', 'buy', 'amount'], castAbility: ['unitId', 'x', 'y'], resign: [],
 };
 
 /**
@@ -348,6 +349,7 @@ const handlers: { [K in Command['kind']]: Handler<K> } = {
   setProductionSpeed: handleSetProductionSpeed,
   pack: (state, cmd) => handlePackCommand(state, cmd),
   unpack: (state, cmd) => handlePackCommand(state, cmd),
+  castAbility: handleCastAbility,
   resign: handleResign,
 };
 

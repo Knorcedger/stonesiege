@@ -518,10 +518,6 @@ export class InputController {
       this.movePlacementToWorld(w.x, w.y);
       return;
     }
-    if (this.host.getArmedVerb() !== null) {
-      this.el.style.cursor = 'crosshair';
-      return;
-    }
     const w = this.host.camera.screenToWorld(sx, sy);
     const picks = this.pickAt(w.x, w.y);
     const sel = this.commandableSelection();
@@ -583,6 +579,10 @@ export class InputController {
     if (this.host.isPlacing()) {
       const w = this.host.camera.screenToWorld(sx, sy);
       this.movePlacementToWorld(w.x, w.y);
+      this.el.style.cursor = 'crosshair';
+      return;
+    }
+    if (this.host.getArmedVerb() !== null) {
       this.el.style.cursor = 'crosshair';
       return;
     }
@@ -666,6 +666,23 @@ export class InputController {
     const undoStop = unitIds.length > 0
       ? () => this.host.issue({ kind: 'stop', player: human, units: unitIds })
       : null;
+
+    if (armedVerb === 'ability') {
+      const hero = units.find((unit) => gameData.units[unit.defId]?.ability);
+      if (!hero || units.length !== 1) {
+        this.host.showToast('Select one hero to cast an ability');
+        return;
+      }
+      const ability = gameData.units[hero.defId].ability!;
+      const target = worldToTile(wx, wy);
+      const x = Math.max(0, Math.min(st.map.width - 0.01, target.x));
+      const y = Math.max(0, Math.min(st.map.height - 0.01, target.y));
+      this.host.clearArmedVerb();
+      this.host.issueWithUndo({
+        kind: 'castAbility', player: human, unitId: hero.id, x: fp(x), y: fp(y),
+      }, ability.name, null);
+      return;
+    }
 
     // Production buildings selected (and no units): Rally must be armed first.
     // This prevents an ordinary map tap/right-click from silently moving the

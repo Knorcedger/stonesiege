@@ -30,6 +30,22 @@ describe('menu flow', () => {
     expect(currentScreen(s)).toEqual({ id: 'briefing', campaignId: 'wallace', scenarioId: 'wallace-1' });
   });
 
+  it('walks the Grand Conquest path down to a custom-mode briefing', () => {
+    const s = run(
+      initialFlow(),
+      { kind: 'openPlay' },
+      { kind: 'openGrandConquests' },
+      { kind: 'openScenarios', campaignId: 'grand-conquests-arena' },
+      {
+        kind: 'openBriefing', campaignId: 'grand-conquests-arena',
+        scenarioId: 'arena-trial-of-banners',
+      },
+    );
+    expect(currentScreen(s)).toEqual({
+      id: 'briefing', campaignId: 'grand-conquests-arena', scenarioId: 'arena-trial-of-banners',
+    });
+  });
+
   it('back pops one screen at a time until the title, then no-ops', () => {
     let s = run(initialFlow(), { kind: 'openPlay' }, { kind: 'openCampaigns' });
     s = flowReducer(s, { kind: 'back' });
@@ -69,5 +85,11 @@ describe('menu flow', () => {
     expect(currentScreen(s)).toEqual({ id: 'campaigns' });
     s = run(s, { kind: 'back' }, { kind: 'back' });
     expect(currentScreen(s)).toEqual({ id: 'title' });
+  });
+
+  it('deep-links back through the Grand Conquests collection', () => {
+    let s = flowAtScenarioList('grand-conquests-arena', 'grandConquests');
+    s = flowReducer(s, { kind: 'back' });
+    expect(currentScreen(s)).toEqual({ id: 'grandConquests' });
   });
 });

@@ -51,6 +51,9 @@ function mixEntity(h: number, e: Entity): number {
   if (e.amountLeft !== undefined) h = mix(h, e.amountLeft);
   if (e.stump) h = mix(h, 1);
   if (e.packed !== undefined) h = mix(h, e.packed ? 3 : 2);
+  if (e.heroLevel !== undefined) h = mix(h, e.heroLevel);
+  if (e.heroXp !== undefined) h = mix(h, e.heroXp);
+  if (e.abilityReadyTick !== undefined) h = mix(h, e.abilityReadyTick);
   if (e.targetId !== undefined) h = mix(h, e.targetId);
   if (e.carrying !== undefined) {
     h = mix(h, RESOURCE_INDEX[e.carrying.type] ?? 0);

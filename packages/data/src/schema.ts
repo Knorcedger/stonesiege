@@ -15,6 +15,18 @@ export interface ClassValue { cls: ArmorClass; amount: number }
 
 export type GatherTask = 'forage' | 'hunt' | 'farm' | 'wood' | 'gold' | 'stone';
 
+/** Deterministic targeted ability used by hero-led custom modes. */
+export interface HeroAbilityDef {
+  id: string;
+  name: string;
+  description: string;
+  cooldownSeconds: number;
+  range: number;
+  radius: number;
+  damage: number;
+  icon: string;
+}
+
 export interface UnitDef {
   id: string;
   name: string;
@@ -71,6 +83,8 @@ export interface UnitDef {
     /** Replaces `armor` while packed/moving (AoE2: packed trebs are arrow-vulnerable). */
     packedArmor?: ClassValue[];
   };
+  /** Optional active ability. Scenario heroes are the first users of this additive hook. */
+  ability?: HeroAbilityDef;
   icon: string; // atlas frame name
   /**
    * World-sprite atlas id to render with, when it differs from `id` (frame names are

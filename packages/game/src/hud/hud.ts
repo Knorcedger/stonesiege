@@ -923,7 +923,9 @@ export class Hud {
       const allBuildings = sel.every((e) => e.kind === 'building');
       this.selName.textContent = `${allUnits ? 'Mixed units' : allBuildings ? 'Mixed buildings' : 'Mixed selection'} ×${sel.length}`;
     } else {
-      this.selName.textContent = sel.length > 1 ? `${name} ×${sel.length}` : name;
+      this.selName.textContent = sel.length > 1
+        ? `${name} ×${sel.length}`
+        : first.heroLevel !== undefined ? `${name} · Level ${first.heroLevel}` : name;
     }
     const selectedUnitHelp = !mixed && first.kind === 'unit'
       ? unitExtendedTip(gameData.units[first.defId]) : '';
@@ -1121,6 +1123,7 @@ export class Hud {
         view.productionSpeed,
       ));
     }
+    if (units.length > 0) push(unitVerbButtons(units, this.host.getArmedVerb(), state.tick));
     return parts.join(',');
   }
 
@@ -1137,7 +1140,8 @@ export class Hud {
         `${e.id}:${e.defId}:${e.trainQueue?.map((q) => q.techId ?? q.defId).join(',') ?? ''}:${e.trainQueue?.[0]?.started ?? ''}` +
         `:${e.hp}/${e.maxHp}:${e.buildProgress ?? ''}:${e.research?.techId ?? ''}:${e.garrison?.length ?? ''}` +
         `:${e.rally ? `${e.rally.x},${e.rally.y},${e.rally.targetId ?? ''}` : ''}` +
-        `:${e.amountLeft !== undefined ? (e.amountLeft > 0 ? 'r' : 'x') : ''}`,
+        `:${e.amountLeft !== undefined ? (e.amountLeft > 0 ? 'r' : 'x') : ''}` +
+        `:${e.heroLevel ?? ''}:${e.heroXp ?? ''}:${e.abilityReadyTick ?? ''}`,
       ).join('|'),
       this.host.getArmedVerb() ?? '',
       this.host.getFormation(),
@@ -1240,7 +1244,7 @@ export class Hud {
       if (villagers.length === 0) this.cardTitle.textContent = 'Commands';
       // attack-move / stop / garrison / convert / heal / pack (cardModel decides
       // visibility per selection contents and wave-2 enabled-ness)
-      for (const vb of unitVerbButtons(units, this.host.getArmedVerb())) {
+      for (const vb of unitVerbButtons(units, this.host.getArmedVerb(), state.tick)) {
         const onClick = vb.id === 'stop'
           ? () => this.host.stopSelection()
           : vb.id === 'pack' || vb.id === 'unpack'

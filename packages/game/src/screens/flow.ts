@@ -8,6 +8,7 @@ export type MenuScreen =
   | { id: 'play' }
   | { id: 'practiceSetup' }
   | { id: 'campaigns' }
+  | { id: 'grandConquests' }
   | { id: 'scenarioList'; campaignId: string }
   | { id: 'briefing'; campaignId: string; scenarioId: string }
   | { id: 'settings' };
@@ -16,7 +17,8 @@ export type FlowEvent =
   | { kind: 'openPlay' }         // title -> play menu
   | { kind: 'openPractice' }     // play -> practice setup
   | { kind: 'openCampaigns' }    // play -> campaign cards
-  | { kind: 'openScenarios'; campaignId: string }   // campaigns -> scenario list
+  | { kind: 'openGrandConquests' } // play -> custom Grand Conquests
+  | { kind: 'openScenarios'; campaignId: string }   // collection -> scenario list
   | { kind: 'openBriefing'; campaignId: string; scenarioId: string } // list -> briefing
   | { kind: 'openSettings' }     // anywhere (settings pushes; back returns)
   | { kind: 'back' };
@@ -28,10 +30,13 @@ export interface FlowState {
 export const initialFlow = (): FlowState => ({ stack: [{ id: 'title' }] });
 
 /** Prebuilt deep-link stacks (post-reload navigation hints). */
-export function flowAtScenarioList(campaignId: string): FlowState {
+export function flowAtScenarioList(
+  campaignId: string,
+  collection: 'campaigns' | 'grandConquests' = 'campaigns',
+): FlowState {
   return {
     stack: [
-      { id: 'title' }, { id: 'play' }, { id: 'campaigns' },
+      { id: 'title' }, { id: 'play' }, { id: collection },
       { id: 'scenarioList', campaignId },
     ],
   };
@@ -58,8 +63,10 @@ export function flowReducer(state: FlowState, ev: FlowEvent): FlowState {
       return top.id === 'play' ? push(state, { id: 'practiceSetup' }) : state;
     case 'openCampaigns':
       return top.id === 'play' ? push(state, { id: 'campaigns' }) : state;
+    case 'openGrandConquests':
+      return top.id === 'play' ? push(state, { id: 'grandConquests' }) : state;
     case 'openScenarios':
-      return top.id === 'campaigns'
+      return top.id === 'campaigns' || top.id === 'grandConquests'
         ? push(state, { id: 'scenarioList', campaignId: ev.campaignId })
         : state;
     case 'openBriefing':

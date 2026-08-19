@@ -24,6 +24,7 @@ import {
   legendaryScenarios,
   saladinCampaign,
 } from './scenarios/legendaryCampaigns';
+import { arenaTrial } from './scenarios/arenaTrial';
 
 export const wallaceCampaign: CampaignDef = {
   id: 'wallace',
@@ -50,6 +51,7 @@ export {
   wallaceChapter09, wallaceChapter10, wallaceChapter11, wallaceChapter12,
   henryCampaign, hardradaCampaign, joanCampaign, genghisCampaign, alexiosCampaign, saladinCampaign,
   legendaryScenarios,
+  arenaTrial,
 };
 
 /** Authored ScenarioDefs by id, in campaign order. */
@@ -65,9 +67,22 @@ export const scenariosById: Record<string, ScenarioDef> = {
   [wallace5.id]: wallace5,
   [wallace6.id]: wallace6,
   [showcaseCitadel.id]: showcaseCitadel,
+  [arenaTrial.id]: arenaTrial,
 };
 
 export const campaigns: Record<string, CampaignDef> = {
   [wallaceCampaign.id]: wallaceCampaign,
   ...Object.fromEntries(legendaryCampaigns.map((campaign) => [campaign.id, campaign])),
+};
+
+/** Experimental, replayable custom adventures kept separate from historical campaigns. */
+export const grandConquests: Record<string, CampaignDef> = {
+  'grand-conquests-arena': {
+    id: 'grand-conquests-arena',
+    title: 'Arena — Trial of Banners',
+    description:
+      'An experimental one-lane Grand Conquest: lead an original hero, fight automatic ' +
+      'warbands, level up, topple towers, and destroy the rival core.',
+    scenarioIds: [arenaTrial.id],
+  },
 };
