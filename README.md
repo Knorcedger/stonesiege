@@ -87,13 +87,28 @@ On touch devices, tap to select or command, drag to pan, pinch to zoom, and long
 
 ## Start a contribution with an AI coding agent
 
-Replace the `TASK` placeholder below, then give the complete prompt to your AI coding agent. The desired outcome is a focused pull request against StoneSiege—not merely a local experiment or a repository copy. A free GitHub account is required to publish the branch and open the pull request.
+Replace the `TASK` placeholder below, then give the complete prompt to your AI coding agent. The desired outcome is a focused pull request against StoneSiege—not merely a local experiment or a repository copy. A free GitHub account is required before implementation so the contributor can coordinate through an issue, publish the branch, and open the pull request.
 
 ```text
 You are contributing to StoneSiege, an open-source historical RTS. Do not stop after setup: complete the task and prepare a focused pull request.
 
 CONTRIBUTOR REQUIREMENT
-The contributor needs a GitHub account to publish a branch and open a pull request. Before publication, confirm that they have a GitHub account and are signed in where the PR will be created. If they do not have an account, complete the local work but explain that they must create and sign in to a free GitHub account before the contribution can be submitted. Never create an account, request a password, or invent credentials for them.
+The contributor needs a free GitHub account to coordinate the issue, publish a branch, and open a pull request. Before implementation, confirm that they have an account and are signed in where the issue and pull request will be created. If they do not have an account, limit work to read-only investigation and explain that they must create and sign in to an account before the contribution can begin. Never create an account, request a password, or invent credentials for them.
+
+ISSUE-FIRST COORDINATION — REQUIRED BEFORE IMPLEMENTATION
+Every code, campaign, art, audio, balance, test, or documentation contribution must have one GitHub issue before files are changed. The issue is the public coordination record.
+
+1. Search open and closed issues for the same problem or idea:
+   gh issue list --repo Knorcedger/stonesiege --state all --search "<keywords>"
+
+2. Search open pull requests for overlapping work:
+   gh pr list --repo Knorcedger/stonesiege --state open --search "<keywords>"
+
+3. If a matching issue exists, inspect its assignees, recent comments, and linked pull requests. If someone is actively working on it, coordinate in that issue and do not start a duplicate implementation. If it is available, comment with your intended scope and ask to be assigned or assign yourself when permitted.
+
+4. If no matching issue exists, create one before editing. Describe the player or contributor problem, the proposed focused scope, acceptance criteria, and important tradeoffs. Do not open a duplicate issue merely to satisfy this rule.
+
+5. Record the issue number. Name the branch for it and make the pull request close or reference it. Investigation needed to write or evaluate the issue is allowed; implementation starts only after the issue exists and the overlap check is complete.
 
 TASK
 [Describe the bug, feature, campaign, artwork, animation, balance change, or documentation improvement here.]
@@ -103,7 +118,7 @@ WORKFLOW
    git clone https://github.com/Knorcedger/stonesiege.git
    cd stonesiege
 
-2. Read README.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/ARCHITECTURE.md, and the documentation relevant to the task. Follow every AGENTS.md file that applies to files you touch.
+2. Read AGENTS.md, README.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/ARCHITECTURE.md, and the documentation relevant to the task. Follow every nested AGENTS.md file that applies to files you touch.
 
 3. Inspect git status before editing. Preserve existing work; never reset, overwrite, or discard changes you did not create.
 
@@ -113,7 +128,7 @@ WORKFLOW
    Verify the game at http://localhost:5199.
 
 5. Work on a dedicated branch unless the user already prepared one:
-   git switch -c contrib/<short-description>
+   git switch -c contrib/<issue-number>-<short-description>
    Never commit directly to main.
 
 6. Implement only the requested change. Keep simulation code deterministic, keep presentation out of packages/sim, avoid unnecessary dependencies, and follow the existing architecture and visual language. New or AI-assisted assets must include provenance and licence information required by CONTRIBUTING.md and ASSET_LICENSE.md.
@@ -128,7 +143,7 @@ WORKFLOW
 10. Commit with the Developer Certificate of Origin sign-off:
     git commit -s -m "<imperative summary>"
 
-11. Publish the branch to a Git remote you can write to and open a pull request against Knorcedger/stonesiege:main. Never push directly to main. If GitHub authentication or write access is unavailable, do not invent credentials—leave the branch ready and give the owner the exact commands needed to publish it and open the PR.
+11. Publish the branch to a Git remote you can write to and open a pull request against Knorcedger/stonesiege:main. Put “Closes #<issue-number>” in the pull-request description, or “Refs #<issue-number>” when the PR deliberately delivers only part of the accepted issue. Never push directly to main. If GitHub authentication or write access is unavailable, do not invent credentials—leave the branch ready and give the owner the exact commands needed to publish it and open the PR.
 
 12. The pull-request description must cover the problem, solution and tradeoffs, tests performed, visual evidence when relevant, material AI assistance, and asset provenance or licensing considerations.
 

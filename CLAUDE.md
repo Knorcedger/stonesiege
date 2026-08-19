@@ -2,6 +2,18 @@
 
 TypeScript + PixiJS (WebGL) game. Deterministic sim core with Capacitor 8 wrappers for iOS/Android.
 
+## Mandatory coordination before implementation
+
+Read and follow the root [`AGENTS.md`](AGENTS.md). Every code, test, campaign, map, balance,
+art, audio, build, or documentation change needs a GitHub issue before files are changed.
+Search open and closed issues and open pull requests first. Reuse and claim an available matching
+issue; if someone is already active, coordinate there and do not duplicate the implementation.
+Create a new issue only when no matching issue exists. Use the issue number in the branch and
+link the pull request with `Closes #<issue-number>` or `Refs #<issue-number>`.
+
+If the contributor cannot authenticate to GitHub, read-only investigation is allowed but
+implementation must wait until the coordination issue exists.
+
 ## Commands
 - `npm run dev` — dev server at http://localhost:5199 (game is playable in browser)
 - `npm run build` — production build to `dist/`

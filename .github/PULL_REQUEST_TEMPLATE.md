@@ -2,6 +2,12 @@
 
 <!-- Describe the player or developer problem and the solution. Keep the PR focused. -->
 
+## Related issue
+
+<!-- Required. Use “Closes #123”, or “Refs #123” only for an intentionally partial delivery. -->
+
+Closes #
+
 ## Why this approach?
 
 <!-- Note important alternatives, tradeoffs, determinism concerns, or migration impact. -->
@@ -22,6 +28,8 @@
 
 ## Contributor checklist
 
+- [ ] I searched issues and active pull requests before implementation and coordinated ownership in the linked issue
+- [ ] This pull request closes or references exactly one primary coordination issue
 - [ ] I read `CONTRIBUTING.md` and followed the deterministic simulation rules
 - [ ] I reviewed and understand every submitted change
 - [ ] I have the right to submit this code and any included assets
