@@ -67,7 +67,9 @@ function frameMaskPixelCount(name: string): number {
   return count;
 }
 
-function frameVisibleBounds(name: string): { width: number; height: number; bottom: number } {
+function frameVisibleBounds(name: string): {
+  left: number; top: number; right: number; width: number; height: number; bottom: number;
+} {
   const match = hdAtlases().find(({ atlas }) => atlas.frames[name]);
   if (!match) throw new Error(`missing HD frame ${name}`);
   const frame = match.atlas.frames[name].frame;
@@ -91,7 +93,7 @@ function frameVisibleBounds(name: string): { width: number; height: number; bott
     }
   }
   if (right < left || bottom < top) throw new Error(`empty HD frame ${name}`);
-  return { width: right - left + 1, height: bottom - top + 1, bottom };
+  return { left, top, right, width: right - left + 1, height: bottom - top + 1, bottom };
 }
 
 describe('complete HD art override contract', () => {
@@ -174,6 +176,17 @@ describe('complete HD art override contract', () => {
     expect(frames['obj/farm/3'].anchor).toEqual({ x: 0.5, y: 0.399 });
     expect(frames['obj/tree/0'].anchor).toEqual({ x: 0.5, y: 0.9688 });
     expect(frames['obj/berries'].anchor).toEqual({ x: 0.5, y: 0.9063 });
+  });
+
+  it('centers gold and stone piles on their logical resource origin', () => {
+    const frames = Object.assign({}, ...hdAtlases().map(({ atlas }) => atlas.frames));
+    for (const name of ['obj/gold/0', 'obj/gold/1', 'obj/stone/0', 'obj/stone/1']) {
+      const visible = frameVisibleBounds(name);
+      const frame = frames[name];
+      const visibleCenter = (visible.left + visible.right) / 2;
+      expect(Math.abs(visibleCenter - frame.frame.w / 2), `${name} horizontal center`)
+        .toBeLessThanOrEqual(1);
+    }
   });
 
   it('uses the approved final canvas and anchor for every construction stage', () => {

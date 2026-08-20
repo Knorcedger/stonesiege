@@ -17,6 +17,7 @@ import { genUnits } from '../assetgen/src/gen-units.ts';
 import { PALETTE } from '../assetgen/src/palette.ts';
 import { writePng } from '../assetgen/src/png.ts';
 import { Raster } from '../assetgen/src/raster.ts';
+import { alphaBounds, type AlphaBounds } from './alpha-bounds.ts';
 import { HD_DENSITY, MaterialLibrary, materializeFrame } from './materialize.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -51,6 +52,8 @@ interface CutoutSpec {
   scaleGroup?: string;
   /** Ignore disconnected sheet bleed when measuring and cropping this pose. */
   dominantComponent?: boolean;
+  /** Ignore generator haze below this alpha while fitting a cutout. */
+  alphaThreshold?: number;
   /** Convert authored blue cloth to the runtime team ramp, with a sash fallback. */
   teamColor?: 'blue' | 'sash';
   /** Add authored-raster motion without falling back to the legacy pixel rig. */
@@ -398,6 +401,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     fitWidth: 0.96,
     fitHeight: 0.92,
     bottom: 0.92,
+    alphaThreshold: 16,
   },
   {
     source: 'art/hd/frames/objects/stone-cutout-v2.png',
@@ -405,6 +409,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     fitWidth: 0.96,
     fitHeight: 0.92,
     bottom: 0.92,
+    alphaThreshold: 16,
   },
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/villager-dir-${dir}-cutout-v2.png`,
@@ -907,8 +912,6 @@ function heroFrame(): { frame: FrameDef; masked: number } {
   return { frame: { name: HERO_FRAME, raster, anchor: { x: 288, y: 267 } }, masked };
 }
 
-interface AlphaBounds { left: number; top: number; right: number; bottom: number }
-
 function cellBounds(png: PNG, spec: CutoutSpec): AlphaBounds {
   if (!spec.cell) return { left: 0, top: 0, right: png.width - 1, bottom: png.height - 1 };
   const { columns, rows, column, row } = spec.cell;
@@ -923,26 +926,8 @@ function cellBounds(png: PNG, spec: CutoutSpec): AlphaBounds {
   };
 }
 
-function alphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
-  let left = region.right + 1;
-  let top = region.bottom + 1;
-  let right = -1;
-  let bottom = -1;
-  for (let y = region.top; y <= region.bottom; y++) {
-    for (let x = region.left; x <= region.right; x++) {
-      if (png.data[(y * png.width + x) * 4 + 3] < 8) continue;
-      left = Math.min(left, x);
-      top = Math.min(top, y);
-      right = Math.max(right, x);
-      bottom = Math.max(bottom, y);
-    }
-  }
-  if (right < left || bottom < top) throw new Error('generated cutout contains no visible pixels');
-  return { left, top, right, bottom };
-}
-
 /** Bounds of the main connected silhouette inside one animation-sheet cell. */
-function dominantAlphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
+function dominantAlphaBounds(png: PNG, region: AlphaBounds, threshold = 8): AlphaBounds {
   const width = region.right - region.left + 1;
   const height = region.bottom - region.top + 1;
   const seen = new Uint8Array(width * height);
@@ -953,7 +938,7 @@ function dominantAlphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
     if (seen[start]) continue;
     const startX = start % width;
     const startY = Math.floor(start / width);
-    if (png.data[((region.top + startY) * png.width + region.left + startX) * 4 + 3] < 8) {
+    if (png.data[((region.top + startY) * png.width + region.left + startX) * 4 + 3] < threshold) {
       seen[start] = 1;
       continue;
     }
@@ -981,7 +966,7 @@ function dominantAlphaBounds(png: PNG, region: AlphaBounds): AlphaBounds {
           if (nx < 0 || ny < 0 || nx >= width || ny >= height) continue;
           const next = ny * width + nx;
           if (seen[next]) continue;
-          if (png.data[((region.top + ny) * png.width + region.left + nx) * 4 + 3] < 8) continue;
+          if (png.data[((region.top + ny) * png.width + region.left + nx) * 4 + 3] < threshold) continue;
           seen[next] = 1;
           queue.push(next);
         }
@@ -1178,8 +1163,8 @@ function cutoutMetrics(spec: CutoutSpec, name: string, base: FrameDef): CutoutMe
   }
   const region = cellBounds(png, spec);
   const bounds = spec.dominantComponent
-    ? dominantAlphaBounds(png, region)
-    : alphaBounds(png, region);
+    ? dominantAlphaBounds(png, region, spec.alphaThreshold)
+    : alphaBounds(png, region, spec.alphaThreshold);
   const sourceWidth = bounds.right - bounds.left + 1;
   const sourceHeight = bounds.bottom - bounds.top + 1;
   const authoredVillager = name.startsWith('unit/villager/');
