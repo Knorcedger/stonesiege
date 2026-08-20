@@ -35,8 +35,6 @@ interface CutoutSpec {
   fitHeight?: number;
   bottom?: number;
   grayscale?: boolean;
-  /** Keep the generator sheet's cell center stable across animation poses. */
-  preserveSourceCenter?: boolean;
   /** Cap scale for multi-pose sheets so raised tools do not shrink the body. */
   maxScale?: number;
   /** Crop one pose from a regular source-sheet grid before fitting it. */
@@ -88,9 +86,14 @@ function walkGridCutouts(
     fitWidth: options.fitWidth ?? 0.96,
     fitHeight: options.fitHeight ?? 0.96,
     bottom: options.bottom ?? 0.97,
-    preserveSourceCenter: true,
     stableSize: options.stableSize,
     teamColor: options.teamColor ?? 'blue',
+    // Every pose in the family is cropped from the same grid sheet, so every
+    // pose has to ignore the neighbouring cell's bleed when it measures its own
+    // bounds. Measuring only `walk` this way left `idle` fitted around a
+    // sliver of the next pose, which pushed the standing body up to 24px off
+    // its own canvas center and made units hop sideways the moment they stopped.
+    dominantComponent: true,
   } as const;
   const deathSize: readonly [number, number] = [
     Math.max(options.stableSize[0], options.stableSize[1] * 2),
@@ -115,7 +118,6 @@ function walkGridCutouts(
         frames: [`unit/${id}/walk/${dir}/${frame}`],
         cell: cell(frame),
         scaleGroup: `walk:${source}:${dir}`,
-        dominantComponent: true,
       })),
       ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
         ...common,
@@ -426,8 +428,8 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
         fitWidth: 0.94,
         fitHeight: 0.97,
         bottom: 0.97,
-        preserveSourceCenter: true,
         maxScale: 0.3,
+        dominantComponent: true,
       })))),
   ...([0, 1, 2, 3, 4] as const).flatMap((dir) =>
     Array.from({ length: 6 }, (_, frame): CutoutSpec => ({
@@ -436,7 +438,6 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.92,
       fitHeight: 0.96,
       bottom: 0.97,
-      preserveSourceCenter: true,
       stableSize: [52, 64],
       scaleGroup: `walk:villager:${dir}`,
       dominantComponent: true,
@@ -456,6 +457,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     fitWidth: 0.92,
     fitHeight: 0.96,
     bottom: 0.97,
+    dominantComponent: true,
   })),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/villager-attack-dir-${dir}-cutout-v3.png`,
@@ -463,6 +465,11 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     fitWidth: 0.94,
     fitHeight: 0.97,
     bottom: 0.97,
+    // The rear-facing render carries a matte fringe of alpha <= 32 running out
+    // to x=0. It is invisible once resampled but it dragged the measured bounds
+    // across half the canvas, so the pose was fitted too small and sat 10px off
+    // the body center that idle and walk use. Bounds are stable from 32 up.
+    alphaThreshold: 32,
   })),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/villager-downed-dir-${dir}-cutout-v3.png`,
@@ -473,6 +480,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     fitWidth: 0.94,
     fitHeight: 0.8,
     bottom: 0.97,
+    alphaThreshold: 32,
   })),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/scout-dir-${dir}-cutout-v3.png`,
@@ -480,6 +488,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     fitWidth: 0.96,
     fitHeight: 0.96,
     bottom: 0.97,
+    dominantComponent: true,
   })),
   ...([0, 1, 2, 3, 4] as const).flatMap((dir) =>
     Array.from({ length: 8 }, (_, frame): CutoutSpec => ({
@@ -488,7 +497,6 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.96,
       fitHeight: 0.96,
       bottom: 0.97,
-      preserveSourceCenter: true,
       stableSize: [68, 80],
       scaleGroup: `walk:scout:${dir}`,
       dominantComponent: true,
@@ -538,6 +546,7 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
     bottom: 0.97,
     stableSize: [68, 80],
     teamColor: 'blue',
+    dominantComponent: true,
   })),
   ...([0, 1, 2, 3, 4] as const).flatMap((dir) =>
     Array.from({ length: 8 }, (_, frame): CutoutSpec => ({
@@ -548,7 +557,6 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       bottom: 0.97,
       stableSize: [68, 80],
       teamColor: 'blue',
-      preserveSourceCenter: true,
       scaleGroup: `walk:scout:${dir}`,
       dominantComponent: true,
     }))),
@@ -646,7 +654,6 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.94,
       fitHeight: 0.9,
       bottom: 0.94,
-      preserveSourceCenter: true,
       stableSize: [64, 64],
       scaleGroup: `walk:sheep:${dir}`,
       dominantComponent: true,
@@ -1139,7 +1146,6 @@ function restoreExactTeamMask(raster: Raster): void {
 
 interface CutoutMetrics {
   png: PNG;
-  region: AlphaBounds;
   bounds: AlphaBounds;
   sourceWidth: number;
   sourceHeight: number;
@@ -1189,7 +1195,7 @@ function cutoutMetrics(spec: CutoutSpec, name: string, base: FrameDef): CutoutMe
     spec.maxScale ?? Number.POSITIVE_INFINITY,
   );
   const metrics = {
-    png, region, bounds, sourceWidth, sourceHeight, width, height, fittedScale,
+    png, bounds, sourceWidth, sourceHeight, width, height, fittedScale,
     authoredVillager, authoredScout,
   };
   let byName = cutoutMetricsCache.get(spec);
@@ -1204,7 +1210,7 @@ function cutoutMetrics(spec: CutoutSpec, name: string, base: FrameDef): CutoutMe
 /** Fit an authored transparent render into the exact mechanical frame contract. */
 function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef, sharedScale?: number): FrameDef {
   const {
-    png, region, bounds, sourceWidth, sourceHeight, width, height, fittedScale,
+    png, bounds, sourceWidth, sourceHeight, width, height, fittedScale,
     authoredVillager, authoredScout,
   } = cutoutMetrics(spec, name, base);
   // A grouped walk cycle uses its most restrictive pose for every frame. This
@@ -1213,12 +1219,17 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef, sharedScale
   const scale = sharedScale ?? fittedScale;
   const drawWidth = Math.max(1, Math.round(sourceWidth * scale));
   const drawHeight = Math.max(1, Math.round(sourceHeight * scale));
-  const centeredDx = Math.round((width - drawWidth) / 2);
-  const sourceCenterX = (region.left + region.right + 1) / 2;
-  const registeredDx = Math.round(width / 2 - (sourceCenterX - bounds.left) * scale);
-  const dx = spec.preserveSourceCenter
-    ? Math.max(0, Math.min(width - drawWidth, registeredDx))
-    : centeredDx;
+  // Horizontal registration is always relative to the subject, never to the
+  // source cell. The authored movement sheets are walk-ACROSS strips: the figure
+  // translates from cell to cell, so registering on the cell center baked that
+  // translation into the atlas and every walk cycle slid sideways and snapped
+  // back at its loop point (monk 42px, skirmisher 33px, militia 15px of travel
+  // at 2x density). Correctly authored sheets — chevalier, mamluk, mangudai,
+  // cataphract, housecarl — already hold their subject bounding box steady to
+  // ~1px per cycle, so subject centering IS the authored convention and leaves
+  // those families untouched. It also keeps idle/walk/attack/die on one
+  // convention, so a unit no longer jumps sideways when it stops or swings.
+  const dx = Math.round((width - drawWidth) / 2);
   const motionFrame = name.match(/\/(walk|gather|carry|attack)\/\d\/(\d+)$/);
   const motionCycle = motionFrame?.[1] === 'attack'
     ? [0, -1, -2, -1, 0]

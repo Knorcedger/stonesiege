@@ -9,8 +9,8 @@
 
 import { describe, expect, it } from 'vitest';
 import { genBuildings } from './gen-buildings.ts';
-import { drawCavalry, trimFrame, CAV_GY } from './rig.ts';
-import type { CavSpec } from './rig.ts';
+import { drawCavalry, drawHuman, trimFrame, DIRS, CAV_GY, HUMAN_GY } from './rig.ts';
+import type { CavSpec, Dir, HumanSpec } from './rig.ts';
 import { PALETTE, isMaskColor } from './palette.ts';
 import type { Raster } from './raster.ts';
 
@@ -56,6 +56,71 @@ describe('building player color survives the outline pass (§5.3/§9.4)', () => 
       const f = frames.find((x) => x.name === `bld/townCenter/${age}/done`);
       expect(f, `bld/townCenter/${age}/done`).toBeDefined();
       expect(maskCount(f!.raster), `bld/townCenter/${age}/done mask px`).toBeGreaterThanOrEqual(40);
+    }
+  });
+});
+
+describe('humanoid walk cycle', () => {
+  // This rig is the missing-atlas fallback, but it was authoring a walk that
+  // was not a walk: facing the camera, frames 2 and 3 were byte-identical and
+  // 0/2/3/5 were within 4 px of each other, so a six-frame cycle played as two
+  // poses strobing. In the side views the far leg collided with the near leg at
+  // the passing frames and was shoved to the wrong side of the body.
+  const VILLAGER: HumanSpec = {
+    id: 'villager', height: 26, torsoW: 7,
+    tunic: [PALETTE.clothLight, PALETTE.clothBase],
+    legsC: PALETTE.clothDark,
+    helmet: 'cap', weapon: 'tool', sashRows: 1, metal: 0, hunch: true,
+  };
+
+  function framePixels(r: Raster): string {
+    let out = '';
+    for (let y = 0; y < r.height; y++) {
+      for (let x = 0; x < r.width; x++) {
+        const [pr, pg, pb, pa] = r.get(x, y);
+        out += pa === 0 ? '.' : `${pr},${pg},${pb},${pa};`;
+      }
+    }
+    return out;
+  }
+
+  function differingPixels(a: Raster, b: Raster): number {
+    let n = 0;
+    for (let y = 0; y < a.height; y++) {
+      for (let x = 0; x < a.width; x++) {
+        const pa = a.get(x, y);
+        const pb = b.get(x, y);
+        if (pa[0] !== pb[0] || pa[1] !== pb[1] || pa[2] !== pb[2] || pa[3] !== pb[3]) n++;
+      }
+    }
+    return n;
+  }
+
+  it('draws six visibly distinct poses in every authored direction', () => {
+    for (const dir of DIRS) {
+      const frames = Array.from({ length: 6 }, (_, f) => drawHuman(VILLAGER, 'walk', dir as Dir, f));
+      const unique = new Set(frames.map(framePixels));
+      expect(unique.size, `dir ${dir} distinct poses`).toBe(6);
+      for (let i = 0; i < 6; i++) {
+        for (let j = i + 1; j < 6; j++) {
+          expect(differingPixels(frames[i], frames[j]), `dir ${dir} frames ${i}/${j}`)
+            .toBeGreaterThanOrEqual(5);
+        }
+      }
+    }
+  });
+
+  it('keeps every walk pose on the ground line', () => {
+    for (const dir of DIRS) {
+      for (let f = 0; f < 6; f++) {
+        const r = drawHuman(VILLAGER, 'walk', dir as Dir, f);
+        let lowest = -1;
+        for (let y = 0; y < r.height; y++) {
+          for (let x = 0; x < r.width; x++) if (r.alphaAt(x, y) > 0) lowest = Math.max(lowest, y);
+        }
+        // The drop shadow sits on HUMAN_GY, so no pose may sink through it.
+        expect(lowest, `dir ${dir} frame ${f} ground contact`).toBeLessThanOrEqual(HUMAN_GY + 2);
+      }
     }
   });
 });
