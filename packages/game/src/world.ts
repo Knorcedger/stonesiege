@@ -32,6 +32,7 @@ const GHOST_TINT = 0x9aa4ad;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
+const OCCLUDER_ALPHA = 0.8;
 const GATE_OPEN_RADIUS_FP = 2 * FP;
 const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
 interface ArtScale { x: number; y: number }
@@ -125,6 +126,56 @@ interface EntityView {
   lastBadgeKey: string;
 }
 
+export interface WorldRect {
+  left: number;
+  right: number;
+  top: number;
+  bottom: number;
+}
+
+/** True only when a unit that sorts behind an obstacle overlaps its visible artwork. */
+export function shouldFadeForUnit(
+  occluder: WorldRect,
+  occluderDepth: number,
+  unit: WorldRect,
+  unitDepth: number,
+): boolean {
+  if (unitDepth >= occluderDepth) return false;
+  return unit.right > occluder.left && unit.left < occluder.right
+    && unit.bottom > occluder.top && unit.top < occluder.bottom;
+}
+
+function spriteWorldRect(view: EntityView): WorldRect {
+  const sprite = view.sprite;
+  const width = sprite.texture.width;
+  const height = sprite.texture.height;
+  const x0 = (0 - sprite.anchor.x) * width * sprite.scale.x;
+  const x1 = (1 - sprite.anchor.x) * width * sprite.scale.x;
+  const y0 = (0 - sprite.anchor.y) * height * sprite.scale.y;
+  const y1 = (1 - sprite.anchor.y) * height * sprite.scale.y;
+  return {
+    left: view.root.position.x + Math.min(x0, x1),
+    right: view.root.position.x + Math.max(x0, x1),
+    // Ignore transparent texture headroom so nearby units do not cause false fades.
+    top: view.root.position.y + Math.max(Math.min(y0, y1), view.spriteTopPx),
+    bottom: view.root.position.y + Math.max(y0, y1),
+  };
+}
+
+function unitWorldRect(view: EntityView): WorldRect {
+  const bounds = spriteWorldRect(view);
+  // A unit's readable body is centred around its feet. Keeping the horizontal
+  // extent bounded prevents transparent cavalry-sheet gutters from fading a
+  // building when the horse is merely beside it.
+  const halfWidth = Math.min(24, Math.max(7, (bounds.right - bounds.left) * 0.4));
+  return {
+    left: view.root.position.x - halfWidth,
+    right: view.root.position.x + halfWidth,
+    top: bounds.top,
+    bottom: view.root.position.y + 2,
+  };
+}
+
 interface GhostRecord {
   defId: string;
   player: PlayerId;
@@ -203,6 +254,7 @@ export class WorldLayer {
     const seen = new Set<EntityId>();
     this.refreshGatherTargets(state);
     this.refreshOpenGates(state);
+    const visibleUnits: Array<{ entity: Entity; view: EntityView }> = [];
 
     for (const e of state.entities.values()) {
       seen.add(e.id);
@@ -228,7 +280,11 @@ export class WorldLayer {
       }
       view.root.visible = true;
       this.updateView(state, e, view, alpha, tickFloat);
+      if (e.kind === 'unit' && e.hp > 0 && e.activity !== 'dying'
+        && e.garrisonedIn === undefined) visibleUnits.push({ entity: e, view });
     }
+
+    this.fadeUnitOccluders(state, visibleUnits);
 
     // stale views
     for (const [id, view] of this.views) {
@@ -445,6 +501,36 @@ export class WorldLayer {
       renderFacing: 0,
       carry: null, lastCarryKey: '', badge: null, badgeText: null, lastBadgeKey: '',
     };
+  }
+
+  /**
+   * Keep concealed units readable without making the map permanently ghostly.
+   * Only the artwork that actually overlaps a visible, living unit is faded;
+   * rings, health bars, carry icons, and ownership badges remain fully opaque.
+   */
+  private fadeUnitOccluders(
+    state: GameState,
+    visibleUnits: Array<{ entity: Entity; view: EntityView }>,
+  ): void {
+    if (visibleUnits.length === 0) return;
+    for (const e of state.entities.values()) {
+      if ((e.kind !== 'building' && e.kind !== 'resource') || e.hp <= 0) continue;
+      const view = this.views.get(e.id);
+      if (!view?.root.visible || !view.sprite.visible) continue;
+      // Flat artwork does not conceal a unit and should not pulse as feet cross it.
+      if (e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250)) continue;
+      const occluderBounds = spriteWorldRect(view);
+      const covered = visibleUnits.some(({ view: unitView }) => shouldFadeForUnit(
+        occluderBounds,
+        view.root.zIndex,
+        unitWorldRect(unitView),
+        unitView.root.zIndex,
+      ));
+      if (!covered) continue;
+      view.sprite.alpha *= OCCLUDER_ALPHA;
+      view.cornerSprite.alpha *= OCCLUDER_ALPHA;
+      view.gateDoor.alpha *= OCCLUDER_ALPHA;
+    }
   }
 
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {

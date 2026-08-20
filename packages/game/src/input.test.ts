@@ -367,6 +367,9 @@ describe('resolveTapAction — no selection', () => {
     expect(resolveTapAction([bld], NO_SEL, HUMAN)).toEqual({ type: 'select', id: bld.id });
     // own unit outranks own building regardless of distance (units are tiny)
     expect(resolveTapAction([bld, own], NO_SEL, HUMAN)).toEqual({ type: 'select', id: own.id });
+    // The same priority keeps a unit selectable when tree/resource art overlaps it.
+    const tree = ent({ kind: 'resource', player: GAIA, defId: 'tree' });
+    expect(resolveTapAction([tree, own], NO_SEL, HUMAN)).toEqual({ type: 'select', id: own.id });
   });
 
   it('enemy/resource with nothing selected: inspect, never a command', () => {

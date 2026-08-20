@@ -41,6 +41,8 @@ apps/web  ──► @bf/game (Pixi renderer + input + HUD + menus)
 - Isometric projection: tile (x, y) → screen ((x−y)·32, (x+y)·16); 64×32 diamond tiles,
   integer zoom scaling with nearest-neighbor for crisp pixel art.
 - Interpolation: renderer runs at rAF; entity positions lerp between last two sim ticks.
+- Readability occlusion: live building/resource artwork fades to 80% only while its
+  visible bounds overlap a visible unit sorted behind it; HUD overlays remain opaque.
 - Minimap: offscreen canvas, terrain baked once, entities/fog refreshed ~4 Hz.
 - HUD is DOM (fast to build, crisp text, natural touch targets); game world is canvas.
 
