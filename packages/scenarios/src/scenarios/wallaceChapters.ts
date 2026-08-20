@@ -40,6 +40,24 @@ const withTimer = (source: TriggerDef, seconds: number): TriggerDef => ({
   )),
 });
 
+const withoutSpawnUnits = (source: TriggerDef, defId: string, count: number): TriggerDef => {
+  let removed = 0;
+  return {
+    ...source,
+    effects: source.effects.map((effect) => {
+      if (effect.kind !== 'spawn') return effect;
+      return {
+        ...effect,
+        entities: effect.entities.filter((entity) => {
+          if (entity.def !== defId || removed >= count) return true;
+          removed++;
+          return false;
+        }),
+      };
+    }),
+  };
+};
+
 const units = (
   def: string,
   player: number,
@@ -372,7 +390,11 @@ export const wallaceChapter06 = chapter({
     'The English vanguard begins to cross two horsemen abreast. Each man who reaches the north bank puts the Forth behind him. Warenne delays; Cressingham demands speed.\n\n' +
     'Wallace and Moray wait until enough of the host is trapped on their side of the river. Hold the bridgehead, answer the western ford, and break an army of knights with common foot soldiers.',
   objectives: ['Hold the Scottish camp', 'Destroy the English force north of the Forth'],
-  hints: wallace3.briefing.hints,
+  hints: [
+    'Hold the north end of the bridge. Chasing the first wave onto the causeway gives up the choke point.',
+    'Keep the villagers on the starting farms and wood line so the Barracks and Archery Range can replace losses.',
+    ...wallace3.briefing.hints,
+  ],
   entities: [...wallace3.entities, ...stirlingReinforcements],
   triggers: [
     {
@@ -387,7 +409,11 @@ export const wallaceChapter06 = chapter({
     trigger(wallace3, 't05b-signal-crossed'),
     trigger(wallace3, 't05-signal'),
     withTimer(trigger(wallace3, 't06-wave-b'), 90),
-    withTimer(trigger(wallace3, 't07-wave-c'), 110),
+    withoutSpawnUnits(
+      withoutSpawnUnits(withTimer(trigger(wallace3, 't07-wave-c'), 110), 'longbowman', 3),
+      'manAtArms',
+      3,
+    ),
     withTimer(trigger(wallace3, 't08-wave-d'), 120),
     trigger(wallace3, 't09-ford-clear'),
     trigger(wallace3, 't10-mopup-gate'),
