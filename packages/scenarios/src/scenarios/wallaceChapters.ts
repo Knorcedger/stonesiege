@@ -255,6 +255,8 @@ const sconeArmy: ScenarioEntity[] = [
   ...units('militia', 1, [[35, 68], [36, 68], [37, 68], [35, 69], [36, 69], [37, 69]]),
   ...units('spearman', 1, [[34, 70], [35, 70], [36, 70], [37, 70], [38, 70], [39, 70]]),
   ...units('archer', 1, [[35, 71], [36, 71], [37, 71], [38, 71]]),
+  { def: 'batteringRam', player: 1, x: 40, y: 69 },
+  { def: 'batteringRam', player: 1, x: 41, y: 69 },
 ];
 
 const raidRefs = ['raid-1', 'raid-2', 'raid-3', 'raid-4', 'raid-5', 'raid-6', 'raid-7', 'raid-8'];
@@ -276,6 +278,7 @@ export const wallaceChapter04 = chapter({
   objectives: ['Break the English patrol', 'Destroy Ormesby’s hall at Scone'],
   hints: [
     'Spearmen counter the patrol’s mounted scouts.',
+    'Keep the rams behind your infantry until the patrol breaks, then send them against Ormesby’s hall.',
     'The ford tower covers the direct road. Bring it down or move quickly past its range.',
   ],
   players: playersWith(wallace2, { age: 'feudal', resources: { food: 300, wood: 200, gold: 150 } }),
