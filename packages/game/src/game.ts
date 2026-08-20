@@ -330,7 +330,10 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   // Destination arrows sit above fog so an order into unexplored terrain is
   // visibly acknowledged. The overlay contains no world information, so this
   // does not leak anything hidden by fog-of-war.
-  worldRoot.addChild(terrain.container, fx.ground, world.container, fx.air, ghostLayer, fog.sprite, fx.overlay);
+  worldRoot.addChild(
+    terrain.container, fx.ground, world.container, fx.air, ghostLayer, fog.sprite,
+    world.rallyOverlay, fx.overlay,
+  );
   app.stage.addChild(worldRoot);
   const bandOverlay = new Graphics();
   app.stage.addChild(bandOverlay);
