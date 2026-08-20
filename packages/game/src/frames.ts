@@ -137,15 +137,31 @@ export const ANIM_FPS: Readonly<Record<AnimName, number>> = {
   idle: 2,
   walk: 10,
   attack: 10,
-  gather: 8,
-  chop: 8,
+  gather: 5,
+  chop: 5,
   farm: 7,
-  forage: 7,
-  mine: 8,
-  build: 8,
+  forage: 5,
+  mine: 5,
+  build: 5,
   carry: 10,
   die: 8,
   decay: 0.5,
+};
+
+/**
+ * Villager work is not a walk or combat loop: the contact pose needs time to
+ * read at game scale, followed by a short recovery before the next action.
+ * Repeating authored frame indices gives every four-frame work sheet a natural
+ * cadence without synthesizing new art or changing simulation work rates.
+ */
+const WORK_FRAME_SEQUENCE: Partial<Readonly<Record<AnimName, readonly number[]>>> = {
+  gather: [0, 1, 2, 2, 3, 0],
+  chop: [0, 1, 2, 2, 3, 0],
+  // Foraging is a quieter reach-and-pick action: hold contact and the ready
+  // pose longer so berry workers do not look as if they are vibrating.
+  forage: [0, 1, 2, 2, 2, 3, 0, 0],
+  mine: [0, 1, 2, 2, 3, 0],
+  build: [0, 1, 2, 2, 3, 0],
 };
 
 /** Frame index for an anim at a given sim-time (seconds). die/decay clamp; others loop. */
@@ -160,5 +176,9 @@ export function animFrameIndex(anim: AnimName, animAgeSeconds: number, frameCoun
   // the sim periodically switches them to walk and resets this sequence when
   // they arrive at a different spot on the plot.
   if (anim === 'farm') return Math.min(raw, Math.min(2, frameCount - 1));
+  const workSequence = WORK_FRAME_SEQUENCE[anim];
+  if (workSequence) {
+    return Math.min(workSequence[raw % workSequence.length], frameCount - 1);
+  }
   return raw % frameCount;
 }
