@@ -4,7 +4,7 @@ import { tileToWorld } from './camera';
 import {
   advanceGateOpenProgress, buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
   mirroredWallIds, ownedResearchProgress, resourceFrameName, wallCornerJoins,
-  rallyFlagWorldPoint,
+  rallyFlagWorldPoint, shouldFadeForUnit,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -126,6 +126,27 @@ describe('rallyFlagWorldPoint', () => {
   it('does not produce rally markers for non-production structures', () => {
     const house = resource({ kind: 'building', defId: 'house', player: HUMAN, buildProgress: 1000 });
     expect(rallyFlagWorldPoint(state([house]), house)).toBeNull();
+  });
+});
+
+describe('shouldFadeForUnit', () => {
+  const occluder = { left: 100, right: 180, top: 70, bottom: 150 };
+
+  it('fades when visible unit artwork overlaps behind an obstacle', () => {
+    const unit = { left: 125, right: 145, top: 80, bottom: 135 };
+    expect(shouldFadeForUnit(occluder, 150, unit, 134)).toBe(true);
+  });
+
+  it('does not fade for a unit in front of or beside the obstacle', () => {
+    const overlap = { left: 125, right: 145, top: 80, bottom: 135 };
+    const beside = { left: 181, right: 205, top: 80, bottom: 135 };
+    expect(shouldFadeForUnit(occluder, 150, overlap, 151)).toBe(false);
+    expect(shouldFadeForUnit(occluder, 150, beside, 134)).toBe(false);
+  });
+
+  it('requires actual vertical artwork overlap', () => {
+    const above = { left: 125, right: 145, top: 20, bottom: 69 };
+    expect(shouldFadeForUnit(occluder, 150, above, 68)).toBe(false);
   });
 });
 
