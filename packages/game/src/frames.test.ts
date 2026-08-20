@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
-  animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
+  ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
   placementGhostFrames, resolveFrameName, unitRig,
 } from './frames';
 
@@ -130,5 +130,18 @@ describe('anim helpers', () => {
     expect(animFrameIndex('farm', 0.2, 4)).toBe(1);
     expect(animFrameIndex('farm', 0.4, 4)).toBe(2);
     expect(animFrameIndex('farm', 30, 4)).toBe(2);
+  });
+
+  it('paces berry foraging with readable contact and recovery holds', () => {
+    const frames = [0, 0.2, 0.4, 0.6, 0.8, 1, 1.2, 1.4, 1.6]
+      .map((seconds) => animFrameIndex('forage', seconds, 4));
+    expect(frames).toEqual([0, 1, 2, 2, 2, 3, 0, 0, 0]);
+  });
+
+  it('paces tool work below combat speed and holds its impact frame', () => {
+    const frames = [0, 0.2, 0.4, 0.6, 0.8, 1, 1.2]
+      .map((seconds) => animFrameIndex('mine', seconds, 4));
+    expect(frames).toEqual([0, 1, 2, 2, 3, 0, 0]);
+    expect(ANIM_FPS.mine).toBeLessThan(ANIM_FPS.attack);
   });
 });
