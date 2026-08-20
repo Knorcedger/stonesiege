@@ -198,7 +198,7 @@ export interface SimState {
   players: PlayerState[];
   refs: Map<string, EntityId>;
   finished: boolean;
-  /** Global construction/training/research multiplier; never used by movement or combat. */
+  /** Global construction/training/research/gathering multiplier; never used by movement or combat. */
   productionSpeed: ProductionSpeed;
 
   // --- internal ---

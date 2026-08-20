@@ -125,7 +125,7 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
   container.appendChild(speedSeg);
   const speedHint = document.createElement('div');
   speedHint.className = 'bf-set-hint';
-  speedHint.textContent = 'Construction, troop training and upgrades. Movement and combat stay unchanged.';
+  speedHint.textContent = 'Construction, training, upgrades and gathering. Movement, combat and animations stay unchanged.';
   container.appendChild(speedHint);
 
   // HP-bar visibility: self-contained segmented toggle (updates its own .on
