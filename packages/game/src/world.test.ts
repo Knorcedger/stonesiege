@@ -1,9 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { FP, type Entity, type GameMap, type PlayerId } from '@bf/sim/types';
+import { FP, type Entity, type GameMap, type GameState, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
 import {
   advanceGateOpenProgress, buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
   mirroredWallIds, ownedResearchProgress, resourceFrameName, wallCornerJoins,
+  rallyFlagWorldPoint,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -95,6 +96,36 @@ describe('defaultRallyTilePoint', () => {
   it('puts a selected Barracks flag beyond the center of its south edge', () => {
     const barracks = resource({ kind: 'building', defId: 'barracks', tileX: 10, tileY: 20 });
     expect(defaultRallyTilePoint(barracks)).toEqual([11.5, 23.5]);
+  });
+});
+
+describe('rallyFlagWorldPoint', () => {
+  const state = (entities: Entity[]): GameState => ({
+    entities: new Map(entities.map((entity) => [entity.id, entity])),
+    players: [],
+  } as unknown as GameState);
+
+  it('resolves default, custom-ground, and live-target destinations', () => {
+    const barracks = resource({
+      id: 20, kind: 'building', defId: 'barracks', player: HUMAN,
+      tileX: 10, tileY: 20, x: 11.5 * FP, y: 21.5 * FP, buildProgress: 1000,
+    });
+    expect(rallyFlagWorldPoint(state([barracks]), barracks))
+      .toEqual(tileToWorld(11.5, 23.5));
+
+    barracks.rally = { x: 20 * FP, y: 18 * FP };
+    expect(rallyFlagWorldPoint(state([barracks]), barracks))
+      .toEqual(tileToWorld(20, 18));
+
+    const target = resource({ id: 21, x: 27 * FP, y: 12 * FP, tileX: 27, tileY: 12 });
+    barracks.rally = { x: 1, y: 1, targetId: target.id };
+    expect(rallyFlagWorldPoint(state([barracks, target]), barracks))
+      .toEqual(tileToWorld(27, 12));
+  });
+
+  it('does not produce rally markers for non-production structures', () => {
+    const house = resource({ kind: 'building', defId: 'house', player: HUMAN, buildProgress: 1000 });
+    expect(rallyFlagWorldPoint(state([house]), house)).toBeNull();
   });
 });
 

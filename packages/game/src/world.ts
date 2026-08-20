@@ -142,6 +142,8 @@ export interface PickResult {
 
 export class WorldLayer {
   readonly container = new Container();
+  /** Player-authored rally destinations render above fog like order arrows. */
+  readonly rallyOverlay = new Container();
   selection = new Set<EntityId>();
 
   /** Faint ground circles for the selected military units' true auto-acquire radius. */
@@ -172,8 +174,8 @@ export class WorldLayer {
   ) {
     this.container.sortableChildren = true;
     this.aggroLayer.zIndex = -1e9; // below every entity, above terrain
-    this.rallyFlags.zIndex = 1e9; // markers float above every sprite
-    this.container.addChild(this.aggroLayer, this.rallyFlags);
+    this.rallyOverlay.addChild(this.rallyFlags);
+    this.container.addChild(this.aggroLayer);
   }
 
   /** Snapshot positions at each tick boundary (for interpolation). */
@@ -293,14 +295,8 @@ export class WorldLayer {
       const def = e?.kind === 'building' ? gameData.buildings[e.defId] : undefined;
       if (!e || e.player !== this.humanPlayer || e.kind !== 'building'
         || (e.buildProgress ?? 1000) < 1000 || (def?.trains?.length ?? 0) === 0) continue;
-      const active = hasActiveRally(e);
-      const target = active && e.rally?.targetId !== undefined
-        ? state.entities.get(e.rally.targetId) : undefined;
-      const p = target
-        ? tileToWorld(target.x / FP, target.y / FP)
-        : active && e.rally
-          ? tileToWorld(e.rally.x / FP, e.rally.y / FP)
-          : tileToWorld(...defaultRallyTilePoint(e));
+      const p = rallyFlagWorldPoint(state, e);
+      if (!p) continue;
       spots.push({ x: Math.round(p.x), y: Math.round(p.y) });
     }
     const key = spots.map((s) => `${s.x},${s.y}`).join('|');
@@ -308,14 +304,19 @@ export class WorldLayer {
     this.lastRallyFlagKey = key;
     this.rallyFlags.clear();
     for (const s of spots) {
-      // ground marker + pole + gold pennant (same look as the garrison badge flag)
-      this.rallyFlags.ellipse(s.x, s.y, 7, 4).stroke({ width: 1.5, color: OUTLINE });
-      this.rallyFlags.ellipse(s.x, s.y, 7, 4).stroke({ width: 1, color: GATHER_HIGHLIGHT });
-      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 20).stroke({ width: 1.5, color: OUTLINE });
+      // A large gold destination marker, deliberately unlike the small
+      // player-color ownership banner attached to production buildings.
       this.rallyFlags
-        .poly([s.x, s.y - 20, s.x + 13, s.y - 16, s.x, s.y - 12])
+        .ellipse(s.x, s.y, 14, 7)
+        .fill({ color: GATHER_HIGHLIGHT, alpha: 0.16 })
+        .stroke({ width: 2, color: OUTLINE });
+      this.rallyFlags.ellipse(s.x, s.y, 11, 5).stroke({ width: 1.5, color: GATHER_HIGHLIGHT });
+      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 3, color: OUTLINE });
+      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 1, color: GATHER_HIGHLIGHT });
+      this.rallyFlags
+        .poly([s.x, s.y - 32, s.x + 22, s.y - 27, s.x, s.y - 20])
         .fill(GATHER_HIGHLIGHT)
-        .stroke({ width: 1, color: OUTLINE });
+        .stroke({ width: 1.5, color: OUTLINE });
     }
   }
 
@@ -874,6 +875,20 @@ export function ownedResearchProgress(e: Entity, humanPlayer: PlayerId): number 
 export function defaultRallyTilePoint(e: Entity): [number, number] {
   const size = e.kind === 'building' ? gameData.buildings[e.defId]?.size ?? 1 : 1;
   return [e.tileX + size / 2, e.tileY + size + 0.5];
+}
+
+/** Resolve the live world destination represented by a production building's rally flag. */
+export function rallyFlagWorldPoint(state: GameState, e: Entity): { x: number; y: number } | null {
+  const def = e.kind === 'building' ? gameData.buildings[e.defId] : undefined;
+  if (e.kind !== 'building' || (e.buildProgress ?? 1000) < 1000
+    || (def?.trains?.length ?? 0) === 0) return null;
+  const active = hasActiveRally(e);
+  const target = active && e.rally?.targetId !== undefined
+    ? state.entities.get(e.rally.targetId) : undefined;
+  if (target) return tileToWorld(target.x / FP, target.y / FP);
+  if (active && e.rally) return tileToWorld(e.rally.x / FP, e.rally.y / FP);
+  const [tileX, tileY] = defaultRallyTilePoint(e);
+  return tileToWorld(tileX, tileY);
 }
 
 export function resourceFrameName(e: Entity, map?: GameMap): string {

@@ -1483,7 +1483,7 @@ export class Hud {
         this.host.getArmedVerb() === 'rally',
         () => this.host.armVerb('rally'),
       );
-      this.addCardSection('Rally flag · arm the button, then choose a destination', true);
+      this.addCardSection('Rally · gold flag = destination · blue banner = ownership', true);
       shown = true;
     }
 

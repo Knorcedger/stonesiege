@@ -698,7 +698,11 @@ export class InputController {
         targetId: target?.id,
       });
       for (const b of buildings.slice(0, -1)) this.host.issue(rallyCmd(b));
-      this.host.issueWithUndo(rallyCmd(buildings[buildings.length - 1]), 'Rally point set', undoRally);
+      this.host.issueWithUndo(
+        rallyCmd(buildings[buildings.length - 1]),
+        'Rally set — gold flag marks the destination',
+        undoRally,
+      );
       return;
     }
     if (unitIds.length === 0) return;
