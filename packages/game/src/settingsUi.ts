@@ -40,8 +40,9 @@ export interface SettingsControlsOptions {
 
 /**
  * Append the full settings control set (master/sfx/ambient volume, camera
- * speed, production speed, HP-bar visibility) to `container`. Controls read the live settings at
- * build time and write through updateSettings on every interaction.
+ * speed, production speed, HP-bar visibility, anonymous-stats opt-out) to
+ * `container`. Controls read the live settings at build time and write through
+ * updateSettings on every interaction.
  */
 export function buildSettingsControls(container: HTMLElement, opts: SettingsControlsOptions = {}): void {
   if (!document.getElementById('bf-settings-style')) {
@@ -128,33 +129,58 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
   speedHint.textContent = 'Construction, training, upgrades and gathering. Movement, combat and animations stay unchanged.';
   container.appendChild(speedHint);
 
-  // HP-bar visibility: self-contained segmented toggle (updates its own .on
-  // classes — no host re-render needed, unlike the old menu implementation)
-  label('HEALTH BARS');
-  const seg = document.createElement('div');
-  seg.className = 'bf-set-seg';
-  const options: Array<{ on: boolean; text: string }> = [
-    { on: true, text: 'Shown' },
-    { on: false, text: 'Hidden' },
-  ];
-  const segBtns: HTMLButtonElement[] = [];
-  for (const opt of options) {
-    const b = document.createElement('button');
-    b.type = 'button';
-    b.textContent = opt.text;
-    const active = getSettings().showHpBars === opt.on;
-    b.classList.toggle('on', active);
-    b.setAttribute('aria-pressed', String(active));
-    b.addEventListener('click', () => {
-      updateSettings({ showHpBars: opt.on });
-      segBtns.forEach((btn, i) => {
-        const selected = options[i].on === opt.on;
-        btn.classList.toggle('on', selected);
-        btn.setAttribute('aria-pressed', String(selected));
+  // Self-contained on/off segmented toggle (updates its own .on classes — no
+  // host re-render needed, unlike the old menu implementation).
+  const booleanToggle = (
+    name: string, onText: string, offText: string,
+    read: () => boolean, write: (on: boolean) => void,
+  ): void => {
+    label(name);
+    const seg = document.createElement('div');
+    seg.className = 'bf-set-seg';
+    const options: Array<{ on: boolean; text: string }> = [
+      { on: true, text: onText },
+      { on: false, text: offText },
+    ];
+    const segBtns: HTMLButtonElement[] = [];
+    for (const opt of options) {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = opt.text;
+      const active = read() === opt.on;
+      b.classList.toggle('on', active);
+      b.setAttribute('aria-pressed', String(active));
+      b.addEventListener('click', () => {
+        write(opt.on);
+        segBtns.forEach((btn, i) => {
+          const selected = options[i].on === opt.on;
+          btn.classList.toggle('on', selected);
+          btn.setAttribute('aria-pressed', String(selected));
+        });
       });
-    });
-    segBtns.push(b);
-    seg.appendChild(b);
-  }
-  container.appendChild(seg);
+      segBtns.push(b);
+      seg.appendChild(b);
+    }
+    container.appendChild(seg);
+  };
+
+  booleanToggle(
+    'HEALTH BARS', 'Shown', 'Hidden',
+    () => getSettings().showHpBars,
+    (on) => void updateSettings({ showHpBars: on }),
+  );
+
+  // Anonymous gameplay statistics. Not legally required given the cookieless
+  // design — it is here because "no dark patterns" is part of the pitch, and
+  // silent measurement in a game that advertised none would undercut it.
+  booleanToggle(
+    'SHARE ANONYMOUS GAMEPLAY STATS', 'On', 'Off',
+    () => getSettings().analyticsEnabled,
+    (on) => void updateSettings({ analyticsEnabled: on }),
+  );
+  const analyticsHint = document.createElement('div');
+  analyticsHint.className = 'bf-set-hint';
+  analyticsHint.textContent = 'Which matches and menus get played, so the game can be improved. '
+    + 'No account, no personal data, no ads, and no tracking between apps or websites.';
+  container.appendChild(analyticsHint);
 }
