@@ -129,6 +129,13 @@ export interface CampaignDef {
   id: string;
   title: string;
   description: string;
+  /**
+   * Campaign-menu cover art: a 16:9 image under apps/web/public (absolute path,
+   * e.g. `/campaign/joan/cover.webp`). Required so no campaign can ship as a
+   * text-only card in the menu.
+   */
+  cover: string;
+  coverAlt: string;
   scenarioIds: string[]; // in order; completing one unlocks the next
   acts?: Array<{
     id: string;
