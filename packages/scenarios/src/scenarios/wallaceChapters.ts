@@ -602,6 +602,14 @@ export const wallaceChapter10 = chapter({
     withTimer(trigger(wallace5, 't08-wave-4'), 210),
     trigger(wallace5, 't09-train-dead'),
     withTimer(trigger(wallace5, 't10-breakout'), 60),
+    {
+      ...withTimer(trigger(wallace5, 't10-breakout'), 270),
+      id: 'chapter-breakout-clock',
+      // The siege-train trigger rewards a successful defense with an earlier
+      // withdrawal. This independent clock prevents a deadlock when the line is
+      // wiped out but the surviving siege engines never finish the camp castle.
+      armed: true,
+    },
     trigger(wallace5, 't11-castle-falls'),
     trigger(wallace5, 't12-graham-falls'),
     trigger(wallace5, 't13-escape'),
