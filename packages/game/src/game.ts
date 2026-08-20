@@ -50,9 +50,10 @@ import { setNavHint } from './screens/nav';
 import { getSettings } from './settings';
 import { NATIVE_BACK_EVENT, NATIVE_PAUSE_EVENT } from './nativeEvents';
 import {
-  clearSnapshot, loadSnapshot, replaySnapshot, saveSnapshot, scenarioFingerprint,
+  clearSnapshot, hasSnapshot, loadSnapshot, replaySnapshotIncrementally, saveSnapshot, scenarioFingerprint,
   SNAPSHOT_VERSION, trySerialize, type CommandLog, type MatchSnapshot,
 } from './persist';
+import { MatchLoadingScreen, withTimeout } from './loadingScreen';
 
 const PLACE_GREEN = 0x3e8c34;
 const PLACE_RED = 0xb3261e;
@@ -103,7 +104,7 @@ function initialScenarioProductionSpeed(log: CommandLog): ProductionSpeed {
   return 1;
 }
 
-/** Null = a resume was requested but nothing valid remains (caller returns to the title). */
+/** Null = a resume was requested but the stored snapshot is not safe to replay. */
 function resolvePlan(options: RunGameOptions): MatchPlan | null {
   if (options.mode === 'resume') {
     const snapshot = loadSnapshot();
@@ -136,23 +137,74 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
 }
 
 export async function runGame(root: HTMLElement, options: RunGameOptions): Promise<void> {
-  const loading = document.createElement('div');
-  loading.style.cssText = 'position:absolute;inset:0;display:flex;align-items:center;justify-content:center;color:#E9D4A7;font:500 18px "Alegreya Sans","Trebuchet MS",sans-serif;background:#16100a;letter-spacing:.5px;';
-  loading.textContent = 'Mustering the banners…';
-  root.appendChild(loading);
+  const resuming = options.mode === 'resume';
+  const loading = new MatchLoadingScreen(root, {
+    title: resuming ? 'Restoring saved match' : 'Mustering the banners',
+    status: resuming ? 'Checking saved match…' : 'Preparing the battlefield…',
+    detail: resuming ? 'Reading the match stored on this device.' : 'Getting the armies ready.',
+    progress: null,
+  });
+
+  try {
+    await bootGame(root, options, loading);
+  } catch (error) {
+    if (!resuming) {
+      console.error('[game] Match startup failed', error);
+      loading.remove();
+      throw error;
+    }
+    const isKnownResumeError = error instanceof Error && (
+      error.message.startsWith('No saved match')
+      || error.message.startsWith('This saved match')
+      || error.message.startsWith('The saved match')
+      || error.message.startsWith('The saved battle')
+      || error.message.startsWith('Restoring this saved match')
+      || error.message.startsWith('Loading battlefield')
+      || error.message.startsWith('Drawing the battlefield')
+    );
+    const knownMessage = isKnownResumeError
+      ? error.message
+      : 'StoneSiege hit an unexpected problem while rebuilding this match.';
+    if (isKnownResumeError) console.warn(`[game] Resume unavailable: ${knownMessage}`);
+    else console.error('[game] Resume failed unexpectedly', error);
+    const canDiscard = hasSnapshot();
+    const nextStep = canDiscard
+      ? 'You can return safely and try again, or discard only this save.'
+      : 'Return to the title and start a new match.';
+    loading.fail(`${knownMessage} ${nextStep}`, {
+      canDiscard,
+      onReturn: () => window.location.reload(),
+      onDiscard: () => {
+        clearSnapshot();
+        window.location.reload();
+      },
+    });
+  }
+}
+
+async function bootGame(
+  root: HTMLElement,
+  options: RunGameOptions,
+  loading: MatchLoadingScreen,
+): Promise<void> {
 
   const plan = resolvePlan(options);
   if (!plan) {
-    // Resume was requested but the snapshot is gone or stale (decodeSnapshot
-    // rejects fingerprint mismatches; the authored set may also have changed).
-    // Clear it and reboot to the title — the standard leave-a-game navigation —
-    // instead of dropping the player into an unrequested practice match.
-    clearSnapshot();
-    loading.remove();
-    window.location.reload();
-    return;
+    // Keep the raw record intact: it may be from another build or damaged, and
+    // only the recovery screen's confirmed discard action is allowed to erase it.
+    throw new Error(hasSnapshot()
+      ? 'This saved match is damaged or belongs to an incompatible version of StoneSiege.'
+      : 'No saved match was found on this device.');
   }
-  const assets = await loadAssets();
+  loading.update({
+    title: options.mode === 'resume' ? 'Restoring saved match' : 'Mustering the banners',
+    status: 'Loading battlefield artwork…',
+    detail: 'This stage is usually quickest after the first visit.',
+    progress: null,
+  });
+  const assets = await withTimeout(
+    loadAssets(), 45_000, 'Loading battlefield artwork took too long.',
+  );
   const { config, snapshot } = plan;
   // Fresh matches inherit the persisted preference. Resumes retain the speed
   // encoded in their deterministic state/config until the player changes it.
@@ -277,28 +329,54 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
     kind: 'setProductionSpeed', player: humanPlayer, multiplier: config.productionSpeed ?? 2,
   }]]];
   if (snapshot && !restored) {
-    loading.textContent = 'Restoring match…';
-    await new Promise((r) => requestAnimationFrame(() => r(null))); // let the text paint
+    const restoreTitle = 'Restoring saved match';
+    let displayedRestorePercent = -1;
+    loading.update({
+      title: restoreTitle,
+      status: 'Replaying battle history…',
+      detail: `0:00 of ${formatMatchTime(snapshot.tick)} restored`,
+      progress: 0,
+    });
     replaying = true;
-    replaySnapshot(game, snapshot, (events) => {
-      if (rebuildTalliesFromReplay) {
-        for (const ev of events) recordMatchEvent(tallies, ev, humanPlayer);
-        recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
-      }
-      triggers?.tick(events);
+    await replaySnapshotIncrementally(game, snapshot, {
+      onEvents: (events) => {
+        if (rebuildTalliesFromReplay) {
+          for (const ev of events) recordMatchEvent(tallies, ev, humanPlayer);
+          recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
+        }
+        triggers?.tick(events);
+      },
+      onProgress: (completedTick, targetTick) => {
+        const fraction = targetTick === 0 ? 1 : completedTick / targetTick;
+        const percent = Math.round(fraction * 100);
+        if (percent === displayedRestorePercent && completedTick !== targetTick) return;
+        displayedRestorePercent = percent;
+        loading.update({
+          title: restoreTitle,
+          status: 'Replaying battle history…',
+          detail: `${formatMatchTime(completedTick)} of ${formatMatchTime(targetTick)} restored`,
+          progress: fraction,
+        });
+      },
     });
     replaying = false;
   }
 
+  loading.update({
+    title: snapshot ? 'Restoring saved match' : 'Mustering the banners',
+    status: 'Drawing the battlefield…',
+    detail: 'Preparing the map, units, and controls.',
+    progress: null,
+  });
   const app = new Application();
-  await app.init({
+  await withTimeout(app.init({
     background: 0x0d0b08,
     resizeTo: root,
     antialias: true,
     resolution: Math.min(window.devicePixelRatio || 1, 2),
     autoDensity: true,
     roundPixels: false,
-  });
+  }), 45_000, 'Drawing the battlefield took too long.');
   loading.remove();
   // Pixi's 2x backing store must still occupy one CSS viewport. Setting
   // cssText after init otherwise discards autoDensity's explicit CSS size and
