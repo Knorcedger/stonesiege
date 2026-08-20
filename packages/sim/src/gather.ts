@@ -528,7 +528,11 @@ function stepWorker(
   if (rate <= 0) { release(state, e); return; }
   if (e.carrying && e.carrying.type !== view.resourceType) e.carrying = undefined; // switched tasks: old load is lost
 
-  info.acc += rate;
+  // Economy speed accelerates productive work, not locomotion. Villagers still
+  // walk to the node/drop-off through the normal movement system, but each
+  // stationary work tick accrues the same deterministic 1x/2x/4x multiplier as
+  // construction, training, and research.
+  info.acc += rate * state.productionSpeed;
   while (info.acc >= ACC_PER_UNIT && (target.amountLeft ?? 0) > 0
     && (!e.carrying || e.carrying.amount < capacity)) {
     info.acc -= ACC_PER_UNIT;

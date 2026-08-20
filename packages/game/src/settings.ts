@@ -14,7 +14,7 @@ export interface GameSettings {
   cameraSpeed: number;
   /** In-match HUD scale, 0.75..1.25. */
   hudScale: number;
-  /** Construction, unit training, and research multiplier. */
+  /** Construction, unit training, research, and stationary gathering multiplier. */
   productionSpeed: ProductionSpeed;
   showHpBars: boolean;
   /** Rich upgrade effects and unit counter advice in the custom HUD tooltips. */

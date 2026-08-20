@@ -368,7 +368,7 @@ class MockGame implements Game {
           e.activity = 'gathering';
           e.facing = facingFromDelta((target.x - e.x) / FP, (target.y - e.y) / FP, e.facing);
           if (this.st.tick % 40 === 0 && target.amountLeft !== undefined) {
-            target.amountLeft = Math.max(0, target.amountLeft - 4);
+            target.amountLeft = Math.max(0, target.amountLeft - 4 * this.st.productionSpeed);
             if (target.amountLeft <= 0 && target.resourceType) {
               events.push({ kind: 'resourceDepleted', id: target.id, resourceType: target.resourceType });
               this.removeEntity(target);

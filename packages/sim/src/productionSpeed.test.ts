@@ -16,6 +16,16 @@ function makeGame(speed?: ProductionSpeed): Game {
   return createGame(config);
 }
 
+function makeGatherGame(speed: ProductionSpeed): Game {
+  return createGame({
+    ...scenarioConfig(93, grassMap(30, 30), [
+      { defId: 'villager', player: HUMAN, tileX: 9, tileY: 10, ref: 'gatherer' },
+      { defId: 'berryBush', player: 0, tileX: 10, tileY: 10, ref: 'bush' },
+    ], [player({ isHuman: true })]),
+    productionSpeed: speed,
+  });
+}
+
 function ticksUntil(
   game: Game,
   command: Command,
@@ -76,6 +86,28 @@ describe('production speed', () => {
       (event) => event.kind === 'buildingComplete' && event.defId === 'house',
     );
     expect(ticks).toBe(expectedTicks);
+  });
+
+  it('gathers at 1×/2×/4× while keeping the approach movement identical', () => {
+    const results = ([1, 2, 4] as const).map((speed) => {
+      const game = makeGatherGame(speed);
+      const villagerId = game.state.refs.get('gatherer')!;
+      const bushId = game.state.refs.get('bush')!;
+      for (let tick = 0; tick < 100; tick++) {
+        game.advance(tick === 0 ? [{
+          kind: 'gather', player: HUMAN, units: [villagerId], targetId: bushId,
+        }] : []);
+      }
+      const villager = game.state.entities.get(villagerId)!;
+      return {
+        carried: villager.carrying?.amount,
+        position: [villager.x, villager.y, villager.tileX, villager.tileY],
+      };
+    });
+
+    expect(results.map((result) => result.carried)).toEqual([1, 3, 6]);
+    expect(results[1].position).toEqual(results[0].position);
+    expect(results[2].position).toEqual(results[0].position);
   });
 
   it('changes active queues deterministically and rejects unsupported values', () => {
