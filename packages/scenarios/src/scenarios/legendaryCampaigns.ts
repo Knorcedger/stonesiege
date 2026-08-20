@@ -359,10 +359,10 @@ function makeChapter(source: CampaignSource, chapter: ChapterSource, index: numb
       {
         name: 'Historical Opposition', civ: source.enemyCiv, team: 2, isHuman: false,
         color: 1, age: 'imperial', resources: { food: 1000, wood: 1000, gold: 1000, stone: 500 },
-        // Campaign attacks are authored by timed aiAttackNow triggers. Keeping the
-        // free-play bot passive prevents an unscripted opening rush from pre-empting
-        // the briefing/turning point or an endless siege-fort production loop.
-        aiProfile: 'passive', popCap: 140,
+        // The aggressive controller stages and reissues the historical opposition
+        // as a formation. A passive controller followed by aiAttackNow instead
+        // commits the entire host in a single hero-seeking pulse.
+        aiProfile: 'aggressive', popCap: 140,
       },
     ],
     map: historicalMap(source.climate),
