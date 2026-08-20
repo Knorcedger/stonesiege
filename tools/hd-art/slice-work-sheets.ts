@@ -1,16 +1,16 @@
 // Split 5-direction × 4-phase generated villager work sheets into one
-// transparent source per runtime atlas frame. The generated columns are
-// S,SE,E,NE,N, while the runtime contract authors S,SW,W,NW,N. Columns 1..3
-// are therefore mirrored as they are extracted. A small inset removes
+// transparent source per runtime atlas frame. Most generated columns are
+// S,SE,E,NE,N and need mirroring for the runtime S,SW,W,NW,N contract. The
+// mining sheet is already authored in runtime order. A small inset removes
 // generator-added grid gutters.
 
 import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
+import { shouldMirrorWorkDirection, WORK_ANIMS } from './work-sheet-layout.ts';
 
 const root = join(import.meta.dirname, '../..');
 const unitDir = join(root, 'art/hd/frames/units');
-const WORK_ANIMS = ['chop', 'farm', 'forage', 'mine', 'build'] as const;
 const COLS = 5;
 const ROWS = 4;
 const X_INSET = 14;
@@ -40,7 +40,7 @@ for (const anim of WORK_ANIMS) {
       const top = rawTop;
       const bottom = rawBottom;
       const out = new PNG({ width: right - left, height: bottom - top });
-      const mirrorForRuntime = dir > 0 && dir < 4;
+      const mirrorForRuntime = shouldMirrorWorkDirection(anim, dir);
       for (let y = top; y < bottom; y++) {
         for (let x = left; x < right; x++) {
           const sourceX = mirrorForRuntime ? right - 1 - (x - left) : x;
