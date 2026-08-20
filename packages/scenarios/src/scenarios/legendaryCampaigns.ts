@@ -84,7 +84,7 @@ function historicalMap(climate: Climate): ScenarioMap {
     [7, 39, 'G'], [8, 39, 'G'], [9, 39, 'G'],
     [24, 64, 'S'], [25, 64, 'S'], [26, 64, 'S'],
     [16, 45, 'B'], [17, 45, 'B'], [18, 45, 'B'],
-    [42, 34, 'G'], [43, 34, 'G'], [62, 34, 'S'], [63, 34, 'S'],
+    [66, 40, 'G'], [67, 40, 'G'], [62, 34, 'S'], [63, 34, 'S'],
   ] as Array<[number, number, string]>) grid[y][x] = token;
 
   return {
@@ -113,6 +113,12 @@ const uniqueUnit: Record<string, string> = {
   mongols: 'mangudai', byzantines: 'cataphract', saracens: 'mamluk',
 };
 
+const eliteUniqueUnit: Record<string, string> = {
+  scots: 'eliteHighlandRaider', english: 'eliteLongbowman', norse: 'eliteHousecarl',
+  french: 'eliteChevalier', mongols: 'eliteMangudai', byzantines: 'eliteCataphract',
+  saracens: 'eliteMamluk',
+};
+
 const armyLine = (
   def: string,
   player: number,
@@ -130,21 +136,33 @@ const armyLine = (
 
 const humanArmy = (source: CampaignSource, kind: MissionKind): ScenarioEntity[] => [
   { def: source.hero, player: 1, x: 12, y: 57, ref: 'protagonist' },
-  ...armyLine(uniqueUnit[source.civ], 1, 14, 57, 8),
-  ...armyLine(source.civ === 'mongols' ? 'lightCavalry' : 'pikeman', 1, 13, 60, 6),
-  ...armyLine(source.civ === 'english' ? 'longbowman' : 'crossbowman', 1, 14, 62, 6),
+  // Legendary chapters begin in the Imperial Age, so the protagonist's compact
+  // company uses the upgraded lines a player would field at that point. The old
+  // Castle-Age mix was erased by several 26-unit opposition matchups.
+  ...armyLine(eliteUniqueUnit[source.civ], 1, 14, 57, 12),
+  ...armyLine(
+    source.civ === 'mongols' ? 'lightCavalry' : 'pikeman',
+    1,
+    13,
+    60,
+    source.civ === 'english' ? 16 : 10,
+  ),
+  ...armyLine(source.civ === 'english' ? 'eliteLongbowman' : 'arbalester', 1, 14, 62, 10),
   ...(['siege', 'defend'].includes(kind) ? armyLine('trebuchet', 1, 10, 61, 2) : []),
 ];
 
 const enemyArmy = (source: CampaignSource): ScenarioEntity[] => [
-  ...armyLine(uniqueUnit[source.enemyCiv], 2, 42, 31, 10, 'enemy'),
+  // Ten French heavy cavalry overwhelm even an upgraded longbow formation before
+  // its pikeman screen can trade. Retain the shock-cavalry identity without making
+  // Henry's field battles a forced hero sacrifice.
+  ...armyLine(uniqueUnit[source.enemyCiv], 2, 42, 31, source.enemyCiv === 'french' ? 4 : 10, 'enemy'),
   ...armyLine('pikeman', 2, 43, 34, 6, 'enemy-pike'),
   ...armyLine(source.enemyCiv === 'english' ? 'longbowman' : 'crossbowman', 2, 44, 36, 6, 'enemy-bow'),
   ...armyLine('knight', 2, 43, 38, 4, 'enemy-horse'),
 ];
 
-const enemyRefs = [
-  ...Array.from({ length: 10 }, (_, i) => `enemy-${i + 1}`),
+const enemyRefsFor = (source: CampaignSource) => [
+  ...Array.from({ length: source.enemyCiv === 'french' ? 4 : 10 }, (_, i) => `enemy-${i + 1}`),
   ...Array.from({ length: 6 }, (_, i) => `enemy-pike-${i + 1}`),
   ...Array.from({ length: 6 }, (_, i) => `enemy-bow-${i + 1}`),
   ...Array.from({ length: 4 }, (_, i) => `enemy-horse-${i + 1}`),
@@ -186,7 +204,7 @@ function triggersFor(source: CampaignSource, chapter: ChapterSource): TriggerDef
     effects: [
       { kind: 'message', speaker: 'Chronicle', text: chapter.turningPoint },
       { kind: 'revealArea', player: 1, area: chapter.kind === 'defend' ? PLAYER_AREA : ENEMY_AREA },
-      ...(!['journey', 'defend'].includes(chapter.kind)
+      ...(!['journey', 'defend', 'siege'].includes(chapter.kind)
         ? [{ kind: 'aiAttackNow' as const, player: 2, targetArea: PLAYER_AREA }]
         : []),
     ],
@@ -211,7 +229,7 @@ function triggersFor(source: CampaignSource, chapter: ChapterSource): TriggerDef
       break;
     case 'battle':
       victory = {
-        id: 'victory', conditions: [{ kind: 'refsDestroyed', refs: enemyRefs, all: true }], effects: [
+        id: 'victory', conditions: [{ kind: 'refsDestroyed', refs: enemyRefsFor(source), all: true }], effects: [
           { kind: 'objectiveComplete', id: objectiveId },
           { kind: 'playSting', sting: 'victory' },
           { kind: 'message', speaker: 'Chronicle', text: chapter.ending },
@@ -341,7 +359,10 @@ function makeChapter(source: CampaignSource, chapter: ChapterSource, index: numb
       {
         name: 'Historical Opposition', civ: source.enemyCiv, team: 2, isHuman: false,
         color: 1, age: 'imperial', resources: { food: 1000, wood: 1000, gold: 1000, stone: 500 },
-        aiProfile: chapter.kind === 'journey' ? 'passive' : 'aggressive', popCap: 140,
+        // Campaign attacks are authored by timed aiAttackNow triggers. Keeping the
+        // free-play bot passive prevents an unscripted opening rush from pre-empting
+        // the briefing/turning point or an endless siege-fort production loop.
+        aiProfile: 'passive', popCap: 140,
       },
     ],
     map: historicalMap(source.climate),
