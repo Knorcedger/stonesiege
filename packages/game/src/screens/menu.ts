@@ -164,6 +164,15 @@ const MAP_SIZES: Array<{ id: PracticeMapSize; label: string }> = [
 ];
 
 /**
+ * In-place Practice setup changes rebuild the panel, but should not throw a
+ * phone user back to the top of the civilization list. Real screen
+ * navigation still starts at the top.
+ */
+export function menuScrollTopAfterRender(previous: number, preserve: boolean): number {
+  return preserve ? Math.max(0, previous) : 0;
+}
+
+/**
  * Show the menu flow; resolves when the player starts a game. `flow` seeds
  * navigation (post-reload deep links, e.g. straight back to a scenario list).
  */
@@ -327,7 +336,7 @@ export function showMenu(
       settings.appendChild(segmented(
         MAP_SIZES.map((m) => ({ id: m.id, label: `${m.label} ${MAP_SIZE_TILES[m.id]}²` })),
         practice.mapSize,
-        (id) => { practice.mapSize = id; render(); },
+        (id) => { practice.mapSize = id; render(true); },
       ));
 
       settings.appendChild(el('div', 'bf-menu-label', 'NUMBER OF OPPONENTS'));
@@ -338,7 +347,7 @@ export function showMenu(
           const n = Number(id);
           while (practice.opponents.length < n) practice.opponents.push('standard');
           practice.opponents.length = n;
-          render();
+          render(true);
         },
       ));
       practice.opponents.forEach((diff, i) => {
@@ -357,7 +366,7 @@ export function showMenu(
           el('div', 'bf-civ-name', civ.name),
           el('div', 'bf-civ-desc', civ.description),
         );
-        card.addEventListener('click', () => { practice.civ = civ.id; render(); });
+        card.addEventListener('click', () => { practice.civ = civ.id; render(true); });
         civBox.appendChild(card);
       }
       panel.appendChild(civBox);
@@ -369,7 +378,7 @@ export function showMenu(
         sw.style.background = `linear-gradient(160deg, ${ramp[0]}, ${ramp[1]} 55%, ${ramp[2]})`;
         sw.setAttribute('aria-pressed', String(i === practice.color));
         setGameTooltip(sw, `${FALLBACK_PLAYER_COLOR_NAMES[i] ?? `Color ${i + 1}`} banner`);
-        sw.addEventListener('click', () => { practice.color = i; render(); });
+        sw.addEventListener('click', () => { practice.color = i; render(true); });
         colors.appendChild(sw);
       });
       panel.appendChild(colors);
@@ -496,7 +505,8 @@ export function showMenu(
     };
 
     // -------------------------------------------------------------- dispatch
-    const render = (): void => {
+    const render = (preserveScroll = false): void => {
+      const previousScrollTop = panel.scrollTop;
       panel.replaceChildren();
       const top: MenuScreen = currentScreen(flow);
       panel.classList.toggle('wide', top.id === 'scenarioList' || top.id === 'briefing');
@@ -514,7 +524,7 @@ export function showMenu(
         case 'briefing': renderBriefing(top.scenarioId); break;
         case 'settings': renderSettings(); break;
       }
-      panel.scrollTop = 0;
+      panel.scrollTop = menuScrollTopAfterRender(previousScrollTop, preserveScroll);
     };
 
     render();
