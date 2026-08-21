@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   autoOpenObjectives, objectiveDisplayState, objectiveMarkerPlacement, objectiveProgressDue,
-  objectiveProgressSummary, objectiveSequencePosition, ObjectivesModel,
+  objectiveMarkerPointerEvents, objectiveProgressSummary, objectiveSequencePosition, ObjectivesModel,
 } from './objectives';
 import { HUD_NARROW_MAX_PX } from './layout';
 
@@ -130,6 +130,13 @@ describe('objectiveMarkerPlacement', () => {
     const marker = objectiveMarkerPlacement(60, 760, 390, 844);
     expect(marker.kind).toBe('edge');
     expect(marker.x).toBeGreaterThanOrEqual(140);
+  });
+});
+
+describe('objective marker hit testing', () => {
+  it('passes battlefield commands through the beacon but keeps the off-screen arrow interactive', () => {
+    expect(objectiveMarkerPointerEvents('beacon')).toBe('none');
+    expect(objectiveMarkerPointerEvents('edge')).toBe('auto');
   });
 });
 
