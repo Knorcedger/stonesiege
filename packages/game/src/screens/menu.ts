@@ -12,7 +12,7 @@ import {
   DEFAULT_PRACTICE_SETUP, MAP_SIZE_TILES,
   type PracticeMapSize, type PracticeSetup,
 } from '../simBridge';
-import { loadProgress, scenarioStatuses } from '../campaign/progress';
+import { loadProgress, nextScenarioId, scenarioStatuses } from '../campaign/progress';
 import { savedMatchLabel } from '../persist';
 import { buildSettingsControls } from '../settingsUi';
 import { setGameTooltip } from '../tooltip';
@@ -23,6 +23,7 @@ import {
   currentScreen, flowReducer, initialFlow,
   type FlowEvent, type FlowState, type MenuScreen,
 } from './flow';
+import { flowFromHash, flowHash } from './route';
 
 /** What the menu resolved to — the app shell starts this game. */
 export type GameRequest =
@@ -87,18 +88,60 @@ const MENU_CSS = `
 .bf-color { width:34px; height:34px; border-radius:4px; cursor:pointer; border:2px solid #1A1208;
   box-shadow:0 0 0 1px #64492B; }
 .bf-color.on { border-color:#E6C04A; box-shadow:0 0 0 2px #8A6414; }
-.bf-camp-card { display:block; width:100%; text-align:left; padding:14px 16px; cursor:pointer; margin:8px 0;
-  background:#241809; border:1px solid #64492B; border-radius:5px; color:#DABE8D; font-family:inherit; }
-.bf-camp-card:hover { border-color:#B99A6B; }
-.bf-camp-card .bf-camp-title { font-family:"Cinzel","Georgia",serif; font-size:21px; font-weight:600;
-  color:#E6C04A; letter-spacing:1px; }
-.bf-camp-card .bf-camp-desc { font-size:12px; line-height:1.4; color:#B99A6B; margin-top:5px; }
-.bf-camp-card .bf-camp-progress { font-size:12px; color:#DABE8D; margin-top:7px; }
-.bf-scn { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:9px 12px;
+/* Campaign cards: the cover art is the card. Text-only campaign lists sold the
+   twelve-chapter stories as a settings menu; the art carries the invitation and
+   the copy underneath carries the progress. */
+.bf-camp-card { display:block; width:100%; overflow:hidden; text-align:left; padding:0; cursor:pointer;
+  margin:12px 0; background:#241809; border:1px solid #64492B; border-radius:6px; color:#DABE8D;
+  font-family:inherit; box-shadow:0 6px 18px rgba(0,0,0,.35); transition:border-color .12s, transform .12s; }
+.bf-camp-card:hover { border-color:#E6C04A; transform:translateY(-2px); }
+.bf-camp-card:active { transform:none; }
+.bf-camp-art { position:relative; display:block; aspect-ratio:16/9; background:#16100a; }
+.bf-camp-art img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 42%; }
+/* Scrim: keeps the display type legible over any cover without dulling the art. */
+.bf-camp-art::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(rgba(16,10,5,0) 38%, rgba(16,10,5,.72) 78%, rgba(16,10,5,.94)); }
+.bf-camp-art-copy { position:absolute; left:16px; right:16px; bottom:11px; z-index:1; display:block; }
+.bf-camp-title { display:block; margin:0; font-family:"Cinzel","Georgia",serif; font-size:24px; font-weight:700;
+  line-height:1.1; color:#F3DE9C; letter-spacing:1.2px; text-shadow:0 2px 6px #0b0703, 0 0 18px rgba(0,0,0,.7); }
+.bf-camp-sub { display:block; margin-top:2px; font-size:13px; letter-spacing:1.4px; text-transform:uppercase;
+  color:#E6C04A; text-shadow:0 1px 4px #0b0703; }
+.bf-camp-ribbon { position:absolute; top:10px; right:10px; z-index:1; padding:3px 9px; border-radius:3px;
+  font-size:10.5px; letter-spacing:1.4px; color:#1A1208; background:linear-gradient(#F2D45C,#D4A82A);
+  box-shadow:0 0 0 1px #8E6E14, 0 2px 6px rgba(0,0,0,.5); }
+.bf-camp-body { display:block; padding:12px 16px 14px; }
+.bf-camp-desc { display:block; font-size:12.5px; line-height:1.45; color:#B99A6B; }
+.bf-camp-progress { display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+  margin-top:9px; font-size:12px; color:#DABE8D; }
+.bf-camp-next { color:#8f7958; font-size:11.5px; min-width:0; overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap; }
+.bf-bar { display:block; height:5px; margin-top:7px; border-radius:3px; background:#1d1409;
+  box-shadow:0 0 0 1px #50391f inset; overflow:hidden; }
+.bf-bar > span { display:block; height:100%; border-radius:3px;
+  background:linear-gradient(90deg,#8E6E14,#F2D45C); }
+/* Scenario-list hero: the campaign's cover again, so the chapter list reads as
+   part of the same story rather than a bare index. */
+.bf-camp-hero { position:relative; display:block; overflow:hidden; margin:-26px -26px 4px;
+  aspect-ratio:16/7; background:#16100a; border-bottom:1px solid #8A6414; }
+.bf-camp-hero img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 40%; }
+.bf-camp-hero::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(rgba(16,10,5,.1) 30%, rgba(16,10,5,.78) 76%, #2C1F12); }
+.bf-camp-hero-copy { position:absolute; left:26px; right:26px; bottom:12px; z-index:1; text-align:left; }
+.bf-camp-hero-copy .bf-camp-title { font-size:27px; }
+.bf-scn { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:8px 12px 8px 8px;
   margin:6px 0; background:#241809; border:1px solid #64492B; border-radius:5px; color:#EFDDB5;
   font-family:inherit; font-size:15px; cursor:pointer; }
 .bf-scn:disabled { cursor:default; color:#6e6252; background:#1d1409; }
 .bf-scn:not(:disabled):hover { border-color:#B99A6B; }
+.bf-scn-thumb { position:relative; flex:0 0 62px; width:62px; height:44px; overflow:hidden;
+  border-radius:4px; background:#16100a; box-shadow:0 0 0 1px #1A1208; }
+.bf-scn-thumb img { display:block; width:100%; height:100%; object-fit:cover; }
+/* Locked chapters keep their art but lose their color: the story ahead is
+   visible and plainly out of reach. */
+.bf-scn-thumb.locked img { filter:grayscale(1) brightness(.42); }
+.bf-scn-thumb .bf-medal { position:absolute; left:2px; bottom:2px; flex:none; width:19px; height:19px;
+  font-size:10px; border-width:1px; }
+.bf-scn:not(:disabled):hover .bf-scn-thumb { box-shadow:0 0 0 1px #B99A6B; }
 .bf-act { display:flex; align-items:baseline; justify-content:space-between; gap:12px; margin:19px 2px 7px;
   padding-bottom:6px; border-bottom:1px solid #64492B; text-align:left; }
 .bf-act:first-of-type { margin-top:8px; }
@@ -117,12 +160,19 @@ const MENU_CSS = `
 .bf-scn-meta { color:#8f7958; font-size:11px; letter-spacing:.35px; }
 .bf-scn .bf-scn-state { margin-left:auto; font-size:11px; color:#B99A6B; letter-spacing:1px; }
 .bf-brief { text-align:left; }
-.bf-chapter-kicker { margin:-3px 0 10px; color:#B99A6B; font-size:11px; letter-spacing:1.1px; text-align:center; text-transform:uppercase; }
-.bf-chapter-art { position:relative; overflow:hidden; margin:0 0 15px; border:1px solid #8A6414;
-  border-radius:4px; background:#16100a; box-shadow:0 4px 16px rgba(0,0,0,.45); aspect-ratio:16/9; }
-.bf-chapter-art img { display:block; width:100%; height:100%; object-fit:cover; }
-.bf-chapter-art::after { content:""; position:absolute; inset:auto 0 0; height:28%;
-  background:linear-gradient(transparent,rgba(16,10,5,.7)); pointer-events:none; }
+.bf-chapter-kicker { display:block; color:#E6C04A; font-size:11px; letter-spacing:1.3px;
+  text-transform:uppercase; text-shadow:0 1px 4px #0b0703; }
+.bf-chapter-kicker.muted { color:#C9AE7E; letter-spacing:.9px; text-transform:none; font-size:11.5px; }
+/* Briefing hero: chapter art bled to the panel edges with the title set over
+   it, so the chapter opens like a title card instead of a form. */
+.bf-chapter-art { position:relative; overflow:hidden; margin:-26px -26px 16px; background:#16100a;
+  border-bottom:1px solid #8A6414; aspect-ratio:16/9; }
+.bf-chapter-art img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 42%; }
+.bf-chapter-art::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(rgba(16,10,5,0) 34%, rgba(16,10,5,.76) 74%, #2C1F12); }
+.bf-chapter-art-copy { position:absolute; left:26px; right:26px; bottom:12px; z-index:1; }
+.bf-chapter-art-copy .bf-menu-h { margin:2px 0 3px; font-size:27px;
+  text-shadow:0 2px 6px #0b0703, 0 0 18px rgba(0,0,0,.7); }
 .bf-brief-hist { font-size:14px; line-height:1.5; color:#EFDDB5; }
 .bf-brief-hist p { margin:0 0 10px; }
 .bf-brief-list { margin:4px 0 0; padding-left:18px; font-size:13.5px; line-height:1.45; color:#DABE8D; }
@@ -140,12 +190,27 @@ const MENU_CSS = `
 .bf-brief-actions .bf-menu-btn.ghost { flex:1; }
 @media (max-width:520px) {
   .bf-menu-panel.wide { width:96vw; padding:22px 16px 20px; }
-  .bf-scn { gap:9px; padding:9px; }
+  .bf-scn { gap:9px; padding:7px 9px 7px 7px; }
   .bf-scn .bf-scn-state { display:none; }
   .bf-scn-meta { font-size:10px; }
+  .bf-scn-thumb { flex-basis:52px; width:52px; height:38px; }
   .bf-act-title { font-size:14px; }
   .bf-act-years { flex:none; white-space:nowrap; }
   .bf-chapter-kicker { font-size:10px; letter-spacing:.7px; }
+  /* The bled hero art follows the panel's smaller padding. */
+  .bf-camp-hero, .bf-chapter-art { margin-left:-16px; margin-right:-16px; }
+  .bf-camp-hero, .bf-chapter-art { margin-top:-22px; }
+  .bf-camp-hero-copy, .bf-chapter-art-copy { left:16px; right:16px; }
+  .bf-camp-title { font-size:20px; }
+  .bf-camp-hero-copy .bf-camp-title, .bf-chapter-art-copy .bf-menu-h { font-size:22px; }
+  .bf-camp-sub { font-size:11.5px; letter-spacing:1px; }
+  /* Card footers lose the "Next: <chapter>" hint to the chapter count; the
+     scenario-list hero keeps its own count line. */
+  .bf-camp-progress .bf-camp-next { display:none; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .bf-camp-card { transition:none; }
+  .bf-camp-card:hover { transform:none; }
 }
 `;
 
@@ -172,6 +237,33 @@ const MAP_SIZES: Array<{ id: PracticeMapSize; label: string }> = [
  */
 export function menuScrollTopAfterRender(previous: number, preserve: boolean): number {
   return preserve ? Math.max(0, previous) : 0;
+}
+
+/**
+ * Campaign titles are authored as "Protagonist — Subtitle". The cards set the
+ * protagonist as the display line and the subtitle as a kicker beneath it; a
+ * title without the separator keeps the whole string as the name.
+ */
+export function splitCampaignTitle(title: string): { name: string; subtitle: string } {
+  const at = title.indexOf(' — ');
+  return at < 0
+    ? { name: title, subtitle: '' }
+    : { name: title.slice(0, at), subtitle: title.slice(at + 3) };
+}
+
+/**
+ * Horizontal crop for a chapter thumbnail. Chapters share one act (Wallace) or
+ * one campaign cover (the legendary six) image, so the thumbnails pan across
+ * the source frame instead of repeating the identical crop down the list.
+ */
+export function thumbnailFocus(index: number): string {
+  return `${(index * 17) % 101}% 50%`;
+}
+
+/** Play-menu note for Campaign, counted from the data so it cannot go stale. */
+export function campaignSubtitle(defs: CampaignDef[] = Object.values(campaigns)): string {
+  const chapters = defs.reduce((n, campaign) => n + campaign.scenarioIds.length, 0);
+  return `${defs.length} historical campaigns · ${chapters} chapters`;
 }
 
 /**
@@ -209,7 +301,42 @@ export function showMenu(
     // Lazy AudioContext — the slider drag itself is the unlocking gesture.
     const previewAudio = new AudioEngine();
 
+    // ------------------------------------------------------------ URL routing
+    // Each screen has an address (screens/route.ts), so the location bar names
+    // where you are and browser/Android back walks the menu. History depth is
+    // carried in history.state instead of a counter: after a forward/back jump
+    // the entry itself still knows whether there is anything behind it, which
+    // a local counter would have lost.
+    const historyDepth = (): number => {
+      const state = window.history.state as { bfMenuDepth?: unknown } | null;
+      return typeof state?.bfMenuDepth === 'number' ? state.bfMenuDepth : 0;
+    };
+    const replaceUrl = (depth = historyDepth()): void => {
+      window.history.replaceState({ bfMenuDepth: depth }, '', flowHash(flow));
+    };
+    const onAddressChanged = (): void => {
+      // Back/forward or a hand-edited address: the URL is now the truth, and
+      // an address this build cannot serve falls back to the title.
+      const next = flowFromHash(window.location.hash) ?? initialFlow();
+      const changed = flowHash(next) !== flowHash(flow);
+      flow = next;
+      // Rewrite an address that resolved to something else (an unknown path,
+      // a campaign this build does not have) to the screen actually shown.
+      if (window.location.hash !== flowHash(flow)) replaceUrl();
+      // Browser back/forward is menu navigation too, so the drop-off funnel
+      // has to see it; dispatch reports the taps, this reports the rest.
+      if (changed) {
+        render(); // back/forward raise popstate AND hashchange
+        trackScreen();
+      }
+    };
+    window.addEventListener('popstate', onAddressChanged);
+    window.addEventListener('hashchange', onAddressChanged);
+    replaceUrl(0);
+
     const done = (request: GameRequest): void => {
+      window.removeEventListener('popstate', onAddressChanged);
+      window.removeEventListener('hashchange', onAddressChanged);
       previewAudio.dispose();
       screen.remove();
       resolve(request);
@@ -222,11 +349,21 @@ export function showMenu(
     const trackScreen = (): void => analytics.track(menuScreenEvent(currentScreen(flow).id));
     const dispatch = (ev: FlowEvent): void => {
       const next = flowReducer(flow, ev);
-      if (next !== flow) {
-        flow = next;
-        render();
-        trackScreen();
+      if (next === flow) return;
+      // In-app Back and browser Back must be the same motion, so when this
+      // menu owns a history entry it steps out through history and lets
+      // popstate re-render. Deep links start with nothing behind them, so
+      // there Back rewrites the current entry instead of leaving the app.
+      if (ev.kind === 'back' && historyDepth() > 0) {
+        window.history.back();
+        return;
       }
+      const depth = historyDepth();
+      flow = next;
+      if (ev.kind === 'back') replaceUrl(0);
+      else window.history.pushState({ bfMenuDepth: depth + 1 }, '', flowHash(flow));
+      render();
+      trackScreen();
     };
 
     // ---------------------------------------------------------- small helpers
@@ -246,6 +383,27 @@ export function showMenu(
       return b;
     };
     const backButton = (): HTMLButtonElement => button('Back', 'ghost', () => dispatch({ kind: 'back' }));
+    /**
+     * Campaign/chapter artwork. Lazy + async: the campaign list holds seven
+     * full-width covers and only the first two are ever on screen, so the rest
+     * must not compete with the atlas download on a phone connection.
+     */
+    const coverImage = (src: string, alt: string, focus?: string): HTMLImageElement => {
+      const image = document.createElement('img');
+      image.src = src;
+      image.alt = alt;
+      image.loading = 'lazy';
+      image.decoding = 'async';
+      if (focus) image.style.objectPosition = focus;
+      return image;
+    };
+    const progressBar = (completed: number, total: number): HTMLSpanElement => {
+      const bar = el('span', 'bf-bar');
+      const fill = el('span', '');
+      fill.style.width = `${total > 0 ? Math.round((completed / total) * 100) : 0}%`;
+      bar.appendChild(fill);
+      return bar;
+    };
     /**
      * Primary button that starts a NEW match. Starting fresh destroys any
      * saved resumable match (game.ts clears the snapshot on boot), so when one
@@ -329,7 +487,7 @@ export function showMenu(
       panel.append(
         el('h1', 'bf-menu-h', 'Play'),
         button('Practice', '', () => dispatch({ kind: 'openPractice' }), 'skirmish vs bots on a random map'),
-        button('Campaign', '', () => dispatch({ kind: 'openCampaigns' }), 'the story of William Wallace'),
+        button('Campaign', '', () => dispatch({ kind: 'openCampaigns' }), campaignSubtitle()),
         backButton(),
       );
     };
@@ -403,16 +561,40 @@ export function showMenu(
     };
 
     const renderCampaigns = (): void => {
-      panel.appendChild(el('h1', 'bf-menu-h', 'Campaigns'));
+      const list = Object.values(campaigns);
+      panel.append(
+        el('h1', 'bf-menu-h', 'Campaigns'),
+        el('p', 'bf-menu-sub', campaignSubtitle(list)),
+      );
       const progress = loadProgress();
-      for (const campaign of Object.values(campaigns)) {
+      for (const campaign of list) {
+        const total = campaign.scenarioIds.length;
         const doneCount = campaign.scenarioIds.filter((id) => progress.completed.includes(id)).length;
+        const { name, subtitle } = splitCampaignTitle(campaign.title);
         const card = el('button', 'bf-camp-card');
-        card.append(
-          el('div', 'bf-camp-title', campaign.title),
-          el('div', 'bf-camp-desc', campaign.description),
-          el('div', 'bf-camp-progress', `${doneCount} / ${campaign.scenarioIds.length} chapters complete`),
-        );
+
+        const art = el('span', 'bf-camp-art');
+        art.appendChild(coverImage(campaign.cover, campaign.coverAlt));
+        const copy = el('span', 'bf-camp-art-copy');
+        copy.appendChild(el('span', 'bf-camp-title', name));
+        if (subtitle) copy.appendChild(el('span', 'bf-camp-sub', subtitle));
+        art.appendChild(copy);
+        if (doneCount === total) art.appendChild(el('span', 'bf-camp-ribbon', 'COMPLETE'));
+
+        const body = el('span', 'bf-camp-body');
+        body.appendChild(el('span', 'bf-camp-desc', campaign.description));
+        body.appendChild(progressBar(doneCount, total));
+        const nextId = nextScenarioId(campaign, progress);
+        const nextTitle = nextId ? scenariosById[nextId]?.title : undefined;
+        const line = el('span', 'bf-camp-progress');
+        line.appendChild(el('span', '', `${doneCount} / ${total} chapters`));
+        line.appendChild(el(
+          'span', 'bf-camp-next',
+          nextTitle ? `${doneCount > 0 ? 'Next' : 'Begin'}: ${nextTitle}` : 'Campaign complete',
+        ));
+        body.appendChild(line);
+
+        card.append(art, body);
         card.addEventListener('click', () => dispatch({ kind: 'openScenarios', campaignId: campaign.id }));
         panel.appendChild(card);
       }
@@ -420,19 +602,35 @@ export function showMenu(
     };
 
     const renderScenarioList = (campaign: CampaignDef): void => {
-      panel.appendChild(el('h1', 'bf-menu-h', campaign.title));
       const progress = loadProgress();
       const statuses = scenarioStatuses(campaign, progress);
+      const total = campaign.scenarioIds.length;
+      const doneCount = statuses.filter((status) => status === 'completed').length;
+      const { name, subtitle } = splitCampaignTitle(campaign.title);
+
+      const hero = el('header', 'bf-camp-hero');
+      // The hero is decorative here: the same art and alt text were just read
+      // aloud on the campaign card that led to this screen.
+      hero.appendChild(coverImage(campaign.cover, ''));
+      const heroCopy = el('div', 'bf-camp-hero-copy');
+      const heading = el('h1', 'bf-camp-title', name);
+      heroCopy.appendChild(heading);
+      if (subtitle) heroCopy.appendChild(el('span', 'bf-camp-sub', subtitle));
+      heroCopy.appendChild(progressBar(doneCount, total));
+      heroCopy.appendChild(el('span', 'bf-camp-next', `${doneCount} / ${total} chapters complete`));
+      hero.appendChild(heroCopy);
+      panel.appendChild(hero);
+
       const actsAt = new Map(campaign.acts?.map((act) => [act.scenarioIds[0], act]) ?? []);
       campaign.scenarioIds.forEach((scenarioId, i) => {
         const act = actsAt.get(scenarioId);
         if (act) {
-          const heading = el('div', 'bf-act');
-          heading.append(
+          const actHeading = el('div', 'bf-act');
+          actHeading.append(
             el('span', 'bf-act-title', act.title),
             el('span', 'bf-act-years', act.years),
           );
-          panel.appendChild(heading);
+          panel.appendChild(actHeading);
         }
         const status = statuses[i];
         const def = scenariosById[scenarioId];
@@ -440,6 +638,9 @@ export function showMenu(
         const row = el('button', 'bf-scn');
         const medal = el('div', `bf-medal ${status}`);
         medal.textContent = status === 'completed' ? '✔' : status === 'locked' ? '🔒' : String(i + 1);
+        const thumb = el('span', `bf-scn-thumb${status === 'locked' ? ' locked' : ''}`);
+        thumb.appendChild(coverImage(def?.chapter?.image ?? campaign.cover, '', thumbnailFocus(i)));
+        thumb.appendChild(medal);
         const copy = el('span', 'bf-scn-copy');
         copy.appendChild(el('span', 'bf-scn-title', authored ? def.title : `Scenario ${i + 1}`));
         if (def?.chapter) {
@@ -452,7 +653,7 @@ export function showMenu(
           status === 'completed' ? 'COMPLETED'
             : status === 'locked' ? 'LOCKED'
               : authored ? 'READY' : 'COMING SOON');
-        row.append(medal, copy, state);
+        row.append(thumb, copy, state);
         row.disabled = status === 'locked' || !authored;
         if (!row.disabled) {
           row.addEventListener('click', () => dispatch({ kind: 'openBriefing', campaignId: campaign.id, scenarioId }));
@@ -468,20 +669,28 @@ export function showMenu(
         dispatch({ kind: 'back' });
         return;
       }
-      panel.appendChild(el('h1', 'bf-menu-h', def.title));
       const brief = el('div', 'bf-brief');
       if (def.chapter) {
-        brief.appendChild(el(
-          'div', 'bf-chapter-kicker',
-          `${def.chapter.act} · ${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`,
-        ));
+        // Title card: the chapter art fills the head of the panel with the
+        // chapter name and its place/date set over the bottom of the frame.
         const art = el('figure', 'bf-chapter-art');
         const image = document.createElement('img');
         image.src = def.chapter.image;
         image.alt = def.chapter.imageAlt;
         image.decoding = 'async';
         art.appendChild(image);
+        const copy = el('div', 'bf-chapter-art-copy');
+        copy.append(
+          el('div', 'bf-chapter-kicker',
+            `Chapter ${def.chapter.number} · ${def.chapter.act}`),
+          el('h1', 'bf-menu-h', def.title),
+          el('div', 'bf-chapter-kicker muted',
+            `${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`),
+        );
+        art.appendChild(copy);
         brief.appendChild(art);
+      } else {
+        brief.appendChild(el('h1', 'bf-menu-h', def.title));
       }
       const hist = el('div', 'bf-brief-hist');
       for (const para of def.briefing.history.split('\n\n')) {
@@ -519,7 +728,10 @@ export function showMenu(
       const previousScrollTop = panel.scrollTop;
       panel.replaceChildren();
       const top: MenuScreen = currentScreen(flow);
-      panel.classList.toggle('wide', top.id === 'scenarioList' || top.id === 'briefing');
+      panel.classList.toggle(
+        'wide',
+        top.id === 'campaigns' || top.id === 'scenarioList' || top.id === 'briefing',
+      );
       switch (top.id) {
         case 'title': renderTitle(); break;
         case 'play': renderPlay(); break;

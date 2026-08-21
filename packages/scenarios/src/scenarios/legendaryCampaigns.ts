@@ -378,6 +378,8 @@ function makeCampaign(source: CampaignSource, scenarios: ScenarioDef[]): Campaig
     id: source.id,
     title: source.title,
     description: `${source.description} Six playable chapters follow the documented chronology; tactical layouts and spoken narration are dramatized.`,
+    cover: `/campaign/${source.id}/cover.webp`,
+    coverAlt: source.imageAlt,
     scenarioIds: scenarios.map((scenario) => scenario.id),
     acts: source.acts.map((act, index) => ({
       ...act,

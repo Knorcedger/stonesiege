@@ -32,6 +32,8 @@ export const wallaceCampaign: CampaignDef = {
     'From the killing of the sheriff at Lanark to the victory at Stirling Bridge, the ' +
     'Guardianship, Falkirk, outlaw years, capture, trial, and execution: play William ' +
     'Wallace’s complete story across twelve focused chapters in five historical acts.',
+  cover: '/campaign/wallace/act-2-stirling.webp',
+  coverAlt: 'Wallace and Moray watch English cavalry file across the narrow bridge at Stirling.',
   scenarioIds: wallaceChapters.map((scenario) => scenario.id),
   acts: [
     { id: 'outlaw', title: 'Act I — The Outlaw', years: '1297', scenarioIds: wallaceChapters.slice(0, 4).map((scenario) => scenario.id) },
