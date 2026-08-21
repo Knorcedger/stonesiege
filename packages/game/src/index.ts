@@ -21,6 +21,8 @@ export async function startApp(root: HTMLElement): Promise<void> {
   let request: GameRequest;
   if (hint?.kind === 'startScenario') {
     request = { mode: 'scenario', scenarioId: hint.scenarioId };
+  } else if (hint?.kind === 'startPractice') {
+    request = { mode: 'practice', setup: hint.setup };
   } else {
     request = await showMenu(root, {
       // Resume is offered when a backgrounded/killed match left a snapshot

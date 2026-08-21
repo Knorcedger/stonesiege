@@ -10,6 +10,31 @@ export interface LoadingStage {
   progress: number | null;
 }
 
+export interface ArtworkLoadProgress {
+  completed: number;
+  total: number;
+  fallback: number;
+}
+
+/** Turn real pack completions into player-facing and accessible loading progress. */
+export function artworkLoadingStage(
+  progress: ArtworkLoadProgress,
+  resuming: boolean,
+): LoadingStage {
+  const total = Math.max(1, progress.total);
+  const completed = Math.min(total, Math.max(0, progress.completed));
+  const fallback = Math.min(completed, Math.max(0, progress.fallback));
+  const fallbackDetail = fallback > 0
+    ? ` · ${fallback} ${fallback === 1 ? 'pack is' : 'packs are'} using fallback art`
+    : '';
+  return {
+    title: resuming ? 'Restoring saved match' : 'Mustering the banners',
+    status: 'Loading battlefield artwork…',
+    detail: `${completed} of ${total} artwork packs checked${fallbackDetail}`,
+    progress: completed / total,
+  };
+}
+
 export interface LoadingPresentationTarget {
   screen: {
     setAttribute(name: string, value: string): void;
@@ -60,6 +85,19 @@ export type LoadingRecoveryActions = {
   onDiscard(): void;
 };
 
+export type FreshLoadingRecoveryActions = {
+  onRetry(): void;
+  onReturn(): void;
+};
+
+export function freshStartFailureStage(message: string): Omit<LoadingStage, 'progress'> {
+  return {
+    title: 'Battlefield could not be prepared',
+    status: 'The match has not started.',
+    detail: message,
+  };
+}
+
 export function discardControlAction(armed: boolean): 'arm' | 'discard' {
   return armed ? 'discard' : 'arm';
 }
@@ -88,6 +126,8 @@ const LOADING_CSS = `
 .bf-loading-detail { text-align:left; }
 .bf-loading-value { min-width:42px; text-align:right; color:#DABE8D; font-variant-numeric:tabular-nums; }
 .bf-loading-actions { display:none; gap:10px; margin-top:24px; }
+.bf-loading.optional .bf-loading-actions { display:flex; justify-content:center; }
+.bf-loading.optional .bf-loading-actions .bf-loading-btn { flex:0 1 300px; }
 .bf-loading.failed .bf-loading-track,.bf-loading.failed .bf-loading-value { display:none; }
 .bf-loading.failed .bf-loading-actions { display:flex; }
 .bf-loading.failed .bf-loading-meta { justify-content:center; }
@@ -104,6 +144,7 @@ const LOADING_CSS = `
 
 /** Full-screen match loader with an explicit, save-preserving failure state. */
 export class MatchLoadingScreen {
+  private readonly root: HTMLElement;
   private readonly screen: HTMLDivElement;
   private readonly view: LoadingPresentationTarget;
   private readonly actions: HTMLDivElement;
@@ -150,6 +191,7 @@ export class MatchLoadingScreen {
     screen.appendChild(card);
     root.appendChild(screen);
 
+    this.root = root;
     this.screen = screen;
     this.view = { screen, title, status, detail, progress, fill, value };
     this.update(initial);
@@ -157,11 +199,32 @@ export class MatchLoadingScreen {
 
   update(stage: LoadingStage): void {
     this.screen.classList.remove('failed');
-    this.actions.replaceChildren();
     syncLoadingPresentation(this.view, stage);
   }
 
+  offerStandardArtwork(onContinue: () => void): void {
+    if (this.screen.classList.contains('failed')) return;
+    this.screen.classList.add('optional');
+    this.actions.replaceChildren();
+    const standard = document.createElement('button');
+    standard.className = 'bf-loading-btn ghost';
+    standard.textContent = 'Play with standard artwork';
+    standard.addEventListener('click', () => {
+      standard.disabled = true;
+      standard.textContent = 'Switching to standard artwork…';
+      onContinue();
+    }, { once: true });
+    this.actions.appendChild(standard);
+  }
+
+  clearOptionalAction(): void {
+    this.screen.classList.remove('optional');
+    this.actions.replaceChildren();
+  }
+
   fail(message: string, recovery: LoadingRecoveryActions): void {
+    this.ensureAttached();
+    this.screen.classList.remove('optional');
     this.screen.classList.add('failed');
     this.screen.setAttribute('role', 'alert');
     this.screen.setAttribute('aria-busy', 'false');
@@ -193,6 +256,36 @@ export class MatchLoadingScreen {
       this.actions.appendChild(discard);
     }
     back.focus();
+  }
+
+  failFresh(message: string, recovery: FreshLoadingRecoveryActions): void {
+    const stage = freshStartFailureStage(message);
+    this.ensureAttached();
+    this.screen.classList.remove('optional');
+    this.screen.classList.add('failed');
+    this.screen.setAttribute('role', 'alert');
+    this.screen.setAttribute('aria-busy', 'false');
+    this.view.title.textContent = stage.title;
+    this.view.status.textContent = stage.status;
+    this.view.detail.textContent = stage.detail ?? '';
+    this.actions.replaceChildren();
+
+    const retry = document.createElement('button');
+    retry.className = 'bf-loading-btn';
+    retry.textContent = 'Try again';
+    retry.addEventListener('click', recovery.onRetry, { once: true });
+    this.actions.appendChild(retry);
+
+    const back = document.createElement('button');
+    back.className = 'bf-loading-btn ghost';
+    back.textContent = 'Return to title';
+    back.addEventListener('click', recovery.onReturn, { once: true });
+    this.actions.appendChild(back);
+    retry.focus();
+  }
+
+  private ensureAttached(): void {
+    if (!this.screen.isConnected) this.root.appendChild(this.screen);
   }
 
   remove(): void {
