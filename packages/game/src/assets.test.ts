@@ -1,7 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
-import { boundedAssetLoad, parseHdManifest, settleAssetPack } from './assets';
+import {
+  boundedAssetLoad, parseHdManifest, settleAssetPack, shouldLoadHdArtwork,
+} from './assets';
 
 describe('bounded artwork-pack loading', () => {
+  it('skips HD discovery only for the explicit developer comparison mode', () => {
+    expect(shouldLoadHdArtwork(undefined)).toBe(true);
+    expect(shouldLoadHdArtwork('hd')).toBe(true);
+    expect(shouldLoadHdArtwork('standard')).toBe(false);
+  });
+
   it('uses the fallback when a pack does not settle before its deadline', async () => {
     vi.useFakeTimers();
     try {

@@ -17,6 +17,7 @@ import {
   GAIA_NEUTRAL_COLOR, GAIA_NEUTRAL_RAMP, type Rgb,
 } from './recolor';
 import { makeMockFrame } from './dev/mockAtlas';
+import type { ArtworkMode } from './developerTools';
 
 /** Dev builds run extra pixel asserts (mask colors must never reach the screen). */
 const DEV_ASSERTS = typeof import.meta !== 'undefined' && !!import.meta.env?.DEV;
@@ -35,8 +36,14 @@ export interface AssetLoadProgress {
 
 export interface AssetLoadOptions {
   onProgress?(progress: AssetLoadProgress): void;
+  /** Developer comparison mode. Standard skips optional HD discovery and overrides. */
+  artworkMode?: ArtworkMode;
   /** Aborting skips optional HD overrides while preserving the complete base atlases. */
   optionalSignal?: AbortSignal;
+}
+
+export function shouldLoadHdArtwork(mode: ArtworkMode | undefined): boolean {
+  return mode !== 'standard';
 }
 
 interface AtlasFrameData {
@@ -159,7 +166,9 @@ export class GameAssets {
   async load(options: AssetLoadOptions = {}): Promise<void> {
     // Crisp nearest-neighbor everywhere (pixel art at integer zooms).
     TextureSource.defaultOptions.scaleMode = 'nearest';
-    const hdManifest = await loadHdManifest();
+    const hdManifest = shouldLoadHdArtwork(options.artworkMode)
+      ? await loadHdManifest()
+      : { atlases: [] };
     const hdFiles = hdManifest.atlases ?? [];
     let progress: AssetLoadProgress = {
       completed: 0,
@@ -480,8 +489,8 @@ export class GameAssets {
       if (!signal?.aborted) onSettled(atlas.missing);
       return atlas;
     }));
-    // A player choosing standard artwork must never see late HD requests alter
-    // frame resolution after the battlefield has begun drawing.
+    // Cancelling optional artwork must never let late HD requests alter frame
+    // resolution after the battlefield has begun drawing.
     if (signal?.aborted) return;
     // Promise.all preserves manifest order, so intentional later overrides
     // (the hand-finished Town Center) remain authoritative.

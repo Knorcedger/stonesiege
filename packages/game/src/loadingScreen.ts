@@ -126,8 +126,6 @@ const LOADING_CSS = `
 .bf-loading-detail { text-align:left; }
 .bf-loading-value { min-width:42px; text-align:right; color:#DABE8D; font-variant-numeric:tabular-nums; }
 .bf-loading-actions { display:none; gap:10px; margin-top:24px; }
-.bf-loading.optional .bf-loading-actions { display:flex; justify-content:center; }
-.bf-loading.optional .bf-loading-actions .bf-loading-btn { flex:0 1 300px; }
 .bf-loading.failed .bf-loading-track,.bf-loading.failed .bf-loading-value { display:none; }
 .bf-loading.failed .bf-loading-actions { display:flex; }
 .bf-loading.failed .bf-loading-meta { justify-content:center; }
@@ -202,29 +200,8 @@ export class MatchLoadingScreen {
     syncLoadingPresentation(this.view, stage);
   }
 
-  offerStandardArtwork(onContinue: () => void): void {
-    if (this.screen.classList.contains('failed')) return;
-    this.screen.classList.add('optional');
-    this.actions.replaceChildren();
-    const standard = document.createElement('button');
-    standard.className = 'bf-loading-btn ghost';
-    standard.textContent = 'Play with standard artwork';
-    standard.addEventListener('click', () => {
-      standard.disabled = true;
-      standard.textContent = 'Switching to standard artwork…';
-      onContinue();
-    }, { once: true });
-    this.actions.appendChild(standard);
-  }
-
-  clearOptionalAction(): void {
-    this.screen.classList.remove('optional');
-    this.actions.replaceChildren();
-  }
-
   fail(message: string, recovery: LoadingRecoveryActions): void {
     this.ensureAttached();
-    this.screen.classList.remove('optional');
     this.screen.classList.add('failed');
     this.screen.setAttribute('role', 'alert');
     this.screen.setAttribute('aria-busy', 'false');
@@ -261,7 +238,6 @@ export class MatchLoadingScreen {
   failFresh(message: string, recovery: FreshLoadingRecoveryActions): void {
     const stage = freshStartFailureStage(message);
     this.ensureAttached();
-    this.screen.classList.remove('optional');
     this.screen.classList.add('failed');
     this.screen.setAttribute('role', 'alert');
     this.screen.setAttribute('aria-busy', 'false');
