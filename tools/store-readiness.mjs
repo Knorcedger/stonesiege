@@ -319,6 +319,11 @@ requireCheck(/android:allowBackup="false"/.test(androidManifest), 'Android cloud
 requireCheck(/android:usesCleartextTraffic="false"/.test(androidManifest), 'Android cleartext traffic is disabled');
 requireCheck(!/android\.permission\.(CAMERA|RECORD_AUDIO|ACCESS_FINE_LOCATION|READ_CONTACTS)/.test(androidManifest), 'Android requests no sensitive permissions');
 requireCheck(/NSPrivacyTracking<\/key>\s*<false\/>/.test(privacyManifest), 'iOS privacy manifest declares no tracking');
+requireCheck(
+  metadata.privacy.dataCollected === false
+    || /NSPrivacyCollectedDataTypeProductInteraction/.test(privacyManifest),
+  'iOS privacy manifest declares the product-interaction data the app collects',
+);
 requireCheck(/PrivacyInfo\.xcprivacy in Resources/.test(xcodeProject), 'iOS privacy manifest belongs to the app target');
 requireCheck(/ITSAppUsesNonExemptEncryption<\/key>\s*<false\/>/.test(read('ios/App/App/Info.plist')), 'iOS export-compliance declaration is present');
 requireCheck(commandOutput('xcodebuild', ['-version']).startsWith('Xcode 26'), 'Xcode 26 is selected');
@@ -328,7 +333,27 @@ requireCheck(metadata.keywords.length <= 100, 'Apple keywords are at most 100 ch
 requireCheck(metadata.promotionalText.length <= 170, 'Apple promotional text is at most 170 characters');
 requireCheck(metadata.shortDescription.length <= 80, 'Google short description is at most 80 characters');
 requireCheck(metadata.description.length <= 4000, 'Store description is at most 4,000 characters');
-requireCheck(metadata.privacy.dataCollected === false && metadata.privacy.tracking === false, 'Store privacy source declares no collection or tracking');
+// The app collects anonymous gameplay statistics. What must never silently
+// change is the rest of the posture: no cross-app/cross-site tracking, no
+// sharing with a third party for its own purposes, no ads, no accounts, no
+// purchases — and a collection claim that stays consistent with the analytics
+// claim in both directions.
+requireCheck(
+  metadata.privacy.tracking === false && metadata.privacy.dataShared === false,
+  'Store privacy source declares no tracking and no data sharing',
+);
+requireCheck(
+  metadata.privacy.ads === false && metadata.privacy.accounts === false && metadata.privacy.purchases === false,
+  'Store privacy source declares no ads, accounts, or purchases',
+);
+requireCheck(
+  metadata.privacy.analytics === metadata.privacy.dataCollected,
+  'Store privacy source keeps the analytics and data-collection answers consistent',
+);
+requireCheck(
+  metadata.privacy.analytics === false || typeof metadata.privacy.analyticsDetail === 'string',
+  'Store privacy source describes what the analytics collect',
+);
 
 checkScreenshotSet('store/screenshots/ios/iphone-6.5', [[2688, 1242]], 'iPhone 6.5-inch');
 checkScreenshotSet('store/screenshots/ios/ipad-12.9', [[2732, 2048]], 'iPad 12.9-inch');

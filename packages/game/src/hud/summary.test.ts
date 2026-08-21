@@ -81,9 +81,24 @@ describe('deriveMatchSummary', () => {
     } as unknown as GameState;
     const s = deriveMatchSummary(state, 1, emptyTallies());
     expect(s.timeText).toBe('1:30');
+    expect(s.durationSeconds).toBe(90);
     expect(s.unitsAlive).toBe(2);
     expect(s.buildingsAlive).toBe(1);
     expect(s.age).toBe('feudal');
     expect(s.techsResearched).toBe(2);
+  });
+
+  it('exposes duration as whole seconds alongside the formatted clock', () => {
+    const at = (tick: number): GameState => ({
+      tick,
+      entities: new Map(),
+      players: [null, { age: 'dark', researchedTechs: [] }],
+    } as unknown as GameState);
+    expect(deriveMatchSummary(at(0), 1, emptyTallies()).durationSeconds).toBe(0);
+    // 20 ticks = 1 second: a raw tick count would read 74,020 here.
+    expect(deriveMatchSummary(at(20 * 3701), 1, emptyTallies()).durationSeconds).toBe(3701);
+    const mid = deriveMatchSummary(at(20 * 42 + 11), 1, emptyTallies());
+    expect(Number.isInteger(mid.durationSeconds)).toBe(true);
+    expect(mid.durationSeconds).toBe(43);
   });
 });

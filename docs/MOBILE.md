@@ -98,11 +98,20 @@ belong in the shared 1Password vault, never in Git.
 
 ## Privacy and release checklist
 
-The current build has no accounts, ads, analytics, tracking, push notifications, purchases, or
-third-party network services. Settings, campaign progress, and resumable-match snapshots remain in
-the app's local WebView storage. On the current implementation, the store privacy questionnaires
-can therefore declare that no user data is collected. Reassess both disclosures before release if
-any online service or SDK is added.
+The current build has no accounts, ads, tracking, push notifications, purchases, or third-party
+network services beyond analytics. Settings, campaign progress, and resumable-match snapshots
+remain in the app's local WebView storage.
+
+Anonymous gameplay statistics are reported through Google Analytics 4 when the build is configured
+with `VITE_GA_ID`: app launches, menu screens visited, and match start/resume/end with outcome,
+duration, and setup. The configuration is cookieless through Consent Mode
+(`analytics_storage: 'denied'`), the client identifier is a random value held in session storage
+and discarded when the app closes, and Google Signals and ad personalization are disabled. Players
+can turn collection off entirely under
+**Settings → Share anonymous gameplay stats**, which prevents the gtag script from loading at all.
+The store privacy questionnaires therefore declare app-activity collection for analytics, not
+shared and not linked to identity, with no cross-app or cross-site tracking and no ATT prompt.
+Reassess every disclosure before release if any further online service or SDK is added.
 
 Before promoting a release:
 

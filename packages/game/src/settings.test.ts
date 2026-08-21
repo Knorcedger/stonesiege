@@ -15,6 +15,16 @@ describe('help settings', () => {
     expect(decodeSettings(JSON.stringify({ hudScale: 3 })).hudScale).toBe(1.25);
   });
 
+  it('shares anonymous stats by default and preserves an explicit opt-out', () => {
+    expect(decodeSettings(null).analyticsEnabled).toBe(true);
+    expect(decodeSettings(JSON.stringify({ analyticsEnabled: false })).analyticsEnabled).toBe(false);
+    // Settings saved before the toggle existed decode to the default, so no
+    // storage-key version bump is needed.
+    expect(decodeSettings(JSON.stringify({ showHpBars: false })).analyticsEnabled).toBe(true);
+    expect(decodeSettings(JSON.stringify({ analyticsEnabled: 'no' })).analyticsEnabled).toBe(true);
+    expect(decodeSettings('not json').analyticsEnabled).toBe(true);
+  });
+
   it('defaults production to 2× and accepts only the supported multipliers', () => {
     expect(decodeSettings(null).productionSpeed).toBe(2);
     expect(decodeSettings(JSON.stringify({ productionSpeed: 1 })).productionSpeed).toBe(1);

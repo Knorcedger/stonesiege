@@ -292,7 +292,11 @@ support it. It also avoids making naval work a blocker for proving that Grand Co
 
 ## Not planned
 
-- Advertising or behavior-based tracking
+- Advertising or behavior-based tracking. Anonymous, aggregate gameplay measurement is not
+  behavior-based tracking and is already shipping: it is cookieless, uses no persistent or
+  advertising identifier, never follows anyone between apps or websites, and can be switched off
+  in Settings. What stays off the roadmap is profiling individual players, cross-site or cross-app
+  identity, and anything that feeds advertising.
 - Energy timers, randomized paid rewards, or consumable power
 - A paid gate around the existing single-player game
 - Loot boxes, pay-to-win systems, blockchain, tokens, or play-to-earn mechanics

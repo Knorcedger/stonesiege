@@ -1,7 +1,7 @@
 {
   "name": "stonesiege",
   "private": true,
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "An open-source historical real-time strategy game for web, Android, and iOS.",
   "license": "MPL-2.0",
   "homepage": "https://stonesiegegame.com",

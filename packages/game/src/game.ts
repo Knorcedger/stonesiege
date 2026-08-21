@@ -48,6 +48,11 @@ import {
   DEFAULT_PRACTICE_SETUP, type PracticeSetup,
 } from './simBridge';
 import { makeScenarioOps, type ScenarioUiHooks } from './scenario/runtime';
+import {
+  campaignChapterCompleteEvent, matchEndEvent, matchResumeEvent, matchStartEvent,
+  type MatchContext,
+} from './analytics/events';
+import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
 import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
 import { setNavHint } from './screens/nav';
 import { getSettings } from './settings';
@@ -139,7 +144,34 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
   return { mode: 'practice', config: practiceConfig(setup), setup, meta: null, snapshot: null };
 }
 
-export async function runGame(root: HTMLElement, options: RunGameOptions): Promise<void> {
+/** What this match is, for anonymous reporting. Practice and campaign fields are disjoint. */
+function analyticsContext(plan: MatchPlan): MatchContext {
+  if (plan.mode === 'scenario') {
+    return {
+      mode: 'scenario',
+      ...(plan.meta ? {
+        scenarioId: plan.meta.id,
+        storyCampaignId: plan.meta.campaign,
+        chapterIndex: plan.meta.index,
+      } : {}),
+    };
+  }
+  return {
+    mode: 'practice',
+    ...(plan.setup ? {
+      civ: plan.setup.civ,
+      mapSize: plan.setup.mapSize,
+      opponentCount: plan.setup.opponents.length,
+      ...(plan.setup.opponents[0] !== undefined ? { difficulty: plan.setup.opponents[0] } : {}),
+    } : {}),
+  };
+}
+
+export async function runGame(
+  root: HTMLElement,
+  options: RunGameOptions,
+  analytics: AnalyticsSink = noopAnalytics,
+): Promise<void> {
   const resuming = options.mode === 'resume';
   const loading = new MatchLoadingScreen(root, {
     title: resuming ? 'Restoring saved match' : 'Mustering the banners',
@@ -149,7 +181,7 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   });
 
   try {
-    await bootGame(root, options, loading);
+    await bootGame(root, options, loading, analytics);
   } catch (error) {
     if (!resuming) {
       console.error('[game] Match startup failed', error);
@@ -207,6 +239,7 @@ async function bootGame(
   root: HTMLElement,
   options: RunGameOptions,
   loading: MatchLoadingScreen,
+  analytics: AnalyticsSink,
 ): Promise<void> {
 
   const plan = resolvePlan(options);
@@ -258,6 +291,11 @@ async function bootGame(
   recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
   const meta = plan.meta;
   const scenarioDef = meta ? scenariosById[meta.id] : null;
+
+  // A resumed snapshot is the player returning to a match already counted at
+  // its start, so it reports match_resume instead of inflating match_start.
+  const matchContext = analyticsContext(plan);
+  analytics.track(snapshot === null ? matchStartEvent(matchContext) : matchResumeEvent(matchContext));
 
   // ------------------------------------------------------------------ audio
   const audioEngine = new AudioEngine();
@@ -581,11 +619,26 @@ async function bootGame(
     deselect();
     audioEngine.play(victory ? 'hornVictory' : 'hornDefeat');
     const summary = deriveMatchSummary(getState(), humanPlayer, tallies);
+    // One fire per match: the endShown guard above already guarantees it, and a
+    // resignation arrives here through the sim's playerDefeated -> showEnd(false).
+    // Killing the app mid-match never reaches this, so match_start minus
+    // match_end IS the abandonment rate.
+    analytics.track(matchEndEvent(matchContext, {
+      outcome: victory ? 'victory' : 'defeat',
+      durationSeconds: summary.durationSeconds,
+      ageReached: summary.age,
+      unitsKilled: summary.tallies.unitsKilled,
+      unitsLost: summary.tallies.unitsLost,
+      peakPopulation: summary.tallies.peakPopulation,
+    }));
     if (meta) {
       // campaign flow: victory unlocks the next scenario; defeat offers retry
       const scenarioId = meta.id;
       const campaignId = meta.campaign;
-      if (victory) saveProgress(completeScenario(loadProgress(), scenarioId));
+      if (victory) {
+        saveProgress(completeScenario(loadProgress(), scenarioId));
+        analytics.track(campaignChapterCompleteEvent(matchContext, summary.durationSeconds));
+      }
       overlays.showEndScreen(victory, summary, {
         sub: victory ? `${meta.title} — complete` : meta.title,
         buttons: victory

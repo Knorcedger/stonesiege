@@ -19,6 +19,11 @@ export interface GameSettings {
   showHpBars: boolean;
   /** Rich upgrade effects and unit counter advice in the custom HUD tooltips. */
   extendedTooltips: boolean;
+  /**
+   * Share anonymous gameplay statistics. Off means the gtag script is never
+   * loaded at all, not merely that events are suppressed.
+   */
+  analyticsEnabled: boolean;
 }
 
 export const DEFAULT_SETTINGS: GameSettings = {
@@ -30,6 +35,7 @@ export const DEFAULT_SETTINGS: GameSettings = {
   productionSpeed: 2,
   showHpBars: true,
   extendedTooltips: true,
+  analyticsEnabled: true,
 };
 
 const STORAGE_KEY = 'bf.settings.v1';
@@ -59,6 +65,9 @@ export function decodeSettings(raw: string | null): GameSettings {
       extendedTooltips: typeof s.extendedTooltips === 'boolean'
         ? s.extendedTooltips
         : DEFAULT_SETTINGS.extendedTooltips,
+      analyticsEnabled: typeof s.analyticsEnabled === 'boolean'
+        ? s.analyticsEnabled
+        : DEFAULT_SETTINGS.analyticsEnabled,
     };
   } catch {
     return { ...DEFAULT_SETTINGS };

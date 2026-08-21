@@ -9,10 +9,18 @@ or Google Play's Designed for Families program.
 
 - Category: Games / Strategy; free; no in-app purchases.
 - App access: unrestricted; reviewers need no account or instructions beyond `reviewNotes`.
-- Ads, tracking, analytics, accounts, purchases, loot boxes, gambling, user-generated content,
-  social features, location, camera, microphone, contacts, health, and financial features: none.
-- Privacy/Data Safety: no data collected or shared. Settings, campaign progress, and saved matches
-  are local. Android backup is disabled so these records are not uploaded by Auto Backup.
+- Ads, tracking, accounts, purchases, loot boxes, gambling, user-generated content, social
+  features, location, camera, microphone, contacts, health, and financial features: none.
+- Analytics: anonymous, cookieless gameplay statistics only (Google Analytics 4), optional through
+  the in-game **Share anonymous gameplay stats** setting. No cookies, no advertising identifier, no
+  persistent identifier, and no cross-app or cross-site tracking, so no App Tracking Transparency
+  prompt applies. Google acts as a processor; nothing is shared for a third party's own purposes.
+- Privacy/Data Safety: **App activity / App interactions** is collected for analytics, not shared,
+  not linked to identity, and optional. Apple's equivalent answer is **Usage Data / Product
+  Interaction**, used for Analytics, not linked to identity, not used for tracking. Everything else
+  — settings, campaign progress, and saved matches — stays local. Android backup is disabled so
+  those records are not uploaded by Auto Backup. Keep this answer, `metadata/en-US.json`,
+  `ios/App/App/PrivacyInfo.xcprivacy`, and `https://stonesiegegame.com/privacy` in agreement.
 - Content: frequent small-scale stylized medieval combat without blood or gore; historical text
   mentions death, execution, and captivity. Use 13+ as the intended minimum audience and answer
   Apple/IARC questionnaires conservatively from those facts.

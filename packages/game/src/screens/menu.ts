@@ -17,6 +17,8 @@ import { savedMatchLabel } from '../persist';
 import { buildSettingsControls } from '../settingsUi';
 import { setGameTooltip } from '../tooltip';
 import { AudioEngine } from '../audio/engine';
+import { menuScreenEvent } from '../analytics/events';
+import { noopAnalytics, type AnalyticsSink } from '../analytics/sink';
 import {
   currentScreen, flowReducer, initialFlow,
   type FlowEvent, type FlowState, type MenuScreen,
@@ -178,8 +180,9 @@ export function menuScrollTopAfterRender(previous: number, preserve: boolean): n
  */
 export function showMenu(
   root: HTMLElement,
-  opts: { canResume?: boolean; flow?: FlowState } = {},
+  opts: { canResume?: boolean; flow?: FlowState; analytics?: AnalyticsSink } = {},
 ): Promise<GameRequest> {
+  const analytics = opts.analytics ?? noopAnalytics;
   if (!document.getElementById('bf-menu-style')) {
     const style = document.createElement('style');
     style.id = 'bf-menu-style';
@@ -211,11 +214,18 @@ export function showMenu(
       screen.remove();
       resolve(request);
     };
+    // Where players drop off before ever starting a match. Reported from
+    // dispatch rather than render() because render also re-runs for in-place
+    // setup edits (picking a civ, adding an opponent), which are not
+    // navigation. The reducer returns the same state for a rejected event, so
+    // an accepted transition always means the top screen changed.
+    const trackScreen = (): void => analytics.track(menuScreenEvent(currentScreen(flow).id));
     const dispatch = (ev: FlowEvent): void => {
       const next = flowReducer(flow, ev);
       if (next !== flow) {
         flow = next;
         render();
+        trackScreen();
       }
     };
 
@@ -528,5 +538,6 @@ export function showMenu(
     };
 
     render();
+    trackScreen(); // the entry screen: 'title', or a deep-linked scenario list
   });
 }
