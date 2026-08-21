@@ -24,6 +24,21 @@ const DEV_ASSERTS = typeof import.meta !== 'undefined' && !!import.meta.env?.DEV
 export const ATLAS_NAMES = ['terrain', 'units', 'buildings', 'objects', 'ui', 'icons'] as const;
 export type AtlasName = (typeof ATLAS_NAMES)[number];
 
+const ATLAS_LOAD_TIMEOUT_MS = 20_000;
+const HD_MANIFEST_TIMEOUT_MS = 8_000;
+
+export interface AssetLoadProgress {
+  completed: number;
+  total: number;
+  fallback: number;
+}
+
+export interface AssetLoadOptions {
+  onProgress?(progress: AssetLoadProgress): void;
+  /** Aborting skips optional HD overrides while preserving the complete base atlases. */
+  optionalSignal?: AbortSignal;
+}
+
 interface AtlasFrameData {
   frame: { x: number; y: number; w: number; h: number };
   anchor?: { x: number; y: number };
@@ -121,13 +136,41 @@ export class GameAssets {
   private colorPages = new Map<string, ColorPage[]>();
   matchColors: number[] = [];
 
-  async load(): Promise<void> {
+  async load(options: AssetLoadOptions = {}): Promise<void> {
     // Crisp nearest-neighbor everywhere (pixel art at integer zooms).
     TextureSource.defaultOptions.scaleMode = 'nearest';
-    await Promise.all(ATLAS_NAMES.map(async (name) => {
-      this.atlases.set(name, await loadAtlas(name));
+    const hdManifest = await loadHdManifest();
+    const hdFiles = hdManifest.atlases ?? [];
+    let progress: AssetLoadProgress = {
+      completed: 0,
+      total: ATLAS_NAMES.length + hdFiles.length,
+      fallback: 0,
+    };
+    options.onProgress?.(progress);
+    const settled = (usedFallback: boolean): void => {
+      progress = settleAssetPack(progress, usedFallback);
+      options.onProgress?.(progress);
+    };
+
+    // Start the complete base art first so the browser gives it the first
+    // network slots. HD packs are optional and can be aborted independently.
+    const baseLoad = Promise.all(ATLAS_NAMES.map(async (name) => {
+      const atlas = await loadAtlas(name);
+      this.atlases.set(name, atlas);
+      settled(atlas.missing);
     }));
-    await this.loadHdOverrides();
+    const hdLoad = this.loadHdOverrides(hdFiles, options.optionalSignal, settled);
+    await Promise.all([baseLoad, hdLoad]);
+    if (
+      !options.optionalSignal?.aborted
+      && hdManifest.frameCount !== undefined
+      && this.hdFrames.size !== hdManifest.frameCount
+    ) {
+      console.warn(
+        `[assets] HD manifest loaded ${this.hdFrames.size}/${hdManifest.frameCount} frames; `
+        + 'missing frames use fallback art',
+      );
+    }
     const missing = ATLAS_NAMES.filter((n) => this.atlases.get(n)!.missing);
     if (missing.length > 0) {
       console.warn(
@@ -401,30 +444,43 @@ export class GameAssets {
     };
   }
 
-  private async loadHdOverrides(): Promise<void> {
-    try {
-      const response = await fetch('assets/hd/manifest.json');
-      if (!response.ok) return;
-      const manifest = await response.json() as HdManifest;
-      const files = manifest.atlases ?? [];
-      const loaded = await Promise.all(files.map((file) => loadAtlasFile(
+  private async loadHdOverrides(
+    files: string[],
+    signal: AbortSignal | undefined,
+    onSettled: (usedFallback: boolean) => void,
+  ): Promise<void> {
+    if (files.length === 0 || signal?.aborted) return;
+    const loaded = await Promise.all(files.map(async (file) => {
+      const atlas = await loadAtlasFile(
         `assets/hd/${file}`,
         'assets/hd/',
         file.replace(/\.json$/i, ''),
-      )));
-      // Promise.all preserves manifest order, so intentional later overrides
-      // (the hand-finished Town Center) remain authoritative.
-      for (const atlas of loaded) {
-        if (atlas.missing) continue;
-        for (const frameName of atlas.frameData.keys()) this.hdFrames.set(frameName, atlas);
-      }
-      if (manifest.frameCount !== undefined && this.hdFrames.size !== manifest.frameCount) {
-        console.warn(`[assets] HD manifest loaded ${this.hdFrames.size}/${manifest.frameCount} frames; missing frames use fallback art`);
-      }
-    } catch {
-      // HD replacements are optional; the complete deterministic fallback stays loadable.
+        signal,
+      );
+      if (!signal?.aborted) onSettled(atlas.missing);
+      return atlas;
+    }));
+    // A player choosing standard artwork must never see late HD requests alter
+    // frame resolution after the battlefield has begun drawing.
+    if (signal?.aborted) return;
+    // Promise.all preserves manifest order, so intentional later overrides
+    // (the hand-finished Town Center) remain authoritative.
+    for (const atlas of loaded) {
+      if (atlas.missing) continue;
+      for (const frameName of atlas.frameData.keys()) this.hdFrames.set(frameName, atlas);
     }
   }
+}
+
+export function settleAssetPack(
+  progress: AssetLoadProgress,
+  usedFallback: boolean,
+): AssetLoadProgress {
+  return {
+    completed: Math.min(progress.total, progress.completed + 1),
+    total: progress.total,
+    fallback: progress.fallback + (usedFallback ? 1 : 0),
+  };
 }
 
 function rgbCss(rgb: Rgb): string {
@@ -451,7 +507,92 @@ async function loadAtlas(name: AtlasName): Promise<Atlas> {
   return loadAtlasFile(`assets/${name}.json`, 'assets/', name);
 }
 
-async function loadAtlasFile(jsonUrl: string, imageBase: string, fallbackName = jsonUrl): Promise<Atlas> {
+function scopedAbortSignal(
+  parent: AbortSignal | undefined,
+  timeoutMs: number,
+): { signal: AbortSignal; dispose(): void } {
+  const controller = new AbortController();
+  const onParentAbort = (): void => controller.abort(parent?.reason);
+  if (parent?.aborted) onParentAbort();
+  else parent?.addEventListener('abort', onParentAbort, { once: true });
+  const timer = setTimeout(() => controller.abort(new Error('Artwork pack timed out.')), timeoutMs);
+  return {
+    signal: controller.signal,
+    dispose: () => {
+      clearTimeout(timer);
+      parent?.removeEventListener('abort', onParentAbort);
+    },
+  };
+}
+
+/** Run one abort-aware asset operation with a deadline and a safe fallback. */
+export async function boundedAssetLoad<T>(
+  start: (signal: AbortSignal) => Promise<T>,
+  fallback: T,
+  timeoutMs: number,
+  parentSignal?: AbortSignal,
+): Promise<T> {
+  const scoped = scopedAbortSignal(parentSignal, timeoutMs);
+  try {
+    return await start(scoped.signal);
+  } catch {
+    return fallback;
+  } finally {
+    scoped.dispose();
+  }
+}
+
+function loadImage(url: string, signal: AbortSignal): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const image = new Image();
+    image.decoding = 'async';
+    const cleanup = (): void => {
+      image.removeEventListener('load', onLoad);
+      image.removeEventListener('error', onError);
+      signal.removeEventListener('abort', onAbort);
+    };
+    const onLoad = (): void => {
+      cleanup();
+      resolve(image);
+    };
+    const onError = (): void => {
+      cleanup();
+      reject(new Error(`Could not load ${url}`));
+    };
+    const onAbort = (): void => {
+      cleanup();
+      image.removeAttribute('src');
+      reject(signal.reason instanceof Error ? signal.reason : new Error(`Loading ${url} was cancelled.`));
+    };
+    if (signal.aborted) {
+      onAbort();
+      return;
+    }
+    image.addEventListener('load', onLoad, { once: true });
+    image.addEventListener('error', onError, { once: true });
+    signal.addEventListener('abort', onAbort, { once: true });
+    image.src = url;
+  });
+}
+
+async function loadHdManifest(): Promise<HdManifest> {
+  return boundedAssetLoad(async (signal) => {
+    const response = await fetch('assets/hd/manifest.json', { signal });
+    if (!response.ok) return {};
+    const manifest = await response.json() as HdManifest;
+    return {
+      atlases: Array.isArray(manifest.atlases) ? manifest.atlases : [],
+      ...(typeof manifest.frameCount === 'number' ? { frameCount: manifest.frameCount } : {}),
+    };
+  }, {}, HD_MANIFEST_TIMEOUT_MS);
+}
+
+async function loadAtlasFile(
+  jsonUrl: string,
+  imageBase: string,
+  fallbackName = jsonUrl,
+  parentSignal?: AbortSignal,
+): Promise<Atlas> {
   const atlas: Atlas = {
     name: fallbackName,
     missing: true,
@@ -463,16 +604,17 @@ async function loadAtlasFile(jsonUrl: string, imageBase: string, fallbackName = 
     maskPalette: null,
     playerRamps: null,
   };
-  try {
-    const res = await fetch(jsonUrl);
+  return boundedAssetLoad(async (signal) => {
+    const res = await fetch(jsonUrl, { signal });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = (await res.json()) as AtlasJson;
     if (!json || typeof json !== 'object' || !json.frames) throw new Error('bad atlas json');
     // A 0-frame atlas is an assetgen stub: treat as missing so mock frames kick in.
     if (Object.keys(json.frames).length === 0) throw new Error('empty atlas (stub)');
-    const image = new Image();
-    image.src = `${imageBase}${json.meta?.image ?? `${fallbackName}.png`}`;
-    await image.decode();
+    const image = await loadImage(
+      `${imageBase}${json.meta?.image ?? `${fallbackName}.png`}`,
+      signal,
+    );
 
     const source = Texture.from(image).source;
     atlas.density = Math.max(1, json.meta?.scale ?? 1);
@@ -498,14 +640,12 @@ async function loadAtlasFile(jsonUrl: string, imageBase: string, fallbackName = 
     }
     atlas.image = image;
     atlas.missing = false;
-  } catch {
-    // Missing/broken atlas: mock-frame mode (warned collectively in load()).
-  }
-  return atlas;
+    return atlas;
+  }, atlas, ATLAS_LOAD_TIMEOUT_MS, parentSignal);
 }
 
-export async function loadAssets(): Promise<GameAssets> {
+export async function loadAssets(options: AssetLoadOptions = {}): Promise<GameAssets> {
   const assets = new GameAssets();
-  await assets.load();
+  await assets.load(options);
   return assets;
 }

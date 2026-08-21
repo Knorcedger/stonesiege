@@ -53,7 +53,7 @@ import {
   clearSnapshot, hasSnapshot, loadSnapshot, replaySnapshotIncrementally, saveSnapshot, scenarioFingerprint,
   SNAPSHOT_VERSION, trySerialize, type CommandLog, type MatchSnapshot,
 } from './persist';
-import { MatchLoadingScreen, withTimeout } from './loadingScreen';
+import { artworkLoadingStage, MatchLoadingScreen, withTimeout } from './loadingScreen';
 
 const PLACE_GREEN = 0x3e8c34;
 const PLACE_RED = 0xb3261e;
@@ -150,8 +150,25 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
   } catch (error) {
     if (!resuming) {
       console.error('[game] Match startup failed', error);
-      loading.remove();
-      throw error;
+      const knownMessage = error instanceof Error && (
+        error.message.startsWith('Loading battlefield')
+        || error.message.startsWith('Drawing the battlefield')
+      )
+        ? error.message
+        : 'StoneSiege hit an unexpected problem while preparing this match.';
+      loading.failFresh(`${knownMessage} Try again, or return to the title without losing campaign progress.`, {
+        onRetry: () => {
+          loading.remove();
+          if (options.mode === 'scenario') {
+            setNavHint({ kind: 'startScenario', scenarioId: options.scenarioId });
+            window.location.reload();
+            return;
+          }
+          void runGame(root, options);
+        },
+        onReturn: () => window.location.reload(),
+      });
+      return;
     }
     const isKnownResumeError = error instanceof Error && (
       error.message.startsWith('No saved match')
@@ -202,9 +219,17 @@ async function bootGame(
     detail: 'This stage is usually quickest after the first visit.',
     progress: null,
   });
-  const assets = await withTimeout(
-    loadAssets(), 45_000, 'Loading battlefield artwork took too long.',
-  );
+  const optionalArtwork = new AbortController();
+  const standardArtworkTimer = setTimeout(() => {
+    loading.offerStandardArtwork(() => optionalArtwork.abort());
+  }, 6_000);
+  const assets = await loadAssets({
+    optionalSignal: optionalArtwork.signal,
+    onProgress: (progress) => loading.update(artworkLoadingStage(progress, options.mode === 'resume')),
+  }).finally(() => {
+    clearTimeout(standardArtworkTimer);
+    loading.clearOptionalAction();
+  });
   const { config, snapshot } = plan;
   // Fresh matches inherit the persisted preference. Resumes retain the speed
   // encoded in their deterministic state/config until the player changes it.
