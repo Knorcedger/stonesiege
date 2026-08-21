@@ -7,12 +7,14 @@ import { flowAtScenarioList } from './screens/flow';
 import { takeNavHint } from './screens/nav';
 import { hasSnapshot } from './persist';
 import type { RunGameOptions } from './game';
+import { installContextMenuBlocker } from './contextMenu';
 
 export { resolveFrameName, facingFromDelta, animForActivity } from './frames';
 export { Camera, tileToWorld, worldToTile } from './camera';
 
 /** Boot the full app (menus -> practice/campaign -> game screen) into the given DOM element. */
 export async function startApp(root: HTMLElement): Promise<void> {
+  installContextMenuBlocker(root);
   root.innerHTML = '';
   root.style.position = 'relative';
 
