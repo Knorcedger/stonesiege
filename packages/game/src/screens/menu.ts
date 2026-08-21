@@ -13,7 +13,10 @@ import {
   type PracticeMapSize, type PracticeSetup,
 } from '../simBridge';
 import { loadProgress, nextScenarioId, scenarioStatuses } from '../campaign/progress';
-import { savedMatchLabel } from '../persist';
+import {
+  campaignSlot, mostRecentSave, PRACTICE_SLOT, savedMatchLabel, saveForCampaign,
+  type SaveEntry, type SaveSlot,
+} from '../persist';
 import { buildSettingsControls } from '../settingsUi';
 import { setGameTooltip } from '../tooltip';
 import { AudioEngine } from '../audio/engine';
@@ -29,7 +32,8 @@ import { flowFromHash, flowHash } from './route';
 export type GameRequest =
   | { mode: 'practice'; setup: PracticeSetup }
   | { mode: 'scenario'; scenarioId: string }
-  | { mode: 'resume' };
+  /** `scenarioId` only addresses the match in the URL; the slot does the work. */
+  | { mode: 'resume'; slot: SaveSlot; scenarioId?: string };
 
 const MENU_CSS = `
 .bf-menu { position:absolute; inset:0; display:flex; align-items:center; justify-content:center;
@@ -109,6 +113,10 @@ const MENU_CSS = `
 .bf-camp-ribbon { position:absolute; top:10px; right:10px; z-index:1; padding:3px 9px; border-radius:3px;
   font-size:10.5px; letter-spacing:1.4px; color:#1A1208; background:linear-gradient(#F2D45C,#D4A82A);
   box-shadow:0 0 0 1px #8E6E14, 0 2px 6px rgba(0,0,0,.5); }
+/* A campaign with a match in its own slot — parchment, not the gold of a
+   finished campaign, so "waiting for you" never reads as "done". */
+.bf-camp-ribbon.saved { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D);
+  box-shadow:0 0 0 1px #8A6414, 0 2px 6px rgba(0,0,0,.5); }
 .bf-camp-body { display:block; padding:12px 16px 14px; }
 .bf-camp-desc { display:block; font-size:12.5px; line-height:1.45; color:#B99A6B; }
 .bf-camp-progress { display:flex; align-items:baseline; justify-content:space-between; gap:10px;
@@ -159,6 +167,10 @@ const MENU_CSS = `
 .bf-scn-title { line-height:1.15; }
 .bf-scn-meta { color:#8f7958; font-size:11px; letter-spacing:.35px; }
 .bf-scn .bf-scn-state { margin-left:auto; font-size:11px; color:#B99A6B; letter-spacing:1px; }
+.bf-scn .bf-scn-state.saved { color:#E6C04A; }
+/* Restarting a saved chapter throws the save away, so it sits apart from the
+   footer's RESUME rather than beside it. */
+.bf-brief-restart { width:100%; margin:14px 0 0; font-size:15px; }
 .bf-brief { text-align:left; }
 .bf-chapter-kicker { display:block; color:#E6C04A; font-size:11px; letter-spacing:1.3px;
   text-transform:uppercase; text-shadow:0 1px 4px #0b0703; }
@@ -269,10 +281,12 @@ export function campaignSubtitle(defs: CampaignDef[] = Object.values(campaigns))
 /**
  * Show the menu flow; resolves when the player starts a game. `flow` seeds
  * navigation (post-reload deep links, e.g. straight back to a scenario list).
+ * What can be resumed is read from the save slots, not passed in — several
+ * campaigns can be in progress and each screen asks about the one it shows.
  */
 export function showMenu(
   root: HTMLElement,
-  opts: { canResume?: boolean; flow?: FlowState; analytics?: AnalyticsSink } = {},
+  opts: { flow?: FlowState; analytics?: AnalyticsSink } = {},
 ): Promise<GameRequest> {
   const analytics = opts.analytics ?? noopAnalytics;
   if (!document.getElementById('bf-menu-style')) {
@@ -405,18 +419,23 @@ export function showMenu(
       return bar;
     };
     /**
-     * Primary button that starts a NEW match. Starting fresh destroys any
-     * saved resumable match (game.ts clears the snapshot on boot), so when one
-     * exists the first tap arms a warning naming the save and the second tap
+     * Primary button that starts a NEW match in `slot`. Starting fresh destroys
+     * whatever that slot holds (game.ts clears it on boot), so when it is
+     * occupied the first tap arms a warning naming the save and the second tap
      * confirms — the same two-tap pattern as Resign. Any re-render (changing a
      * setup option, navigating) rebuilds the button and disarms it.
+     *
+     * Only this slot is at risk: a save in another campaign is untouched, so
+     * starting a Joan chapter never warns about a Wallace one.
      */
-    const startMatchButton = (label: string, start: () => void): HTMLButtonElement => {
-      const b = el('button', 'bf-menu-btn primary');
+    const startMatchButton = (
+      label: string, slot: SaveSlot, start: () => void, cls = 'primary',
+    ): HTMLButtonElement => {
+      const b = el('button', `bf-menu-btn ${cls}`);
       b.appendChild(document.createTextNode(label));
       let armed = false;
       b.addEventListener('click', () => {
-        const saved = armed ? null : savedMatchLabel();
+        const saved = armed ? null : savedMatchLabel(slot);
         if (saved) {
           armed = true;
           b.replaceChildren(
@@ -470,16 +489,29 @@ export function showMenu(
       return box;
     };
 
+    const resumeRequest = (save: SaveEntry): GameRequest => ({
+      mode: 'resume',
+      slot: save.slot,
+      ...(save.scenarioId !== undefined ? { scenarioId: save.scenarioId } : {}),
+    });
+
     // ---------------------------------------------------------------- views
     const renderTitle = (): void => {
       panel.append(
         el('h1', 'bf-menu-name', 'StoneSiege'),
         el('p', 'bf-menu-sub', 'Raise your banner. Advance the ages.'),
       );
-      if (opts.canResume) {
-        panel.appendChild(button('Resume match', 'primary', () => done({ mode: 'resume' }), 'pick up where you left off'));
+      // Continue resumes the most recently saved slot and names it, so with
+      // several campaigns in progress it is obvious which one this picks up.
+      const recent = mostRecentSave();
+      if (recent) {
+        panel.appendChild(button(
+          'Continue', 'primary',
+          () => done(resumeRequest(recent)),
+          recent.label,
+        ));
       }
-      panel.appendChild(button('Play', opts.canResume ? '' : 'primary', () => dispatch({ kind: 'openPlay' })));
+      panel.appendChild(button('Play', recent ? '' : 'primary', () => dispatch({ kind: 'openPlay' })));
       panel.appendChild(button('Settings', 'ghost', () => dispatch({ kind: 'openSettings' })));
     };
 
@@ -552,7 +584,7 @@ export function showMenu(
       panel.appendChild(colors);
 
       panel.append(
-        startMatchButton('Start match', () => done({
+        startMatchButton('Start match', PRACTICE_SLOT, () => done({
           mode: 'practice',
           setup: { ...practice, opponents: [...practice.opponents] },
         })),
@@ -579,7 +611,11 @@ export function showMenu(
         copy.appendChild(el('span', 'bf-camp-title', name));
         if (subtitle) copy.appendChild(el('span', 'bf-camp-sub', subtitle));
         art.appendChild(copy);
-        if (doneCount === total) art.appendChild(el('span', 'bf-camp-ribbon', 'COMPLETE'));
+        // Each campaign keeps its own save, so a match in progress here is a
+        // property of the campaign, not of the app.
+        const save = saveForCampaign(campaign.id);
+        if (save) art.appendChild(el('span', 'bf-camp-ribbon saved', 'IN PROGRESS'));
+        else if (doneCount === total) art.appendChild(el('span', 'bf-camp-ribbon', 'COMPLETE'));
 
         const body = el('span', 'bf-camp-body');
         body.appendChild(el('span', 'bf-camp-desc', campaign.description));
@@ -590,7 +626,8 @@ export function showMenu(
         line.appendChild(el('span', '', `${doneCount} / ${total} chapters`));
         line.appendChild(el(
           'span', 'bf-camp-next',
-          nextTitle ? `${doneCount > 0 ? 'Next' : 'Begin'}: ${nextTitle}` : 'Campaign complete',
+          save ? `Saved: ${save.label}`
+            : nextTitle ? `${doneCount > 0 ? 'Next' : 'Begin'}: ${nextTitle}` : 'Campaign complete',
         ));
         body.appendChild(line);
 
@@ -607,6 +644,7 @@ export function showMenu(
       const total = campaign.scenarioIds.length;
       const doneCount = statuses.filter((status) => status === 'completed').length;
       const { name, subtitle } = splitCampaignTitle(campaign.title);
+      const save = saveForCampaign(campaign.id);
 
       const hero = el('header', 'bf-camp-hero');
       // The hero is decorative here: the same art and alt text were just read
@@ -649,10 +687,12 @@ export function showMenu(
             `${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`,
           ));
         }
-        const state = el('span', 'bf-scn-state',
-          status === 'completed' ? 'COMPLETED'
-            : status === 'locked' ? 'LOCKED'
-              : authored ? 'READY' : 'COMING SOON');
+        const savedHere = save?.scenarioId === scenarioId;
+        const state = el('span', `bf-scn-state${savedHere ? ' saved' : ''}`,
+          savedHere ? 'IN PROGRESS'
+            : status === 'completed' ? 'COMPLETED'
+              : status === 'locked' ? 'LOCKED'
+                : authored ? 'READY' : 'COMING SOON');
         row.append(thumb, copy, state);
         row.disabled = status === 'locked' || !authored;
         if (!row.disabled) {
@@ -707,9 +747,24 @@ export function showMenu(
       brief.appendChild(hintList);
       // sticky footer: the primary CTA stays on screen while the text scrolls
       const actions = el('div', 'bf-brief-actions');
+      const slot = campaignSlot(def.campaign);
+      const save = saveForCampaign(def.campaign);
+      const resumable = save?.scenarioId === scenarioId ? save : null;
+      if (resumable) {
+        // Resuming is the expected action, so it owns the footer. Starting over
+        // is the one that costs the save, and it keeps the two-tap confirm on
+        // its own full-width line rather than crowding the footer to three.
+        brief.appendChild(startMatchButton(
+          'Restart this chapter', slot,
+          () => done({ mode: 'scenario', scenarioId }),
+          'ghost bf-brief-restart',
+        ));
+      }
       actions.append(
         backButton(),
-        startMatchButton('START', () => done({ mode: 'scenario', scenarioId })),
+        resumable
+          ? button('RESUME', 'primary', () => done(resumeRequest(resumable)), resumable.label)
+          : startMatchButton('START', slot, () => done({ mode: 'scenario', scenarioId })),
       );
       panel.append(brief, actions);
     };
