@@ -120,6 +120,12 @@ export function recordPopulation(tallies: MatchTallies, population: number): voi
 
 export interface MatchSummary {
   timeText: string;
+  /**
+   * Whole seconds of match time. The end screen shows `timeText`; anything
+   * that needs to compute with the length (analytics, future records) must use
+   * this instead of parsing the formatted clock back apart.
+   */
+  durationSeconds: number;
   age: AgeId;
   unitsAlive: number;
   buildingsAlive: number;
@@ -142,6 +148,7 @@ export function deriveMatchSummary(
   const p = state.players[player];
   return {
     timeText: formatMatchTime(state.tick),
+    durationSeconds: Math.max(0, Math.round(state.tick / TICKS_PER_SECOND)),
     age: p?.age ?? 'dark',
     unitsAlive,
     buildingsAlive,

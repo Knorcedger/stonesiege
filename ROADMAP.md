@@ -25,7 +25,8 @@ and scenario-tool foundations below come first.
 - Deep water and shallows as terrain types; deep water is currently impassable
 - Scenario maps, objectives, dialogue, timed and event-driven triggers, allied teams, and AI
   profiles
-- One local resumable match with autosave, explicit “Save now,” and deterministic restoration
+- One autosaved resumable match per campaign plus one for practice, with explicit “Save now”
+  and deterministic restoration
 - Touch-first controls, native mobile wrappers, HD runtime art, and automated quality gates
 
 ## Gap audit
@@ -44,7 +45,7 @@ and scenario-tool foundations below come first.
 | Civilizations | Seven civs with bonuses, roster cuts, renamed shared units, unique units, and unique techs | More distinct core troop stats/art, architecture sets, naval identities, broader tech-tree asymmetry, and civ-specific audio |
 | AI | Seven deterministic levels, fog-honest memory, economy, counters, siege, monks, scouting, and attack profiles | Multi-base planning, territorial defense, naval play, transport landings, province strategy, supply pressure, and an empire-scale director |
 | Scenarios | ASCII maps plus fixed entities and a deterministic condition/effect trigger graph | Visual authoring, reusable regions, variables/counters, choices, branching objectives, capture zones, province state, and reusable templates |
-| Long games | One autosaved resumable match on the current device | Multiple named saves, checkpoints, versioned migrations, a player-facing replay browser, and clearer failure recovery |
+| Long games | One autosaved resumable match per campaign, plus practice, on the current device | Named saves, per-chapter checkpoints, versioned migrations, a player-facing replay browser, and clearer failure recovery |
 | Presentation | HD units/buildings, effects, synthesized SFX, and ambient audio | Full music score, richer biome ambience, naval/elevation art, complete civilization art sets, and cinematic transitions |
 | Reach | English UI and limited device evidence | Localization infrastructure, full accessibility audit, more device coverage, and sustained performance telemetry without invasive tracking |
 | Community play | Source is public; game data and deterministic systems are modular | Supported scenario/mod packaging, safe validation, discovery/import UX, and compatibility rules |
@@ -127,8 +128,9 @@ cleanly.
   hundreds of hand-counted ASCII rows.
 - Add scenario linting for inaccessible objectives, invalid dock sites, sealed land regions,
   missing references, impossible victory states, and unsupported entity budgets.
-- Add multiple named local saves and scenario checkpoints for long adventures. Continue to keep
-  all progress on-device unless a future online design is explicitly approved.
+- Add named local saves and scenario checkpoints on top of the per-campaign slots, for players
+  who want more than one save per campaign. Continue to keep all progress on-device unless a
+  future online design is explicitly approved.
 
 **Exit signal:** a contributor can author a large province-based scenario, validate it, and test
 its complete objective graph without editing engine code.
@@ -292,7 +294,11 @@ support it. It also avoids making naval work a blocker for proving that Grand Co
 
 ## Not planned
 
-- Advertising or behavior-based tracking
+- Advertising or behavior-based tracking. Anonymous, aggregate gameplay measurement is not
+  behavior-based tracking and is already shipping: it is cookieless, uses no persistent or
+  advertising identifier, never follows anyone between apps or websites, and can be switched off
+  in Settings. What stays off the roadmap is profiling individual players, cross-site or cross-app
+  identity, and anything that feeds advertising.
 - Energy timers, randomized paid rewards, or consumable power
 - A paid gate around the existing single-player game
 - Loot boxes, pay-to-win systems, blockchain, tokens, or play-to-earn mechanics

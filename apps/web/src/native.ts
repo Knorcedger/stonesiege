@@ -17,6 +17,18 @@ async function applyGameSystemBars(): Promise<void> {
   }
 }
 
+/**
+ * 'web' | 'ios' | 'android'. Reported as an analytics parameter rather than
+ * used to gate anything: all three platforms measure identically.
+ */
+export function nativePlatform(): string {
+  try {
+    return Capacitor.getPlatform();
+  } catch {
+    return 'web';
+  }
+}
+
 export async function installNativeBridge(): Promise<void> {
   if (!Capacitor.isNativePlatform()) return;
 

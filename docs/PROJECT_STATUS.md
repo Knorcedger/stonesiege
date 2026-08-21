@@ -1,6 +1,6 @@
 # StoneSiege project status
 
-_Last updated: 2026-08-19_
+_Last updated: 2026-08-20_
 
 StoneSiege is a playable single-player RTS in **alpha**. The public browser build and internal Android and iOS builds share one offline game bundle and the same deterministic simulation.
 
@@ -9,13 +9,13 @@ StoneSiege is a playable single-player RTS in **alpha**. The public browser buil
 | Area | State |
 |---|---|
 | Browser build | Public at [play.stonesiegegame.com](https://play.stonesiegegame.com) |
-| Android | Version 0.1.1, build 6 configured for Google Play internal testing |
-| iOS | Version 0.1.1, build 5 configured for TestFlight internal testing |
+| Android | Version 0.1.2, build 7 configured for Google Play internal testing |
+| iOS | Version 0.1.2, build 6 configured for TestFlight internal testing |
 | Website | Live at [stonesiegegame.com](https://stonesiegegame.com) |
 | Repository | Public at [github.com/Knorcedger/stonesiege](https://github.com/Knorcedger/stonesiege) |
 | Accounts, ads, purchases | None in the current build |
 
-The current store builds collect no user data through accounts, analytics, advertising, tracking, purchases, push notifications, or project-operated network services. Campaign progress, settings, and resumable matches remain on-device. This must be reassessed before any online feature or SDK is added.
+The current store builds collect no user data through accounts, advertising, tracking, purchases, push notifications, or project-operated network services. They do report anonymous gameplay statistics through cookieless Google Analytics 4 — app launches, menu screens visited, and match start/resume/end with outcome, duration, and setup — with no cookie, no advertising identifier, and no persistent identifier; the client id is a random value held in session storage and discarded when the app closes. Players can turn it off under **Settings → Share anonymous gameplay stats**, which stops the analytics script from loading. Campaign progress, settings, and resumable matches remain on-device. This must be reassessed before any further online feature or SDK is added.
 
 ## What is playable
 

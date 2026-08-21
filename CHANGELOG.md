@@ -4,8 +4,24 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ## Unreleased
 
+## 0.1.2 — 2026-08-20
+
+### Added
+
+- Anonymous gameplay statistics so the game can be improved with evidence instead of guesswork:
+  app launches, menu screens visited, and matches started, resumed, and finished with their
+  outcome, duration, and setup.
+- A **Share anonymous gameplay stats** switch in Settings, on by default. Turning it off stops the
+  analytics script from ever loading.
+
 ### Changed
 
+- Reporting is cookieless: no cookie, no advertising identifier, and no persistent identifier. The
+  client id is a random value held in session storage and discarded when the app closes, so it
+  never follows anyone between visits. Google Signals and ad personalization are disabled, and the
+  game stays fully playable offline and with reporting switched off.
+- Corrected the store listing, store privacy declarations, iOS privacy manifest, and project
+  documentation, all of which previously stated that the game contained no analytics.
 - Kept the in-match HUD and overlays inside device safe areas without shrinking the battlefield.
 - Refreshed public project, contribution, release-status, and roadmap documentation.
 - Added automated Developer Certificate of Origin checks for pull requests.

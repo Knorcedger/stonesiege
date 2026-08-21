@@ -13,6 +13,8 @@ const campaign: CampaignDef = {
   id: 'wallace',
   title: 'Test',
   description: '',
+  cover: '/campaign/wallace/act-2-stirling.webp',
+  coverAlt: '',
   scenarioIds: ['w1', 'w2', 'w3'],
 };
 

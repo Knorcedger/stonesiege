@@ -9,12 +9,13 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '@bf/sim';
 import { fp, TICKS_PER_SECOND, type Entity, type GameConfig } from '@bf/sim/types';
 import {
-  decodeSnapshot, encodeSnapshot, hasSnapshot, loadSnapshot, replaySnapshot, replaySnapshotIncrementally,
-  savedMatchLabel, saveSnapshot,
-  scenarioFingerprint, SNAPSHOT_VERSION, trySerialize,
+  campaignSlot, clearSnapshot, decodeSnapshot, encodeSnapshot, hasSnapshot, listSaves, loadSnapshot,
+  mostRecentSave, PRACTICE_SLOT, replaySnapshot, replaySnapshotIncrementally,
+  resetSaveIndexCache, savedMatchLabel, saveForCampaign, saveSnapshot,
+  scenarioFingerprint, SNAPSHOT_VERSION, slotForSnapshot, trySerialize,
   type CommandLog, type PracticeSnapshot, type ScenarioSnapshot,
 } from './persist';
-import { makeMemoryStorage, setStorageBackend } from './storage';
+import { appStorage, makeMemoryStorage, setStorageBackend } from './storage';
 import { gameFromSerialized, type PracticeSetup } from './simBridge';
 import { SimLoop, TICK_MS } from './simloop';
 import { emptyTallies } from './hud/summary';
@@ -212,14 +213,16 @@ describe('scenarioFingerprint', () => {
 describe('savedMatchLabel (menu abandon-confirm text)', () => {
   it('names the saved scenario and its match time; practice saves read as Practice match', () => {
     setStorageBackend(makeMemoryStorage());
+    resetSaveIndexCache();
     try {
-      expect(savedMatchLabel()).toBeNull(); // nothing saved
+      const wallace = campaignSlot('wallace');
+      expect(savedMatchLabel(wallace)).toBeNull(); // nothing saved
       saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId: 'wallace-1', seed: 42,
         fingerprint: scenarioFingerprint('wallace-1')!,
         tick: (42 * 60 + 10) * TICKS_PER_SECOND, log: [],
       });
-      expect(savedMatchLabel()).toBe('The Sheriff of Lanark, 42:10');
+      expect(savedMatchLabel(wallace)).toBe('The Sheriff of Lanark, 42:10');
       saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'practice',
         config: { seed: 7, map: { type: 'practice-random', width: 96, height: 96 }, players: [
@@ -229,17 +232,20 @@ describe('savedMatchLabel (menu abandon-confirm text)', () => {
         setup: { mapSize: 'small', opponents: ['standard'], civ: 'scots', color: 0 },
         tick: 90 * TICKS_PER_SECOND, log: [],
       });
-      expect(savedMatchLabel()).toBe('Practice match, 1:30');
+      expect(savedMatchLabel(PRACTICE_SLOT)).toBe('Practice match, 1:30');
+      // saving practice must not have disturbed the campaign's own slot
+      expect(savedMatchLabel(wallace)).toBe('The Sheriff of Lanark, 42:10');
       // a stale scenario save must offer no label either (decode rejects it)
       saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId: 'wallace-1', seed: 42,
         fingerprint: 'deadbeef', tick: 100, log: [],
       });
-      expect(hasSnapshot()).toBe(true);
-      expect(loadSnapshot()).toBeNull();
-      expect(savedMatchLabel()).toBe('Saved match from an earlier or incompatible version');
+      expect(hasSnapshot(wallace)).toBe(true);
+      expect(loadSnapshot(wallace)).toBeNull();
+      expect(savedMatchLabel(wallace)).toBe('Saved match from an earlier or incompatible version');
     } finally {
       setStorageBackend(makeMemoryStorage()); // never leak test snapshots
+      resetSaveIndexCache();
     }
   });
 });
@@ -270,5 +276,164 @@ describe('sim serialize seam', () => {
     expect(gameFromSerialized('garbage')).toBeNull();
     const noSerialize = { state: {} } as unknown as Parameters<typeof trySerialize>[0];
     expect(trySerialize(noSerialize)).toBeUndefined();
+  });
+});
+
+// --------------------------------------------------------------- save slots
+// The behaviour players asked for: several campaigns in progress at once, each
+// resumable, none destroyed by starting another.
+
+describe('per-campaign save slots', () => {
+  const scenarioSave = (scenarioId: string, tick: number): ScenarioSnapshot => ({
+    version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId, seed: 42,
+    fingerprint: scenarioFingerprint(scenarioId)!, tick, log: [],
+  });
+  const practiceSave = (tick: number): PracticeSnapshot => ({
+    version: SNAPSHOT_VERSION, mode: 'practice', config: makeConfig(), setup: makeSetup(),
+    tick, log: [],
+  });
+  const withStore = (quotaBytes?: number) => (run: () => void): void => {
+    setStorageBackend(makeMemoryStorage(quotaBytes));
+    resetSaveIndexCache();
+    try {
+      run();
+    } finally {
+      setStorageBackend(makeMemoryStorage());
+      resetSaveIndexCache();
+    }
+  };
+  const fresh = withStore();
+
+  it('routes a snapshot to its own campaign, and practice to its own slot', () => {
+    expect(slotForSnapshot(scenarioSave('wallace-01-ledger', 1))).toBe(campaignSlot('wallace'));
+    expect(slotForSnapshot(scenarioSave('joan-02-orleans', 1))).toBe(campaignSlot('joan'));
+    expect(slotForSnapshot(practiceSave(1))).toBe(PRACTICE_SLOT);
+  });
+
+  it('keeps two campaigns and a practice match in progress at the same time', () => fresh(() => {
+    saveSnapshot(scenarioSave('wallace-01-ledger', 100));
+    saveSnapshot(scenarioSave('joan-02-orleans', 200));
+    saveSnapshot(practiceSave(300));
+
+    expect(loadSnapshot(campaignSlot('wallace'))?.tick).toBe(100);
+    expect(loadSnapshot(campaignSlot('joan'))?.tick).toBe(200);
+    expect(loadSnapshot(PRACTICE_SLOT)?.tick).toBe(300);
+    expect(listSaves()).toHaveLength(3);
+  }));
+
+  it('replaces only its own slot when the same campaign saves again', () => fresh(() => {
+    saveSnapshot(scenarioSave('wallace-01-ledger', 100));
+    saveSnapshot(scenarioSave('joan-02-orleans', 200));
+    // a later Wallace chapter overwrites the Wallace slot, not Joan's
+    saveSnapshot(scenarioSave('wallace-05-two-risings', 500));
+
+    const wallace = loadSnapshot(campaignSlot('wallace'));
+    expect(wallace?.mode === 'scenario' && wallace.scenarioId).toBe('wallace-05-two-risings');
+    expect(loadSnapshot(campaignSlot('joan'))?.tick).toBe(200);
+    expect(listSaves()).toHaveLength(2);
+  }));
+
+  it('clears one slot without touching the others', () => fresh(() => {
+    saveSnapshot(scenarioSave('wallace-01-ledger', 100));
+    saveSnapshot(scenarioSave('joan-02-orleans', 200));
+    clearSnapshot(campaignSlot('joan'));
+
+    expect(hasSnapshot(campaignSlot('joan'))).toBe(false);
+    expect(hasSnapshot(campaignSlot('wallace'))).toBe(true);
+    expect(saveForCampaign('wallace')?.scenarioId).toBe('wallace-01-ledger');
+    expect(saveForCampaign('joan')).toBeNull();
+  }));
+
+  it('continues the most recently saved campaign, whichever it is', () => fresh(() => {
+    expect(mostRecentSave()).toBeNull();
+    saveSnapshot(scenarioSave('wallace-01-ledger', 100));
+    expect(mostRecentSave()?.slot).toBe(campaignSlot('wallace'));
+    saveSnapshot(scenarioSave('joan-02-orleans', 200));
+    expect(mostRecentSave()?.slot).toBe(campaignSlot('joan'));
+    // going back to Wallace makes it the most recent again
+    saveSnapshot(scenarioSave('wallace-01-ledger', 140));
+    expect(mostRecentSave()?.slot).toBe(campaignSlot('wallace'));
+    expect(mostRecentSave()?.label).toBe('A Name in the Ledger, 0:07');
+  }));
+
+  it('indexes the chapter a campaign save is in, for the chapter list', () => fresh(() => {
+    saveSnapshot(scenarioSave('joan-02-orleans', 200));
+    const entry = saveForCampaign('joan');
+    expect(entry).toMatchObject({
+      slot: campaignSlot('joan'), mode: 'scenario',
+      scenarioId: 'joan-02-orleans', campaignId: 'joan',
+    });
+    expect(saveForCampaign('genghis')).toBeNull();
+  }));
+
+  it('never stores the unusable fast-path blob on a campaign save', () => fresh(() => {
+    // bootGame only takes gameFromSerialized for practice: a scenario resume
+    // log-replays, so a scenario blob is hundreds of KiB nothing can read
+    saveSnapshot({ ...scenarioSave('wallace-01-ledger', 100), serialized: { big: 'blob' } });
+    const stored = loadSnapshot(campaignSlot('wallace'));
+    expect(stored?.serialized).toBeUndefined();
+
+    saveSnapshot({ ...practiceSave(100), serialized: { schemaVersion: 1 } });
+    expect(loadSnapshot(PRACTICE_SLOT)?.serialized).toEqual({ schemaVersion: 1 });
+  }));
+
+  it('migrates a pre-slot save into its campaign slot, once', () => fresh(() => {
+    const legacy = encodeSnapshot(scenarioSave('wallace-01-ledger', 100));
+    setStorageBackend(makeMemoryStorage());
+    resetSaveIndexCache();
+    appStorage.set('bf.match.snapshot.v2', legacy);
+
+    expect(loadSnapshot(campaignSlot('wallace'))).toBeNull(); // not read directly
+    expect(mostRecentSave()?.slot).toBe(campaignSlot('wallace')); // reading the index migrates
+    expect(loadSnapshot(campaignSlot('wallace'))?.tick).toBe(100);
+    expect(appStorage.get('bf.match.snapshot.v2')).toBeNull(); // moved, not copied
+
+    // and it survives the next boot: the legacy key is gone, so an index that
+    // only lived in memory would orphan the save it just moved
+    resetSaveIndexCache();
+    expect(mostRecentSave()?.slot).toBe(campaignSlot('wallace'));
+    expect(saveForCampaign('wallace')?.scenarioId).toBe('wallace-01-ledger');
+  }));
+
+  it('leaves a pre-slot save in place when the device is too full to move it', () => {
+    const legacyKey = 'bf.match.snapshot.v2';
+    const legacy = encodeSnapshot(scenarioSave('wallace-01-ledger', 100));
+    // room for the record where it is, but not for a second copy in a slot
+    withStore(legacyKey.length + legacy.length)(() => {
+      appStorage.set(legacyKey, legacy);
+      expect(mostRecentSave()).toBeNull(); // no room to copy it into a slot
+      // the original is still there for a later boot to migrate
+      expect(appStorage.get(legacyKey)).toBe(legacy);
+    });
+  });
+
+  it('keeps an undecodable pre-slot record resumable for the recovery screen', () => fresh(() => {
+    setStorageBackend(makeMemoryStorage());
+    resetSaveIndexCache();
+    appStorage.set('bf.match.snapshot.v2', '{"version":1,"mode":"scenario"}');
+
+    const entry = mostRecentSave();
+    expect(entry).not.toBeNull();
+    expect(hasSnapshot(entry!.slot)).toBe(true);
+    expect(loadSnapshot(entry!.slot)).toBeNull();
+    expect(savedMatchLabel(entry!.slot))
+      .toBe('Saved match from an earlier or incompatible version');
+  }));
+
+  it('evicts the oldest other save rather than dropping the one being written', () => {
+    // room for roughly two campaign saves
+    const one = encodeSnapshot(scenarioSave('wallace-01-ledger', 100)).length;
+    withStore(one * 3)(() => {
+      saveSnapshot(scenarioSave('wallace-01-ledger', 100));
+      saveSnapshot(scenarioSave('joan-02-orleans', 200));
+      saveSnapshot(scenarioSave('genghis-01-empty-camp', 300));
+
+      // the newest save always survives
+      expect(loadSnapshot(campaignSlot('genghis'))?.tick).toBe(300);
+      expect(hasSnapshot(campaignSlot('wallace'))).toBe(false); // oldest went first
+      const slots = listSaves().map((e) => e.slot);
+      expect(slots).not.toContain(campaignSlot('wallace'));
+      expect(slots).toContain(campaignSlot('genghis'));
+    });
   });
 });
