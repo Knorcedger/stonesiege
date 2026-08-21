@@ -9,11 +9,27 @@
 export interface KeyValueStorage {
   get(key: string): string | null;
   set(key: string, value: string): void;
+  /**
+   * Like set, but reports whether the write landed. Match saves are the only
+   * writes big enough to exhaust a quota, and they need to know: silently
+   * dropping one save is fine, silently dropping every save while the player
+   * believes their campaigns are safe is not (see persist.ts eviction).
+   */
+  trySet(key: string, value: string): boolean;
   remove(key: string): void;
 }
 
 /** localStorage-backed store; every access is defensive (privacy modes throw). */
 function makeLocalStorage(): KeyValueStorage {
+  const trySet = (key: string, value: string): boolean => {
+    try {
+      if (typeof localStorage === 'undefined') return false;
+      localStorage.setItem(key, value);
+      return true;
+    } catch {
+      return false; // quota or privacy mode
+    }
+  };
   return {
     get(key) {
       try {
@@ -22,12 +38,10 @@ function makeLocalStorage(): KeyValueStorage {
         return null;
       }
     },
+    trySet,
     set(key, value) {
-      try {
-        if (typeof localStorage !== 'undefined') localStorage.setItem(key, value);
-      } catch {
-        // quota/privacy failure: losing a save beats crashing
-      }
+      // quota/privacy failure: losing a save beats crashing
+      trySet(key, value);
     },
     remove(key) {
       try {
@@ -39,12 +53,26 @@ function makeLocalStorage(): KeyValueStorage {
   };
 }
 
-/** In-memory store for tests (and the base of a future Capacitor cache adapter). */
-export function makeMemoryStorage(): KeyValueStorage {
+/**
+ * In-memory store for tests (and the base of a future Capacitor cache adapter).
+ * `quotaBytes` simulates a full device so the eviction path is testable.
+ */
+export function makeMemoryStorage(quotaBytes = Infinity): KeyValueStorage {
   const m = new Map<string, string>();
+  const used = (without: string): number => {
+    let n = 0;
+    for (const [k, v] of m) if (k !== without) n += k.length + v.length;
+    return n;
+  };
+  const trySet = (k: string, v: string): boolean => {
+    if (used(k) + k.length + v.length > quotaBytes) return false;
+    m.set(k, v);
+    return true;
+  };
   return {
     get: (k) => m.get(k) ?? null,
-    set: (k, v) => void m.set(k, v),
+    trySet,
+    set: (k, v) => void trySet(k, v),
     remove: (k) => void m.delete(k),
   };
 }
@@ -55,6 +83,7 @@ let backend: KeyValueStorage = makeLocalStorage();
 export const appStorage: KeyValueStorage = {
   get: (k) => backend.get(k),
   set: (k, v) => backend.set(k, v),
+  trySet: (k, v) => backend.trySet(k, v),
   remove: (k) => backend.remove(k),
 };
 
