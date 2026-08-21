@@ -64,6 +64,7 @@ import {
   SNAPSHOT_VERSION, trySerialize, type CommandLog, type MatchSnapshot,
 } from './persist';
 import { artworkLoadingStage, MatchLoadingScreen, withTimeout } from './loadingScreen';
+import { campaignLoadingArtwork } from './loadingContext';
 
 const PLACE_GREEN = 0x3e8c34;
 const PLACE_RED = 0xb3261e;
@@ -190,7 +191,7 @@ export async function runGame(
     status: resuming ? 'Checking saved match…' : 'Preparing the battlefield…',
     detail: resuming ? 'Reading the match stored on this device.' : 'Getting the armies ready.',
     progress: null,
-  });
+  }, options.mode === 'scenario' ? campaignLoadingArtwork(options.scenarioId) : null);
 
   try {
     await bootGame(root, options, loading, analytics);
@@ -263,6 +264,9 @@ async function bootGame(
     throw new Error(options.mode === 'resume' && hasSnapshot(options.slot)
       ? 'This saved match is damaged or belongs to an incompatible version of StoneSiege.'
       : 'No saved match was found on this device.');
+  }
+  if (options.mode === 'resume' && plan.meta) {
+    loading.setArtwork(campaignLoadingArtwork(plan.meta.id));
   }
   loading.update({
     title: options.mode === 'resume' ? 'Restoring saved match' : 'Mustering the banners',
