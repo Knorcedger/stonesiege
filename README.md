@@ -133,7 +133,7 @@ TASK
 
 WORKFLOW
 1. If StoneSiege is not already checked out, run:
-   git clone https://github.com/Knorcedger/stonesiege.git
+   git clone --depth 1 https://github.com/Knorcedger/stonesiege.git
    cd stonesiege
 
 2. Read AGENTS.md, README.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/ARCHITECTURE.md, and the documentation relevant to the task. Follow every nested AGENTS.md file that applies to files you touch.
