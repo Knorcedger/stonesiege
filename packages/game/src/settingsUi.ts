@@ -25,6 +25,9 @@ const SETTINGS_CSS = `
   box-shadow:0 0 0 2px #16100a; }
 .bf-set-row input[type=range]:focus-visible { outline:3px solid #FFE98A; outline-offset:3px; }
 .bf-set-hint { margin:5px 0 7px; color:#8F7A59; font:13px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif; }
+.bf-set-devtools { margin-top:18px; padding:12px 14px 7px; text-align:left; background:#1d1409;
+  border:1px dashed #8A6414; border-radius:5px; }
+.bf-set-devtitle { color:#E6C04A; font:15px "Pixelify Sans",monospace; letter-spacing:1px; }
 `;
 
 export interface SettingsControlsOptions {

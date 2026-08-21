@@ -15,6 +15,7 @@ import {
 import { loadProgress, scenarioStatuses } from '../campaign/progress';
 import { savedMatchLabel } from '../persist';
 import { buildSettingsControls } from '../settingsUi';
+import { buildDeveloperTools, developerToolsEnabled } from '../developerTools';
 import { setGameTooltip } from '../tooltip';
 import { AudioEngine } from '../audio/engine';
 import {
@@ -501,6 +502,7 @@ export function showMenu(
       // in-match pause overlay. uiTap on slider release: audible preview of
       // the level the player just set (the menu runs no game audio otherwise).
       buildSettingsControls(panel, { onSliderRelease: () => previewAudio.play('uiTap') });
+      if (developerToolsEnabled()) buildDeveloperTools(panel);
       panel.appendChild(backButton());
     };
 

@@ -51,6 +51,7 @@ import { makeScenarioOps, type ScenarioUiHooks } from './scenario/runtime';
 import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
 import { setNavHint } from './screens/nav';
 import { getSettings } from './settings';
+import { activeArtworkMode } from './developerTools';
 import { NATIVE_BACK_EVENT, NATIVE_PAUSE_EVENT } from './nativeEvents';
 import {
   clearSnapshot, hasSnapshot, loadSnapshot, replaySnapshotIncrementally, saveSnapshot, scenarioFingerprint,
@@ -223,16 +224,9 @@ async function bootGame(
     detail: 'This stage is usually quickest after the first visit.',
     progress: null,
   });
-  const optionalArtwork = new AbortController();
-  const standardArtworkTimer = setTimeout(() => {
-    loading.offerStandardArtwork(() => optionalArtwork.abort());
-  }, 6_000);
   const assets = await loadAssets({
-    optionalSignal: optionalArtwork.signal,
+    artworkMode: activeArtworkMode(),
     onProgress: (progress) => loading.update(artworkLoadingStage(progress, options.mode === 'resume')),
-  }).finally(() => {
-    clearTimeout(standardArtworkTimer);
-    loading.clearOptionalAction();
   });
   const { config, snapshot } = plan;
   // Fresh matches inherit the persisted preference. Resumes retain the speed
