@@ -27,6 +27,7 @@ export class Minimap {
   private lastRefresh = 0;
   private pings: Array<{ tileX: number; tileY: number; at: number }> = [];
   private moveMarkers: Array<{ tileX: number; tileY: number; at: number }> = [];
+  private objectiveTarget: { tileX: number; tileY: number } | null = null;
 
   constructor(
     slot: HTMLElement,
@@ -102,6 +103,16 @@ export class Minimap {
   /** Red expanding alert ring (underAttack event). Redraws immediately. */
   ping(tileX: number, tileY: number): void {
     this.pings.push({ tileX, tileY, at: performance.now() });
+    this.redraw();
+  }
+
+  /** Persistent current-objective marker; null for progress-only goals. */
+  setObjectiveTarget(target: { x: number; y: number } | null): void {
+    if (
+      this.objectiveTarget?.tileX === target?.x
+      && this.objectiveTarget?.tileY === target?.y
+    ) return;
+    this.objectiveTarget = target ? { tileX: target.x, tileY: target.y } : null;
     this.redraw();
   }
 
@@ -195,6 +206,32 @@ export class Minimap {
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
+      ctx.restore();
+    }
+
+    // Current spatial objective: a persistent pulsing gold diamond with a dark
+    // backing, deliberately distinct from resource dots and red attack pings.
+    if (this.objectiveTarget) {
+      const px = m.a * this.objectiveTarget.tileX + m.c * this.objectiveTarget.tileY + m.e;
+      const py = m.b * this.objectiveTarget.tileX + m.d * this.objectiveTarget.tileY + m.f;
+      const radius = 4.5 + (Math.sin(now / 180) + 1) * 1.25;
+      ctx.save();
+      ctx.fillStyle = '#1A1208';
+      ctx.beginPath();
+      ctx.moveTo(px, py - radius - 2);
+      ctx.lineTo(px + radius + 2, py);
+      ctx.lineTo(px, py + radius + 2);
+      ctx.lineTo(px - radius - 2, py);
+      ctx.closePath();
+      ctx.fill();
+      ctx.fillStyle = '#E6C04A';
+      ctx.beginPath();
+      ctx.moveTo(px, py - radius);
+      ctx.lineTo(px + radius, py);
+      ctx.lineTo(px, py + radius);
+      ctx.lineTo(px - radius, py);
+      ctx.closePath();
+      ctx.fill();
       ctx.restore();
     }
 

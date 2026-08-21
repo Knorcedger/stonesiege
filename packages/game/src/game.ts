@@ -12,7 +12,10 @@ import {
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
-import { scenariosById, TriggerRuntime, type AiProfile, type Rect, type ScenarioMeta } from '@bf/scenarios';
+import {
+  deriveObjectiveGuides, evaluateObjectiveGuide, scenariosById, TriggerRuntime,
+  type AiProfile, type Rect, type ScenarioMeta,
+} from '@bf/scenarios';
 import { applyAiProfile, attackNow, createBot, type Bot } from '@bf/ai';
 import { loadAssets } from './assets';
 import {
@@ -34,7 +37,7 @@ import { AGE_LABEL, type ArmedVerb } from './hud/cardModel';
 import { Minimap } from './hud/minimap';
 import { Overlays } from './hud/overlays';
 import { MessageBanner } from './hud/messages';
-import { ObjectivesPanel } from './hud/objectives';
+import { objectiveProgressDue, ObjectivesPanel } from './hud/objectives';
 import {
   copyTallies, deriveMatchSummary, emptyTallies, formatMatchTime,
   recordMatchEvent, recordPopulation,
@@ -343,7 +346,10 @@ async function bootGame(
     setAiProfile,
     aiAttackNow,
   };
-  const triggers = scenarioDef ? new TriggerRuntime(scenarioDef, makeScenarioOps(game, scenarioHooks)) : null;
+  const scenarioOps = scenarioDef ? makeScenarioOps(game, scenarioHooks) : null;
+  const triggers = scenarioDef && scenarioOps ? new TriggerRuntime(scenarioDef, scenarioOps) : null;
+  const objectiveGuides = scenarioDef ? deriveObjectiveGuides(scenarioDef) : [];
+  const objectiveGuidesById = new Map(objectiveGuides.map((guide) => [guide.id, guide]));
 
   // ------------------------------------------------------------------ resume
   // Restore the snapshotted state on the fresh engine. Fast path: the sim's
@@ -1011,7 +1017,11 @@ async function bootGame(
   const hud = new Hud(hudRoot, hudHost);
   const overlays = new Overlays(hudRoot);
   if (meta && meta.id !== SHOWCASE_SCENARIO_ID) {
-    objectivesPanel = new ObjectivesPanel(hudRoot);
+    objectivesPanel = new ObjectivesPanel(
+      hudRoot,
+      (target) => startCameraPan(target.x, target.y),
+      objectiveGuides.map((guide) => guide.id),
+    );
     messageBanner = new MessageBanner(hudRoot);
     for (const op of pendingObjectiveOps) op(objectivesPanel); // resume-replayed state
     pendingObjectiveOps.length = 0;
@@ -1039,6 +1049,28 @@ async function bootGame(
       return true;
     },
   );
+
+  let lastObjectiveProgressTick = -1;
+  let objectiveProgressEvaluations = 0;
+  let objectiveViewportWidth = app.screen.width;
+  let objectiveViewportHeight = app.screen.height;
+  let objectiveSafeRect = hudRoot.getBoundingClientRect();
+  const refreshObjectiveProgress = (tick: number): void => {
+    if (!objectivesPanel || !scenarioOps || !triggers) return;
+    const objectives = objectivesPanel.model.items();
+    const needsInitialReadout = objectives.some((objective) =>
+      objective.readout === undefined && objectiveGuidesById.has(objective.id)
+    );
+    if (!needsInitialReadout && !objectiveProgressDue(tick, lastObjectiveProgressTick)) return;
+    const readouts = objectives.flatMap((objective) => {
+      if (objective.state !== 'open' && objective.readout) return [];
+      const guide = objectiveGuidesById.get(objective.id);
+      return guide ? [evaluateObjectiveGuide(guide, scenarioOps, triggers)] : [];
+    });
+    objectivesPanel.setReadouts(readouts);
+    lastObjectiveProgressTick = tick;
+    objectiveProgressEvaluations++;
+  };
 
   // --------------------------------------------------------------- input
   const inputHost: InputHost = {
@@ -1151,6 +1183,11 @@ async function bootGame(
       issue: (cmd: Command): void => issue(cmd),
       setSpeed: (s: number): void => { simSpeed = Math.max(1, Math.min(64, Math.round(s))); },
       objectives: () => objectivesPanel?.model.items() ?? [],
+      objectiveGuidance: () => ({
+        evaluationPasses: objectiveProgressEvaluations,
+        lastEvaluationTick: lastObjectiveProgressTick,
+        currentTarget: objectivesPanel?.currentTarget ?? null,
+      }),
     };
   }
 
@@ -1192,9 +1229,29 @@ async function bootGame(
     fx.update(st, st.tick + alpha);
     if (placement) refreshGhost();
     hud.update();
-    minimap.update(now);
-    gameAudio.update(st, now);
+    refreshObjectiveProgress(st.tick);
     objectivesPanel?.update();
+    const objectiveTarget = objectivesPanel?.currentTarget ?? null;
+    minimap.setObjectiveTarget(objectiveTarget);
+    minimap.update(now);
+    if (objectivesPanel) {
+      if (app.screen.width !== objectiveViewportWidth || app.screen.height !== objectiveViewportHeight) {
+        objectiveViewportWidth = app.screen.width;
+        objectiveViewportHeight = app.screen.height;
+        objectiveSafeRect = hudRoot.getBoundingClientRect();
+      }
+      const targetWorld = objectiveTarget ? tileToWorld(objectiveTarget.x, objectiveTarget.y) : null;
+      const targetScreen = targetWorld ? camera.worldToScreen(targetWorld.x, targetWorld.y) : null;
+      objectivesPanel.updateMarker(
+        targetScreen ? {
+          x: targetScreen.x - objectiveSafeRect.left,
+          y: targetScreen.y - objectiveSafeRect.top,
+        } : null,
+        objectiveSafeRect.width,
+        objectiveSafeRect.height,
+      );
+    }
+    gameAudio.update(st, now);
     messageBanner?.update(now);
     if (st.tick - lastSavedTick >= AUTOSAVE_TICKS) saveMatch();
   });
