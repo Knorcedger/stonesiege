@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  activatePauseControl, resignControlAction, syncPausePresentation, unitStatRows,
+  activatePauseControl, PAUSE_SAVE_HINT, resignControlAction, syncPausePresentation, unitStatRows,
   type PausePresentationTarget,
 } from './hud';
 
@@ -16,6 +16,12 @@ function target() {
 }
 
 describe('pause presentation', () => {
+  it('describes independent campaign and practice save slots', () => {
+    expect(PAUSE_SAVE_HINT).toBe(
+      'StoneSiege keeps one resumable match for each campaign, plus one practice match, locally on this device. It autosaves every 15 seconds and when the app is backgrounded.',
+    );
+  });
+
   it('runs the pause action on click instead of only changing the icon', () => {
     const host = { togglePause: vi.fn(), returnToTitle: vi.fn() };
 
