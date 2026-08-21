@@ -108,6 +108,7 @@ const CARD_GAP = 4;
 const CARD_COLS = 5;
 /** Three five-button rows, excluding WASD so camera movement always wins. */
 export const COMMAND_HOTKEYS = ['q', 'e', 'r', 't', 'y', 'f', 'g', 'h', 'j', 'k', 'z', 'x', 'c', 'v', 'b'] as const;
+export const PAUSE_SAVE_HINT = 'StoneSiege keeps one resumable match for each campaign, plus one practice match, locally on this device. It autosaves every 15 seconds and when the app is backgrounded.';
 
 export function commandRepeatCount(shiftKey: boolean, shiftRepeat: number): number {
   return shiftKey ? Math.max(1, shiftRepeat) : 1;
@@ -743,7 +744,7 @@ export class Hud {
     saveTitle.textContent = 'SAVE GAME';
     const saveHint = document.createElement('div');
     saveHint.className = 'bf-pausehint';
-    saveHint.textContent = 'StoneSiege keeps one resumable match locally on this device. It autosaves every 15 seconds and when the app is backgrounded.';
+    saveHint.textContent = PAUSE_SAVE_HINT;
     const saveRow = document.createElement('div');
     saveRow.className = 'bf-pausesaverow';
     const saveBtn = document.createElement('button');
