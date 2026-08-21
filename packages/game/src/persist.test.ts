@@ -9,7 +9,8 @@ import { describe, expect, it } from 'vitest';
 import { createGame } from '@bf/sim';
 import { fp, TICKS_PER_SECOND, type Entity, type GameConfig } from '@bf/sim/types';
 import {
-  decodeSnapshot, encodeSnapshot, replaySnapshot, savedMatchLabel, saveSnapshot,
+  decodeSnapshot, encodeSnapshot, hasSnapshot, loadSnapshot, replaySnapshot, replaySnapshotIncrementally,
+  savedMatchLabel, saveSnapshot,
   scenarioFingerprint, SNAPSHOT_VERSION, trySerialize,
   type CommandLog, type PracticeSnapshot, type ScenarioSnapshot,
 } from './persist';
@@ -86,6 +87,47 @@ describe('snapshot record → replay', () => {
       resumed.advance([]);
     }
     expect(resumed.hash()).toBe(original.hash());
+  });
+
+  it('incremental replay yields and reports exact tick progress without changing the result', async () => {
+    const config = makeConfig();
+    const original = createGame(config);
+    for (let tick = 0; tick < 600; tick++) original.advance([]);
+    const snapshot: PracticeSnapshot = {
+      version: SNAPSHOT_VERSION, mode: 'practice', config, setup: makeSetup(),
+      tick: original.state.tick, log: [],
+    };
+    const resumed = createGame(config);
+    const progress: number[] = [];
+    let yields = 0;
+
+    await replaySnapshotIncrementally(resumed, snapshot, {
+      now: () => 0,
+      maxTicksPerChunk: 100,
+      yieldControl: async () => { yields++; },
+      onProgress: (completed, target) => progress.push(completed / target),
+    });
+
+    expect(yields).toBeGreaterThan(0);
+    expect(progress[0]).toBe(0);
+    expect(progress.at(-1)).toBe(1);
+    expect(progress.every((value, index) => index === 0 || value >= progress[index - 1])).toBe(true);
+    expect(resumed.hash()).toBe(original.hash());
+  });
+
+  it('bounds an incremental replay that cannot finish in time', async () => {
+    const config = makeConfig();
+    const snapshot: PracticeSnapshot = {
+      version: SNAPSHOT_VERSION, mode: 'practice', config, setup: makeSetup(), tick: 600, log: [],
+    };
+    let clock = 0;
+    await expect(replaySnapshotIncrementally(createGame(config), snapshot, {
+      now: () => ++clock,
+      chunkBudgetMs: 0,
+      maxTicksPerChunk: 1,
+      timeoutMs: 2,
+      yieldControl: async () => undefined,
+    })).rejects.toThrow('took too long');
   });
 });
 
@@ -193,7 +235,9 @@ describe('savedMatchLabel (menu abandon-confirm text)', () => {
         version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId: 'wallace-1', seed: 42,
         fingerprint: 'deadbeef', tick: 100, log: [],
       });
-      expect(savedMatchLabel()).toBeNull();
+      expect(hasSnapshot()).toBe(true);
+      expect(loadSnapshot()).toBeNull();
+      expect(savedMatchLabel()).toBe('Saved match from an earlier or incompatible version');
     } finally {
       setStorageBackend(makeMemoryStorage()); // never leak test snapshots
     }
