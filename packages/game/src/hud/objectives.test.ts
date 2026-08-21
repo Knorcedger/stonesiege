@@ -4,7 +4,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   autoOpenObjectives, objectiveDisplayState, objectiveMarkerPlacement, objectiveProgressDue,
-  objectiveSequencePosition, ObjectivesModel,
+  objectiveProgressSummary, objectiveSequencePosition, ObjectivesModel,
 } from './objectives';
 import { HUD_NARROW_MAX_PX } from './layout';
 
@@ -77,6 +77,20 @@ describe('ObjectivesModel', () => {
     expect(m.items()[0].readout?.goals[0]).toMatchObject({ have: 1, need: 1, done: true });
     m.setReadout(progress('a', 0));
     expect(m.items()[0].readout?.goals[0]).toMatchObject({ have: 1, need: 1, done: true });
+  });
+
+  it('formats current progress for the always-visible collapsed header', () => {
+    const m = new ObjectivesModel();
+    m.add('food', 'Stockpile 150 food');
+    m.setReadout({
+      id: 'food',
+      goals: [
+        { label: 'Food', have: 92, need: 150, done: false },
+        { label: 'Houses', have: 1, need: 2, done: false },
+      ],
+    });
+    expect(objectiveProgressSummary(m.current)).toBe('Food 92/150 · Houses 1/2');
+    expect(objectiveProgressSummary()).toBe('');
   });
 });
 

@@ -1030,8 +1030,13 @@ async function bootGame(
   let objectiveViewportHeight = app.screen.height;
   let objectiveSafeRect = hudRoot.getBoundingClientRect();
   const refreshObjectiveProgress = (tick: number): void => {
-    if (!objectivesPanel || !scenarioOps || !triggers || !objectiveProgressDue(tick, lastObjectiveProgressTick)) return;
-    const readouts = objectivesPanel.model.items().flatMap((objective) => {
+    if (!objectivesPanel || !scenarioOps || !triggers) return;
+    const objectives = objectivesPanel.model.items();
+    const needsInitialReadout = objectives.some((objective) =>
+      objective.readout === undefined && objectiveGuidesById.has(objective.id)
+    );
+    if (!needsInitialReadout && !objectiveProgressDue(tick, lastObjectiveProgressTick)) return;
+    const readouts = objectives.flatMap((objective) => {
       if (objective.state !== 'open' && objective.readout) return [];
       const guide = objectiveGuidesById.get(objective.id);
       return guide ? [evaluateObjectiveGuide(guide, scenarioOps, triggers)] : [];

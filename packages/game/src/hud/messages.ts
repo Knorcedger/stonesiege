@@ -61,9 +61,11 @@ const MSG_CSS = `
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
   border:1px solid #64492B; border-radius:5px; box-shadow:0 0 0 1px #1A1208, 0 4px 16px rgba(0,0,0,0.5);
   font-family:"Pixelify Sans",monospace; pointer-events:auto; }
-/* The collapsed objective head occupies the right half of the wrapped top bar
-   and ends around y=92 at 390px. Keep transient dialogue clear of both. */
-@media (max-width: ${HUD_NARROW_MAX_PX}px) { .bf-msgbanner { top:${belowTopBarPx(true) + 28}px; } }
+/* The objective panel publishes its measured head clearance. The fallback
+   covers the wrapped top bar before the first objective render. */
+@media (max-width: ${HUD_NARROW_MAX_PX}px) {
+  .bf-msgbanner { top:max(${belowTopBarPx(true)}px, var(--bf-objectives-message-top, 0px)); }
+}
 .bf-msgbanner.show { display:block; animation:bfMsgIn 0.22s ease-out; }
 @keyframes bfMsgIn { from { opacity:0; transform:translate(-50%,-6px); } to { opacity:1; transform:translate(-50%,0); } }
 .bf-msg-speaker { font-size:13px; color:#E6C04A; letter-spacing:1px; margin:0 0 2px; }

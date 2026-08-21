@@ -90,6 +90,12 @@ export function objectiveProgressDue(currentTick: number, lastReadTick: number):
   return lastReadTick < 0 || currentTick - lastReadTick >= OBJECTIVE_PROGRESS_INTERVAL_TICKS;
 }
 
+export function objectiveProgressSummary(objective?: ObjectiveItem): string {
+  return objective?.readout?.goals
+    .map((goal) => `${goal.label} ${goal.have}/${goal.need}`)
+    .join(' · ') ?? '';
+}
+
 export function objectiveDisplayState(objective: ObjectiveItem, currentId?: string): ObjectiveDisplayState {
   return objective.state === 'open'
     ? objective.id === currentId ? 'current' : 'upcoming'
@@ -153,16 +159,20 @@ export function objectiveMarkerPlacement(
 const OBJ_CSS = `
 .bf-objectives { position:absolute; right:6px; top:40px; width:min(300px, 60vw); z-index:24;
   font-family:"Pixelify Sans",monospace; pointer-events:auto; }
-.bf-obj-head { display:grid; grid-template-columns:minmax(0,1fr) 32px; align-items:stretch;
+.bf-obj-head { display:grid; grid-template-columns:minmax(0,1fr) 44px; align-items:stretch;
   background:linear-gradient(#3a2a18,#2C1F12); border:1px solid #64492B; border-radius:4px;
   box-shadow:0 0 0 1px #1A1208; }
 .bf-obj-summary,.bf-obj-focus { border:0; color:inherit; font:inherit; cursor:pointer; }
-.bf-obj-summary { min-width:0; padding:4px 7px 5px; text-align:left; background:transparent; }
+.bf-obj-summary { min-width:0; min-height:44px; padding:4px 7px 5px; text-align:left; background:transparent; }
 .bf-obj-position { display:block; color:#E6C04A; font-size:10px; line-height:1; letter-spacing:1px; }
 .bf-obj-current-text { display:block; margin-top:3px; color:#EFDDB5; font-size:12px;
   line-height:1.15; letter-spacing:0; overflow-wrap:anywhere; }
-.bf-obj-focus { display:none; margin:3px; min-width:28px; min-height:28px; padding:0;
-  background:#241809; border:1px solid #8A6414; border-radius:3px; color:#E6C04A; font-size:18px; }
+.bf-obj-current-progress { display:block; margin-top:3px; color:#9BCB70; font-size:10px;
+  line-height:1.1; overflow-wrap:anywhere; }
+.bf-obj-current-progress:empty { display:none; }
+.bf-obj-focus { display:none; box-sizing:border-box; width:44px; min-height:44px; padding:0;
+  background:#241809; border-left:1px solid #8A6414; border-radius:0 3px 3px 0;
+  color:#E6C04A; font-size:18px; }
 .bf-obj-focus.show { display:block; }
 .bf-obj-list { margin:2px 0 0; padding:5px 7px; list-style:none; display:none; max-height:44vh; overflow:auto;
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
@@ -185,7 +195,7 @@ const OBJ_CSS = `
   background:#1A1208; font-size:10px; white-space:nowrap; text-decoration:none; }
 .bf-obj-chip.done { color:#9BCB70; border-color:#527033; }
 .bf-obj-item.complete .bf-obj-chip { color:#8f8268; border-color:#46331F; }
-.bf-obj-row-focus { width:27px; height:27px; padding:0; border:1px solid #8A6414; border-radius:3px;
+.bf-obj-row-focus { box-sizing:border-box; width:44px; height:44px; padding:0; border:1px solid #8A6414; border-radius:3px;
   background:#241809; color:#E6C04A; font:16px "Pixelify Sans",monospace; cursor:pointer; }
 .bf-obj-item.flash { animation:bfObjFlash 0.9s ease-out; }
 @keyframes bfObjFlash { 0% { background:rgba(230,192,74,0.35); } 100% { background:transparent; } }
@@ -223,15 +233,18 @@ export class ObjectivesPanel {
   private summaryEl: HTMLButtonElement;
   private positionEl: HTMLSpanElement;
   private currentTextEl: HTMLSpanElement;
+  private currentProgressEl: HTMLSpanElement;
   private headFocusEl: HTMLButtonElement;
   private listEl: HTMLUListElement;
   private markerEl: HTMLButtonElement;
   private open: boolean;
+  private wideViewport: boolean;
+  private viewportKey: string;
   private lastKey = '';
   private flashIds = new Set<string>();
 
   constructor(
-    root: HTMLElement,
+    private root: HTMLElement,
     private onFocusTarget: (target: ObjectiveTargetTile) => void,
     private authoredObjectiveIds: readonly string[] = [],
   ) {
@@ -241,7 +254,9 @@ export class ObjectivesPanel {
       style.textContent = OBJ_CSS;
       document.head.appendChild(style);
     }
-    this.open = autoOpenObjectives(window.innerWidth);
+    this.wideViewport = autoOpenObjectives(window.innerWidth);
+    this.viewportKey = `${window.innerWidth}x${window.innerHeight}`;
+    this.open = this.wideViewport;
     this.el = document.createElement('div');
     this.el.className = this.open ? 'bf-objectives open' : 'bf-objectives';
     this.headEl = document.createElement('div');
@@ -254,7 +269,9 @@ export class ObjectivesPanel {
     this.positionEl.className = 'bf-obj-position';
     this.currentTextEl = document.createElement('span');
     this.currentTextEl.className = 'bf-obj-current-text';
-    this.summaryEl.append(this.positionEl, this.currentTextEl);
+    this.currentProgressEl = document.createElement('span');
+    this.currentProgressEl.className = 'bf-obj-current-progress';
+    this.summaryEl.append(this.positionEl, this.currentTextEl, this.currentProgressEl);
     this.summaryEl.addEventListener('click', () => {
       this.open = !this.open;
       this.el.classList.toggle('open', this.open);
@@ -270,17 +287,18 @@ export class ObjectivesPanel {
     this.listEl = document.createElement('ul');
     this.listEl.className = 'bf-obj-list';
     this.el.append(this.headEl, this.listEl);
-    root.appendChild(this.el);
+    this.root.appendChild(this.el);
 
     this.markerEl = document.createElement('button');
     this.markerEl.type = 'button';
     this.markerEl.className = 'bf-obj-marker';
     this.markerEl.setAttribute('aria-label', 'Go to current objective');
     this.markerEl.addEventListener('click', () => this.focusCurrentTarget());
-    root.appendChild(this.markerEl);
+    this.root.appendChild(this.markerEl);
   }
 
   destroy(): void {
+    this.root.style.removeProperty('--bf-objectives-message-top');
     this.el.remove();
     this.markerEl.remove();
   }
@@ -341,6 +359,18 @@ export class ObjectivesPanel {
 
   /** Call once per frame; DOM content re-renders only when state/progress changes. */
   update(): void {
+    const nextViewportKey = `${window.innerWidth}x${window.innerHeight}`;
+    const viewportChanged = nextViewportKey !== this.viewportKey;
+    if (viewportChanged) {
+      this.viewportKey = nextViewportKey;
+      const nextWideViewport = autoOpenObjectives(window.innerWidth);
+      if (nextWideViewport !== this.wideViewport) {
+        this.wideViewport = nextWideViewport;
+        this.open = nextWideViewport;
+        this.el.classList.toggle('open', this.open);
+        this.summaryEl.setAttribute('aria-expanded', String(this.open));
+      }
+    }
     const items = this.model.items();
     const key = items.map((objective) => {
       const progress = objective.readout?.goals
@@ -348,7 +378,7 @@ export class ObjectivesPanel {
       const target = objective.readout?.target;
       return `${objective.id}:${objective.state}:${progress}:${target?.x ?? ''}:${target?.y ?? ''}`;
     }).join('|');
-    if (key === this.lastKey && this.flashIds.size === 0) return;
+    if (key === this.lastKey && this.flashIds.size === 0 && !viewportChanged) return;
     this.lastKey = key;
 
     const current = this.model.current;
@@ -356,10 +386,12 @@ export class ObjectivesPanel {
       const sequence = objectiveSequencePosition(current.id, items, this.authoredObjectiveIds);
       this.positionEl.textContent = `OBJECTIVE ${sequence.position}/${sequence.total}`;
       this.currentTextEl.textContent = current.text;
+      this.currentProgressEl.textContent = objectiveProgressSummary(current);
     } else {
       const total = Math.max(this.authoredObjectiveIds.length, items.length);
       this.positionEl.textContent = items.length > 0 ? `OBJECTIVES ${items.length}/${total}` : 'OBJECTIVES';
       this.currentTextEl.textContent = items.length > 0 ? 'All current goals resolved' : 'Awaiting orders';
+      this.currentProgressEl.textContent = '';
     }
     this.headFocusEl.classList.toggle('show', this.currentTarget !== undefined);
 
@@ -399,5 +431,13 @@ export class ObjectivesPanel {
       this.listEl.appendChild(li);
     }
     this.flashIds.clear();
+    if (this.wideViewport) {
+      this.root.style.removeProperty('--bf-objectives-message-top');
+    } else {
+      const rootRect = this.root.getBoundingClientRect();
+      const headRect = this.headEl.getBoundingClientRect();
+      const messageTop = Math.ceil(headRect.bottom - rootRect.top + 14);
+      this.root.style.setProperty('--bf-objectives-message-top', `${messageTop}px`);
+    }
   }
 }

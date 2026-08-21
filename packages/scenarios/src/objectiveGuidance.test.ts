@@ -58,6 +58,26 @@ describe('objective guidance derivation', () => {
     expect(guides.filter(isSpatial)).toHaveLength(48);
   });
 
+  it('evaluates all 48 spatial guides to in-bounds authored map targets', () => {
+    const scenarioIds = Object.values(campaigns).flatMap((campaign) => campaign.scenarioIds);
+    const targets = scenarioIds.flatMap((scenarioId) => {
+      const scenario = scenariosById[scenarioId];
+      const ops = new GuidanceOps();
+      const runtime = new GuidanceRuntime();
+      return deriveObjectiveGuides(scenario).flatMap((guide) => {
+        const target = evaluateObjectiveGuide(guide, ops, runtime).target;
+        if (!target) return [];
+        expect(target.x).toBeGreaterThanOrEqual(0);
+        expect(target.y).toBeGreaterThanOrEqual(0);
+        expect(target.x).toBeLessThanOrEqual(scenario.map.width);
+        expect(target.y).toBeLessThanOrEqual(scenario.map.height);
+        return [{ scenarioId, objectiveId: guide.id, target }];
+      });
+    });
+
+    expect(targets).toHaveLength(48);
+  });
+
   it('uses the first completing trigger when an objective has alternate paths', () => {
     const scenarioIds = Object.values(campaigns).flatMap((campaign) => campaign.scenarioIds);
     const alternates: string[] = [];
