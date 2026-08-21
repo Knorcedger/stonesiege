@@ -2,8 +2,16 @@
 // expanded list must never bury the control-group chips under it).
 
 import { describe, expect, it } from 'vitest';
-import { autoOpenObjectives, ObjectivesModel } from './objectives';
+import {
+  autoOpenObjectives, objectiveDisplayState, objectiveMarkerPlacement, objectiveProgressDue,
+  objectiveSequencePosition, ObjectivesModel,
+} from './objectives';
 import { HUD_NARROW_MAX_PX } from './layout';
+
+const progress = (id: string, have: number) => ({
+  id,
+  goals: [{ label: 'At target', have, need: 1, done: have >= 1 }],
+});
 
 describe('ObjectivesModel', () => {
   it('keeps insertion order and dedupes by id', () => {
@@ -27,6 +35,49 @@ describe('ObjectivesModel', () => {
     expect(m.items()[1].state).toBe('failed');
     expect(m.openCount).toBe(0);
   });
+
+  it('advances the current objective while preserving sequence position', () => {
+    const m = new ObjectivesModel();
+    m.add('a', 'first');
+    m.add('b', 'second');
+    m.add('c', 'third');
+    expect(m.current?.id).toBe('a');
+    expect(m.currentPosition).toBe(1);
+    m.complete('a');
+    expect(m.current?.id).toBe('b');
+    expect(m.currentPosition).toBe(2);
+    m.fail('b');
+    expect(m.current?.id).toBe('c');
+    expect(m.currentPosition).toBe(3);
+  });
+
+  it('distinguishes current and queued open objectives', () => {
+    const m = new ObjectivesModel();
+    m.add('a', 'first');
+    m.add('b', 'second');
+    expect(objectiveDisplayState(m.items()[0], m.current?.id)).toBe('current');
+    expect(objectiveDisplayState(m.items()[1], m.current?.id)).toBe('upcoming');
+  });
+
+  it('reports position in the complete authored sequence without revealing future text', () => {
+    const m = new ObjectivesModel();
+    m.add('a', 'first');
+    expect(objectiveSequencePosition('a', m.items(), ['a', 'b', 'c'])).toEqual({ position: 1, total: 3 });
+    m.complete('a');
+    m.add('b', 'second');
+    expect(objectiveSequencePosition('b', m.items(), ['a', 'b', 'c'])).toEqual({ position: 2, total: 3 });
+    expect(m.items().map((objective) => objective.text)).toEqual(['first', 'second']);
+  });
+
+  it('freezes completed progress so leaving a completed area cannot regress it', () => {
+    const m = new ObjectivesModel();
+    m.add('a', 'reach the target');
+    m.setReadout(progress('a', 0));
+    m.complete('a');
+    expect(m.items()[0].readout?.goals[0]).toMatchObject({ have: 1, need: 1, done: true });
+    m.setReadout(progress('a', 0));
+    expect(m.items()[0].readout?.goals[0]).toMatchObject({ have: 1, need: 1, done: true });
+  });
 });
 
 describe('autoOpenObjectives', () => {
@@ -42,5 +93,48 @@ describe('autoOpenObjectives', () => {
     expect(autoOpenObjectives(HUD_NARROW_MAX_PX)).toBe(false);
     expect(autoOpenObjectives(HUD_NARROW_MAX_PX + 1)).toBe(true);
     expect(autoOpenObjectives(1280)).toBe(true);
+  });
+});
+
+describe('objectiveMarkerPlacement', () => {
+  it('keeps an in-view target on its battlefield tile', () => {
+    expect(objectiveMarkerPlacement(210, 360, 390, 844)).toEqual({
+      kind: 'beacon', x: 210, y: 360, angle: expect.any(Number),
+    });
+  });
+
+  it('clamps an off-screen target to a tappable edge arrow', () => {
+    const marker = objectiveMarkerPlacement(900, -400, 390, 844);
+    expect(marker.kind).toBe('edge');
+    expect(marker.x).toBeGreaterThanOrEqual(28);
+    expect(marker.x).toBeLessThanOrEqual(362);
+    expect(marker.y).toBeGreaterThanOrEqual(104);
+    expect(marker.y).toBeLessThanOrEqual(792);
+  });
+
+  it('moves guidance beside the minimap when the target is occluded by it', () => {
+    const marker = objectiveMarkerPlacement(60, 760, 390, 844);
+    expect(marker.kind).toBe('edge');
+    expect(marker.x).toBeGreaterThanOrEqual(140);
+  });
+});
+
+describe('objective progress throttle', () => {
+  it('runs at most once per five simulation ticks', () => {
+    expect(objectiveProgressDue(0, -1)).toBe(true);
+    expect(objectiveProgressDue(1, 0)).toBe(false);
+    expect(objectiveProgressDue(4, 0)).toBe(false);
+    expect(objectiveProgressDue(5, 0)).toBe(true);
+  });
+
+  it('measures four reads across one 20-tick simulation second', () => {
+    let lastRead = -1;
+    let reads = 0;
+    for (let tick = 0; tick < 20; tick++) {
+      if (!objectiveProgressDue(tick, lastRead)) continue;
+      lastRead = tick;
+      reads++;
+    }
+    expect(reads).toBe(4);
   });
 });

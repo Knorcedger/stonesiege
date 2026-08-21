@@ -123,6 +123,15 @@ export class TriggerRuntime {
   get isEnded(): boolean { return this.ended; }
   hasFired(triggerId: string): boolean { return this.byId.get(triggerId)?.fired ?? false; }
   isArmed(triggerId: string): boolean { return this.byId.get(triggerId)?.armed ?? false; }
+  /** Tick at which this trigger was last armed, including after it fires. */
+  armedAtTick(triggerId: string): number | undefined {
+    const tick = this.byId.get(triggerId)?.armedAtTick;
+    return tick !== undefined && tick >= 0 ? tick : undefined;
+  }
+  /** Latched ref lifecycle read for presentation progress. */
+  hasRefBeenDestroyed(ref: string): boolean {
+    return this.refState.get(ref)?.status === 'destroyed';
+  }
   objectiveState(id: string): ObjectiveState | undefined { return this.objectives.get(id); }
   /** Objective ids in the order they were added (for HUD rendering). */
   objectiveIds(): string[] { return [...this.objectives.keys()]; }
@@ -164,10 +173,6 @@ export class TriggerRuntime {
     }
   }
 
-  private refDestroyed(ref: string): boolean {
-    return this.refState.get(ref)?.status === 'destroyed';
-  }
-
   // ---------- conditions (AND, side-effect free) ----------
   private evalCondition(state: TriggerState, c: Condition): boolean {
     switch (c.kind) {
@@ -186,9 +191,9 @@ export class TriggerRuntime {
         return true;
       }
       case 'refDestroyed':
-        return this.refDestroyed(c.ref);
+        return this.hasRefBeenDestroyed(c.ref);
       case 'refsDestroyed': {
-        const destroyed = c.refs.filter((r) => this.refDestroyed(r)).length;
+        const destroyed = c.refs.filter((r) => this.hasRefBeenDestroyed(r)).length;
         return c.all ? destroyed === c.refs.length : destroyed > 0;
       }
       case 'playerDefeated':

@@ -96,6 +96,7 @@ describe('TriggerRuntime — timers', () => {
     const rt = new TriggerRuntime(scenarioWith([
       { id: 't', conditions: [{ kind: 'timerSeconds', seconds: 2 }], effects: [sting()] },
     ]), ops);
+    expect(rt.armedAtTick('t')).toBe(100);
 
     ops.now = 100 + secondsToTicks(2) - 1;
     rt.tick([]);
@@ -103,6 +104,7 @@ describe('TriggerRuntime — timers', () => {
     ops.now = 100 + secondsToTicks(2); // exactly 40 ticks after arming
     rt.tick([]);
     expect(rt.hasFired('t')).toBe(true);
+    expect(rt.armedAtTick('t')).toBe(100); // retained for presentation after firing
   });
 
   it('unarmed timers count from the armTrigger that armed them', () => {
@@ -116,10 +118,12 @@ describe('TriggerRuntime — timers', () => {
       },
       { id: 't-wave', armed: false, conditions: [{ kind: 'timerSeconds', seconds: 2 }], effects: [sting()] },
     ]), ops);
+    expect(rt.armedAtTick('t-wave')).toBeUndefined();
 
     ops.now = secondsToTicks(1); // 20: gate fires, arms wave at tick 20
     rt.tick([]);
     expect(rt.hasFired('t-gate')).toBe(true);
+    expect(rt.armedAtTick('t-wave')).toBe(secondsToTicks(1));
 
     ops.now = secondsToTicks(2); // 40 ticks from construction — but only 20 from arming
     rt.tick([]);
