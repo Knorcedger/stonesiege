@@ -9,6 +9,7 @@ import { flowFromHash, hashFor, matchPath, type MatchRoute } from './screens/rou
 import { NATIVE_BACK_EVENT } from './nativeEvents';
 import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
 import type { RunGameOptions } from './game';
+import { installContextMenuBlocker } from './contextMenu';
 
 export { resolveFrameName, facingFromDelta, animForActivity } from './frames';
 export { Camera, tileToWorld, worldToTile } from './camera';
@@ -52,6 +53,7 @@ function enterMatchRoute(request: GameRequest): void {
 
 /** Boot the full app (menus -> practice/campaign -> game screen) into the given DOM element. */
 export async function startApp(root: HTMLElement, options: StartAppOptions = {}): Promise<void> {
+  installContextMenuBlocker(root);
   const analytics = options.analytics ?? noopAnalytics;
   root.innerHTML = '';
   root.style.position = 'relative';
