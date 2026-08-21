@@ -9,8 +9,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { genBuildings } from './gen-buildings.ts';
+import { HUMANS } from './gen-units.ts';
 import { drawCavalry, drawHuman, trimFrame, DIRS, CAV_GY, HUMAN_GY } from './rig.ts';
-import type { CavSpec, Dir, HumanSpec } from './rig.ts';
+import type { CavSpec, Dir } from './rig.ts';
 import { PALETTE, isMaskColor } from './palette.ts';
 import type { Raster } from './raster.ts';
 
@@ -66,12 +67,11 @@ describe('humanoid walk cycle', () => {
   // 0/2/3/5 were within 4 px of each other, so a six-frame cycle played as two
   // poses strobing. In the side views the far leg collided with the near leg at
   // the passing frames and was shoved to the wrong side of the body.
-  const VILLAGER: HumanSpec = {
-    id: 'villager', height: 26, torsoW: 7,
-    tunic: [PALETTE.clothLight, PALETTE.clothBase],
-    legsC: PALETTE.clothDark,
-    helmet: 'cap', weapon: 'tool', sashRows: 1, metal: 0, hunch: true,
-  };
+  //
+  // Drive this from the REAL shipping specs, not a stand-in: robed roles hide
+  // their legs entirely, so a leg-only gait leaves the monk on two poses while
+  // a hand-written non-robed spec passes.
+  const SPECS = Object.entries(HUMANS);
 
   function framePixels(r: Raster): string {
     let out = '';
@@ -96,30 +96,49 @@ describe('humanoid walk cycle', () => {
     return n;
   }
 
-  it('draws six visibly distinct poses in every authored direction', () => {
-    for (const dir of DIRS) {
-      const frames = Array.from({ length: 6 }, (_, f) => drawHuman(VILLAGER, 'walk', dir as Dir, f));
-      const unique = new Set(frames.map(framePixels));
-      expect(unique.size, `dir ${dir} distinct poses`).toBe(6);
-      for (let i = 0; i < 6; i++) {
-        for (let j = i + 1; j < 6; j++) {
-          expect(differingPixels(frames[i], frames[j]), `dir ${dir} frames ${i}/${j}`)
-            .toBeGreaterThanOrEqual(5);
+  it('draws six visibly distinct poses for every unit in every authored direction', () => {
+    for (const [id, spec] of SPECS) {
+      for (const dir of DIRS) {
+        const frames = Array.from({ length: 6 }, (_, f) => drawHuman(spec, 'walk', dir as Dir, f));
+        expect(new Set(frames.map(framePixels)).size, `${id} dir ${dir} distinct poses`).toBe(6);
+        for (let i = 0; i < 6; i++) {
+          for (let j = i + 1; j < 6; j++) {
+            expect(differingPixels(frames[i], frames[j]), `${id} dir ${dir} frames ${i}/${j}`)
+              .toBeGreaterThanOrEqual(5);
+          }
         }
       }
     }
   });
 
-  it('keeps every walk pose on the ground line', () => {
-    for (const dir of DIRS) {
-      for (let f = 0; f < 6; f++) {
-        const r = drawHuman(VILLAGER, 'walk', dir as Dir, f);
-        let lowest = -1;
-        for (let y = 0; y < r.height; y++) {
-          for (let x = 0; x < r.width; x++) if (r.alphaAt(x, y) > 0) lowest = Math.max(lowest, y);
-        }
+  it('holds one body center and ground line across every walk pose', () => {
+    // The sprite must not travel inside its own canvas — that is the same
+    // slide-and-snap the HD walk cycles had, and the simulation already moves
+    // the unit.
+    for (const [id, spec] of SPECS) {
+      for (const dir of DIRS) {
+        const bounds = Array.from({ length: 6 }, (_, f) => {
+          const r = drawHuman(spec, 'walk', dir as Dir, f);
+          let left = r.width;
+          let right = -1;
+          let bottom = -1;
+          for (let y = 0; y < r.height; y++) {
+            for (let x = 0; x < r.width; x++) {
+              if (r.alphaAt(x, y) === 0) continue;
+              if (x < left) left = x;
+              if (x > right) right = x;
+              if (y > bottom) bottom = y;
+            }
+          }
+          return { center: (left + right) / 2, bottom };
+        });
+        const centers = bounds.map((b) => b.center);
+        expect(Math.max(...centers) - Math.min(...centers), `${id} dir ${dir} travel`)
+          .toBeLessThanOrEqual(1);
         // The drop shadow sits on HUMAN_GY, so no pose may sink through it.
-        expect(lowest, `dir ${dir} frame ${f} ground contact`).toBeLessThanOrEqual(HUMAN_GY + 2);
+        for (const { bottom } of bounds) {
+          expect(bottom, `${id} dir ${dir} ground contact`).toBeLessThanOrEqual(HUMAN_GY + 2);
+        }
       }
     }
   });

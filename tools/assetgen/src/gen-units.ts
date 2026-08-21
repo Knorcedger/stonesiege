@@ -29,7 +29,7 @@ export interface UnitsResult {
 
 const CLOTH: readonly [RGB, RGB] = [P.clothLight, P.clothBase];
 
-const HUMANS: Record<string, HumanSpec> = {
+export const HUMANS: Record<string, HumanSpec> = {
   villager: {
     id: 'villager', height: 24, torsoW: 7, tunic: CLOTH, legsC: P.clothDark,
     helmet: 'cap', weapon: 'tool', sashRows: 2, metal: 0, hunch: true,

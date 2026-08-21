@@ -403,6 +403,22 @@ describe('complete HD art override contract', () => {
     }
   });
 
+  it('leaves side margin on every standing and walking pose', () => {
+    // Content touching a canvas edge means the fit ran out of room and the
+    // silhouette is cut. Registering on the source cell pinned poses against
+    // the edge (257 unit/obj frames touched one); subject registration must
+    // leave every idle and walk pose clear of both sides.
+    const clipped: string[] = [];
+    for (const { atlas } of hdAtlases()) {
+      for (const name of Object.keys(atlas.frames)) {
+        if (!/^unit\/[^/]+\/(idle|walk)\/[0-4]\/\d+$/.test(name)) continue;
+        const visible = frameVisibleBounds(name);
+        if (visible.left === 0 || visible.right === atlas.frames[name].frame.w - 1) clipped.push(name);
+      }
+    }
+    expect(clipped, 'poses cut off at a canvas edge').toEqual([]);
+  });
+
   it('registers idle, walk, and attack of a unit on the same body center', () => {
     // Mixed registration made a unit jump sideways the moment it stopped
     // walking or started swinging.

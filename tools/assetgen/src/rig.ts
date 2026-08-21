@@ -385,21 +385,35 @@ function paintLegs(r: Raster, s: Skel, spec: HumanSpec, dir: Dir, anim: HumanAni
   }
 }
 
-function paintRobe(r: Raster, s: Skel, spec: HumanSpec): void {
+/**
+ * Robed roles hide their legs, so a walk has to read out of the hem: the skirt
+ * swings onto the weighted foot and each corner lifts as the leg under it swings
+ * through. Without this the monk's six-frame walk was the torso bob alone —
+ * two poses, four of them byte-identical.
+ */
+function paintRobe(
+  r: Raster,
+  s: Skel,
+  spec: HumanSpec,
+  hemDx = 0,
+  hemLiftL = 0,
+  hemLiftR = 0,
+): void {
   const cx = s.cx + s.lean;
+  const hemY = s.footY + 1;
   r.fillPoly(
     [
       [cx - 2, s.shoulderY],
       [cx + 3, s.shoulderY],
-      [cx + 5, s.footY + 1],
-      [cx - 4, s.footY + 1],
+      [cx + 5 + hemDx, hemY - hemLiftR],
+      [cx - 4 + hemDx, hemY - hemLiftL],
     ],
     P.clothBase,
   );
   for (let y = s.shoulderY; y <= s.footY; y++) {
     const t = (y - s.shoulderY) / (s.footY - s.shoulderY);
-    const xl = Math.round(cx - 2 - 2 * t);
-    const xr = Math.round(cx + 3 + 2 * t);
+    const xl = Math.round(cx - 2 - 2 * t + hemDx * t);
+    const xr = Math.round(cx + 3 + 2 * t + hemDx * t);
     if (r.alphaAt(xl + 1, y) === 255) r.set(xl + 1, y, P.clothLight);
     if (r.alphaAt(xr - 1, y) === 255 && Raster.ditherOn(xr, y, 50)) r.set(xr - 1, y, P.clothDark);
   }
@@ -704,7 +718,13 @@ export function drawHuman(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: num
   const behindWeapon = awayView(dir); // weapon behind body when facing away
   if (behindWeapon) paintWeapon(r, s, spec, dir, anim, frame);
   if (spec.robe) {
-    paintRobe(r, s, spec);
+    const walkish = anim === 'walk' || anim === 'carry';
+    paintRobe(
+      r, s, spec,
+      walkish ? WALK_SWAY[frame] : 0,
+      walkish ? Math.min(2, WALK_FRONT_DROP_L[frame]) : 0,
+      walkish ? Math.min(2, WALK_FRONT_DROP_R[frame]) : 0,
+    );
   } else {
     paintLegs(r, s, spec, dir, anim, frame);
     paintTorso(r, s, spec);
