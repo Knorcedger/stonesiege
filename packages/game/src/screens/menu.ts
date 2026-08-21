@@ -12,7 +12,9 @@ import {
   DEFAULT_PRACTICE_SETUP, MAP_SIZE_TILES,
   type PracticeMapSize, type PracticeSetup,
 } from '../simBridge';
-import { loadProgress, nextScenarioId, scenarioStatuses } from '../campaign/progress';
+import {
+  loadProgress, nextScenarioId, scenarioStatuses, type CampaignProgress,
+} from '../campaign/progress';
 import {
   campaignSlot, mostRecentSave, PRACTICE_SLOT, savedMatchLabel, saveForCampaign,
   type SaveEntry, type SaveSlot,
@@ -120,10 +122,12 @@ const MENU_CSS = `
   box-shadow:0 0 0 1px #8A6414, 0 2px 6px rgba(0,0,0,.5); }
 .bf-camp-body { display:block; padding:12px 16px 14px; }
 .bf-camp-desc { display:block; font-size:12.5px; line-height:1.45; color:#B99A6B; }
-.bf-camp-progress { display:flex; align-items:baseline; justify-content:space-between; gap:10px;
+.bf-camp-progress { display:flex; flex-wrap:wrap; align-items:baseline; justify-content:space-between; gap:3px 10px;
   margin-top:9px; font-size:12px; color:#DABE8D; }
-.bf-camp-next { color:#8f7958; font-size:11.5px; min-width:0; overflow:hidden; text-overflow:ellipsis;
-  white-space:nowrap; }
+.bf-camp-count { color:#DABE8D; font-variant-numeric:tabular-nums; }
+.bf-camp-next { flex-basis:100%; color:#B99A6B; font-size:12px; line-height:1.3; white-space:normal; }
+.bf-camp-action { display:block; margin-top:8px; color:#E6C04A; font-size:12px; letter-spacing:.65px;
+  text-align:right; }
 .bf-bar { display:block; height:5px; margin-top:7px; border-radius:3px; background:#1d1409;
   box-shadow:0 0 0 1px #50391f inset; overflow:hidden; }
 .bf-bar > span { display:block; height:100%; border-radius:3px;
@@ -137,11 +141,14 @@ const MENU_CSS = `
   background:linear-gradient(rgba(16,10,5,.1) 30%, rgba(16,10,5,.78) 76%, #2C1F12); }
 .bf-camp-hero-copy { position:absolute; left:26px; right:26px; bottom:12px; z-index:1; text-align:left; }
 .bf-camp-hero-copy .bf-camp-title { font-size:27px; }
+.bf-camp-hero-copy .bf-camp-progress { margin-top:5px; }
+.bf-camp-hero-copy .bf-camp-next { color:#C9AE7E; text-shadow:0 1px 4px #0b0703; }
 .bf-scn { display:flex; align-items:center; gap:12px; width:100%; text-align:left; padding:8px 12px 8px 8px;
   margin:6px 0; background:#241809; border:1px solid #64492B; border-radius:5px; color:#EFDDB5;
   font-family:inherit; font-size:15px; cursor:pointer; }
 .bf-scn:disabled { cursor:default; color:#6e6252; background:#1d1409; }
 .bf-scn:not(:disabled):hover { border-color:#B99A6B; }
+.bf-scn.saved { border-color:#E6C04A; box-shadow:0 0 0 1px rgba(142,110,20,.65) inset; }
 .bf-scn-thumb { position:relative; flex:0 0 62px; width:62px; height:44px; overflow:hidden;
   border-radius:4px; background:#16100a; box-shadow:0 0 0 1px #1A1208; }
 .bf-scn-thumb img { display:block; width:100%; height:100%; object-fit:cover; }
@@ -204,7 +211,7 @@ const MENU_CSS = `
 @media (max-width:520px) {
   .bf-menu-panel.wide { width:96vw; padding:22px 16px 20px; }
   .bf-scn { gap:9px; padding:7px 9px 7px 7px; }
-  .bf-scn .bf-scn-state { display:none; }
+  .bf-scn .bf-scn-state { flex:0 0 auto; font-size:9.5px; letter-spacing:.45px; }
   .bf-scn-meta { font-size:10px; }
   .bf-scn-thumb { flex-basis:52px; width:52px; height:38px; }
   .bf-act-title { font-size:14px; }
@@ -217,9 +224,24 @@ const MENU_CSS = `
   .bf-camp-title { font-size:20px; }
   .bf-camp-hero-copy .bf-camp-title, .bf-chapter-art-copy .bf-menu-h { font-size:22px; }
   .bf-camp-sub { font-size:11.5px; letter-spacing:1px; }
-  /* Card footers lose the "Next: <chapter>" hint to the chapter count; the
-     scenario-list hero keeps its own count line. */
-  .bf-camp-progress .bf-camp-next { display:none; }
+  .bf-camp-action { text-align:left; }
+}
+/* Native phones are landscape-only. Turn each tall campaign poster into a
+   compact cover + summary row so the active chapter and progress are visible
+   together instead of sitting more than a viewport apart. */
+@media (max-height:520px) and (orientation:landscape) {
+  .bf-menu-panel { box-sizing:border-box; max-height:calc(100dvh - 12px); margin:6px 0; padding-top:18px; }
+  .bf-menu-panel.wide { width:min(920px,calc(100vw - 16px)); }
+  .bf-menu-panel.wide > .bf-menu-h { font-size:26px; margin-bottom:5px; }
+  .bf-menu-panel.wide > .bf-menu-sub { margin-bottom:10px; }
+  .bf-camp-card { display:grid; grid-template-columns:minmax(230px,42%) minmax(0,1fr); min-height:184px; }
+  .bf-camp-art { min-height:184px; aspect-ratio:auto; }
+  .bf-camp-body { display:flex; min-width:0; flex-direction:column; padding:13px 16px; }
+  .bf-camp-desc { display:-webkit-box; overflow:hidden; -webkit-box-orient:vertical; -webkit-line-clamp:5; }
+  .bf-camp-body .bf-bar { margin-top:auto; }
+  .bf-camp-action { margin-top:6px; }
+  .bf-camp-hero { aspect-ratio:16/4.5; }
+  .bf-chapter-art { aspect-ratio:16/5.5; }
 }
 @media (prefers-reduced-motion:reduce) {
   .bf-camp-card { transition:none; }
@@ -277,6 +299,82 @@ export function thumbnailFocus(index: number): string {
 export function campaignSubtitle(defs: CampaignDef[] = Object.values(campaigns)): string {
   const chapters = defs.reduce((n, campaign) => n + campaign.scenarioIds.length, 0);
   return `${defs.length} historical campaigns · ${chapters} chapters`;
+}
+
+export interface CampaignMenuSummary {
+  completed: number;
+  total: number;
+  progressLabel: string;
+  detailLabel: string;
+  ribbonLabel?: string;
+}
+
+/**
+ * One coherent campaign status for both the campaign card and its chapter-list
+ * hero. A resumable match is progress within a chapter, while the numeric bar
+ * counts finished chapters; naming both makes "0 complete" and "in progress"
+ * understandable instead of contradictory.
+ */
+export function campaignMenuSummary(
+  campaign: CampaignDef,
+  progress: CampaignProgress,
+  save: Pick<SaveEntry, 'scenarioId' | 'label'> | null,
+): CampaignMenuSummary {
+  const total = campaign.scenarioIds.length;
+  const completed = campaign.scenarioIds.filter((id) => progress.completed.includes(id)).length;
+  const progressLabel = `${completed} of ${total} ${total === 1 ? 'chapter' : 'chapters'} complete`;
+  const savedIndex = save?.scenarioId === undefined ? -1 : campaign.scenarioIds.indexOf(save.scenarioId);
+
+  if (save && savedIndex >= 0) {
+    return {
+      completed,
+      total,
+      progressLabel,
+      detailLabel: `Chapter ${savedIndex + 1} in progress · ${save.label}`,
+      ribbonLabel: `CHAPTER ${savedIndex + 1} IN PROGRESS`,
+    };
+  }
+  if (save) {
+    return {
+      completed,
+      total,
+      progressLabel,
+      detailLabel: `Saved match in progress · ${save.label}`,
+      ribbonLabel: 'MATCH IN PROGRESS',
+    };
+  }
+  if (completed === total) {
+    return {
+      completed,
+      total,
+      progressLabel,
+      detailLabel: 'Campaign complete · Replay any chapter',
+      ribbonLabel: 'COMPLETE',
+    };
+  }
+
+  const nextId = nextScenarioId(campaign, progress);
+  const nextIndex = nextId === null ? -1 : campaign.scenarioIds.indexOf(nextId);
+  const nextTitle = nextId === null ? undefined : scenariosById[nextId]?.title;
+  return {
+    completed,
+    total,
+    progressLabel,
+    detailLabel: nextIndex >= 0
+      ? `Chapter ${nextIndex + 1} ready${nextTitle ? ` · ${nextTitle}` : ''}`
+      : 'Choose a chapter',
+  };
+}
+
+/** Title-screen Continue copy names the campaign and chapter, not only the save title. */
+export function resumeMenuLabel(save: Pick<SaveEntry, 'scenarioId' | 'label'>): string {
+  const scenario = save.scenarioId === undefined ? undefined : scenariosById[save.scenarioId];
+  const campaign = scenario === undefined ? undefined : campaigns[scenario.campaign];
+  const chapterIndex = campaign === undefined || save.scenarioId === undefined
+    ? -1 : campaign.scenarioIds.indexOf(save.scenarioId);
+  if (!campaign || chapterIndex < 0) return save.label;
+  const { name } = splitCampaignTitle(campaign.title);
+  return `${name} · Chapter ${chapterIndex + 1} of ${campaign.scenarioIds.length} · ${save.label}`;
 }
 
 /**
@@ -414,6 +512,11 @@ export function showMenu(
     };
     const progressBar = (completed: number, total: number): HTMLSpanElement => {
       const bar = el('span', 'bf-bar');
+      bar.setAttribute('role', 'progressbar');
+      bar.setAttribute('aria-label', 'Campaign chapters complete');
+      bar.setAttribute('aria-valuemin', '0');
+      bar.setAttribute('aria-valuemax', String(total));
+      bar.setAttribute('aria-valuenow', String(completed));
       const fill = el('span', '');
       fill.style.width = `${total > 0 ? Math.round((completed / total) * 100) : 0}%`;
       bar.appendChild(fill);
@@ -509,7 +612,7 @@ export function showMenu(
         panel.appendChild(button(
           'Continue', 'primary',
           () => done(resumeRequest(recent)),
-          recent.label,
+          resumeMenuLabel(recent),
         ));
       }
       panel.appendChild(button('Play', recent ? '' : 'primary', () => dispatch({ kind: 'openPlay' })));
@@ -601,8 +704,6 @@ export function showMenu(
       );
       const progress = loadProgress();
       for (const campaign of list) {
-        const total = campaign.scenarioIds.length;
-        const doneCount = campaign.scenarioIds.filter((id) => progress.completed.includes(id)).length;
         const { name, subtitle } = splitCampaignTitle(campaign.title);
         const card = el('button', 'bf-camp-card');
 
@@ -615,22 +716,23 @@ export function showMenu(
         // Each campaign keeps its own save, so a match in progress here is a
         // property of the campaign, not of the app.
         const save = saveForCampaign(campaign.id);
-        if (save) art.appendChild(el('span', 'bf-camp-ribbon saved', 'IN PROGRESS'));
-        else if (doneCount === total) art.appendChild(el('span', 'bf-camp-ribbon', 'COMPLETE'));
+        const summary = campaignMenuSummary(campaign, progress, save);
+        if (summary.ribbonLabel) {
+          art.appendChild(el(
+            'span', `bf-camp-ribbon${save ? ' saved' : ''}`, summary.ribbonLabel,
+          ));
+        }
 
         const body = el('span', 'bf-camp-body');
         body.appendChild(el('span', 'bf-camp-desc', campaign.description));
-        body.appendChild(progressBar(doneCount, total));
-        const nextId = nextScenarioId(campaign, progress);
-        const nextTitle = nextId ? scenariosById[nextId]?.title : undefined;
+        body.appendChild(progressBar(summary.completed, summary.total));
         const line = el('span', 'bf-camp-progress');
-        line.appendChild(el('span', '', `${doneCount} / ${total} chapters`));
-        line.appendChild(el(
-          'span', 'bf-camp-next',
-          save ? `Saved: ${save.label}`
-            : nextTitle ? `${doneCount > 0 ? 'Next' : 'Begin'}: ${nextTitle}` : 'Campaign complete',
-        ));
+        line.append(
+          el('span', 'bf-camp-count', summary.progressLabel),
+          el('span', 'bf-camp-next', summary.detailLabel),
+        );
         body.appendChild(line);
+        body.appendChild(el('span', 'bf-camp-action', 'View chapters →'));
 
         card.append(art, body);
         card.addEventListener('click', () => dispatch({ kind: 'openScenarios', campaignId: campaign.id }));
@@ -642,10 +744,9 @@ export function showMenu(
     const renderScenarioList = (campaign: CampaignDef): void => {
       const progress = loadProgress();
       const statuses = scenarioStatuses(campaign, progress);
-      const total = campaign.scenarioIds.length;
-      const doneCount = statuses.filter((status) => status === 'completed').length;
       const { name, subtitle } = splitCampaignTitle(campaign.title);
       const save = saveForCampaign(campaign.id);
+      const summary = campaignMenuSummary(campaign, progress, save);
 
       const hero = el('header', 'bf-camp-hero');
       // The hero is decorative here: the same art and alt text were just read
@@ -655,8 +756,13 @@ export function showMenu(
       const heading = el('h1', 'bf-camp-title', name);
       heroCopy.appendChild(heading);
       if (subtitle) heroCopy.appendChild(el('span', 'bf-camp-sub', subtitle));
-      heroCopy.appendChild(progressBar(doneCount, total));
-      heroCopy.appendChild(el('span', 'bf-camp-next', `${doneCount} / ${total} chapters complete`));
+      heroCopy.appendChild(progressBar(summary.completed, summary.total));
+      const heroProgress = el('span', 'bf-camp-progress');
+      heroProgress.append(
+        el('span', 'bf-camp-count', summary.progressLabel),
+        el('span', 'bf-camp-next', summary.detailLabel),
+      );
+      heroCopy.appendChild(heroProgress);
       hero.appendChild(heroCopy);
       panel.appendChild(hero);
 
@@ -674,7 +780,8 @@ export function showMenu(
         const status = statuses[i];
         const def = scenariosById[scenarioId];
         const authored = def !== undefined;
-        const row = el('button', 'bf-scn');
+        const savedHere = save?.scenarioId === scenarioId;
+        const row = el('button', `bf-scn${savedHere ? ' saved' : ''}`);
         const medal = el('div', `bf-medal ${status}`);
         medal.textContent = status === 'completed' ? '✔' : status === 'locked' ? '🔒' : String(i + 1);
         const thumb = el('span', `bf-scn-thumb${status === 'locked' ? ' locked' : ''}`);
@@ -688,7 +795,6 @@ export function showMenu(
             `${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`,
           ));
         }
-        const savedHere = save?.scenarioId === scenarioId;
         const state = el('span', `bf-scn-state${savedHere ? ' saved' : ''}`,
           savedHere ? 'IN PROGRESS'
             : status === 'completed' ? 'COMPLETED'

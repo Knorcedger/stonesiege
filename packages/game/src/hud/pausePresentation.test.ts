@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  activatePauseControl, PAUSE_SAVE_HINT, resignControlAction, syncPausePresentation, unitStatRows,
+  activatePauseControl, PAUSE_SAVE_HINT, pauseTabIndexAfterKey, resignControlAction,
+  syncPausePresentation, unitStatRows,
   type PausePresentationTarget,
 } from './hud';
 
@@ -69,6 +70,21 @@ describe('destructive pause-menu actions', () => {
     expect(resignControlAction(false, true)).toBe('resign');
     expect(resignControlAction(true, false)).toBe('returnToTitle');
     expect(resignControlAction(true, true)).toBe('returnToTitle');
+  });
+});
+
+describe('pause-menu tab navigation', () => {
+  it('moves between sections and wraps at both ends', () => {
+    expect(pauseTabIndexAfterKey(0, 'ArrowRight')).toBe(1);
+    expect(pauseTabIndexAfterKey(2, 'ArrowRight')).toBe(0);
+    expect(pauseTabIndexAfterKey(0, 'ArrowLeft')).toBe(2);
+    expect(pauseTabIndexAfterKey(1, 'ArrowLeft')).toBe(0);
+  });
+
+  it('supports Home and End without intercepting unrelated keys', () => {
+    expect(pauseTabIndexAfterKey(1, 'Home')).toBe(0);
+    expect(pauseTabIndexAfterKey(1, 'End')).toBe(2);
+    expect(pauseTabIndexAfterKey(1, 'Enter')).toBe(1);
   });
 });
 

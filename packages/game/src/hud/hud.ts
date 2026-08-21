@@ -145,6 +145,21 @@ export function resignControlAction(matchFinished: boolean, armed: boolean): Res
   return armed ? 'resign' : 'arm';
 }
 
+export const PAUSE_TABS = ['game', 'controls', 'settings'] as const;
+export type PauseTabId = typeof PAUSE_TABS[number];
+
+/** Roving-tab keyboard navigation for the pause menu's three compact sections. */
+export function pauseTabIndexAfterKey(current: number, key: string): number {
+  const last = PAUSE_TABS.length - 1;
+  switch (key) {
+    case 'ArrowRight': return current >= last ? 0 : current + 1;
+    case 'ArrowLeft': return current <= 0 ? last : current - 1;
+    case 'Home': return 0;
+    case 'End': return last;
+    default: return current;
+  }
+}
+
 /** Keep the visible pause state synchronous with the action that changed it. */
 export function syncPausePresentation(
   target: PausePresentationTarget,
@@ -265,19 +280,35 @@ const HUD_CSS = `
 .bf-goccrow canvas { width:24px; height:24px; image-rendering:auto; border:1px solid #64492B; }
 .bf-toast { position:absolute; left:50%; bottom:120px; transform:translateX(-50%); padding:6px 10px; display:none; align-items:center; gap:10px; font-size:14px; pointer-events:auto; }
 .bf-toast.show { display:flex; }
-/* scrollable overlay + margin:auto box: the settings block can exceed short
-   (landscape-phone) viewports — flex centering alone would clip the top */
-.bf-pause { position:absolute; inset:0; background:rgba(10,8,5,0.72); display:none; overflow-y:auto; pointer-events:auto; z-index:40; }
+/* The shell stays within the safe-area root while each tab owns its scrolling.
+   A short landscape phone therefore keeps Resume + navigation on screen even
+   when the Settings controls are much taller than the available viewport. */
+.bf-pause { position:absolute; inset:0; box-sizing:border-box; padding:12px; background:rgba(10,8,5,0.76); display:none; pointer-events:auto; z-index:40; }
 .bf-pause.show { display:flex; }
-.bf-pausebox { margin:auto; display:flex; align-items:center; flex-direction:column; gap:14px; padding:24px 16px; }
-.bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:42px; color:#E6C04A; margin:0; }
+.bf-pausebox { box-sizing:border-box; width:min(680px,100%); max-height:100%; min-height:0; margin:auto;
+  display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:10px; padding:16px; pointer-events:auto; }
+.bf-pausehead { display:flex; align-items:center; justify-content:space-between; gap:16px; }
+.bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:40px; line-height:1; color:#E6C04A; margin:0; }
+.bf-pauseresume { min-width:132px; min-height:44px; font-size:18px; }
+.bf-pausetabs { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
+.bf-pausetab { min-height:44px; padding:7px 10px; color:#DABE8D; background:#241809;
+  border:1px solid #64492B; border-radius:4px; font:15px/1 "Pixelify Sans",monospace; cursor:pointer; }
+.bf-pausetab[aria-selected="true"] { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D);
+  border-color:#B99A6B; box-shadow:0 1px 0 #8A6414; }
+.bf-pausetab:focus-visible, .bf-pauseresume:focus-visible { outline:3px solid #FFE98A; outline-offset:2px; }
+.bf-pausepanels { min-height:0; overflow-y:auto; overscroll-behavior:contain; scrollbar-gutter:stable; }
+.bf-pausepanel { min-height:0; padding:2px; }
+.bf-pausepanel.game { display:grid; grid-template-columns:1fr 1fr; gap:10px; }
+.bf-pausepanel[hidden] { display:none; }
 /* in-match settings (same controls as the menu screen — see settingsUi.ts) */
-.bf-pausesettings { width:min(320px, 88%); text-align:left; }
-.bf-pausesection { box-sizing:border-box; width:min(320px,88%); padding:10px 12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
+.bf-pausesettings { box-sizing:border-box; width:100%; max-width:520px; margin:0 auto; padding:2px 10px 10px; text-align:left; }
+.bf-pausesection { box-sizing:border-box; width:100%; padding:12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
 .bf-pausetitle { color:#E6C04A; font:15px/1 "Pixelify Sans",monospace; letter-spacing:1px; }
 .bf-pausehint { margin-top:5px; font:14px/1.25 "VT323",monospace; }
 .bf-pausesaverow { display:flex; align-items:center; gap:10px; margin-top:8px; }
 .bf-pausestate { color:#E6C04A; font:15px/1 "VT323",monospace; }
+.bf-pauseleave { display:flex; flex-direction:column; }
+.bf-pauseleave .bf-btn { width:100%; min-height:44px; margin-top:auto; }
 .bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }
 .bf-help.show { display:flex; }
 .bf-helpbox { box-sizing:border-box; width:min(430px,calc(100% - 24px)); margin:auto; padding:20px; }
@@ -312,6 +343,18 @@ const HUD_CSS = `
 @media (max-width: 480px) {
   .bf-mini > canvas { width:112px !important; height:112px !important; image-rendering:auto; }
   .bf-rightcluster { right:4px; bottom:4px; }
+}
+@media (max-width:600px) {
+  .bf-pause { padding:8px; }
+  .bf-pausebox { padding:12px; gap:8px; }
+  .bf-pause h2 { font-size:34px; }
+  .bf-pauseresume { min-width:112px; }
+  .bf-pausepanel.game { grid-template-columns:1fr; }
+}
+@media (max-height:420px) and (orientation:landscape) {
+  .bf-pause { padding:6px; }
+  .bf-pausebox { padding:10px 12px; gap:7px; }
+  .bf-pause h2 { font-size:32px; }
 }
 `;
 
@@ -398,6 +441,11 @@ export class Hud {
   private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
   private pauseGroups!: HTMLDivElement;
   private groupStatus!: HTMLDivElement;
+  private pauseResumeBtn!: HTMLButtonElement;
+  private pausePanelScroller!: HTMLDivElement;
+  private pauseTabs = new Map<PauseTabId, HTMLButtonElement>();
+  private pausePanels = new Map<PauseTabId, HTMLDivElement>();
+  private pauseWasOpen = false;
   private lastCardKey = '';
   private queueProgressEls: Array<{ el: HTMLDivElement; buildingId: EntityId; index: number }> = [];
   private utilRow!: HTMLDivElement;
@@ -720,14 +768,57 @@ export class Hud {
     this.pauseOverlay.setAttribute('aria-label', 'Paused game menu');
     this.pauseOverlay.setAttribute('aria-hidden', 'true');
     const box = document.createElement('div');
-    box.className = 'bf-pausebox';
+    box.className = 'bf-panel bf-pausebox';
+    const head = document.createElement('div');
+    head.className = 'bf-pausehead';
     const h = document.createElement('h2');
     h.textContent = 'Paused';
-    const btn = document.createElement('button');
-    btn.className = 'bf-btn';
-    btn.style.fontSize = '18px';
-    btn.textContent = 'Resume';
-    btn.addEventListener('click', () => this.resumeGame());
+    this.pauseResumeBtn = document.createElement('button');
+    this.pauseResumeBtn.className = 'bf-btn bf-pauseresume';
+    this.pauseResumeBtn.textContent = 'Resume game';
+    this.pauseResumeBtn.addEventListener('click', () => this.resumeGame());
+    head.append(h, this.pauseResumeBtn);
+
+    const tabs = document.createElement('div');
+    tabs.className = 'bf-pausetabs';
+    tabs.setAttribute('role', 'tablist');
+    tabs.setAttribute('aria-label', 'Pause menu sections');
+    this.pausePanelScroller = document.createElement('div');
+    this.pausePanelScroller.className = 'bf-pausepanels';
+    const labels: Record<PauseTabId, string> = {
+      game: 'Game', controls: 'Controls', settings: 'Settings',
+    };
+    for (const [index, id] of PAUSE_TABS.entries()) {
+      const tab = document.createElement('button');
+      tab.className = 'bf-pausetab';
+      tab.id = `bf-pause-tab-${id}`;
+      tab.type = 'button';
+      tab.textContent = labels[id];
+      tab.setAttribute('role', 'tab');
+      tab.setAttribute('aria-controls', `bf-pause-panel-${id}`);
+      tab.addEventListener('click', () => this.selectPauseTab(id));
+      tab.addEventListener('keydown', (event) => {
+        const nextIndex = pauseTabIndexAfterKey(index, event.key);
+        if (nextIndex === index) return;
+        event.preventDefault();
+        this.selectPauseTab(PAUSE_TABS[nextIndex]);
+      });
+      const panel = document.createElement('div');
+      panel.className = `bf-pausepanel ${id}`;
+      panel.id = `bf-pause-panel-${id}`;
+      panel.setAttribute('role', 'tabpanel');
+      panel.setAttribute('aria-labelledby', tab.id);
+      tabs.appendChild(tab);
+      this.pausePanelScroller.appendChild(panel);
+      this.pauseTabs.set(id, tab);
+      this.pausePanels.set(id, panel);
+    }
+
+    const gamePanel = this.pausePanels.get('game');
+    const controlsPanel = this.pausePanels.get('controls');
+    const settingsPanel = this.pausePanels.get('settings');
+    if (!gamePanel || !controlsPanel || !settingsPanel) return;
+
     // In-match settings (shared builder with the menu screen): volume, camera
     // speed and HP bars were otherwise only reachable by resigning the match.
     // Slider release plays a uiTap so the player HEARS the level they set.
@@ -737,6 +828,7 @@ export class Hud {
       onSliderRelease: () => this.host.playUiSound(),
       onProductionSpeedChange: (speed) => this.host.setProductionSpeed(speed),
     });
+    settingsPanel.appendChild(settings);
 
     const saveSection = document.createElement('div');
     saveSection.className = 'bf-pausesection';
@@ -753,12 +845,14 @@ export class Hud {
     saveBtn.textContent = 'Save now';
     const saveState = document.createElement('span');
     saveState.className = 'bf-pausestate';
+    saveState.setAttribute('aria-live', 'polite');
     saveBtn.addEventListener('click', () => {
       this.host.saveGame();
       saveState.textContent = 'Saved locally';
     });
     saveRow.append(saveBtn, saveState);
     saveSection.append(saveTitle, saveHint, saveRow);
+    gamePanel.appendChild(saveSection);
 
     this.pauseGroups = document.createElement('div');
     this.pauseGroups.className = 'bf-pausesection';
@@ -770,7 +864,18 @@ export class Hud {
     groupHint.textContent = 'Hold a number to assign the currently selected units. Tap an assigned group to select it and resume. These are temporary unit shortcuts, not game saves.';
     this.groupStatus = document.createElement('div');
     this.groupStatus.className = 'bf-pausestate';
+    this.groupStatus.setAttribute('aria-live', 'polite');
     this.pauseGroups.append(groupTitle, groupHint, this.groupStatus);
+    controlsPanel.appendChild(this.pauseGroups);
+
+    const leaveSection = document.createElement('div');
+    leaveSection.className = 'bf-pausesection bf-pauseleave';
+    const leaveTitle = document.createElement('div');
+    leaveTitle.className = 'bf-pausetitle';
+    leaveTitle.textContent = 'LEAVE MATCH';
+    const leaveHint = document.createElement('div');
+    leaveHint.className = 'bf-pausehint';
+    leaveHint.textContent = 'Resigning ends this match. A second tap confirms so a stray touch cannot forfeit the game.';
     // Resign (GDD: a human can resign at any time) — two taps to confirm,
     // because a mis-tap here forfeits the whole match.
     this.resignBtn = document.createElement('button');
@@ -794,20 +899,45 @@ export class Hud {
           return;
       }
     });
-    box.append(h, btn, saveSection, this.pauseGroups, settings, this.resignBtn);
+    leaveSection.append(leaveTitle, leaveHint, this.resignBtn);
+    gamePanel.appendChild(leaveSection);
+
+    box.append(head, tabs, this.pausePanelScroller);
     this.pauseOverlay.appendChild(box);
     this.pauseOverlay.addEventListener('click', (e) => {
       if (e.target === this.pauseOverlay) this.resumeGame();
     });
     this.el.appendChild(this.pauseOverlay);
+    this.selectPauseTab('game', false);
+  }
+
+  private selectPauseTab(id: PauseTabId, focus = true): void {
+    for (const tabId of PAUSE_TABS) {
+      const active = tabId === id;
+      const tab = this.pauseTabs.get(tabId);
+      const panel = this.pausePanels.get(tabId);
+      tab?.setAttribute('aria-selected', String(active));
+      if (tab) tab.tabIndex = active ? 0 : -1;
+      if (panel) panel.hidden = !active;
+    }
+    this.pausePanelScroller.scrollTop = 0;
+    if (focus) this.pauseTabs.get(id)?.focus();
   }
 
   private syncPauseUi(): void {
+    const paused = this.host.isPaused();
     syncPausePresentation(
       { button: this.pauseBtn, overlay: this.pauseOverlay },
       this.matchFinished,
-      this.host.isPaused(),
+      paused,
     );
+    if (paused && !this.pauseWasOpen) {
+      this.selectPauseTab('game', false);
+      this.pauseResumeBtn.focus();
+    } else if (!paused && this.pauseWasOpen) {
+      this.pauseBtn.focus();
+    }
+    this.pauseWasOpen = paused;
   }
 
   private resumeGame(): void {

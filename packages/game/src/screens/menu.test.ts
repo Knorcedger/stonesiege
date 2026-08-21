@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { campaigns } from '@bf/scenarios';
-import { menuScrollTopAfterRender, splitCampaignTitle, thumbnailFocus } from './menu';
+import {
+  campaignMenuSummary, menuScrollTopAfterRender, resumeMenuLabel, splitCampaignTitle,
+  thumbnailFocus,
+} from './menu';
 
 describe('menuScrollTopAfterRender', () => {
   it('preserves the setup-panel position for in-place Practice changes', () => {
@@ -46,5 +49,52 @@ describe('thumbnailFocus', () => {
       expect(percent).toBeGreaterThanOrEqual(0);
       expect(percent).toBeLessThanOrEqual(100);
     }
+  });
+});
+
+describe('campaignMenuSummary', () => {
+  const wallace = campaigns.wallace;
+
+  it('connects a resumable match to its chapter number and completed count', () => {
+    const completed = wallace.scenarioIds.slice(0, 6);
+    const summary = campaignMenuSummary(
+      wallace,
+      { completed },
+      { scenarioId: wallace.scenarioIds[6], label: 'A Guardian’s Winter, 5:59' },
+    );
+
+    expect(summary.progressLabel).toBe('6 of 12 chapters complete');
+    expect(summary.ribbonLabel).toBe('CHAPTER 7 IN PROGRESS');
+    expect(summary.detailLabel).toBe('Chapter 7 in progress · A Guardian’s Winter, 5:59');
+  });
+
+  it('names the first ready chapter before a campaign begins', () => {
+    const summary = campaignMenuSummary(wallace, { completed: [] }, null);
+
+    expect(summary.progressLabel).toBe('0 of 12 chapters complete');
+    expect(summary.detailLabel).toContain('Chapter 1 ready');
+    expect(summary.ribbonLabel).toBeUndefined();
+  });
+
+  it('turns the completed state into an explicit replay invitation', () => {
+    const summary = campaignMenuSummary(
+      wallace, { completed: [...wallace.scenarioIds] }, null,
+    );
+
+    expect(summary.ribbonLabel).toBe('COMPLETE');
+    expect(summary.detailLabel).toBe('Campaign complete · Replay any chapter');
+  });
+});
+
+describe('resumeMenuLabel', () => {
+  it('adds campaign and chapter position to the title-screen Continue action', () => {
+    const wallace = campaigns.wallace;
+    expect(resumeMenuLabel({
+      scenarioId: wallace.scenarioIds[6], label: 'A Guardian’s Winter, 5:59',
+    })).toBe('William Wallace · Chapter 7 of 12 · A Guardian’s Winter, 5:59');
+  });
+
+  it('keeps a practice or legacy label that has no current chapter', () => {
+    expect(resumeMenuLabel({ label: 'Practice match, 12:30' })).toBe('Practice match, 12:30');
   });
 });

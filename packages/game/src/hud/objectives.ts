@@ -119,6 +119,13 @@ export type ObjectiveMarkerPlacement =
   | { kind: 'beacon'; x: number; y: number; angle: number }
   | { kind: 'edge'; x: number; y: number; angle: number };
 
+/** A visible battlefield target must not steal commands from the canvas below it. */
+export function objectiveMarkerPointerEvents(
+  kind: ObjectiveMarkerPlacement['kind'],
+): 'none' | 'auto' {
+  return kind === 'beacon' ? 'none' : 'auto';
+}
+
 /** Pure geometry for the battlefield beacon / screen-edge arrow. */
 export function objectiveMarkerPlacement(
   targetX: number,
@@ -354,6 +361,7 @@ export class ObjectivesPanel {
     this.markerEl.className = `bf-obj-marker show ${placement.kind}`;
     this.markerEl.style.left = `${placement.x}px`;
     this.markerEl.style.top = `${placement.y}px`;
+    this.markerEl.style.pointerEvents = objectiveMarkerPointerEvents(placement.kind);
     this.markerEl.style.setProperty('--bf-obj-angle', `${placement.angle}deg`);
   }
 
