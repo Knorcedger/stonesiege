@@ -18,6 +18,7 @@ import { PALETTE } from '../assetgen/src/palette.ts';
 import { writePng } from '../assetgen/src/png.ts';
 import { Raster } from '../assetgen/src/raster.ts';
 import { alphaBounds, type AlphaBounds } from './alpha-bounds.ts';
+import { shouldMirrorDirectionSheetCell } from './direction-sheet-layout.ts';
 import { HD_DENSITY, MaterialLibrary, materializeFrame } from './materialize.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -61,6 +62,8 @@ interface CutoutSpec {
     kind: 'attack' | 'die' | 'stride' | 'gather';
     progress: number;
     direction: number;
+    /** Mirror rotation derived from a source cell that the slicer flips horizontally. */
+    sourceMirrored?: boolean;
   };
 }
 
@@ -448,7 +451,12 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
       fitWidth: 0.92,
       fitHeight: 0.96,
       bottom: 0.97,
-      pose: { kind: 'gather', progress, direction: dir },
+      pose: {
+        kind: 'gather', progress, direction: dir,
+        sourceMirrored: shouldMirrorDirectionSheetCell(
+          'villager-gather-directions-cutout-v3.png', dir,
+        ),
+      },
     }))),
   ...([0, 1, 2, 3, 4] as const).map((dir): CutoutSpec => ({
     source: `art/hd/frames/units/villager-carry-dir-${dir}-cutout-v3.png`,
@@ -1090,7 +1098,8 @@ function transformCutoutPose(
     // Rock the approved worker/tool silhouette around grounded feet. The full
     // downstroke is intentionally pronounced at game scale, where a static
     // high-detail pose otherwise reads as an idle villager.
-    const swingSign = pose.direction <= 2 ? -1 : 1;
+    const authoredSwingSign = pose.direction <= 2 ? -1 : 1;
+    const swingSign = pose.sourceMirrored ? -authoredSwingSign : authoredSwingSign;
     angle = swingSign * pose.progress * 0.085;
     scaleX = 1 + pose.progress * 0.025;
     scaleY = 1 - pose.progress * 0.055;

@@ -6,6 +6,7 @@ import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { PNG } from 'pngjs';
 import { clearMinorAlphaComponents } from './alpha-components.ts';
+import { shouldMirrorDirectionSheetCell } from './direction-sheet-layout.ts';
 
 const root = join(import.meta.dirname, '../..');
 
@@ -62,9 +63,13 @@ for (const sheet of SHEETS) {
   for (let dir = 0; dir < CELLS.length; dir++) {
     const [cellX, cellY] = CELLS[dir];
     const out = new PNG({ width: cellWidth, height: cellHeight });
+    const mirrorForRuntime = shouldMirrorDirectionSheetCell(sheet.source, dir);
     for (let y = 0; y < cellHeight; y++) {
       for (let x = 0; x < cellWidth; x++) {
-        const sourceIndex = ((cellY * cellHeight + y) * source.width + cellX * cellWidth + x) * 4;
+        const sourceX = mirrorForRuntime ? cellWidth - 1 - x : x;
+        const sourceIndex = (
+          (cellY * cellHeight + y) * source.width + cellX * cellWidth + sourceX
+        ) * 4;
         const outputIndex = (y * cellWidth + x) * 4;
         out.data[outputIndex] = source.data[sourceIndex];
         out.data[outputIndex + 1] = source.data[sourceIndex + 1];
