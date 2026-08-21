@@ -29,10 +29,6 @@ if ([...selected].some((arg) => !['--apple', '--google'].includes(arg))) {
   throw new Error('Usage: node tools/store-metadata-sync.mjs [--apple] [--google]');
 }
 
-const pngs = (relativeDir) => readdirSync(join(root, relativeDir))
-  .filter((name) => name.endsWith('.png'))
-  .sort()
-  .map((name) => join(root, relativeDir, name));
 const storeImages = (relativeDir) => readdirSync(join(root, relativeDir))
   .filter((name) => /\.(png|jpe?g)$/i.test(name))
   .sort()
@@ -323,10 +319,10 @@ async function syncAppleMetadata() {
 
   for (const localization of versionLocalizations) {
     await replaceAppleScreenshotSet(
-      localization.id, 'APP_IPHONE_65', pngs('store/screenshots/ios/iphone-6.5'),
+      localization.id, 'APP_IPHONE_65', storeImages('store/screenshots/ios/iphone-6.5'),
     );
     await replaceAppleScreenshotSet(
-      localization.id, 'APP_IPAD_PRO_3GEN_129', pngs('store/screenshots/ios/ipad-12.9'),
+      localization.id, 'APP_IPAD_PRO_3GEN_129', storeImages('store/screenshots/ios/ipad-12.9'),
     );
   }
   console.log(`App Store Connect: synced StoneSiege ${version} metadata, content rights, age rating, and privacy URL.`);
@@ -384,7 +380,7 @@ async function syncGoogleMetadata() {
       }),
     });
     const imageSets = [
-      ['phoneScreenshots', pngs('store/screenshots/android/phone')],
+      ['phoneScreenshots', storeImages('store/screenshots/android/phone')],
       ['sevenInchScreenshots', storeImages('store/screenshots/android/tablet')],
       ['tenInchScreenshots', storeImages('store/screenshots/android/tablet')],
     ];

@@ -85,7 +85,7 @@ AI assistance is welcome, but the human contributor is accountable for the resul
 
 For generated or AI-assisted art, include provenance, source references, model/tool, material edits, and a statement that you reasonably believe the contribution can be dedicated under [ASSET_LICENSE.md](ASSET_LICENSE.md). Recognizable copies of third-party game art will not be accepted.
 
-Do not edit generated atlases in `apps/web/public/assets/hd/` by hand. Source renders, validated frames, generation steps, and licensing provenance belong under `art/hd/`; see [art/hd/README.md](art/hd/README.md). Store screenshots and native release media are intentionally part of the full checkout but are not required for ordinary web development.
+Do not edit generated atlases in `apps/web/public/assets/hd/` by hand. Source renders, validated frames, generation steps, and licensing provenance belong under `art/hd/`; see [art/hd/README.md](art/hd/README.md). Source art and store screenshots use Git LFS and are intentionally excluded from ordinary clones. Install Git LFS and run `git lfs pull --include="art/**,store/screenshots/**" --exclude=""` before source-art or store-publishing work. Shipping runtime atlases remain regular Git files.
 
 ## Commits and pull requests
 

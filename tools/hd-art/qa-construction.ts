@@ -5,7 +5,7 @@
 import { mkdirSync, readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { PNG } from 'pngjs';
+import sharp from 'sharp';
 import { buildings } from '../../packages/data/src/buildings.ts';
 import { drawText } from '../assetgen/src/font.ts';
 import { PALETTE } from '../assetgen/src/palette.ts';
@@ -39,22 +39,27 @@ for (const file of manifest.atlases) {
   }
 }
 
-const pngs = new Map<string, PNG>();
+const atlasImages = new Map<string, { data: Buffer; height: number; width: number }>();
+await Promise.all([...new Set([...frameSources.values()].map(({ image }) => image))].map(async (image) => {
+  const { data, info } = await sharp(join(HD, image))
+    .ensureAlpha()
+    .raw()
+    .toBuffer({ resolveWithObject: true });
+  atlasImages.set(image, { data, height: info.height, width: info.width });
+}));
+
 function frameRaster(name: string): Raster {
   const source = frameSources.get(name);
   if (!source) throw new Error(`missing HD frame: ${name}`);
-  let png = pngs.get(source.image);
-  if (!png) {
-    png = PNG.sync.read(readFileSync(join(HD, source.image)));
-    pngs.set(source.image, png);
-  }
+  const image = atlasImages.get(source.image);
+  if (!image) throw new Error(`HD atlas image was not decoded: ${source.image}`);
   const box = source.frame.frame;
   const raster = new Raster(box.w, box.h);
   for (let y = 0; y < box.h; y++) {
     for (let x = 0; x < box.w; x++) {
-      const i = ((box.y + y) * png.width + box.x + x) * 4;
-      const a = png.data[i + 3];
-      if (a > 0) raster.set(x, y, [png.data[i], png.data[i + 1], png.data[i + 2]], a);
+      const i = ((box.y + y) * image.width + box.x + x) * 4;
+      const a = image.data[i + 3];
+      if (a > 0) raster.set(x, y, [image.data[i], image.data[i + 1], image.data[i + 2]], a);
     }
   }
   return raster;

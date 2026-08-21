@@ -21,3 +21,9 @@
 *.webp binary
 *.woff binary
 *.woff2 binary
+art/**/*.png filter=lfs diff=lfs merge=lfs -text
+art/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+art/**/*.jpeg filter=lfs diff=lfs merge=lfs -text
+store/screenshots/**/*.png filter=lfs diff=lfs merge=lfs -text
+store/screenshots/**/*.jpg filter=lfs diff=lfs merge=lfs -text
+store/screenshots/**/*.jpeg filter=lfs diff=lfs merge=lfs -text

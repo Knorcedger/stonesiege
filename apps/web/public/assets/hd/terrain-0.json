@@ -4132,7 +4132,7 @@
  "meta": {
   "app": "stonesiege-assetgen",
   "version": "1.0",
-  "image": "terrain-0.png",
+  "image": "terrain-0.webp",
   "format": "RGBA8888",
   "size": {
    "w": 2048,

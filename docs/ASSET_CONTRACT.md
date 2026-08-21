@@ -9,9 +9,9 @@ logical frame name, the renderer prefers it and applies `1 / meta.scale` as the
 world render scale. This preserves all existing anchors, footprints, animation
 lookups, hitboxes, and gameplay code while allowing atlas-family migration.
 
-HD sheets use linear texture sampling; baseline pixel atlases retain nearest
-sampling. Both use the same runtime player-color mask metadata. See
-`HD_ART_PIPELINE.md` for the active visual rules.
+HD sheets are lossless WebP and use linear texture sampling; baseline pixel
+atlases are PNG and retain nearest sampling. Both use the same runtime
+player-color mask metadata. See `HD_ART_PIPELINE.md` for the active visual rules.
 
 The shipping HD manifest currently covers every baseline frame. Runtime team
 colors are resolved on demand and packed into shared 1,024px color pages; the
