@@ -9,8 +9,9 @@
 
 import { describe, expect, it } from 'vitest';
 import { genBuildings } from './gen-buildings.ts';
-import { drawCavalry, trimFrame, CAV_GY } from './rig.ts';
-import type { CavSpec } from './rig.ts';
+import { HUMANS } from './gen-units.ts';
+import { drawCavalry, drawHuman, trimFrame, DIRS, CAV_GY, HUMAN_GY } from './rig.ts';
+import type { CavSpec, Dir } from './rig.ts';
 import { PALETTE, isMaskColor } from './palette.ts';
 import type { Raster } from './raster.ts';
 
@@ -56,6 +57,89 @@ describe('building player color survives the outline pass (§5.3/§9.4)', () => 
       const f = frames.find((x) => x.name === `bld/townCenter/${age}/done`);
       expect(f, `bld/townCenter/${age}/done`).toBeDefined();
       expect(maskCount(f!.raster), `bld/townCenter/${age}/done mask px`).toBeGreaterThanOrEqual(40);
+    }
+  });
+});
+
+describe('humanoid walk cycle', () => {
+  // This rig is the missing-atlas fallback, but it was authoring a walk that
+  // was not a walk: facing the camera, frames 2 and 3 were byte-identical and
+  // 0/2/3/5 were within 4 px of each other, so a six-frame cycle played as two
+  // poses strobing. In the side views the far leg collided with the near leg at
+  // the passing frames and was shoved to the wrong side of the body.
+  //
+  // Drive this from the REAL shipping specs, not a stand-in: robed roles hide
+  // their legs entirely, so a leg-only gait leaves the monk on two poses while
+  // a hand-written non-robed spec passes.
+  const SPECS = Object.entries(HUMANS);
+
+  function framePixels(r: Raster): string {
+    let out = '';
+    for (let y = 0; y < r.height; y++) {
+      for (let x = 0; x < r.width; x++) {
+        const [pr, pg, pb, pa] = r.get(x, y);
+        out += pa === 0 ? '.' : `${pr},${pg},${pb},${pa};`;
+      }
+    }
+    return out;
+  }
+
+  function differingPixels(a: Raster, b: Raster): number {
+    let n = 0;
+    for (let y = 0; y < a.height; y++) {
+      for (let x = 0; x < a.width; x++) {
+        const pa = a.get(x, y);
+        const pb = b.get(x, y);
+        if (pa[0] !== pb[0] || pa[1] !== pb[1] || pa[2] !== pb[2] || pa[3] !== pb[3]) n++;
+      }
+    }
+    return n;
+  }
+
+  it('draws six visibly distinct poses for every unit in every authored direction', () => {
+    for (const [id, spec] of SPECS) {
+      for (const dir of DIRS) {
+        const frames = Array.from({ length: 6 }, (_, f) => drawHuman(spec, 'walk', dir as Dir, f));
+        expect(new Set(frames.map(framePixels)).size, `${id} dir ${dir} distinct poses`).toBe(6);
+        for (let i = 0; i < 6; i++) {
+          for (let j = i + 1; j < 6; j++) {
+            expect(differingPixels(frames[i], frames[j]), `${id} dir ${dir} frames ${i}/${j}`)
+              .toBeGreaterThanOrEqual(5);
+          }
+        }
+      }
+    }
+  });
+
+  it('holds one body center and ground line across every walk pose', () => {
+    // The sprite must not travel inside its own canvas — that is the same
+    // slide-and-snap the HD walk cycles had, and the simulation already moves
+    // the unit.
+    for (const [id, spec] of SPECS) {
+      for (const dir of DIRS) {
+        const bounds = Array.from({ length: 6 }, (_, f) => {
+          const r = drawHuman(spec, 'walk', dir as Dir, f);
+          let left = r.width;
+          let right = -1;
+          let bottom = -1;
+          for (let y = 0; y < r.height; y++) {
+            for (let x = 0; x < r.width; x++) {
+              if (r.alphaAt(x, y) === 0) continue;
+              if (x < left) left = x;
+              if (x > right) right = x;
+              if (y > bottom) bottom = y;
+            }
+          }
+          return { center: (left + right) / 2, bottom };
+        });
+        const centers = bounds.map((b) => b.center);
+        expect(Math.max(...centers) - Math.min(...centers), `${id} dir ${dir} travel`)
+          .toBeLessThanOrEqual(1);
+        // The drop shadow sits on HUMAN_GY, so no pose may sink through it.
+        for (const { bottom } of bounds) {
+          expect(bottom, `${id} dir ${dir} ground contact`).toBeLessThanOrEqual(HUMAN_GY + 2);
+        }
+      }
     }
   });
 });

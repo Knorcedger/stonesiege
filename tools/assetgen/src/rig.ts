@@ -138,8 +138,36 @@ interface Skel {
   fy: number;
 }
 
-const WALK_STRIDE = [2, 1, -1, -2, -1, 1]; // near-leg dx (side views)
-const WALK_BOB = [0, -1, 0, 0, -1, 0];
+// One walk cycle: contacts on frames 0 and 3, passings between them.
+// `WALK_STRIDE` is the near leg's dx; the far leg mirrors it, so the pair is
+// never closer than 2 px and never has to be nudged apart.
+const WALK_STRIDE = [3, 1, -1, -3, -1, 1];
+// The horizontal swing alone is a palindrome (frames 1/5 and 2/4 share a stride
+// magnitude). The lifts are in quadrature with it — each leg leaves the ground
+// only while it is swinging through — which is what makes all six poses
+// distinct and what makes the cycle read as a gait instead of a pendulum.
+const WALK_LIFT_NEAR = [0, 0, 0, 0, 2, 1];
+const WALK_LIFT_FAR = [0, 2, 1, 0, 0, 0];
+/** Front/back: legs apart at the contacts, together as they pass. */
+const WALK_SPREAD = [1, 0, 0, 1, 0, 0];
+/**
+ * Hips sway onto the foot taking the weight and stay there for that whole
+ * stance, releasing to centre as the weight transfers. Sums to zero over the
+ * cycle, so the body still tracks the simulation and not the sprite.
+ */
+const WALK_SWAY = [1, 1, 0, -1, -1, 0];
+/**
+ * Front/back leg shortening, in px off the ground line. Facing the camera a
+ * stride has almost no horizontal component, so the gait has to read out of
+ * foot HEIGHT: in iso a foot planted forward sits low on screen, one planted
+ * behind sits high, and a swinging foot is higher still — then drops fast as it
+ * plants. `R` is `L` half a cycle later, and no entry equals its own half-cycle
+ * partner, which is what keeps all six (left, right) pairs distinct.
+ */
+const WALK_FRONT_DROP_L = [0, 1, 2, 3, 4, 1];
+const WALK_FRONT_DROP_R = [3, 4, 1, 0, 1, 2];
+/** Body sits lowest at each contact and rises over the straight stance leg. */
+const WALK_BOB = [0, -1, -1, 0, -1, -1];
 
 function skeleton(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: number): Skel {
   const [fx, fy] = FACE[dir];
@@ -147,8 +175,15 @@ function skeleton(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: number): Sk
   const legLen = Math.round(h * 0.34);
   const torsoH = Math.round(h * 0.42);
   let bob = 0;
+  let hipBob = 0;
   let lean = 0;
-  if (anim === 'walk' || anim === 'carry') bob = WALK_BOB[frame];
+  if (anim === 'walk' || anim === 'carry') {
+    // Carry the bob on the HIPS, not just the shoulders: raising the shoulders
+    // alone stretched and squashed the torso by a pixel each frame instead of
+    // lifting the body over the stance leg, which is what made the old cycle
+    // look like it was vibrating rather than walking.
+    hipBob = WALK_BOB[frame];
+  }
   if (anim === 'idle') bob = frame === 1 ? -1 : 0;
   if (anim === 'attack' || anim === 'gather') {
     const shift = anim === 'attack' ? [-1, -1, 2, 1, 0][frame] : [-1, -1, 2, 0][frame];
@@ -156,7 +191,7 @@ function skeleton(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: number): Sk
     bob = [0, -1, 0, 0, 0][frame] ?? 0;
   }
   const footY = HUMAN_GY;
-  const hipY = footY - legLen;
+  const hipY = footY - legLen + hipBob;
   const shoulderY = hipY - torsoH + bob + (spec.hunch ? 1 : 0);
   // hunched roles carry the head low + forward; everyone else gets a 1px neck gap
   const headY = shoulderY - (spec.hunch ? 3 : 4);
@@ -317,41 +352,68 @@ function paintLegs(r: Raster, s: Skel, spec: HumanSpec, dir: Dir, anim: HumanAni
   // filler between the two columns so each keeps a visible core color, and
   // the pair never collapses into one outline-black post.
   if (sideView(dir)) {
+    // Mirrored about the hip so the pair is always >=2 px apart: the old rig
+    // offset the near leg by a fixed -2, which collided at the passing frames
+    // and had to teleport the far leg to the wrong side of the body.
     const stride = walkish ? WALK_STRIDE[frame] : 0;
-    const nearX = s.cx + s.lean - 2 + stride;
-    let farX = s.cx + s.lean - stride;
-    if (Math.abs(farX - nearX) < 2) farX = nearX + 2; // never coincide (passing frames)
-    const farLift = walkish && Math.abs(stride) === 2 ? 1 : 0;
+    const nearX = s.cx + s.lean - 1 + stride;
+    const farX = s.cx + s.lean - 1 - stride;
+    const nearLift = walkish ? WALK_LIFT_NEAR[frame] : 0;
+    const farLift = walkish ? WALK_LIFT_FAR[frame] : 0;
     const lo = Math.min(nearX, farX);
     const hi = Math.max(nearX, farX);
     r.fillRect(lo, s.hipY, hi - lo + 2, h - 1, far); // hull filler (feet row stays split)
     r.fillRect(farX, s.hipY, 2, h - farLift, far);
-    r.fillRect(nearX, s.hipY, 2, h, spec.legsC);
+    r.fillRect(nearX, s.hipY, 2, h - nearLift, spec.legsC);
   } else {
-    const liftL = walkish ? [1, 0, 0, 0, 1, 0][frame] : 0;
-    const liftR = walkish ? [0, 0, 1, 1, 0, 0][frame] : 0;
-    const cx = s.cx + s.lean;
-    r.fillRect(cx - 1, s.hipY, 2, h - 2, far); // dark crotch column between the legs
-    r.fillRect(cx - 3, s.hipY, 2, h - liftL, spec.legsC);
-    r.fillRect(cx + 1, s.hipY, 2, h - liftR, spec.legsC);
+    // Front/back: the legs scissor apart at the contacts and pass close
+    // together. The hips also sway a pixel onto whichever foot is taking the
+    // weight, which is what separates the two contact frames — without it the
+    // front-facing cycle was two poses strobing at 10 fps.
+    const spread = walkish ? WALK_SPREAD[frame] : 0;
+    const sway = walkish ? WALK_SWAY[frame] : 0;
+    const dropL = walkish ? WALK_FRONT_DROP_L[frame] : 0;
+    const dropR = walkish ? WALK_FRONT_DROP_R[frame] : 0;
+    const cx = s.cx + s.lean + sway;
+    // Filler spans the hip, so a scissored leg never becomes an isolated 2 px
+    // column (the §7.2 outline pass eats those down to a black post). Both legs
+    // keep the lit leg tone: shading one of them turned the whole lower body
+    // into one dark slab at game scale.
+    r.fillRect(cx - 2 - spread, s.hipY, 3 + 2 * spread, h - 2, far);
+    r.fillRect(cx - 3 - spread, s.hipY, 2, Math.max(2, h - dropL), spec.legsC);
+    r.fillRect(cx + 1 + spread, s.hipY, 2, Math.max(2, h - dropR), spec.legsC);
   }
 }
 
-function paintRobe(r: Raster, s: Skel, spec: HumanSpec): void {
+/**
+ * Robed roles hide their legs, so a walk has to read out of the hem: the skirt
+ * swings onto the weighted foot and each corner lifts as the leg under it swings
+ * through. Without this the monk's six-frame walk was the torso bob alone —
+ * two poses, four of them byte-identical.
+ */
+function paintRobe(
+  r: Raster,
+  s: Skel,
+  spec: HumanSpec,
+  hemDx = 0,
+  hemLiftL = 0,
+  hemLiftR = 0,
+): void {
   const cx = s.cx + s.lean;
+  const hemY = s.footY + 1;
   r.fillPoly(
     [
       [cx - 2, s.shoulderY],
       [cx + 3, s.shoulderY],
-      [cx + 5, s.footY + 1],
-      [cx - 4, s.footY + 1],
+      [cx + 5 + hemDx, hemY - hemLiftR],
+      [cx - 4 + hemDx, hemY - hemLiftL],
     ],
     P.clothBase,
   );
   for (let y = s.shoulderY; y <= s.footY; y++) {
     const t = (y - s.shoulderY) / (s.footY - s.shoulderY);
-    const xl = Math.round(cx - 2 - 2 * t);
-    const xr = Math.round(cx + 3 + 2 * t);
+    const xl = Math.round(cx - 2 - 2 * t + hemDx * t);
+    const xr = Math.round(cx + 3 + 2 * t + hemDx * t);
     if (r.alphaAt(xl + 1, y) === 255) r.set(xl + 1, y, P.clothLight);
     if (r.alphaAt(xr - 1, y) === 255 && Raster.ditherOn(xr, y, 50)) r.set(xr - 1, y, P.clothDark);
   }
@@ -656,7 +718,13 @@ export function drawHuman(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: num
   const behindWeapon = awayView(dir); // weapon behind body when facing away
   if (behindWeapon) paintWeapon(r, s, spec, dir, anim, frame);
   if (spec.robe) {
-    paintRobe(r, s, spec);
+    const walkish = anim === 'walk' || anim === 'carry';
+    paintRobe(
+      r, s, spec,
+      walkish ? WALK_SWAY[frame] : 0,
+      walkish ? Math.min(2, WALK_FRONT_DROP_L[frame]) : 0,
+      walkish ? Math.min(2, WALK_FRONT_DROP_R[frame]) : 0,
+    );
   } else {
     paintLegs(r, s, spec, dir, anim, frame);
     paintTorso(r, s, spec);

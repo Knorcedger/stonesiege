@@ -358,4 +358,82 @@ describe('complete HD art override contract', () => {
       expect(heightRatio, `${groupName} apparent scale`).toBeLessThanOrEqual(1.15);
     }
   });
+
+  it('keeps every looping cycle horizontally registered instead of sliding and snapping', () => {
+    // The authored movement sheets are walk-ACROSS strips. Registering a pose on
+    // its source cell preserved that translation, so a cycle drifted sideways
+    // and teleported back at its loop point every 0.6s of playback. Poses must
+    // register on the subject, which is what the correctly authored sheets do.
+    const atlasEntries = hdAtlases().flatMap(({ atlas }) =>
+      Object.entries(atlas.frames).map(([name, frame]) => ({ name, frame: frame as any })));
+    const groups = new Map<string, Array<{ name: string; index: number }>>();
+    for (const entry of atlasEntries) {
+      const match = entry.name.match(
+        /^((?:unit|obj)\/[^/]+)\/(walk|chop|farm|forage|mine|build|gather|carry)\/([0-4])\/(\d+)$/,
+      );
+      if (!match) continue;
+      const key = `${match[1]}/${match[2]}/${match[3]}`;
+      const group = groups.get(key) ?? [];
+      group.push({ name: entry.name, index: Number(match[4]) });
+      groups.set(key, group);
+    }
+
+    expect(groups.size).toBeGreaterThan(200);
+    for (const [groupName, entries] of groups) {
+      if (entries.length < 2) continue;
+      entries.sort((a, b) => a.index - b.index);
+      const centers = entries.map(({ name }) => {
+        const visible = frameVisibleBounds(name);
+        return (visible.left + visible.right) / 2;
+      });
+      // Travel across the whole cycle: the subject must stay put inside its own
+      // canvas, because the simulation — not the sprite — moves the unit. The
+      // budget leaves room for authored body sway (the deer and wolf cycles
+      // rock ~3.5px either side of center) while still catching the 15-42px
+      // sheet translation this test exists to prevent.
+      const travel = Math.max(...centers) - Math.min(...centers);
+      expect(travel, `${groupName} horizontal travel`).toBeLessThanOrEqual(8);
+
+      // No sawtooth: returning to frame 0 must not cost more than the largest
+      // step taken inside the cycle.
+      const steps = centers.map((c, i) => Math.abs(centers[(i + 1) % centers.length] - c));
+      const wrap = steps[steps.length - 1];
+      const inCycle = Math.max(...steps.slice(0, -1));
+      expect(wrap, `${groupName} loop-point snap`).toBeLessThanOrEqual(Math.max(inCycle, 2));
+    }
+  });
+
+  it('leaves side margin on every standing and walking pose', () => {
+    // Content touching a canvas edge means the fit ran out of room and the
+    // silhouette is cut. Registering on the source cell pinned poses against
+    // the edge (257 unit/obj frames touched one); subject registration must
+    // leave every idle and walk pose clear of both sides.
+    const clipped: string[] = [];
+    for (const { atlas } of hdAtlases()) {
+      for (const name of Object.keys(atlas.frames)) {
+        if (!/^unit\/[^/]+\/(idle|walk)\/[0-4]\/\d+$/.test(name)) continue;
+        const visible = frameVisibleBounds(name);
+        if (visible.left === 0 || visible.right === atlas.frames[name].frame.w - 1) clipped.push(name);
+      }
+    }
+    expect(clipped, 'poses cut off at a canvas edge').toEqual([]);
+  });
+
+  it('registers idle, walk, and attack of a unit on the same body center', () => {
+    // Mixed registration made a unit jump sideways the moment it stopped
+    // walking or started swinging.
+    for (const id of ['villager', 'militia', 'archer', 'monk', 'knight', 'skirmisher'] as const) {
+      for (let dir = 0; dir < 5; dir++) {
+        const center = (name: string): number => {
+          const visible = frameVisibleBounds(name);
+          return (visible.left + visible.right) / 2;
+        };
+        const idle = center(`unit/${id}/idle/${dir}/0`);
+        expect(Math.abs(center(`unit/${id}/walk/${dir}/0`) - idle), `${id} dir ${dir} idle vs walk`)
+          .toBeLessThanOrEqual(4);
+        expect(Math.abs(center(`unit/${id}/attack/${dir}/0`) - idle), `${id} dir ${dir} idle vs attack`)
+          .toBeLessThanOrEqual(6);
+      }
+    }
+  });
 });
