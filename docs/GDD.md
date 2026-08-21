@@ -10,9 +10,11 @@ Platforms: iOS + Android (Capacitor), plus browser for development/testing.
 Long sessions must survive mobile OS lifecycle: when the app is backgrounded, the match is
 automatically snapshotted (the deterministic sim makes this cheap — persist the RNG seed +
 command log, or a direct state dump) and resumed on relaunch, so a phone call at minute 90
-never loses a game. All v1 modes are single-player, so the game is always pausable: explicit
-pause button, plus auto-pause on backgrounding. (Manual save/load UI stays on the roadmap —
-see Out of scope.)
+never loses a game. Each campaign autosaves into its own slot, plus one for practice, so
+several campaigns can be in progress at once and starting one never destroys another. All v1
+modes are single-player, so the game is always pausable: explicit pause button, plus auto-pause
+on backgrounding. (Named saves and per-chapter checkpoints stay on the roadmap — see Out of
+scope.)
 
 ## Modes
 - **Practice**: random-map skirmish vs 1–3 bot opponents. A seven-step slider runs
@@ -219,5 +221,6 @@ placement, horn stings for age-up and attack warnings, UI clicks). Ambient loop.
 ## Out of scope for v1 (explicit roadmap)
 Naval/water gameplay, elevation bonuses, formations & stances (per-category default behavior
 covers v1 — see Combat), trade carts, relics, regicide, multiplayer (architecture is ready:
-deterministic lockstep), manual save/load UI (automatic suspend/resume snapshots and pause
-ARE in v1 — see the top of this document), additional civs and campaigns, music score.
+deterministic lockstep), named save slots and per-chapter checkpoints (automatic per-campaign
+suspend/resume snapshots and pause ARE in v1 — see the top of this document), additional civs
+and campaigns, music score.

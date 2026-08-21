@@ -7,7 +7,6 @@ import { flowAtScenarioList, type FlowState } from './screens/flow';
 import { takeNavHint } from './screens/nav';
 import { flowFromHash, hashFor, matchPath, type MatchRoute } from './screens/route';
 import { NATIVE_BACK_EVENT } from './nativeEvents';
-import { hasSnapshot } from './persist';
 import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
 import type { RunGameOptions } from './game';
 
@@ -23,8 +22,15 @@ export interface StartAppOptions {
   analytics?: AnalyticsSink;
 }
 
-const matchRouteFor = (request: GameRequest): MatchRoute =>
-  request.mode === 'scenario' ? { mode: 'scenario', scenarioId: request.scenarioId } : { mode: request.mode };
+// A resumed campaign chapter addresses itself by chapter, like a fresh one:
+// the URL should say which battle is on screen, not that it was resumed.
+const matchRouteFor = (request: GameRequest): MatchRoute => {
+  if (request.mode === 'scenario') return { mode: 'scenario', scenarioId: request.scenarioId };
+  if (request.mode === 'resume' && request.scenarioId !== undefined) {
+    return { mode: 'scenario', scenarioId: request.scenarioId };
+  }
+  return { mode: request.mode };
+};
 
 /**
  * Address the running match and hold that address. A match is not a menu
@@ -63,19 +69,13 @@ export async function startApp(root: HTMLElement, options: StartAppOptions = {})
     const flow: FlowState | null = hint?.kind === 'scenarioList'
       ? flowAtScenarioList(hint.campaignId)
       : flowFromHash(window.location.hash);
-    request = await showMenu(root, {
-      // Resume is offered when a backgrounded/killed match left a snapshot
-      // (GDD: a phone call at minute 90 never loses a game)
-      canResume: hasSnapshot(),
-      analytics,
-      ...(flow ? { flow } : {}),
-    });
+    request = await showMenu(root, { analytics, ...(flow ? { flow } : {}) });
   }
   enterMatchRoute(request);
 
   const { runGame } = await import('./game');
   const runOptions: RunGameOptions = request.mode === 'resume'
-    ? { mode: 'resume' }
+    ? { mode: 'resume', slot: request.slot }
     : request.mode === 'scenario'
       ? { mode: 'scenario', scenarioId: request.scenarioId }
       : { mode: 'practice', setup: request.setup };

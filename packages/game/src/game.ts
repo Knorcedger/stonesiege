@@ -58,7 +58,8 @@ import { setNavHint } from './screens/nav';
 import { getSettings } from './settings';
 import { NATIVE_BACK_EVENT, NATIVE_PAUSE_EVENT } from './nativeEvents';
 import {
-  clearSnapshot, hasSnapshot, loadSnapshot, replaySnapshotIncrementally, saveSnapshot, scenarioFingerprint,
+  campaignSlot, clearSnapshot, hasSnapshot, loadSnapshot, PRACTICE_SLOT,
+  replaySnapshotIncrementally, saveSnapshot, scenarioFingerprint, type SaveSlot,
   SNAPSHOT_VERSION, trySerialize, type CommandLog, type MatchSnapshot,
 } from './persist';
 import { artworkLoadingStage, MatchLoadingScreen, withTimeout } from './loadingScreen';
@@ -84,7 +85,7 @@ export function stageShowcaseEconomy(game: { state: GameState; advance(commands:
 }
 
 export type RunGameOptions =
-  | { mode: 'resume' }
+  | { mode: 'resume'; slot: SaveSlot }
   | { mode: 'practice'; setup: PracticeSetup }
   | { mode: 'scenario'; scenarioId: string };
 
@@ -97,6 +98,8 @@ interface MatchPlan {
   /** scenario only */
   meta: ScenarioMeta | null;
   snapshot: MatchSnapshot | null;
+  /** Save slot this match reads from and writes to for its whole life. */
+  slot: SaveSlot;
 }
 
 /**
@@ -115,12 +118,12 @@ function initialScenarioProductionSpeed(log: CommandLog): ProductionSpeed {
 /** Null = a resume was requested but the stored snapshot is not safe to replay. */
 function resolvePlan(options: RunGameOptions): MatchPlan | null {
   if (options.mode === 'resume') {
-    const snapshot = loadSnapshot();
+    const snapshot = loadSnapshot(options.slot);
     if (snapshot?.mode === 'scenario') {
       try {
         const { config, meta } = scenarioConfig(snapshot.scenarioId, snapshot.seed);
         config.productionSpeed = initialScenarioProductionSpeed(snapshot.log);
-        return { mode: 'scenario', config, setup: null, meta, snapshot };
+        return { mode: 'scenario', config, setup: null, meta, snapshot, slot: options.slot };
       } catch {
         // the authored scenario set changed under the save
         return null;
@@ -131,17 +134,25 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
         ...snapshot.config,
         productionSpeed: snapshot.config.productionSpeed ?? 1,
       };
-      return { mode: 'practice', config, setup: snapshot.setup, meta: null, snapshot };
+      return {
+        mode: 'practice', config, setup: snapshot.setup, meta: null, snapshot, slot: options.slot,
+      };
     }
     // nothing (valid) to resume — never boot a match the player did not ask for
     return null;
   }
   if (options.mode === 'scenario') {
     const { config, meta } = scenarioConfig(options.scenarioId);
-    return { mode: 'scenario', config, setup: null, meta, snapshot: null };
+    return {
+      mode: 'scenario', config, setup: null, meta, snapshot: null,
+      slot: campaignSlot(scenariosById[options.scenarioId]?.campaign ?? 'unknown'),
+    };
   }
   const setup = options.mode === 'practice' ? options.setup : DEFAULT_PRACTICE_SETUP;
-  return { mode: 'practice', config: practiceConfig(setup), setup, meta: null, snapshot: null };
+  return {
+    mode: 'practice', config: practiceConfig(setup), setup, meta: null, snapshot: null,
+    slot: PRACTICE_SLOT,
+  };
 }
 
 /** What this match is, for anonymous reporting. Practice and campaign fields are disjoint. */
@@ -220,7 +231,9 @@ export async function runGame(
       : 'StoneSiege hit an unexpected problem while rebuilding this match.';
     if (isKnownResumeError) console.warn(`[game] Resume unavailable: ${knownMessage}`);
     else console.error('[game] Resume failed unexpectedly', error);
-    const canDiscard = hasSnapshot();
+    // Only a resume reaches here, so the failing save is the one it named.
+    const slot = options.mode === 'resume' ? options.slot : null;
+    const canDiscard = slot !== null && hasSnapshot(slot);
     const nextStep = canDiscard
       ? 'You can return safely and try again, or discard only this save.'
       : 'Return to the title and start a new match.';
@@ -228,7 +241,7 @@ export async function runGame(
       canDiscard,
       onReturn: () => window.location.reload(),
       onDiscard: () => {
-        clearSnapshot();
+        if (slot !== null) clearSnapshot(slot);
         window.location.reload();
       },
     });
@@ -246,7 +259,7 @@ async function bootGame(
   if (!plan) {
     // Keep the raw record intact: it may be from another build or damaged, and
     // only the recovery screen's confirmed discard action is allowed to erase it.
-    throw new Error(hasSnapshot()
+    throw new Error(options.mode === 'resume' && hasSnapshot(options.slot)
       ? 'This saved match is damaged or belongs to an incompatible version of StoneSiege.'
       : 'No saved match was found on this device.');
   }
@@ -271,7 +284,9 @@ async function bootGame(
   // Fresh matches inherit the persisted preference. Resumes retain the speed
   // encoded in their deterministic state/config until the player changes it.
   if (!snapshot) config.productionSpeed = getSettings().productionSpeed;
-  if (!snapshot) clearSnapshot(); // starting fresh abandons any stale match
+  // Starting fresh abandons the stale match in THIS slot only: a new Joan
+  // chapter must leave a Wallace campaign in progress exactly where it was.
+  if (!snapshot) clearSnapshot(plan.slot);
   assets.prepareMatchColors(config.players.map((p) => p.color));
   // Practice fast-path resume: rebuild straight from the sim's serialized
   // snapshot when one rode along (scenarios always log-replay instead — the
@@ -615,7 +630,7 @@ async function bootGame(
   const showEnd = (victory: boolean): void => {
     if (endShown) return;
     endShown = true;
-    clearSnapshot(); // a finished match must never be offered for resume
+    clearSnapshot(plan.slot); // a finished match must never be offered for resume
     deselect();
     audioEngine.play(victory ? 'hornVictory' : 'hornDefeat');
     const summary = deriveMatchSummary(getState(), humanPlayer, tallies);
