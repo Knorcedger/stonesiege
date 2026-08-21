@@ -186,7 +186,7 @@ reference, then balanced by playtesting loops.
   ready — the touch answer to AoE2's `.` hotkey) and an **idle-military** equivalent;
   bottom-left minimap (tap to jump; shows alerts and idle-military markers); bottom command
   card (train/build/research grid with progress + queue). Selecting any owned building,
-  including passive Houses and wall pieces, shows its details and delete control. A selected
+  including passive Houses and wall pieces, shows its details and destroy control. A selected
   villager shows the type and amount of resources currently carried. Desktop right-click on the
   minimap sends selected units to that map position and uses the same destination arrow.
 - **Building placement**: placement mode immediately spawns a draggable ghost with green/red

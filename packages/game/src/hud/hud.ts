@@ -37,6 +37,7 @@ import type { UnitDisplayStats } from '../simBridge';
 import { formatMatchTime } from './summary';
 import { getSettings, onSettingsChanged, updateSettings } from '../settings';
 import { extendedTooltip, techExtendedTip, unitExtendedTip } from './helpText';
+import { buildingRemovalPresentation } from './buildingRemoval';
 
 export interface HudHost {
   assets: GameAssets;
@@ -56,8 +57,8 @@ export interface HudHost {
   townBell(buildingId: EntityId): void;
   /** Clear a production building's rally (GDD: "tap the flag control to clear"). */
   clearRally(buildingId: EntityId): void;
-  /** Delete an own building (deleteEntity command — refunds queue + unbuilt fraction). */
-  deleteBuilding(buildingId: EntityId): void;
+  /** Destroy an own building (internal deleteEntity command — refunds queue + unbuilt fraction). */
+  destroyBuilding(buildingId: EntityId): void;
   marketTrade(sell: ResourceType, buy: ResourceType, amount: number): void;
   reseedFarm(farmId: EntityId): void;
   /** Mill auto-reseed queue toggle (queueReseed command; state in PlayerState.autoReseed). */
@@ -1376,7 +1377,7 @@ export class Hud {
         def?.icon ?? `icon/${b.defId}`,
         `${name} · ${health} · ${Math.floor((b.buildProgress ?? 0) / 10)}% built`,
       );
-      this.addDeleteButton(b); // a misplaced foundation must be cancellable
+      this.addBuildingRemovalButton(b); // a misplaced foundation must be cancellable
       return true;
     }
     let shown = false;
@@ -1586,33 +1587,35 @@ export class Hud {
       shown = true;
     }
 
-    this.addDeleteButton(b);
+    this.addBuildingRemovalButton(b);
     // Even passive buildings (House, wall segments, etc.) need a visible details
-    // card so their owner can inspect and delete them.
+    // card so their owner can inspect and destroy them.
     return true;
   }
 
   /**
-   * Delete for own buildings (foundations included): the sim's deleteEntity
+   * Destroy own buildings or cancel their foundations via the sim's deleteEntity
    * refunds the queue and the unbuilt foundation fraction. Destructive, so it
    * takes two taps to confirm (same pattern as Resign).
    */
-  private addDeleteButton(b: Entity): void {
+  private addBuildingRemovalButton(b: Entity): void {
     if (b.player !== this.host.humanPlayer) return;
     const btn = document.createElement('button');
     btn.className = 'bf-btn';
     btn.style.cssText = 'margin-top:6px;color:#DABE8D;';
-    const isFoundation = (b.buildProgress ?? 1000) < 1000;
-    btn.textContent = isFoundation ? 'Cancel construction' : 'Delete building';
+    const presentation = buildingRemovalPresentation(b.buildProgress);
+    btn.textContent = presentation.actionLabel;
+    setGameTooltip(btn, presentation.tooltip);
     let armed = false;
     btn.addEventListener('click', () => {
       if (!armed) {
         armed = true;
-        btn.textContent = 'Tap again to confirm';
+        btn.textContent = presentation.confirmationLabel;
+        btn.setAttribute('aria-label', presentation.confirmationLabel);
         btn.style.color = '#C05B4E';
         return;
       }
-      this.host.deleteBuilding(b.id);
+      this.host.destroyBuilding(b.id);
     });
     this.utilRow.appendChild(btn);
   }
