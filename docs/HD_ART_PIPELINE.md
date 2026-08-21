@@ -1,9 +1,9 @@
 # StoneSiege HD art direction
 
 Status: complete runtime contract coverage and complete authored world-art
-migration. All 3,908 shipping frames have 2× HD overrides. The 3,557 building,
+migration. All 4,570 shipping frames have 2× HD overrides. The 4,142 building,
 resource, animal, unit, construction, and world-entity icon frames use authored
-pre-rendered subject art; the remaining 351 terrain, rubble, interface, command,
+pre-rendered subject art; the remaining 428 terrain, rubble, interface, command,
 resource, and technology frames use the deterministic HD material renderer. The
 procedural pixel atlases remain source geometry and a safe fallback if an HD
 sheet cannot load.
@@ -32,7 +32,9 @@ acceptance asset for camera, material density, contrast, lighting, and scale.
 HD sheets live in `apps/web/public/assets/hd/` and are listed by
 `manifest.json`. A frame in an HD sheet overrides the same logical frame name in
 the legacy atlas. Missing or unavailable HD frames automatically fall back to
-the procedural set.
+the procedural set. Shipping HD image sheets are lossless WebP files: their
+visible RGBA pixels and exact team-color masks are preserved while reducing the
+runtime download and checkout payload. Baseline fallback sheets remain PNG.
 
 - Author at 2 source pixels per existing world pixel (`meta.scale: 2`).
 - Runtime renders HD textures at `0.5` scale with linear sampling.
@@ -52,8 +54,10 @@ the procedural set.
   1,024px runtime pages. This avoids cloning the complete HD set for every player
   while keeping team colors batchable.
 
-Run `npm run assets:hd` to rebuild HD sheets. `npm run assets` rebuilds both the
-legacy fallback and HD overrides.
+Run `npm run assets:hd` to rebuild HD sheets. This requires the Git LFS source
+art under `art/`; hydrate it with
+`git lfs pull --include="art/**" --exclude=""` first. `npm run assets` rebuilds
+both the legacy fallback and HD overrides.
 
 ## Age and asset-family grammar
 

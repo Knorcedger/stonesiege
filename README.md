@@ -51,7 +51,9 @@ Contributors can browse every playable chapter in the [campaign and chapter inde
 
 ## Quick start
 
-You need [Node.js 22.12+ or 24+](https://nodejs.org/) and npm.
+You need [Node.js 22.12+ or 24+](https://nodejs.org/) and npm. Source artwork
+and store screenshots use Git LFS and are excluded from ordinary clones; the
+runtime game does not need them.
 
 ```bash
 git clone --depth 1 https://github.com/Knorcedger/stonesiege.git
@@ -79,7 +81,18 @@ npm ci
 npm run dev
 ```
 
-Use a normal, non-sparse clone when working on native builds, source art, or store publishing. Run `git fetch --unshallow` if a shallow checkout later needs the complete history.
+Use a normal, non-sparse clone when working on native builds. For source-art or
+store-publishing work, install [Git LFS](https://git-lfs.com/) and explicitly
+hydrate the large media that the repository excludes by default:
+
+```bash
+git lfs pull --include="art/**,store/screenshots/**" --exclude=""
+```
+
+Run `git fetch --unshallow` if a shallow checkout later needs the complete
+history. The LFS rules apply only to source/master art and store media; shipping
+runtime atlases remain regular Git files so builds and CI do not spend LFS
+bandwidth.
 
 Desktop controls:
 
@@ -120,7 +133,7 @@ TASK
 
 WORKFLOW
 1. If StoneSiege is not already checked out, run:
-   git clone https://github.com/Knorcedger/stonesiege.git
+   git clone --depth 1 https://github.com/Knorcedger/stonesiege.git
    cd stonesiege
 
 2. Read AGENTS.md, README.md, CONTRIBUTING.md, CODE_OF_CONDUCT.md, docs/ARCHITECTURE.md, and the documentation relevant to the task. Follow every nested AGENTS.md file that applies to files you touch.

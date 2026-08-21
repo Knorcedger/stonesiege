@@ -14,8 +14,12 @@ The chroma source was matted with the image-generation skill's
 `remove_chroma_key.py`, cropped, and Lanczos-downsampled into the padded 2×
 acceptance frame `frames/town-center-dark-neutral.png`. `npm run assets:hd`
 converts its two authored cloth regions to StoneSiege's exact runtime mask and
-emits the shipping atlas. Never hand-edit the generated atlas in
+emits the shipping lossless WebP atlas. Never hand-edit the generated atlas in
 `apps/web/public/assets/hd/`; edit the neutral frame or builder instead.
+
+Source and validated PNGs in `art/` use Git LFS and are excluded from ordinary
+clones. Before regenerating atlases, install Git LFS and run
+`git lfs pull --include="art/**" --exclude=""`.
 
 `materials/material-atlas.png` was generated with the same built-in OpenAI image
 workflow and Town Center style reference. Its prompt requested an exact 4×2 grid

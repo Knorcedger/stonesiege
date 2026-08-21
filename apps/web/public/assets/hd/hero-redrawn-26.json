@@ -3124,7 +3124,7 @@
  "meta": {
   "app": "stonesiege-assetgen",
   "version": "1.0",
-  "image": "hero-redrawn-26.png",
+  "image": "hero-redrawn-26.webp",
   "format": "RGBA8888",
   "size": {
    "w": 2048,

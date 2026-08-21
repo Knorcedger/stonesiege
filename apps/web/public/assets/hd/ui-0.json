@@ -916,7 +916,7 @@
  "meta": {
   "app": "stonesiege-assetgen",
   "version": "1.0",
-  "image": "ui-0.png",
+  "image": "ui-0.webp",
   "format": "RGBA8888",
   "size": {
    "w": 1024,

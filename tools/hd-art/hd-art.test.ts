@@ -1,8 +1,8 @@
 import { readFileSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { join } from 'node:path';
-import { describe, expect, it } from 'vitest';
-import { PNG } from 'pngjs';
+import sharp from 'sharp';
+import { beforeAll, describe, expect, it } from 'vitest';
 import { buildings } from '../../packages/data/src/buildings.ts';
 
 const ROOT = join(import.meta.dirname, '../..');
@@ -10,7 +10,7 @@ const HD = join(ROOT, 'apps/web/public/assets/hd');
 const BASE = join(ROOT, 'apps/web/public/assets');
 const manifest = JSON.parse(readFileSync(join(HD, 'manifest.json'), 'utf8'));
 let atlasCache: Array<{ file: string; atlas: any }> | undefined;
-const pngCache = new Map<string, PNG>();
+const imageCache = new Map<string, { data: Buffer; height: number; width: number }>();
 
 function hdAtlases(): Array<{ file: string; atlas: any }> {
   return atlasCache ??= manifest.atlases.map((file: string) => ({
@@ -28,16 +28,29 @@ function baselineFrameNames(): Set<string> {
   return names;
 }
 
+beforeAll(async () => {
+  const imageNames = new Set(hdAtlases().map(({ atlas }) => atlas.meta.image as string));
+  await Promise.all([...imageNames].map(async (image) => {
+    const { data, info } = await sharp(join(HD, image))
+      .ensureAlpha()
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    imageCache.set(image, { data, height: info.height, width: info.width });
+  }));
+});
+
+function atlasImage(image: string): { data: Buffer; height: number; width: number } {
+  const decoded = imageCache.get(image);
+  if (!decoded) throw new Error(`HD atlas image was not decoded: ${image}`);
+  return decoded;
+}
+
 function framePixelsHash(name: string): string {
   const match = hdAtlases().find(({ atlas }) => atlas.frames[name]);
   if (!match) throw new Error(`missing HD frame ${name}`);
   const frame = match.atlas.frames[name].frame;
   const image = match.atlas.meta.image as string;
-  let png = pngCache.get(image);
-  if (!png) {
-    png = PNG.sync.read(readFileSync(join(HD, image)));
-    pngCache.set(image, png);
-  }
+  const png = atlasImage(image);
   const hash = createHash('sha256');
   for (let y = frame.y; y < frame.y + frame.h; y++) {
     const start = (y * png.width + frame.x) * 4;
@@ -51,11 +64,7 @@ function frameMaskPixelCount(name: string): number {
   if (!match) throw new Error(`missing HD frame ${name}`);
   const frame = match.atlas.frames[name].frame;
   const image = match.atlas.meta.image as string;
-  let png = pngCache.get(image);
-  if (!png) {
-    png = PNG.sync.read(readFileSync(join(HD, image)));
-    pngCache.set(image, png);
-  }
+  const png = atlasImage(image);
   const mask = new Set(['255,0,255', '204,0,204', '153,0,153']);
   let count = 0;
   for (let y = frame.y; y < frame.y + frame.h; y++) {
@@ -74,11 +83,7 @@ function frameVisibleBounds(name: string): {
   if (!match) throw new Error(`missing HD frame ${name}`);
   const frame = match.atlas.frames[name].frame;
   const image = match.atlas.meta.image as string;
-  let png = pngCache.get(image);
-  if (!png) {
-    png = PNG.sync.read(readFileSync(join(HD, image)));
-    pngCache.set(image, png);
-  }
+  const png = atlasImage(image);
   let left = frame.w;
   let top = frame.h;
   let right = -1;
@@ -105,6 +110,7 @@ describe('complete HD art override contract', () => {
 
     const hdNames = new Set<string>();
     for (const { atlas } of hdAtlases()) {
+      expect(atlas.meta.image).toMatch(/\.webp$/);
       expect(atlas.meta.scale).toBe(2);
       expect(atlas.meta.bannerfall.artStyle).toBe('pre-rendered-3d');
       expect(atlas.meta.size.w).toBeLessThanOrEqual(2048);
@@ -153,7 +159,7 @@ describe('complete HD art override contract', () => {
     expect(frame.frame.h).toBe(416);
     expect(frame.anchor).toEqual({ x: 0.5, y: 0.6418 });
 
-    const png = PNG.sync.read(readFileSync(join(HD, hero.meta.image)));
+    const png = atlasImage(hero.meta.image);
     const mask = new Set(['255,0,255', '204,0,204', '153,0,153']);
     let maskPixels = 0;
     for (let y = frame.frame.y; y < frame.frame.y + frame.frame.h; y++) {

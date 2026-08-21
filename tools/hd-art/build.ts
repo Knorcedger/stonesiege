@@ -6,6 +6,7 @@ import { mkdirSync, readFileSync, readdirSync, unlinkSync, writeFileSync } from 
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { PNG } from 'pngjs';
+import sharp from 'sharp';
 import { buildings as buildingDefs } from '../../packages/data/src/buildings.ts';
 import { buildAtlas, defaultStoneSiegeMeta, type FrameDef } from '../assetgen/src/atlas.ts';
 import { genBuildings } from '../assetgen/src/gen-buildings.ts';
@@ -15,7 +16,6 @@ import { genTerrain } from '../assetgen/src/gen-terrain.ts';
 import { genUi } from '../assetgen/src/gen-ui.ts';
 import { genUnits } from '../assetgen/src/gen-units.ts';
 import { PALETTE } from '../assetgen/src/palette.ts';
-import { writePng } from '../assetgen/src/png.ts';
 import { Raster } from '../assetgen/src/raster.ts';
 import { alphaBounds, type AlphaBounds } from './alpha-bounds.ts';
 import { shouldMirrorDirectionSheetCell } from './direction-sheet-layout.ts';
@@ -28,6 +28,14 @@ const OUT = join(ROOT, 'apps/web/public/assets/hd');
 const MAX_ATLAS = 2048;
 const HERO_FRAME = 'bld/townCenter/dark/done';
 const cutoutSourceCache = new Map<string, PNG>();
+
+async function writeLosslessWebp(path: string, raster: Raster): Promise<void> {
+  await sharp(Buffer.from(raster.data), {
+    raw: { width: raster.width, height: raster.height, channels: 4 },
+  })
+    .webp({ lossless: true, effort: 6 })
+    .toFile(path);
+}
 
 interface CutoutSpec {
   source: string;
@@ -1508,7 +1516,7 @@ function atlasGroups(frames: FrameDef[]): FrameDef[][] {
   }
 }
 
-function emitFamily(
+async function emitFamily(
   family: string,
   sourceFrames: FrameDef[],
   materials: MaterialLibrary,
@@ -1516,7 +1524,7 @@ function emitFamily(
   emittedNames: Set<string>,
   impactFrame: Record<string, number> = {},
   nineSlice?: Record<string, [number, number, number, number]>,
-): number {
+): Promise<number> {
   const frames = sourceFrames
     .filter((f) => !BESPOKE_FRAMES.has(f.name))
     .map((f) => materializeFrame(f, materials));
@@ -1526,9 +1534,9 @@ function emitFamily(
       [name, inset.map((n) => n * HD_DENSITY) as [number, number, number, number]]))
     : undefined;
   const groups = atlasGroups(frames);
-  groups.forEach((group, index) => {
+  for (const [index, group] of groups.entries()) {
     const stem = `${family}-${index}`;
-    const imageName = `${stem}.png`;
+    const imageName = `${stem}.webp`;
     const jsonName = `${stem}.json`;
     const meta = defaultStoneSiegeMeta({
       impactFrame,
@@ -1537,7 +1545,7 @@ function emitFamily(
     const atlas = buildAtlas(group, imageName, meta, MAX_ATLAS);
     atlas.json.meta.scale = HD_DENSITY;
     (atlas.json.meta.bannerfall as Record<string, unknown>).artStyle = 'pre-rendered-3d';
-    writePng(join(OUT, imageName), atlas.image);
+    await writeLosslessWebp(join(OUT, imageName), atlas.image);
     writeFileSync(join(OUT, jsonName), `${JSON.stringify(atlas.json, null, 1)}\n`);
     manifest.push(jsonName);
     for (const frame of group) {
@@ -1545,13 +1553,13 @@ function emitFamily(
       emittedNames.add(frame.name);
     }
     console.log(`  ${stem.padEnd(14)} ${String(group.length).padStart(4)} frames  ${atlas.image.width}x${atlas.image.height}`);
-  });
+  }
   return frames.length;
 }
 
 mkdirSync(OUT, { recursive: true });
 for (const file of readdirSync(OUT)) {
-  if (/^(terrain|objects|units|buildings|ui|icons|hero)-.*\.(png|json)$/.test(file) || file === 'manifest.json') {
+  if (/^(terrain|objects|units|buildings|ui|icons|hero)-.*\.(png|webp|json)$/.test(file) || file === 'manifest.json') {
     unlinkSync(join(OUT, file));
   }
 }
@@ -1564,17 +1572,17 @@ const emittedNames = new Set<string>();
 let converted = 0;
 
 const terrain = genTerrain();
-converted += emitFamily('terrain', terrain, materials, manifest, emittedNames);
+converted += await emitFamily('terrain', terrain, materials, manifest, emittedNames);
 const objects = genObjects();
-converted += emitFamily('objects', objects.frames, materials, manifest, emittedNames, objects.impactFrames);
+converted += await emitFamily('objects', objects.frames, materials, manifest, emittedNames, objects.impactFrames);
 const units = genUnits();
-converted += emitFamily('units', units.frames, materials, manifest, emittedNames, units.impactFrames);
+converted += await emitFamily('units', units.frames, materials, manifest, emittedNames, units.impactFrames);
 const buildings = genBuildings();
-converted += emitFamily('buildings', buildings.frames, materials, manifest, emittedNames, buildings.impactFrames);
+converted += await emitFamily('buildings', buildings.frames, materials, manifest, emittedNames, buildings.impactFrames);
 const ui = genUi();
-converted += emitFamily('ui', ui.frames, materials, manifest, emittedNames, {}, ui.nineSlice);
+converted += await emitFamily('ui', ui.frames, materials, manifest, emittedNames, {}, ui.nineSlice);
 const icons = genIcons();
-converted += emitFamily('icons', icons, materials, manifest, emittedNames);
+converted += await emitFamily('icons', icons, materials, manifest, emittedNames);
 
 // Last manifest entries contain the genuinely redrawn art. All other frames
 // retain the systemic material renderer until their authored replacement lands.
@@ -1625,18 +1633,18 @@ const constructions = CONSTRUCTION_CUTOUTS.map((entry) => {
 });
 const bespokeFrames = [hero.frame, ...cutouts, ...gateLayers, ...constructions];
 const bespokeGroups = atlasGroups(bespokeFrames);
-bespokeGroups.forEach((group, index) => {
+for (const [index, group] of bespokeGroups.entries()) {
   const stem = `hero-redrawn-${index}`;
-  const imageName = `${stem}.png`;
+  const imageName = `${stem}.webp`;
   const jsonName = `${stem}.json`;
   const heroAtlas = buildAtlas(group, imageName, defaultStoneSiegeMeta(), MAX_ATLAS);
   heroAtlas.json.meta.scale = HD_DENSITY;
   (heroAtlas.json.meta.bannerfall as Record<string, unknown>).artStyle = 'pre-rendered-3d';
-  writePng(join(OUT, imageName), heroAtlas.image);
+  await writeLosslessWebp(join(OUT, imageName), heroAtlas.image);
   writeFileSync(join(OUT, jsonName), `${JSON.stringify(heroAtlas.json, null, 1)}\n`);
   manifest.push(jsonName);
   console.log(`  ${stem.padEnd(14)} ${String(group.length).padStart(4)} frames  ${heroAtlas.image.width}x${heroAtlas.image.height}`);
-});
+}
 for (const frame of bespokeFrames) {
   if (emittedNames.has(frame.name)) throw new Error(`duplicate HD frame: ${frame.name}`);
   emittedNames.add(frame.name);
