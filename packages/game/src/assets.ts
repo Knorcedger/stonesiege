@@ -86,6 +86,26 @@ export interface ResolvedFrame {
 
 interface HdManifest { atlases?: string[]; frameCount?: number }
 
+export function parseHdManifest(value: unknown): HdManifest {
+  if (!value || typeof value !== 'object') return { atlases: [] };
+  const manifest = value as Record<string, unknown>;
+  const atlases = Array.isArray(manifest.atlases)
+    ? manifest.atlases.filter((file): file is string => (
+      typeof file === 'string'
+      && /^[a-z0-9][a-z0-9._-]*\.json$/i.test(file)
+    ))
+    : [];
+  const frameCount = typeof manifest.frameCount === 'number'
+    && Number.isInteger(manifest.frameCount)
+    && manifest.frameCount >= 0
+    ? manifest.frameCount
+    : undefined;
+  return {
+    atlases,
+    ...(frameCount !== undefined ? { frameCount } : {}),
+  };
+}
+
 interface ColorPage {
   canvas: HTMLCanvasElement;
   ctx: CanvasRenderingContext2D;
@@ -476,10 +496,14 @@ export function settleAssetPack(
   progress: AssetLoadProgress,
   usedFallback: boolean,
 ): AssetLoadProgress {
+  const canSettle = progress.completed < progress.total;
   return {
     completed: Math.min(progress.total, progress.completed + 1),
     total: progress.total,
-    fallback: progress.fallback + (usedFallback ? 1 : 0),
+    fallback: Math.min(
+      progress.total,
+      progress.fallback + (usedFallback && canSettle ? 1 : 0),
+    ),
   };
 }
 
@@ -578,13 +602,9 @@ function loadImage(url: string, signal: AbortSignal): Promise<HTMLImageElement> 
 async function loadHdManifest(): Promise<HdManifest> {
   return boundedAssetLoad(async (signal) => {
     const response = await fetch('assets/hd/manifest.json', { signal });
-    if (!response.ok) return {};
-    const manifest = await response.json() as HdManifest;
-    return {
-      atlases: Array.isArray(manifest.atlases) ? manifest.atlases : [],
-      ...(typeof manifest.frameCount === 'number' ? { frameCount: manifest.frameCount } : {}),
-    };
-  }, {}, HD_MANIFEST_TIMEOUT_MS);
+    if (!response.ok) return { atlases: [] };
+    return parseHdManifest(await response.json() as unknown);
+  }, { atlases: [] }, HD_MANIFEST_TIMEOUT_MS);
 }
 
 async function loadAtlasFile(

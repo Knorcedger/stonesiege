@@ -156,15 +156,16 @@ export async function runGame(root: HTMLElement, options: RunGameOptions): Promi
       )
         ? error.message
         : 'StoneSiege hit an unexpected problem while preparing this match.';
-      loading.failFresh(`${knownMessage} Try again, or return to the title without losing campaign progress.`, {
+      loading.failFresh(`${knownMessage} Try again, or return to the title without losing saved progress.`, {
         onRetry: () => {
-          loading.remove();
           if (options.mode === 'scenario') {
             setNavHint({ kind: 'startScenario', scenarioId: options.scenarioId });
-            window.location.reload();
-            return;
+          } else if (options.mode === 'practice') {
+            setNavHint({ kind: 'startPractice', setup: options.setup });
           }
-          void runGame(root, options);
+          // Always rebuild from a clean document. A failed Pixi init may have
+          // already installed audio contexts, DOM listeners, or a partial canvas.
+          window.location.reload();
         },
         onReturn: () => window.location.reload(),
       });
