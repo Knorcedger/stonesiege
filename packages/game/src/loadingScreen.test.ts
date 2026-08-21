@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  discardControlAction, syncLoadingPresentation, withTimeout, type LoadingPresentationTarget,
+  artworkLoadingStage, discardControlAction, freshStartFailureStage,
+  syncLoadingPresentation, withTimeout, type LoadingPresentationTarget,
 } from './loadingScreen';
 
 function target() {
@@ -23,6 +24,21 @@ function target() {
 }
 
 describe('match loading presentation', () => {
+  it('reports exact artwork-pack progress instead of fabricated activity', () => {
+    expect(artworkLoadingStage({ completed: 12, total: 42, fallback: 0 }, false)).toEqual({
+      title: 'Mustering the banners',
+      status: 'Loading battlefield artwork…',
+      detail: '12 of 42 artwork packs checked',
+      progress: 12 / 42,
+    });
+    expect(artworkLoadingStage({ completed: 42, total: 42, fallback: 2 }, true)).toEqual({
+      title: 'Restoring saved match',
+      status: 'Loading battlefield artwork…',
+      detail: '42 of 42 artwork packs checked · 2 packs are using fallback art',
+      progress: 1,
+    });
+  });
+
   it('shows honest indeterminate activity when totals are unavailable', () => {
     const { view, attributes, progressAttributes } = target();
     syncLoadingPresentation(view, {
@@ -54,6 +70,14 @@ describe('match loading presentation', () => {
   it('requires confirmation before discarding the saved match', () => {
     expect(discardControlAction(false)).toBe('arm');
     expect(discardControlAction(true)).toBe('discard');
+  });
+
+  it('describes a fresh-start failure without claiming a save restore failed', () => {
+    expect(freshStartFailureStage('Drawing the battlefield took too long.')).toEqual({
+      title: 'Battlefield could not be prepared',
+      status: 'The match has not started.',
+      detail: 'Drawing the battlefield took too long.',
+    });
   });
 });
 
