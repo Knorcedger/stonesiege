@@ -33,21 +33,32 @@ const matchRouteFor = (request: GameRequest): MatchRoute => {
   return { mode: request.mode };
 };
 
+export interface MatchRouteTarget {
+  history: Pick<History, 'state' | 'pushState' | 'replaceState'>;
+  addEventListener(type: 'popstate', listener: (event: PopStateEvent) => void): void;
+  dispatchEvent(event: Event): boolean;
+}
+
 /**
  * Address the running match and hold that address. A match is not a menu
  * screen you can step out of by changing the URL — the game owns the screen
  * until it ends — so a back gesture here does what the Android back button
  * already does: pause and save, and put the match address back.
  */
-function enterMatchRoute(request: GameRequest): void {
+export function enterMatchRoute(request: GameRequest, target: MatchRouteTarget = window): void {
   const hash = hashFor(matchPath(matchRouteFor(request)));
+  const state = target.history.state as { bfMenuDepth?: unknown } | null;
+  const menuDepth = typeof state?.bfMenuDepth === 'number' ? state.bfMenuDepth : 0;
   // Replace, not push: the briefing entry becomes the match, so the first back
   // out of a finished match returns to the chapter list rather than the
-  // briefing of the chapter that was just played.
-  window.history.replaceState(window.history.state, '', hash);
-  window.addEventListener('popstate', () => {
-    window.history.pushState(window.history.state, '', hash);
-    window.dispatchEvent(new Event(NATIVE_BACK_EVENT, { cancelable: true }));
+  // briefing of the chapter that was just played. A cold deep link has no
+  // same-document menu entry behind it, though, so it needs a pushed match
+  // entry before Back can be trapped without discarding the whole document.
+  if (menuDepth > 0) target.history.replaceState(state, '', hash);
+  else target.history.pushState(state, '', hash);
+  target.addEventListener('popstate', () => {
+    target.history.pushState(target.history.state, '', hash);
+    target.dispatchEvent(new Event(NATIVE_BACK_EVENT, { cancelable: true }));
   });
 }
 
