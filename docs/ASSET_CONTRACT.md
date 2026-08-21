@@ -2,12 +2,19 @@
 
 ## HD frame overrides
 
-The six baseline atlases below remain a complete fallback contract. Optional
-2× pre-rendered sheets are discovered through
+The six baseline atlases below remain a complete source and developer-comparison
+contract. The 2× pre-rendered sheets are discovered through
 `apps/web/public/assets/hd/manifest.json`. When an HD sheet contains the same
 logical frame name, the renderer prefers it and applies `1 / meta.scale` as the
 world render scale. This preserves all existing anchors, footprints, animation
 lookups, hitboxes, and gameplay code while allowing atlas-family migration.
+
+Normal play validates the declared HD frame count before the battlefield is
+created. A missing manifest, failed pack, timeout, or incomplete HD frame set
+uses the existing save-preserving loading recovery screen instead of resolving
+individual missing frames from the pixel-source atlases. This prevents one
+animation from alternating between HD and pixel-source artwork. The complete
+baseline set is rendered only through the explicit developer comparison mode.
 
 HD sheets are lossless WebP and use linear texture sampling; baseline pixel
 atlases are PNG and retain nearest sampling. Both use the same runtime
@@ -73,8 +80,8 @@ baking, without the 8× atlas blowup. The mask ramp and the 8 player ramps are a
 hexes. (Baked `@p<idx>` frame naming remains reserved for a future strategy switch.)
 
 ## Style (see `HD_ART_PIPELINE.md`)
-The shipping renderer prefers the premium pre-rendered 2× override set: grounded
+The shipping renderer requires the premium pre-rendered 2× override set: grounded
 medieval materials, upper-left world light, antialiased silhouettes, and exact
 runtime player colors. The deterministic warm-palette pixel atlases described in
-`ART_BIBLE.md` remain the fallback and mechanical animation source; they are not
-the active visual target. No content is copied from another game.
+`ART_BIBLE.md` remain the developer comparison and mechanical animation source;
+they are not the active visual target. No content is copied from another game.

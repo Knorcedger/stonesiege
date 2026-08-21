@@ -34,7 +34,7 @@ describe('match loading presentation', () => {
     expect(artworkLoadingStage({ completed: 42, total: 42, fallback: 2 }, true)).toEqual({
       title: 'Restoring saved match',
       status: 'Loading battlefield artwork…',
-      detail: '42 of 42 artwork packs checked · 2 packs are using fallback art',
+      detail: '42 of 42 artwork packs checked · 2 packs could not be loaded',
       progress: 1,
     });
   });

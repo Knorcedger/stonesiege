@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  boundedAssetLoad, parseHdManifest, settleAssetPack, shouldLoadHdArtwork,
+  assertCompleteHdArtwork, boundedAssetLoad, parseHdManifest, settleAssetPack,
+  shouldLoadHdArtwork,
 } from './assets';
 
 describe('bounded artwork-pack loading', () => {
@@ -8,6 +9,25 @@ describe('bounded artwork-pack loading', () => {
     expect(shouldLoadHdArtwork(undefined)).toBe(true);
     expect(shouldLoadHdArtwork('hd')).toBe(true);
     expect(shouldLoadHdArtwork('standard')).toBe(false);
+  });
+
+  it('accepts only a complete declared HD frame set in normal play', () => {
+    const manifest = { atlases: ['units-0.json', 'units-1.json'], frameCount: 240 };
+    expect(() => assertCompleteHdArtwork('hd', manifest, 240)).not.toThrow();
+    expect(() => assertCompleteHdArtwork(undefined, manifest, 240)).not.toThrow();
+    expect(() => assertCompleteHdArtwork('hd', manifest, 180)).toThrow(
+      'only 180 of 240 HD frames loaded',
+    );
+  });
+
+  it('rejects a missing HD manifest before normal gameplay starts', () => {
+    expect(() => assertCompleteHdArtwork('hd', { atlases: [] }, 0)).toThrow(
+      'HD manifest was unavailable',
+    );
+  });
+
+  it('keeps incomplete HD discovery irrelevant to explicit pixel-source mode', () => {
+    expect(() => assertCompleteHdArtwork('standard', { atlases: [] }, 0)).not.toThrow();
   });
 
   it('uses the fallback when a pack does not settle before its deadline', async () => {

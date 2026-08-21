@@ -5,8 +5,8 @@ migration. All 4,570 shipping frames have 2× HD overrides. The 4,142 building,
 resource, animal, unit, construction, and world-entity icon frames use authored
 pre-rendered subject art; the remaining 428 terrain, rubble, interface, command,
 resource, and technology frames use the deterministic HD material renderer. The
-procedural pixel atlases remain source geometry and a safe fallback if an HD
-sheet cannot load.
+procedural pixel atlases remain source geometry and an explicit developer
+comparison set.
 
 ## Visual target
 
@@ -31,10 +31,13 @@ acceptance asset for camera, material density, contrast, lighting, and scale.
 
 HD sheets live in `apps/web/public/assets/hd/` and are listed by
 `manifest.json`. A frame in an HD sheet overrides the same logical frame name in
-the legacy atlas. Missing or unavailable HD frames automatically fall back to
-the procedural set. Shipping HD image sheets are lossless WebP files: their
+the legacy atlas. Normal play verifies that every frame declared by the
+manifest loaded before creating the battlefield; incomplete HD delivery enters
+the recoverable loading-error flow instead of mixing procedural frames into an
+animation. The procedural set is selectable only through developer tools.
+Shipping HD image sheets are lossless WebP files: their
 visible RGBA pixels and exact team-color masks are preserved while reducing the
-runtime download and checkout payload. Baseline fallback sheets remain PNG.
+runtime download and checkout payload. Baseline pixel-source sheets remain PNG.
 
 - Author at 2 source pixels per existing world pixel (`meta.scale: 2`).
 - Runtime renders HD textures at `0.5` scale with linear sampling.
@@ -57,7 +60,7 @@ runtime download and checkout payload. Baseline fallback sheets remain PNG.
 Run `npm run assets:hd` to rebuild HD sheets. This requires the Git LFS source
 art under `art/`; hydrate it with
 `git lfs pull --include="art/**" --exclude=""` first. `npm run assets` rebuilds
-both the legacy fallback and HD overrides.
+both the legacy pixel-source set and HD overrides.
 
 ## Age and asset-family grammar
 
@@ -92,8 +95,8 @@ both the legacy fallback and HD overrides.
 4. UI: typography and panel treatment are refreshed. Every world-entity icon is
    derived from the matching authored render; command, resource, and technology
    symbols retain the legible deterministic material treatment.
-5. The legacy atlas remains intentionally: it is compact fallback art and the
-   source geometry for deterministic regeneration.
+5. The legacy atlas remains intentionally: it is compact developer-comparison
+   art and the source geometry for deterministic regeneration.
 
 `tools/hd-art/materialize.ts` applies the approved material library, softened
 contours, natural edge shading, and 2× sampling to the remaining mechanical

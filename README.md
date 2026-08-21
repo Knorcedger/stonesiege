@@ -66,8 +66,9 @@ Open <http://localhost:5199>.
 
 For visual comparison work, open <http://localhost:5199/?dev=1>. The Settings
 screen then includes developer tools for choosing HD or pixel-source artwork
-for the next match. Without `?dev=1`, the game always uses the normal HD-first
-path and keeps pixel art only as an automatic fallback.
+for the next match. Without `?dev=1`, the game requires the complete HD artwork
+set before starting a match; pixel-source art is reserved for that explicit
+developer comparison mode.
 
 The repository includes HD source art, generated frames, native wrappers, and store media. Contributors working only on the web game can avoid downloading most non-runtime media:
 
