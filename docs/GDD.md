@@ -216,6 +216,18 @@ reference, then balanced by playtesting loops.
 Procedural/synthesized SFX v1 (villager chop, mining picks, swordplay, arrows, building
 placement, horn stings for age-up and attack warnings, UI clicks). Ambient loop. Music: roadmap.
 
+**Combat impacts.** A blow is voiced by the weapon that lands it and the material it lands on,
+so the battle can be read by ear. Swords clash on armor but chop into timber; pikes thrust at
+troops and knock dully against walls; cavalry sabres carry the swing and the weight of the
+horse; villagers strike with tools; wolves bite. A battering ram booms — a swung log against a
+gate, nothing else in the game sounds like it — and crushes rather than booms when it catches a
+body. Ranged attacks sound twice: the release (bowstring, crossbow lock, or a siege arm slamming
+its stop) and the arrival, where an arrow thuds into flesh, thunks into wood, a crossbow bolt
+punches, and a mangonel or trebuchet boulder crushes bodies or shatters masonry. Ram and boulder
+impacts carry further than hand weapons, so an off-screen siege is still audible. Every family
+has its own concurrency budget, so a wall crew, a field battle, and an archer volley never
+starve one another out of the mix.
+
 **Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as
 spoken story rather than silent text. There is no recorded voice-over: the lines go to the
 device's own speech synthesizer, steered into a slow, low, deliberate delivery. The `Narrator`
