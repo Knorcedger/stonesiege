@@ -33,6 +33,7 @@ import { AudioEngine } from './audio/engine';
 import { GameAudio } from './audio/events';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
+import { buildingRemovalPresentation } from './hud/buildingRemoval';
 import { AGE_LABEL, type ArmedVerb } from './hud/cardModel';
 import { Minimap } from './hud/minimap';
 import { Overlays } from './hud/overlays';
@@ -988,12 +989,11 @@ async function bootGame(
         issue({ kind: 'setRally', player: humanPlayer, buildingId, x: prev.x, y: prev.y, targetId: prev.targetId });
       } : null);
     },
-    deleteBuilding: (buildingId) => {
+    destroyBuilding: (buildingId) => {
       const b = getState().entities.get(buildingId);
       issue({ kind: 'deleteEntity', player: humanPlayer, entityId: buildingId });
       deselect(); // the card was showing an entity that no longer exists
-      const wasFoundation = (b?.buildProgress ?? 1000) < 1000;
-      hud.showUndoToast(wasFoundation ? 'Construction cancelled — cost refunded' : 'Building deleted', null);
+      hud.showUndoToast(buildingRemovalPresentation(b?.buildProgress).feedback, null);
     },
     marketTrade: (sell, buy, amount) => {
       issue({ kind: 'marketTrade', player: humanPlayer, sell, buy, amount });
