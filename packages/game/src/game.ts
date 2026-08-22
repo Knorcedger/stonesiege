@@ -1192,7 +1192,7 @@ async function bootGame(
     for (const s of [1, 4, 16]) {
       const b = document.createElement('button');
       b.textContent = `${s}×`;
-      b.style.cssText = 'font:12px "Pixelify Sans",monospace;padding:3px 8px;cursor:pointer;border-radius:3px;border:1px solid #64492B;background:#241809;color:#DABE8D;';
+      b.style.cssText = 'font:12px "Alegreya Sans","Trebuchet MS",sans-serif;padding:3px 8px;cursor:pointer;border-radius:3px;border:1px solid #64492B;background:#241809;color:#DABE8D;';
       b.addEventListener('click', () => {
         simSpeed = s;
         for (const x of btns) {

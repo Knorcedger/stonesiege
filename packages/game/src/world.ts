@@ -707,7 +707,7 @@ export class WorldLayer {
           const text = new Text({
             text: '',
             style: {
-              fontFamily: 'VT323, monospace', fontSize: 12,
+              fontFamily: 'Alegreya Sans, Trebuchet MS, sans-serif', fontSize: 11,
               fill: 0xefddb5, stroke: { color: 0x1a1208, width: 2 },
             },
           });

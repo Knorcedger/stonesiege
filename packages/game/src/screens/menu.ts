@@ -2,7 +2,7 @@
 // list -> briefing -> game, plus the settings screen. Navigation state lives
 // in the pure flow reducer (screens/flow.ts); this module only renders the top
 // of the stack and dispatches events. ART_BIBLE §8 styling: dark wood panels,
-// parchment buttons, Jacquard display face, gold accents.
+// parchment buttons, Cinzel display face, gold accents.
 
 import { gameData } from '@bf/data';
 import { campaigns, scenariosById, type CampaignDef } from '@bf/scenarios';

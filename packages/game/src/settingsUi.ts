@@ -11,13 +11,13 @@ import type { ProductionSpeed } from '@bf/sim/types';
 
 const SETTINGS_CSS = `
 .bf-set-label { text-align:left; font-size:13px; color:#B99A6B; letter-spacing:1px; margin:12px 0 4px;
-  font-family:"Pixelify Sans",monospace; }
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-set-row { display:flex; align-items:center; gap:10px; margin:2px 0; min-height:28px; }
 .bf-set-row input[type=range] { flex:1; accent-color:#E6C04A; margin:0; }
-.bf-set-val { flex:0 0 44px; text-align:right; font-family:"VT323",monospace; font-size:16px;
+.bf-set-val { flex:0 0 44px; text-align:right; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:15px;
   color:#E6C04A; }
 .bf-set-seg { display:flex; gap:6px; }
-.bf-set-seg button { flex:1; padding:8px 0; font-family:"Pixelify Sans",monospace; font-size:14px;
+.bf-set-seg button { flex:1; padding:8px 0; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-size:14px;
   cursor:pointer; color:#DABE8D; background:#241809; border:1px solid #64492B; border-radius:4px; }
 .bf-set-seg button.on { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border-color:#B99A6B;
   box-shadow:0 1px 0 #8A6414; }
@@ -27,7 +27,7 @@ const SETTINGS_CSS = `
 .bf-set-hint { margin:5px 0 7px; color:#8F7A59; font:13px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-set-devtools { margin-top:18px; padding:12px 14px 7px; text-align:left; background:#1d1409;
   border:1px dashed #8A6414; border-radius:5px; }
-.bf-set-devtitle { color:#E6C04A; font:15px "Pixelify Sans",monospace; letter-spacing:1px; }
+.bf-set-devtitle { color:#E6C04A; font:600 15px "Cinzel","Georgia",serif; letter-spacing:1px; }
 `;
 
 export interface SettingsControlsOptions {
