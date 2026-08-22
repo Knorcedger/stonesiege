@@ -1195,7 +1195,7 @@ export const wallaceChapter12 = chapter({
         'The English position at Earnside breaks. After it, the military record of William Wallace simply stops.',
         'On 5 August 1305 he is taken at Robroyston and carried south in chains. At Westminster Hall he is crowned with laurel and charged with treason, and he answers the only argument he has ever needed: he could not be a traitor to Edward, because he had never been Edward’s subject. It is not a defence the court is willing to hear. There is no trial in the sense of a verdict in doubt.',
         'On 23 August he is dragged to Smithfield and hanged, drawn, and quartered. His head is set on London Bridge; his quarters go to Newcastle, Berwick, Stirling, and Perth, so that four Scottish towns can see what happens.',
-        'It was meant to end the argument. Within eight months Robert Bruce kills Comyn, seizes the crown, and takes up a war Wallace had refused to concede. Sixteen years after Smithfield, at Bannockburn, an English army breaks against Scottish spears on ground of Scotland’s choosing.',
+        'It was meant to end the argument. Within six months Robert Bruce kills Comyn, seizes the crown, and takes up a war Wallace had refused to concede. Nine years after Smithfield, at Bannockburn, an English army breaks against Scottish spears on ground of Scotland’s choosing.',
         'The man could be killed. The rising could not.',
       ],
       quote: {

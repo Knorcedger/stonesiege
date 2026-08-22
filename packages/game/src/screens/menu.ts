@@ -1096,9 +1096,17 @@ export function showMenu(
         case 'prologue':
         case 'epilogue': {
           const campaign = campaigns[top.campaignId];
-          if (!campaign) {
-            dispatch({ kind: 'back' });
-            return;
+          // An epilogue is the campaign's whole ending — Wallace's execution,
+          // Joan's trial. The in-app button is gated behind completion, so a
+          // hand-typed or shared /epilogue address must not walk past that
+          // gate: it falls back to the chapter list rather than spoiling the
+          // campaign for someone who has not played it.
+          const earned = top.id === 'prologue'
+            || (!!campaign && isCampaignComplete(campaign, loadProgress()));
+          if (!campaign || !earned) {
+            if (campaign) renderScenarioList(campaign);
+            else renderCampaigns();
+            break;
           }
           renderStoryPage(
             campaign,

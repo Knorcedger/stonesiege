@@ -32,10 +32,13 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Changed
 
-- The twelve William Wallace chapters now carry story while they are being played, not only an
-  opening and a closing line: the campaign gained roughly fifty new spoken beats covering the
-  political situation, the arguments between Wallace and his captains, and what each fight was
-  for.
+- Every chapter in every campaign now carries story while it is being played, not only an opening
+  and a closing line. The twelve William Wallace chapters gained 57 new spoken beats; the six
+  legendary campaigns gained 72, and their missions are no longer narrated end to end by a single
+  "Chronicle" voice — Henry, Joan, Charles VII, Temüjin, Bohemond, Richard the Lionheart and the
+  rest speak for themselves.
+- Chapter briefings state what is lost if the chapter fails, rather than repeating the line that
+  sets the scene.
 
 ## 0.1.2 — 2026-08-20
 

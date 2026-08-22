@@ -210,7 +210,6 @@ export class Overlays {
       paragraphs: string[];
       quote?: { text: string; source: string };
       note?: string;
-      continueLabel?: string;
     },
     onContinue: () => void,
   ): void {
@@ -285,7 +284,8 @@ export class Overlays {
     actions.className = 'bf-after-actions';
     const btn = document.createElement('button');
     btn.className = 'bf-end-btn';
-    btn.textContent = page.continueLabel ?? 'Continue';
+    // One exit, and it opens the statistics panel underneath.
+    btn.textContent = 'Continue';
     btn.addEventListener('click', () => {
       this.storyScreen.classList.remove('show');
       onContinue();

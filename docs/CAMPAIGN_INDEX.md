@@ -8,7 +8,7 @@ Mission type describes the current gameplay objective, not a claim that the hist
 
 Difficulty is authored per chapter as a 1–5 rating (Recruit, Soldier, Veteran, Captain, Legend) with a one-line note naming what makes the chapter hard; the menu shows both. A campaign's own rating is derived from its chapters rather than authored separately, so the two can never disagree. For the six campaigns built by the shared factory in `legendaryCampaigns.ts`, the rating follows the mission kind unless a chapter overrides it.
 
-Each selectable chapter also carries a `story` block — the stakes, the chapter's cast, and the aftermath page shown when it is won — and each campaign carries a `prologue` and an `epilogue`. `campaignStory.test.ts` holds all of that to a contract.
+Each selectable chapter also carries a `story` block — the stakes, the chapter's cast, and the aftermath page shown when it is won — and each campaign carries a `prologue` and an `epilogue`. Chapters additionally author `beats`: timed, message-only triggers that carry story through the middle of a mission, spoken by named participants rather than by one narrator. `campaignStory.test.ts` holds all of that to a contract, including that no campaign is narrated by fewer than six voices.
 
 ## William Wallace — The Rising of Scotland
 

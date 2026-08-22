@@ -14,7 +14,6 @@ export interface AftermathPage {
   quote?: { text: string; source: string };
   /** Where the mission departed from the record, prefixed by the renderer. */
   note?: string;
-  continueLabel: string;
 }
 
 /**
@@ -22,13 +21,12 @@ export interface AftermathPage {
  * dev and legacy scenarios, which then go straight to the statistics panel as
  * they always did.
  *
- * `campaignFinished` changes only the button: winning the last chapter
- * continues into the campaign's closing page, not back to a list of chapters
- * that are all complete.
+ * The page has one exit and it leads to the statistics panel, so the button
+ * says so plainly. Where the run goes after that — the chapter list or the
+ * campaign's closing page — is the statistics panel's decision to word.
  */
 export function chapterAftermathPage(
   scenario: Pick<ScenarioDef, 'title' | 'chapter' | 'story'> | null | undefined,
-  campaignFinished: boolean,
 ): AftermathPage | null {
   const aftermath = scenario?.story?.aftermath;
   if (!scenario || !aftermath) return null;
@@ -40,6 +38,5 @@ export function chapterAftermathPage(
     paragraphs: aftermath.paragraphs,
     ...(aftermath.quote ? { quote: aftermath.quote } : {}),
     ...(scenario.story?.historyNote ? { note: scenario.story.historyNote } : {}),
-    continueLabel: campaignFinished ? 'Read the ending' : 'Continue',
   };
 }

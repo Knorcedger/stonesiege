@@ -45,6 +45,23 @@ export function isCampaignComplete(campaign: CampaignDef, progress: CampaignProg
     && campaign.scenarioIds.every((id) => isCompleted(progress, id));
 }
 
+/**
+ * Whether winning `scenarioId` should lead into the campaign's closing page.
+ *
+ * Completion alone is not enough: replaying an early chapter of a finished
+ * campaign is an offered flow, and it must end back on the chapter list rather
+ * than at the ending. Only the final chapter, with everything before it done,
+ * earns the epilogue.
+ */
+export function campaignEpilogueDue(
+  campaign: CampaignDef | undefined,
+  progress: CampaignProgress,
+  scenarioId: string,
+): boolean {
+  if (!campaign) return false;
+  return campaign.scenarioIds.at(-1) === scenarioId && isCampaignComplete(campaign, progress);
+}
+
 export function isCompleted(progress: CampaignProgress, scenarioId: string): boolean {
   return progress.completed.includes(scenarioId);
 }

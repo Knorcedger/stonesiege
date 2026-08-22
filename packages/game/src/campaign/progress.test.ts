@@ -4,8 +4,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CampaignDef } from '@bf/scenarios';
 import {
-  completeScenario, decodeProgress, emptyProgress, hasSeenPrologue, isCampaignComplete,
-  loadProgress, markPrologueSeen, nextScenarioId, saveProgress, scenarioStatuses,
+  campaignEpilogueDue, completeScenario, decodeProgress, emptyProgress, hasSeenPrologue,
+  isCampaignComplete, loadProgress, markPrologueSeen, nextScenarioId, saveProgress,
+  scenarioStatuses,
 } from './progress';
 import { makeMemoryStorage } from '../storage';
 
@@ -121,5 +122,30 @@ describe('campaign story state', () => {
     const store = makeMemoryStorage();
     saveProgress(markPrologueSeen(emptyProgress(), 'wallace'), store);
     expect(loadProgress(store).prologuesSeen).toEqual(['wallace']);
+  });
+});
+
+describe('campaignEpilogueDue', () => {
+  const finished = { completed: ['w1', 'w2', 'w3'], prologuesSeen: [] };
+
+  it('is due when the final chapter completes the campaign', () => {
+    expect(campaignEpilogueDue(campaign, finished, 'w3')).toBe(true);
+  });
+
+  it('is not due for a replay of an earlier chapter of a finished campaign', () => {
+    // Replay is an offered flow at COMPLETE, and it must end on the chapter
+    // list — not drop the player back at the ending they have already read.
+    expect(campaignEpilogueDue(campaign, finished, 'w1')).toBe(false);
+    expect(campaignEpilogueDue(campaign, finished, 'w2')).toBe(false);
+  });
+
+  it('is not due while any earlier chapter is still unplayed', () => {
+    const skipped = { completed: ['w1', 'w3'], prologuesSeen: [] };
+    expect(campaignEpilogueDue(campaign, skipped, 'w3')).toBe(false);
+  });
+
+  it('is never due for a scenario outside any known campaign', () => {
+    expect(campaignEpilogueDue(undefined, finished, 'w3')).toBe(false);
+    expect(campaignEpilogueDue(campaign, finished, 'showcase-citadel')).toBe(false);
   });
 });

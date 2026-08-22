@@ -58,7 +58,7 @@ import {
 } from './analytics/events';
 import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
 import {
-  completeScenario, isCampaignComplete, loadProgress, saveProgress,
+  campaignEpilogueDue, completeScenario, loadProgress, saveProgress,
 } from './campaign/progress';
 import { chapterAftermathPage } from './campaign/aftermath';
 import { setNavHint } from './screens/nav';
@@ -689,8 +689,7 @@ async function bootGame(
       if (victory) {
         const progress = completeScenario(loadProgress(), scenarioId);
         saveProgress(progress);
-        const campaign = campaigns[campaignId];
-        campaignFinished = !!campaign && isCampaignComplete(campaign, progress);
+        campaignFinished = campaignEpilogueDue(campaigns[campaignId], progress, scenarioId);
         analytics.track(campaignChapterCompleteEvent(matchContext, summary.durationSeconds));
       }
       // Winning the last chapter continues into the campaign's closing page
@@ -720,9 +719,7 @@ async function bootGame(
       // The story payoff comes before the arithmetic: what the chapter changed,
       // then how many sheep it took. Only on a win, and only where the chapter
       // has an authored aftermath.
-      const aftermath = victory
-        ? chapterAftermathPage(scenarioDef, campaignFinished)
-        : null;
+      const aftermath = victory ? chapterAftermathPage(scenarioDef) : null;
       if (aftermath) overlays.showAftermath(aftermath, showStats);
       else showStats();
     } else {

@@ -64,6 +64,28 @@ describe('chapter story data', () => {
   }
 });
 
+describe('aftermath headings', () => {
+  it('are authored, not derived from a location that does not read as a place', () => {
+    // These were generated as `After <location before the comma>`, which gave
+    // 'After Off the Nisa River' and 'After Jin northern China'.
+    for (const campaign of Object.values(campaigns)) {
+      for (const scenarioId of campaign.scenarioIds) {
+        const title = scenariosById[scenarioId]!.story!.aftermath.title;
+        expect(title.length, scenarioId).toBeGreaterThan(0);
+        expect(title, scenarioId).not.toMatch(/^After (The|Off|Eastern|Jin) /);
+      }
+    }
+  });
+
+  it('are distinct within a campaign, so two chapters never close the same way', () => {
+    for (const campaign of Object.values(campaigns)) {
+      const titles = campaign.scenarioIds
+        .map((id) => scenariosById[id]!.story!.aftermath.title);
+      expect(new Set(titles).size, campaign.id).toBe(titles.length);
+    }
+  });
+});
+
 describe('chapter difficulty', () => {
   for (const campaign of Object.values(campaigns)) {
     for (const scenarioId of campaign.scenarioIds) {
@@ -109,14 +131,30 @@ describe('chapter difficulty', () => {
   });
 });
 
-describe('Wallace chapters carry story while they are being played', () => {
-  for (const scenarioId of campaigns.wallace.scenarioIds) {
-    it(`${scenarioId} speaks more than an opening and a closing line`, () => {
-      const scenario = scenariosById[scenarioId]!;
-      const lines = scenario.triggers.flatMap(
-        (trigger) => trigger.effects.filter((effect) => effect.kind === 'message'),
-      );
-      expect(lines.length, scenarioId).toBeGreaterThanOrEqual(5);
-    });
+describe('chapters carry story while they are being played', () => {
+  for (const campaign of Object.values(campaigns)) {
+    for (const scenarioId of campaign.scenarioIds) {
+      it(`${scenarioId} speaks more than an opening and a closing line`, () => {
+        const scenario = scenariosById[scenarioId]!;
+        const lines = scenario.triggers.flatMap(
+          (trigger) => trigger.effects.filter((effect) => effect.kind === 'message'),
+        );
+        expect(lines.length, scenarioId).toBeGreaterThanOrEqual(5);
+      });
+    }
   }
+
+  it('gives the story more than one voice per campaign', () => {
+    // Every legendary chapter used to be narrated end to end by 'Chronicle'.
+    for (const campaign of Object.values(campaigns)) {
+      const speakers = new Set(
+        campaign.scenarioIds.flatMap((id) => scenariosById[id]!.triggers.flatMap(
+          (trigger) => trigger.effects.flatMap(
+            (effect) => (effect.kind === 'message' && effect.speaker ? [effect.speaker] : []),
+          ),
+        )),
+      );
+      expect(speakers.size, campaign.id).toBeGreaterThanOrEqual(6);
+    }
+  });
 });
