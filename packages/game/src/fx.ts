@@ -29,6 +29,7 @@ import type { GameAssets } from './assets';
 import { ANIM_FPS, animFrameIndex, unitRig } from './frames';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld } from './camera';
+import { tileVisibility } from './fog';
 import { projectileKindFor, type ProjectileKind } from './projectiles';
 
 interface Projectile {
@@ -116,7 +117,7 @@ export class FxLayer {
   private deferred = new Map<EntityId, DeferredDeath>();
   private beamGfx = new Graphics();
 
-  constructor(private assets: GameAssets) {
+  constructor(private assets: GameAssets, private humanPlayer: PlayerId) {
     this.ground.sortableChildren = true;
     this.air.addChild(this.beamGfx);
   }
@@ -330,6 +331,7 @@ export class FxLayer {
   }
 
   private updateTargetPings(state: GameState, tickFloat: number): void {
+    const vis = state.players[this.humanPlayer]?.visibility ?? null;
     for (let i = this.targetPings.length - 1; i >= 0; i--) {
       const ping = this.targetPings[i];
       const t = Math.max(0, (tickFloat - ping.startTick) / TARGET_PING_TICKS);
@@ -338,10 +340,13 @@ export class FxLayer {
         this.targetPings.splice(i, 1);
         continue;
       }
-      // Track a target that walks off (attack/convert/heal); a dead one keeps
-      // its last point so the pulse finishes where the player aimed it.
+      // Track a target that walks off (attack/convert/heal) only while the
+      // player can still see it. `overlay` draws above the fog, so a ping that
+      // followed a fleeing scout would trace its hidden path — and its death
+      // spot — in the clear. A target that dies or slips into fog keeps its
+      // last seen point, so the pulse finishes where the player aimed it.
       const target = state.entities.get(ping.targetId);
-      if (target) {
+      if (target && this.targetVisible(state, vis, target)) {
         const p = tileToWorld(target.x / FP, target.y / FP);
         ping.wx = p.x;
         ping.wy = p.y;
@@ -353,6 +358,12 @@ export class FxLayer {
       ping.gfx.alpha = (1 - pulse) * (1 - t * 0.4);
       ping.gfx.scale.set(1 + pulse * 0.3);
     }
+  }
+
+  /** Same rule the world layer uses to decide whether a sprite is drawn at all. */
+  private targetVisible(state: GameState, vis: Uint8Array | null, target: Entity): boolean {
+    if (target.player === this.humanPlayer || target.kind === 'resource') return true;
+    return tileVisibility(vis, state.map, target.tileX, target.tileY) === 2;
   }
 
   // ---------------------------------------------------------------- corpses

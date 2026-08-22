@@ -508,7 +508,7 @@ async function bootGame(
     (defId) => unitDisplayStats(game, humanPlayer, defId)?.los ?? gameData.units[defId]?.los ?? 0,
     resourceMemory,
   );
-  const fx = new FxLayer(assets);
+  const fx = new FxLayer(assets, humanPlayer);
   const fog = new FogLayer(game.state.map);
   const ghostLayer = new Container();
   const ghostFoot = new Graphics();

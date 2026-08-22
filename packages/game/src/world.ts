@@ -19,6 +19,7 @@ import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 import { getSettings } from './settings';
+import { tileVisibility } from './fog';
 import { PlayerResourceMemory } from './resourceMemory';
 
 const HIGHLIGHT = 0xf4eedd;
@@ -512,9 +513,7 @@ export class WorldLayer {
   // ------------------------------------------------------------------ internals
 
   private tileVis(vis: Uint8Array | null, state: GameState, tx: number, ty: number): number {
-    if (!vis) return 2;
-    if (tx < 0 || ty < 0 || tx >= state.map.width || ty >= state.map.height) return 0;
-    return vis[ty * state.map.width + tx];
+    return tileVisibility(vis, state.map, tx, ty);
   }
 
   private createView(): EntityView {
