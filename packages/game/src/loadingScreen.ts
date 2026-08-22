@@ -10,6 +10,14 @@ export interface LoadingStage {
   progress: number | null;
 }
 
+/** Optional campaign context rendered over its existing chapter artwork. */
+export interface LoadingArtwork {
+  src: string;
+  campaign: string;
+  chapter: string;
+  setting?: string;
+}
+
 export interface ArtworkLoadProgress {
   completed: number;
   total: number;
@@ -104,16 +112,36 @@ export function discardControlAction(armed: boolean): 'arm' | 'discard' {
 
 const LOADING_CSS = `
 .bf-loading { position:absolute; inset:0; z-index:1000; display:flex; align-items:center; justify-content:center;
-  box-sizing:border-box; padding:24px; overflow:auto; color:#E9D4A7;
+  box-sizing:border-box; padding:clamp(18px,5vw,64px); overflow:auto; color:#E9D4A7;
   background:radial-gradient(ellipse at 50% 38%,rgba(230,192,74,.08),transparent 58%),#16100a;
   font:500 18px "Alegreya Sans","Trebuchet MS",sans-serif; letter-spacing:.35px; }
+.bf-loading.has-art { align-items:flex-end; justify-content:flex-start; isolation:isolate; }
+.bf-loading-art { position:absolute; inset:0; z-index:-2; display:block; width:100%; height:100%; object-fit:cover;
+  object-position:center 42%; }
+.bf-loading.has-art::after { content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  background:linear-gradient(90deg,rgba(10,6,3,.9) 0%,rgba(10,6,3,.56) 48%,rgba(10,6,3,.08) 78%),
+    linear-gradient(0deg,rgba(10,6,3,.94) 0%,rgba(10,6,3,.2) 66%,rgba(10,6,3,.42) 100%); }
 .bf-loading-card { width:min(520px,92vw); text-align:center; }
+.bf-loading.has-art .bf-loading-card { width:min(600px,100%); box-sizing:border-box; padding:24px 26px 22px;
+  text-align:left; background:linear-gradient(135deg,rgba(25,16,8,.94),rgba(25,16,8,.76));
+  border:1px solid rgba(185,154,107,.6); border-left:4px solid #C99B2B; border-radius:4px;
+  box-shadow:0 14px 44px rgba(0,0,0,.55),0 0 0 1px rgba(26,18,8,.7) inset;
+  -webkit-backdrop-filter:blur(7px); backdrop-filter:blur(7px); }
+.bf-loading-story { margin:0 0 18px; padding:0 0 15px; border-bottom:1px solid rgba(185,154,107,.36); }
+.bf-loading-campaign { margin:0 0 3px; color:#E6C04A; font-size:12px; line-height:1.3;
+  letter-spacing:1.45px; text-transform:uppercase; text-shadow:0 2px 8px #0b0703; }
+.bf-loading-chapter { margin:0; color:#F3DE9C; font:600 24px/1.15 "Cinzel","Georgia",serif;
+  letter-spacing:.7px; text-shadow:0 2px 8px #0b0703; }
+.bf-loading-setting { margin:5px 0 0; color:#C9AE7E; font-size:13px; line-height:1.3; letter-spacing:.5px; }
 .bf-loading-mark { width:46px; height:46px; margin:0 auto 18px; transform:rotate(45deg);
   border:2px solid #8A6414; box-shadow:0 0 0 2px #2C1F12 inset,0 0 20px rgba(230,192,74,.12); }
+.bf-loading.has-art .bf-loading-mark { width:28px; height:28px; margin:0 0 14px; }
+.bf-loading.has-art .bf-loading-mark::after { width:8px; height:8px; margin:8px; }
 .bf-loading-mark::after { content:""; display:block; width:14px; height:14px; margin:14px;
   background:#E6C04A; box-shadow:0 0 10px rgba(230,192,74,.35); }
 .bf-loading h1 { margin:0 0 10px; color:#E9C76A; font:600 26px "Cinzel","Georgia",serif;
   letter-spacing:1.2px; text-shadow:0 2px 3px #0b0703; }
+.bf-loading.has-art h1 { font-size:22px; }
 .bf-loading-status { min-height:24px; margin:0 0 15px; color:#EFDDB5; }
 .bf-loading-track { position:relative; height:10px; overflow:hidden; border:1px solid #64492B;
   border-radius:999px; background:#241809; box-shadow:0 1px 3px rgba(0,0,0,.55) inset; }
@@ -130,13 +158,30 @@ const LOADING_CSS = `
 .bf-loading.failed .bf-loading-actions { display:flex; }
 .bf-loading.failed .bf-loading-meta { justify-content:center; }
 .bf-loading.failed .bf-loading-detail { max-width:460px; text-align:center; color:#B99A6B; }
+.bf-loading.has-art.failed .bf-loading-meta { justify-content:flex-start; }
+.bf-loading.has-art.failed .bf-loading-detail { text-align:left; }
 .bf-loading-btn { flex:1; padding:11px 14px; color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D);
   border:1px solid #B99A6B; border-radius:4px; box-shadow:0 2px 0 #8A6414; cursor:pointer;
   font:600 16px "Alegreya Sans","Trebuchet MS",sans-serif; letter-spacing:.5px; }
 .bf-loading-btn.ghost { color:#DABE8D; background:none; border-color:#64492B; box-shadow:none; }
 .bf-loading-btn.danger { color:#F2E6CB; background:#6E2118; border-color:#A24737; box-shadow:none; }
 .bf-loading-btn:focus-visible { outline:3px solid #FFE98A; outline-offset:3px; }
-@media (max-width:520px) { .bf-loading-actions { flex-direction:column; } }
+@media (max-width:520px) {
+  .bf-loading { padding:14px; }
+  .bf-loading.has-art .bf-loading-card { padding:18px 18px 16px; }
+  .bf-loading-chapter { font-size:20px; }
+  .bf-loading-campaign { font-size:10.5px; letter-spacing:1px; }
+  .bf-loading-actions { flex-direction:column; }
+}
+@media (max-height:560px) {
+  .bf-loading.has-art .bf-loading-card { padding:14px 18px 13px; }
+  .bf-loading-story { margin-bottom:10px; padding-bottom:9px; }
+  .bf-loading-chapter { font-size:19px; }
+  .bf-loading-setting { margin-top:3px; font-size:11.5px; }
+  .bf-loading.has-art .bf-loading-mark { display:none; }
+  .bf-loading.has-art h1 { margin-bottom:5px; font-size:19px; }
+  .bf-loading-status { min-height:20px; margin-bottom:9px; font-size:16px; }
+}
 @media (prefers-reduced-motion:reduce) { .bf-loading-track.indeterminate .bf-loading-fill { animation-duration:2.5s; } }
 `;
 
@@ -144,10 +189,13 @@ const LOADING_CSS = `
 export class MatchLoadingScreen {
   private readonly root: HTMLElement;
   private readonly screen: HTMLDivElement;
+  private readonly card: HTMLDivElement;
   private readonly view: LoadingPresentationTarget;
   private readonly actions: HTMLDivElement;
+  private artworkImage: HTMLImageElement | null = null;
+  private artworkStory: HTMLDivElement | null = null;
 
-  constructor(root: HTMLElement, initial: LoadingStage) {
+  constructor(root: HTMLElement, initial: LoadingStage, artwork?: LoadingArtwork | null) {
     if (!document.getElementById('bf-loading-style')) {
       const style = document.createElement('style');
       style.id = 'bf-loading-style';
@@ -191,13 +239,64 @@ export class MatchLoadingScreen {
 
     this.root = root;
     this.screen = screen;
+    this.card = card;
     this.view = { screen, title, status, detail, progress, fill, value };
+    if (artwork) this.setArtwork(artwork);
     this.update(initial);
   }
 
   update(stage: LoadingStage): void {
     this.screen.classList.remove('failed');
     syncLoadingPresentation(this.view, stage);
+  }
+
+  /** Add campaign context after a saved match has been resolved. */
+  setArtwork(artwork: LoadingArtwork | null): void {
+    this.artworkImage?.remove();
+    this.artworkStory?.remove();
+    this.artworkImage = null;
+    this.artworkStory = null;
+    this.screen.classList.remove('has-art');
+    if (!artwork) return;
+
+    const image = document.createElement('img');
+    image.className = 'bf-loading-art';
+    image.alt = '';
+    image.setAttribute('aria-hidden', 'true');
+    image.loading = 'eager';
+    image.decoding = 'async';
+    image.fetchPriority = 'high';
+    image.addEventListener('error', () => {
+      if (this.artworkImage !== image) return;
+      image.remove();
+      story.remove();
+      this.artworkImage = null;
+      this.artworkStory = null;
+      this.screen.classList.remove('has-art');
+    }, { once: true });
+
+    const story = document.createElement('div');
+    story.className = 'bf-loading-story';
+    const campaign = document.createElement('p');
+    campaign.className = 'bf-loading-campaign';
+    campaign.textContent = artwork.campaign;
+    const chapter = document.createElement('p');
+    chapter.className = 'bf-loading-chapter';
+    chapter.textContent = artwork.chapter;
+    story.append(campaign, chapter);
+    if (artwork.setting) {
+      const setting = document.createElement('p');
+      setting.className = 'bf-loading-setting';
+      setting.textContent = artwork.setting;
+      story.appendChild(setting);
+    }
+
+    this.artworkImage = image;
+    this.artworkStory = story;
+    this.screen.classList.add('has-art');
+    this.screen.prepend(image);
+    this.card.prepend(story);
+    image.src = artwork.src;
   }
 
   fail(message: string, recovery: LoadingRecoveryActions): void {
