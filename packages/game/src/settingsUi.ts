@@ -11,13 +11,13 @@ import type { ProductionSpeed } from '@bf/sim/types';
 
 const SETTINGS_CSS = `
 .bf-set-label { text-align:left; font-size:13px; color:#B99A6B; letter-spacing:1px; margin:12px 0 4px;
-  font-family:"Pixelify Sans",monospace; }
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-set-row { display:flex; align-items:center; gap:10px; margin:2px 0; min-height:28px; }
 .bf-set-row input[type=range] { flex:1; accent-color:#E6C04A; margin:0; }
-.bf-set-val { flex:0 0 44px; text-align:right; font-family:"VT323",monospace; font-size:16px;
+.bf-set-val { flex:0 0 44px; text-align:right; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:15px;
   color:#E6C04A; }
 .bf-set-seg { display:flex; gap:6px; }
-.bf-set-seg button { flex:1; padding:8px 0; font-family:"Pixelify Sans",monospace; font-size:14px;
+.bf-set-seg button { flex:1; padding:8px 0; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-size:14px;
   cursor:pointer; color:#DABE8D; background:#241809; border:1px solid #64492B; border-radius:4px; }
 .bf-set-seg button.on { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border-color:#B99A6B;
   box-shadow:0 1px 0 #8A6414; }
@@ -27,7 +27,7 @@ const SETTINGS_CSS = `
 .bf-set-hint { margin:5px 0 7px; color:#8F7A59; font:13px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-set-devtools { margin-top:18px; padding:12px 14px 7px; text-align:left; background:#1d1409;
   border:1px dashed #8A6414; border-radius:5px; }
-.bf-set-devtitle { color:#E6C04A; font:15px "Pixelify Sans",monospace; letter-spacing:1px; }
+.bf-set-devtitle { color:#E6C04A; font:600 15px "Cinzel","Georgia",serif; letter-spacing:1px; }
 `;
 
 export interface SettingsControlsOptions {
@@ -42,8 +42,9 @@ export interface SettingsControlsOptions {
 }
 
 /**
- * Append the full settings control set (master/sfx/ambient volume, camera
- * speed, production speed, HP-bar visibility, anonymous-stats opt-out) to
+ * Append the full settings control set (master/sfx/ambient/narration volume,
+ * camera speed, production speed, campaign narration, HP-bar visibility,
+ * anonymous-stats opt-out) to
  * `container`. Controls read the live settings at build time and write through
  * updateSettings on every interaction.
  */
@@ -94,6 +95,8 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
     (v) => updateSettings({ sfxVolume: v / 100 }));
   slider('AMBIENT', s.ambientVolume * 100, 0, 100, (v) => `${v}%`,
     (v) => updateSettings({ ambientVolume: v / 100 }));
+  slider('NARRATION', s.narrationVolume * 100, 0, 100, (v) => `${v}%`,
+    (v) => updateSettings({ narrationVolume: v / 100 }));
   slider('CAMERA SPEED', s.cameraSpeed * 100, 50, 200, (v) => `${v}%`,
     (v) => updateSettings({ cameraSpeed: v / 100 }));
   slider('HUD SIZE', s.hudScale * 100, 75, 125, (v) => `${v}%`,
@@ -166,6 +169,19 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
     }
     container.appendChild(seg);
   };
+
+  // Spoken campaign dialogue. Off is a real off: nothing is sent to the
+  // synthesizer at all, and anything mid-sentence stops on the switch.
+  booleanToggle(
+    'CAMPAIGN NARRATION', 'Spoken', 'Silent',
+    () => getSettings().narrationEnabled,
+    (on) => void updateSettings({ narrationEnabled: on }),
+  );
+  const narrationHint = document.createElement('div');
+  narrationHint.className = 'bf-set-hint';
+  narrationHint.textContent = 'Reads campaign dialogue aloud using the voices installed on your device. '
+    + 'The delivery and accent depend on what your device provides.';
+  container.appendChild(narrationHint);
 
   booleanToggle(
     'HEALTH BARS', 'Shown', 'Hidden',

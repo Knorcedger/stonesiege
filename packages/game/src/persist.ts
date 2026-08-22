@@ -19,6 +19,10 @@ import { BOT_DIFFICULTIES, type BotDifficulty } from '@bf/ai';
 import { appStorage } from './storage';
 import { formatMatchTime, isMatchTallies, type MatchTallies } from './hud/summary';
 import type { PracticeSetup } from './simBridge';
+import {
+  canonicalResourceMemorySnapshot,
+  type ResourceMemorySnapshot,
+} from './resourceMemory';
 
 export const SNAPSHOT_VERSION = 3;
 /** Pre-slot single-save key. Read once at startup and migrated into its slot. */
@@ -42,6 +46,8 @@ export interface PracticeSnapshot {
   serialized?: unknown;
   /** Renderer-owned statistics required by the end-of-match report. */
   tallies?: MatchTallies;
+  /** Player-facing last-seen resource state; never reconstructed from hidden live truth. */
+  resourceMemory?: ResourceMemorySnapshot;
 }
 
 export interface ScenarioSnapshot {
@@ -62,6 +68,8 @@ export interface ScenarioSnapshot {
   serialized?: unknown;
   /** Renderer-owned statistics required by the end-of-match report. */
   tallies?: MatchTallies;
+  /** Player-facing last-seen resource state; never reconstructed from hidden live truth. */
+  resourceMemory?: ResourceMemorySnapshot;
 }
 
 export type MatchSnapshot = PracticeSnapshot | ScenarioSnapshot;
@@ -120,6 +128,10 @@ export function decodeSnapshot(raw: string | null): MatchSnapshot | null {
     if (!isInt(s.tick) || s.tick < 0) return null;
     if (!Array.isArray(s.log)) return null;
     if (s.tallies !== undefined && !isMatchTallies(s.tallies)) return null;
+    const resourceMemory = s.resourceMemory === undefined
+      ? undefined : canonicalResourceMemorySnapshot(s.resourceMemory);
+    if (s.resourceMemory !== undefined && resourceMemory === null) return null;
+    const validResourceMemory = resourceMemory ?? undefined;
     if (s.mode === 'practice') {
       const cfg = s.config;
       if (!cfg || typeof cfg.seed !== 'number' || !Array.isArray(cfg.players)) return null;
@@ -140,7 +152,12 @@ export function decodeSnapshot(raw: string | null): MatchSnapshot | null {
         opponents = [...setup.opponents];
       }
       if (typeof setup.civ !== 'string' || !isInt(setup.color)) return null;
-      return { ...s, version: SNAPSHOT_VERSION, setup: { ...setup, opponents } };
+      return {
+        ...s,
+        version: SNAPSHOT_VERSION,
+        setup: { ...setup, opponents },
+        ...(validResourceMemory === undefined ? {} : { resourceMemory: validResourceMemory }),
+      };
     }
     if (s.mode === 'scenario') {
       if (typeof s.scenarioId !== 'string' || s.scenarioId.length === 0) return null;
@@ -150,7 +167,11 @@ export function decodeSnapshot(raw: string | null): MatchSnapshot | null {
       // would silently produce a subtly wrong mission, so refuse to replay it
       if (typeof s.fingerprint !== 'string'
         || s.fingerprint !== scenarioFingerprint(s.scenarioId)) return null;
-      return { ...s, version: SNAPSHOT_VERSION };
+      return {
+        ...s,
+        version: SNAPSHOT_VERSION,
+        ...(validResourceMemory === undefined ? {} : { resourceMemory: validResourceMemory }),
+      };
     }
     return null;
   } catch {

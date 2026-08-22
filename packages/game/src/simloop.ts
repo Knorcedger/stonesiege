@@ -43,8 +43,23 @@ export class SimLoop {
   }
 
   /** Queue a command for the next tick boundary. */
-  issue(cmd: Command): void {
+  issue(cmd: Command): boolean {
+    if (this.game.state.finished) return false;
     this.pending.push(cmd);
+    return true;
+  }
+
+  /** Detached view used by exact client-side admission previews. */
+  pendingSnapshot(): Command[] {
+    return [...this.pending];
+  }
+
+  /** Remove only the exact not-yet-applied command represented by an Undo toast. */
+  retract(cmd: Command): boolean {
+    const index = this.pending.indexOf(cmd);
+    if (index < 0) return false;
+    this.pending.splice(index, 1);
+    return true;
   }
 
   pause(auto = false): void {

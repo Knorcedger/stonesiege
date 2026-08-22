@@ -58,8 +58,9 @@ briefing text. The trigger engine evaluates each tick against sim state/events.
 ## AI (`packages/ai`)
 Bot = per-player controller. Economy manager (villager allocation targets by age/strategy,
 build orders), military manager (army composition vs scouted enemy, attack waves, defense),
-expansion manager. Reads only what the sim exposes (honors fog at higher difficulties is a
-roadmap item; v1 bots use full state but throttled APM and scripted pacing per difficulty).
+expansion manager. Enemy, resource, and placement knowledge is filtered through current vision
+plus deterministic last-seen memory; hidden live state never changes a bot decision. Difficulty
+comes from APM, planning, and scripted pacing rather than privileged map information.
 
 ## Asset pipeline (`tools/assetgen`)
 Procedural original pixel-art generation (pngjs; custom rasterizer — no native deps).
