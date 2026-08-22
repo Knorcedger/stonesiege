@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
   ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
-  placementGhostFrames, resolveFrameName, unitRig,
+  buildingFrameCandidates, placementGhostFrames, resolveFrameName, unitRig,
 } from './frames';
 
 describe('resolveFrameName (mirrored dirs per ASSET_CONTRACT)', () => {
@@ -143,5 +143,33 @@ describe('anim helpers', () => {
       .map((seconds) => animFrameIndex('mine', seconds, 4));
     expect(frames).toEqual([0, 1, 2, 2, 3, 0, 0]);
     expect(ANIM_FPS.mine).toBeLessThan(ANIM_FPS.attack);
+  });
+});
+
+describe('buildingFrameCandidates (one rule for live art, fog ghosts and previews)', () => {
+  it('walks the construction stages before the finished building', () => {
+    expect(buildingFrameCandidates('barracks', 'dark', 0).candidates).toEqual(['bld/barracks/construct0']);
+    expect(buildingFrameCandidates('barracks', 'dark', 500).candidates).toEqual(['bld/barracks/construct1']);
+    expect(buildingFrameCandidates('barracks', 'dark', 800).candidates).toEqual(['bld/barracks/construct2']);
+    expect(buildingFrameCandidates('barracks', 'dark', 1000).candidates)
+      .toEqual(['bld/barracks/dark/done', 'bld/barracks/done']);
+  });
+
+  it('defaults to the finished building, which is what a placement preview wants', () => {
+    expect(buildingFrameCandidates('keep', 'castle').candidates)
+      .toEqual(['bld/keep/castle/done', 'bld/keep/done']);
+  });
+
+  it('keeps the farm exception: no bld/ frames, and a fade-in while it is sown', () => {
+    const sowing = buildingFrameCandidates('farm', 'dark', 500);
+    expect(sowing.candidates).toEqual(['obj/farm/0']);
+    expect(sowing.alpha).toBeGreaterThan(0.35);
+    expect(sowing.alpha).toBeLessThan(1);
+    expect(buildingFrameCandidates('farm', 'dark', 1000, 100).candidates).toEqual(['obj/farm/3']);
+    expect(buildingFrameCandidates('farm', 'dark', 1000, 0).candidates).toEqual(['obj/farm/4']);
+  });
+
+  it('gives a finished building full opacity', () => {
+    expect(buildingFrameCandidates('house', 'imperial').alpha).toBe(1);
   });
 });
