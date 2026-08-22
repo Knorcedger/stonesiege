@@ -55,23 +55,39 @@ function harness(army: number): Harness {
   return { world, state, view };
 }
 
+/** The game renders at 60fps over a 20tps sim, so a tick lands every third frame. */
+const FRAMES_PER_TICK = 3;
+
 /**
  * Median-of-three CPU ms per frame. CPU time rather than wall time keeps sibling
  * vitest workers out of the measurement, and the median rejects a single GC spike
  * (the same treatment the sim's perf smoke needs to stay unflaky).
+ *
+ * The tick counter advances on the real 1-in-3 cadence. Holding it fixed would let
+ * the renderer's tick-gated work (the resource-memory scan over every entity)
+ * short-circuit on every frame after the first, quietly excluding it from the
+ * budget — a regression there would then sail through this gate. The tick is
+ * stepped directly rather than by running the sim so the measurement stays a
+ * renderer measurement.
  */
 function frameCpuMs(h: Harness, frames = 200, culled = true): number {
   const view = culled ? h.view : undefined;
+  const baseTick = h.state.tick;
   const samples: number[] = [];
-  for (let sample = 0; sample < 3; sample++) {
-    for (let i = 0; i < 30; i++) h.world.update(h.state, 0.5, h.state.tick + 0.5, view);
-    const cpu0 = process.cpuUsage();
-    for (let i = 0; i < frames; i++) {
+  const run = (count: number, from: number): void => {
+    for (let i = 0; i < count; i++) {
+      h.state.tick = from + Math.floor(i / FRAMES_PER_TICK);
       h.world.update(h.state, 0.5, h.state.tick + 0.5, view);
     }
+  };
+  for (let sample = 0; sample < 3; sample++) {
+    run(30, baseTick + sample * 10_000);
+    const cpu0 = process.cpuUsage();
+    run(frames, baseTick + sample * 10_000 + 1_000);
     const cpu = process.cpuUsage(cpu0);
     samples.push((cpu.user + cpu.system) / 1000 / frames);
   }
+  h.state.tick = baseTick;
   samples.sort((a, b) => a - b);
   return samples[1];
 }
@@ -101,10 +117,16 @@ describe('renderer performance smoke', () => {
     const ms = frameCpuMs(h);
     // eslint-disable-next-line no-console
     console.log(`render perf: ${h.state.entities.size} entities, ${ms.toFixed(3)}ms CPU/frame`);
-    // Unloaded this measures well under 2ms, leaving a 60fps frame almost entirely
-    // to the sim and to Pixi's own draw. The pre-optimization renderer measured
-    // ~13ms on the same map, so this budget catches that regression class with
-    // room to spare on slower CI hardware.
+    // Unloaded this measures ~2ms, leaving a 60fps frame almost entirely to the
+    // sim and to Pixi's own draw. The pre-optimization renderer measured ~13ms on
+    // the same map, so this budget catches that regression class with room to
+    // spare on slower CI hardware.
+    //
+    // It is deliberately a coarse backstop: a change worth only a few tenths of a
+    // millisecond will not trip it, and a loose time-based threshold is the wrong
+    // tool for those. The narrower invariants are gated exactly and without
+    // timing elsewhere — record reuse in resourceMemory.test.ts, fade equivalence
+    // and cull geometry in world.render.test.ts.
     expect(ms).toBeLessThanOrEqual(6);
   });
 });

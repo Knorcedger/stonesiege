@@ -257,7 +257,8 @@ export class WorldLayer {
   /** Sim tick the resource memory was last refreshed for (-1 = never). */
   private resourceMemoryTick = -1;
   private readonly seenScratch = new Set<EntityId>();
-  private readonly visibleUnitsScratch: Array<{ entity: Entity; view: EntityView }> = [];
+  /** Views of the units drawn this frame — the fade pass reads nothing else. */
+  private readonly visibleUnitsScratch: EntityView[] = [];
   private readonly posScratch = { x: 0, y: 0 };
 
   constructor(
@@ -347,7 +348,7 @@ export class WorldLayer {
       view.root.visible = true;
       this.updateView(state, displayed!, view, alpha, tickFloat);
       if (displayed!.kind === 'unit' && displayed!.hp > 0 && displayed!.activity !== 'dying'
-        && displayed!.garrisonedIn === undefined) visibleUnits.push({ entity: displayed!, view });
+        && displayed!.garrisonedIn === undefined) visibleUnits.push(view);
     }
 
     for (const remembered of this.resourceMemory.hiddenMissing(state)) {
@@ -500,6 +501,11 @@ export class WorldLayer {
   /**
    * entityWorldPos into a shared scratch object. Called for every entity every
    * frame, so the result must NOT be retained across calls — copy what you need.
+   *
+   * The isometric projection is inlined rather than delegated to tileToWorld
+   * because that helper returns a fresh Vec2, which would reintroduce exactly the
+   * per-entity allocation the scratch object exists to avoid. It must stay in step
+   * with tileToWorld; camera.test.ts pins that projection.
    */
   private readWorldPos(e: Entity, alpha: number): { x: number; y: number } {
     const prev = this.prevPos.get(e.id);
@@ -508,9 +514,9 @@ export class WorldLayer {
     const curY = cur ? cur.y : e.y;
     const fx = prev ? prev.x + (curX - prev.x) * alpha : curX;
     const fy = prev ? prev.y + (curY - prev.y) * alpha : curY;
-    const p = tileToWorld(fx / FP, fy / FP);
-    this.posScratch.x = p.x;
-    this.posScratch.y = p.y;
+    const tx = fx / FP, ty = fy / FP;
+    this.posScratch.x = (tx - ty) * HALF_W;
+    this.posScratch.y = (tx + ty) * HALF_H;
     return this.posScratch;
   }
 
@@ -643,7 +649,7 @@ export class WorldLayer {
    */
   private fadeUnitOccluders(
     state: GameState,
-    visibleUnits: Array<{ entity: Entity; view: EntityView }>,
+    visibleUnits: EntityView[],
   ): void {
     if (visibleUnits.length === 0) return;
 
@@ -658,7 +664,7 @@ export class WorldLayer {
     const buckets = this.fadeBuckets;
     for (const cell of buckets.values()) cell.length = 0;
     for (let i = 0; i < visibleUnits.length; i++) {
-      const unitView = visibleUnits[i].view;
+      const unitView = visibleUnits[i];
       const rect = rects[i] ?? (rects[i] = { left: 0, right: 0, top: 0, bottom: 0 });
       writeUnitWorldRect(unitView, rect);
       depths[i] = unitView.root.zIndex;

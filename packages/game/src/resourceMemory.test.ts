@@ -105,6 +105,33 @@ describe('PlayerResourceMemory refresh cost', () => {
     expect(memory.snapshot().resources[0].amountLeft).toBe(500);
   });
 
+  it('reuses the stored record object across refreshes of an unchanged resource', () => {
+    // Identity, not equality: `snapshot()` copies, so a structural check passes
+    // even when every refresh mints a fresh record. The projection cache is keyed
+    // on record identity, so a stable projection across two refreshes is exactly
+    // the proof that the record itself was reused — and it needs no timing.
+    const visibility = new Uint8Array(64).fill(2);
+    const gold = resource();
+    const state = makeState(gold, visibility);
+    const memory = new PlayerResourceMemory(HUMAN);
+    const hide = (): void => { visibility[gold.tileY * 8 + gold.tileX] = 1; };
+    const show = (): void => { visibility[gold.tileY * 8 + gold.tileX] = 2; };
+
+    memory.refresh(state);
+    hide();
+    const before = memory.entityFor(state, gold);
+    show();
+    memory.refresh(state); // observed again, nothing about it changed
+    hide();
+    expect(memory.entityFor(state, gold)).toBe(before);
+
+    show();
+    gold.amountLeft = 500;
+    memory.refresh(state); // a real change must break the reuse
+    hide();
+    expect(memory.entityFor(state, gold)).not.toBe(before);
+  });
+
   it('reuses one projection per observation but re-projects after a change', () => {
     const visibility = new Uint8Array(64).fill(2);
     const gold = resource();
