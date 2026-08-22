@@ -130,6 +130,16 @@ export interface CombatInfo {
    */
   slotX?: number;
   slotY?: number;
+  /**
+   * Sampled target motion (fixed units per tick) and the sample it was measured from.
+   * A chase that always walks at where the target IS trails a faster runner forever a
+   * hair outside reach; aiming at where it WILL BE turns the walk into an interception.
+   */
+  velX?: Fixed;
+  velY?: Fixed;
+  trackTick?: number;
+  trackX?: Fixed;
+  trackY?: Fixed;
 }
 
 /** An in-flight projectile. Damage payload frozen at fire time (attacker may die). */

@@ -15,7 +15,7 @@ import type { UnitDef } from '@bf/data';
 import { FP, GAIA, TICKS_PER_SECOND } from './types';
 import type { Command, Entity, EntityId, Fixed, SimEvent } from './types';
 import {
-  adjacentToFootprint, effDistFp, facingFromDelta, isTileWalkableForPlayer,
+  adjacentToFootprint, effDistFp, facingFromDelta, isqrt, isTileWalkableForPlayer,
 } from './internal';
 import type { CombatInfo, SimState } from './internal';
 import { resolveBuildingStats, resolveUnitStats } from './stats';
@@ -36,6 +36,10 @@ const BATTLE_SUPPORT_RADIUS_MULTIPLIER = 2;
 const ARROW_JITTER_FP = 32;
 /** Explicit building assaults chain through structures within the same local base. */
 const ASSAULT_CHAIN_RADIUS_FP = 12 * FP;
+/** Ticks between target-motion samples used to aim the chase ahead of a runner. */
+const VELOCITY_SAMPLE_TICKS = 4;
+/** A chase never aims further ahead of a moving target than this many ticks of its travel. */
+const MAX_LEAD_TICKS = 10;
 
 const queryBuf: EntityId[] = [];
 
@@ -199,6 +203,62 @@ function alternateAssaultBuilding(
   return null;
 }
 
+/** Forget a target's sampled motion (engagement retargeted — the old velocity is stale). */
+function clearTargetMotion(info: CombatInfo): void {
+  info.velX = undefined;
+  info.velY = undefined;
+  info.trackTick = undefined;
+  info.trackX = undefined;
+  info.trackY = undefined;
+}
+
+/**
+ * Sample how fast the target is travelling (fixed units per tick), measured over a few
+ * ticks so one separation shove does not read as a sprint. Called every tick an
+ * engagement is alive, so the reading survives walks that span many ticks.
+ */
+function trackTargetMotion(state: SimState, info: CombatInfo, target: Entity): void {
+  const elapsed = info.trackTick === undefined ? -1 : state.tick - info.trackTick;
+  if (elapsed < 0 || elapsed >= VELOCITY_SAMPLE_TICKS) {
+    if (elapsed >= VELOCITY_SAMPLE_TICKS) {
+      info.velX = Math.trunc((target.x - info.trackX!) / elapsed);
+      info.velY = Math.trunc((target.y - info.trackY!) / elapsed);
+    }
+    info.trackTick = state.tick;
+    info.trackX = target.x;
+    info.trackY = target.y;
+  }
+}
+
+/**
+ * Where to walk to meet a moving target. Walking at where it stands is a tail chase:
+ * against anything faster the attacker converges to a fixed gap behind it and — if that
+ * gap lands even slightly outside its reach — never swings once, however close it looks.
+ * Aiming at where the target will be by the time we arrive turns a fly-by into an
+ * interception, without letting a slower unit run down a faster one in a straight line
+ * (there the lead point is collinear with the target, so the walk is unchanged).
+ */
+function chasePoint(state: SimState, e: Entity, info: CombatInfo, target: Entity): { x: Fixed; y: Fixed } {
+  const vx = info.velX ?? 0, vy = info.velY ?? 0;
+  const stats = resolveUnitStats(state, e.player, e.defId);
+  const speedFp = Math.max(1, stats.speedFp);
+  // Only a melee unit has to physically arrive, and only a target it cannot out-walk is
+  // worth cutting off. Shooters keep walking straight at their target (they need firing
+  // distance, not contact), as does anything chasing something it can run down — the
+  // ordinary case in a field battle, left byte-for-byte unchanged.
+  if (stats.projectileSpeedFpPerTick > 0 || !state.motion.has(target.id)
+    || isqrt(vx * vx + vy * vy) <= speedFp) {
+    return { x: target.x, y: target.y };
+  }
+  const lead = Math.min(Math.floor(effDistFp(state, e, target) / speedFp), MAX_LEAD_TICKS);
+  if (lead <= 0) return { x: target.x, y: target.y };
+  const maxX = state.map.width * FP - 1, maxY = state.map.height * FP - 1;
+  return {
+    x: Math.max(0, Math.min(maxX, target.x + vx * lead)),
+    y: Math.max(0, Math.min(maxY, target.y + vy * lead)),
+  };
+}
+
 /**
  * (Re)aim the chase walk. Re-path when the target drifted > 1 tile from where the walk
  * was ordered, or when the walk ended while still out of range (with a short backoff so
@@ -229,6 +289,7 @@ function chase(state: SimState, e: Entity, info: CombatInfo, target: Entity): vo
       info.chaseX = alternate.target.x;
       info.chaseY = alternate.target.y;
       info.chaseFails = 0;
+      clearTargetMotion(info);
       e.intent = { kind: 'attackTarget', targetId: alternate.target.id };
       e.targetId = alternate.target.id;
       goal = alternate.goal;
@@ -236,7 +297,9 @@ function chase(state: SimState, e: Entity, info: CombatInfo, target: Entity): vo
       return;
     }
   }
-  orderMove(state, [e.id], goal?.x ?? target.x, goal?.y ?? target.y);
+  if (goal) { orderMove(state, [e.id], goal.x, goal.y); return; }
+  const lead = chasePoint(state, e, info, target);
+  orderMove(state, [e.id], lead.x, lead.y);
 }
 
 /** Drop the engagement: resume attack-move, otherwise hold the battle endpoint. */
@@ -277,6 +340,7 @@ function continueBuildingAssault(state: SimState, e: Entity, info: CombatInfo): 
   info.chaseFails = undefined;
   info.slotX = undefined;
   info.slotY = undefined;
+  clearTargetMotion(info);
   e.intent = { kind: 'attackTarget', targetId: next.id };
   e.targetId = next.id;
   return true;
@@ -309,6 +373,7 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
     if (dx * dx + dy * dy > LEASH_FP * LEASH_FP) { disengage(state, e); return; }
   }
   e.targetId = target.id;
+  trackTargetMotion(state, info, target);
 
   const stats = resolveUnitStats(state, e.player, e.defId);
   const ranged = stats.projectileSpeedFpPerTick > 0;
