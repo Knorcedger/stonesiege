@@ -65,7 +65,7 @@ interface CutoutSpec {
   teamColor?: 'blue' | 'sash';
   /** Add authored-raster motion without falling back to the legacy pixel rig. */
   pose?: {
-    kind: 'attack' | 'die' | 'stride' | 'gather';
+    kind: 'attack' | 'die' | 'stride' | 'gather' | 'gait';
     progress: number;
     direction: number;
     /** Mirror rotation derived from a source cell that the slicer flips horizontally. */
@@ -82,6 +82,14 @@ interface WalkGridOptions {
   bottom?: number;
   teamColor?: 'blue' | 'sash';
   walkFrames?: number;
+  /**
+   * Drive the walk cycle with a synthesized gait instead of the authored cells.
+   * For sheets that translate their subject across the strip without ever
+   * changing its pose, the authored "cycle" carries no leg motion at all, so
+   * subject registration (issue #60) correctly leaves nothing behind. Opt those
+   * families in here; families with a real authored stride must not use this.
+   */
+  syntheticGait?: boolean;
 }
 
 /** Map a 6x5 authored movement sheet over every animation in a visual family. */
@@ -127,8 +135,15 @@ function walkGridCutouts(
       ...Array.from({ length: walkFrames }, (_, frame): CutoutSpec => ({
         ...common,
         frames: [`unit/${id}/walk/${dir}/${frame}`],
-        cell: cell(frame),
+        // A synthesized gait reads every frame off one authored cell. Sharing a
+        // cell is the point: the sheet's cell-to-cell translation and per-cell
+        // jitter are exactly what leaked back in as a planted foot creeping
+        // forward, and a single cell cannot contribute either.
+        cell: cell(options.syntheticGait ? 0 : frame),
         scaleGroup: `walk:${source}:${dir}`,
+        ...(options.syntheticGait
+          ? { pose: { kind: 'gait' as const, progress: frame / walkFrames, direction: dir } }
+          : {}),
       })),
       ...Array.from({ length: 5 }, (_, frame): CutoutSpec => ({
         ...common,
@@ -579,7 +594,10 @@ const CUTOUT_SPECS: readonly CutoutSpec[] = [
   ...walkGridCutouts(
     'art/hd/frames/units/champion-walk-grid-cutout-v1.png',
     ['militia', 'manAtArms', 'longswordsman', 'champion'],
-    { stableSize: [84, 88] },
+    // This sheet's six cells are the same standing pose translated across the
+    // strip: dirs 3 and 4 hold their feet within 2.5px of the body for the
+    // whole "cycle". Synthesize the gait rather than ship a sliding statue.
+    { stableSize: [84, 88], syntheticGait: true },
   ),
   ...walkGridCutouts(
     'art/hd/frames/units/pikeman-walk-grid-cutout-v1.png',
@@ -1078,6 +1096,140 @@ function bilinearRasterPixel(raster: Raster, x: number, y: number): readonly [nu
   ];
 }
 
+/** Screen-space facing of each authored direction (S, SW, W, NW, N); +x is right. */
+const GAIT_FACING: ReadonlyArray<readonly [number, number]> = [
+  [0, 1], [-0.72, 0.5], [-1, 0], [-0.72, -0.5], [0, -1],
+];
+/** Leg geometry as a fraction of the subject's own height. */
+const GAIT_HIP = 0.36;
+const GAIT_STRIDE = 0.13;
+const GAIT_LIFT = 0.06;
+const GAIT_DEPTH = 0.05;
+
+/**
+ * One leg's state at a point in the cycle. Stance (first half) sweeps the foot
+ * from ahead of the body to behind it — the planted foot must travel *against*
+ * the direction of movement, which is the difference between walking and
+ * moonwalking. Swing (second half) carries it forward again, lifted clear.
+ */
+function gaitLegState(phase: number): { sweep: number; lift: number } {
+  const p = ((phase % 1) + 1) % 1;
+  if (p < 0.5) return { sweep: 1 - 4 * p, lift: 0 };
+  const swing = (p - 0.5) * 2;
+  return { sweep: -1 + 2 * swing, lift: Math.sin(swing * Math.PI) };
+}
+
+/** Horizontal center of the subject between two rows, or null when they are empty. */
+function rasterBandCenter(raster: Raster, y0: number, y1: number): number | null {
+  let left = raster.width;
+  let right = -1;
+  const top = Math.max(0, Math.round(y0));
+  const bottom = Math.min(raster.height - 1, Math.round(y1));
+  for (let y = top; y <= bottom; y++) {
+    for (let x = 0; x < raster.width; x++) {
+      if (raster.alphaAt(x, y) <= 40) continue;
+      if (x < left) left = x;
+      if (x > right) right = x;
+    }
+  }
+  return right < 0 ? null : (left + right) / 2;
+}
+
+/**
+ * Synthesize a walk cycle for a family whose authored sheet has none.
+ *
+ * The two legs run half a cycle apart around a hip pivot: displacement grows
+ * with depth below the hip, so the thighs barely move and the boots carry the
+ * stride. The swing leg lifts clear of the ground, and in iso a foot planted
+ * ahead of the body also sits lower on screen walking toward the camera and
+ * higher walking away, which is the only stride cue the front and rear views
+ * have. The pair is anchored so whichever foot is lower keeps the authored
+ * ground line, and the body's bob fades to zero at the feet so a planted boot
+ * never lifts off with it.
+ */
+function applyWalkGait(
+  source: Raster,
+  direction: number,
+  progress: number,
+  groundY: number,
+): Raster {
+  const { top, bottom } = rasterAlphaBounds(source);
+  if (bottom < 0) return source;
+  const footY = Math.min(bottom, groundY);
+  const height = Math.max(1, bottom - top + 1);
+  const hipY = footY - GAIT_HIP * height;
+  const legSpan = Math.max(1, footY - hipY);
+  const probe = Math.max(2, legSpan / 4);
+  const hipCenter = rasterBandCenter(source, hipY, hipY + probe) ?? source.width / 2;
+  const footCenter = rasterBandCenter(source, footY - probe, footY) ?? hipCenter;
+
+  const [faceX, faceY] = GAIT_FACING[direction] ?? GAIT_FACING[0];
+  const stride = GAIT_STRIDE * height;
+  const near = gaitLegState(progress);
+  const far = gaitLegState(progress + 0.5);
+  // Facing the camera or away there is no screen-horizontal travel to show, so
+  // the stride reads as the legs scissoring apart and closing instead.
+  const sweepX = (sweep: number): number => (Math.abs(faceX) > 0.01
+    ? sweep * stride * faceX
+    : -sweep * stride * 0.45);
+  const depth = GAIT_DEPTH * height * faceY;
+  const nearDx = sweepX(near.sweep);
+  const farDx = sweepX(far.sweep);
+  const nearRise = near.sweep * depth - near.lift * GAIT_LIFT * height;
+  const farRise = far.sweep * depth - far.lift * GAIT_LIFT * height;
+  // Anchor on whichever foot ends up lowest — the planted one, since only the
+  // swing leg carries a lift — so the cycle keeps the authored ground line.
+  // Anchoring on depth alone let a rear-quarter swing leg define the ground and
+  // hoisted the planted foot off it.
+  const grounded = Math.max(nearRise, farRise);
+  const nearDy = nearRise - grounded;
+  const farDy = farRise - grounded;
+  // Lowest at each contact, rising over the straight stance leg between them.
+  const bob = -Math.round(Math.abs(Math.sin(progress * Math.PI * 2)));
+  // The leading leg is the one on the side the unit is walking toward.
+  const leadSign = faceX <= 0 ? 1 : -1;
+
+  const output = new Raster(source.width, source.height);
+  for (let y = 0; y < source.height; y++) {
+    if (y <= hipY) {
+      for (let x = 0; x < source.width; x++) {
+        const [r, g, b, a] = bilinearRasterPixel(source, x, y - bob);
+        if (a > 0) output.set(x, y, [r, g, b], a);
+      }
+      continue;
+    }
+    const t = Math.min(1, Math.max(0, (y - hipY) / legSpan));
+    const pivot = t * t;
+    const split = hipCenter + (footCenter - hipCenter) * t;
+    const carry = bob * (1 - t);
+    for (let x = 0; x < source.width; x++) {
+      const nearX = x - nearDx * pivot;
+      const useNear = (nearX - split) * leadSign < 0;
+      const sx = useNear ? nearX : x - farDx * pivot;
+      const sy = y - (useNear ? nearDy : farDy) * pivot - carry;
+      const [r, g, b, a] = bilinearRasterPixel(source, sx, sy);
+      if (a > 0) output.set(x, y, [r, g, b], a);
+    }
+  }
+  // Anchoring the pair by displacement is not the same as anchoring the render:
+  // where the authored pose already stands one boot lower than the other, the
+  // frame that swings *that* boot lifts the whole silhouette off the ground
+  // line. Re-seat the finished frame on it, which moves the body and both legs
+  // together and so cannot disturb the gait.
+  const rendered = rasterAlphaBounds(output);
+  if (rendered.bottom < 0) return output;
+  const drop = Math.min(footY - rendered.bottom, source.height - 1 - rendered.bottom);
+  if (drop <= 0) return output;
+  const seated = new Raster(source.width, source.height);
+  for (let y = source.height - 1 - drop; y >= 0; y--) {
+    for (let x = 0; x < source.width; x++) {
+      const [r, g, b, a] = output.get(x, y);
+      if (a > 0) seated.set(x, y + drop, [r, g, b], a);
+    }
+  }
+  return seated;
+}
+
 /** Preserve premium source pixels while adding readable attack, gait, and fall silhouettes. */
 function transformCutoutPose(
   source: Raster,
@@ -1329,7 +1481,9 @@ function cutoutFrame(spec: CutoutSpec, name: string, base: FrameDef, sharedScale
     }
   }
   if (spec.pose) {
-    raster = transformCutoutPose(raster, spec.pose, bottom);
+    raster = spec.pose.kind === 'gait'
+      ? applyWalkGait(raster, spec.pose.direction, spec.pose.progress, bottom)
+      : transformCutoutPose(raster, spec.pose, bottom);
     if (spec.teamColor) restoreExactTeamMask(raster);
   }
   const buildingMatch = name.match(/^bld\/([^/]+)\//);
