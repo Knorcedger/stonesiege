@@ -5,9 +5,9 @@ import { FP, type Entity, type GameMap, type GameState, type PlayerId } from '@b
 import { tileToWorld } from './camera';
 import {
   advanceGateOpenProgress, artScaleForFrame, artZIndex, buildingArtKey, buildingHpBarWidth,
-  defaultRallyTilePoint,
-  entityPickDistance, isHiddenInHost, mirroredWallIds, ownedResearchProgress, resourceFrameName,
-  wallCornerJoins, rallyFlagWorldPoint, shouldFadeForUnit,
+  defaultRallyTilePoint, entityPickDistance, isHiddenInHost, mirroredWallIds,
+  ownedResearchProgress, resourceFrameName, wallCornerJoins, rallyFlagWorldPoint,
+  shouldFadeForUnit, villagerWorkTarget,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -431,5 +431,45 @@ describe('no building-art draw path may drift off the shared art scale', () => {
     const fx = code('./fx.ts');
     expect(fx).toContain('renderScale');
     expect(statements(fx).filter((s) => s.includes('artScale'))).toEqual([]);
+  });
+});
+
+describe('villagerWorkTarget', () => {
+  const villager = (patch: Partial<Entity>): Entity => ({
+    id: 3, kind: 'unit', defId: 'villager', player: HUMAN,
+    x: 0, y: 0, tileX: 0, tileY: 0, facing: 0,
+    hp: 25, maxHp: 25, activity: 'idle',
+    ...patch,
+  } as Entity);
+
+  it('rings a build or repair site for the whole order, walk included', () => {
+    // The sim keeps `intent` from the moment the order lands until the job ends,
+    // so the ring covers the walk over — the stretch that used to look like a
+    // dropped command.
+    expect(villagerWorkTarget(villager({
+      activity: 'moving', intent: { kind: 'build', targetId: 12 },
+    }))).toBe(12);
+    expect(villagerWorkTarget(villager({
+      activity: 'building', intent: { kind: 'build', targetId: 12 },
+    }))).toBe(12);
+    expect(villagerWorkTarget(villager({
+      activity: 'repairing', intent: { kind: 'repair', targetId: 8 },
+    }))).toBe(8);
+  });
+
+  it('still rings the resource a laden villager is walking back from', () => {
+    expect(villagerWorkTarget(villager({
+      activity: 'carrying', targetId: 5,
+    }))).toBe(5);
+    expect(villagerWorkTarget(villager({
+      activity: 'moving', intent: { kind: 'gather', targetId: 5 },
+    }))).toBe(5);
+  });
+
+  it('rings nothing for an idle villager or a recorded attack-move', () => {
+    expect(villagerWorkTarget(villager({}))).toBeUndefined();
+    expect(villagerWorkTarget(villager({
+      activity: 'moving', intent: { kind: 'attackMove', x: 0, y: 0 },
+    }))).toBeUndefined();
   });
 });
