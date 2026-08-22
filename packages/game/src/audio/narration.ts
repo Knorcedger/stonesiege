@@ -105,14 +105,20 @@ export function deliveryFor(speaker: string | undefined): NarrationDelivery {
 /** Name fragments of voices that read as a low, formal storyteller. */
 const PREFERRED_NAMES = [
   'daniel', 'arthur', 'oliver', 'george', 'brian', 'ryan', 'james', 'alex', 'fred',
-  'rishi', 'gordon', 'aaron', 'male',
+  'rishi', 'gordon', 'aaron',
 ];
+/**
+ * Platforms that label voices by sex ("Google UK English Male") rather than by
+ * name. Matched as a whole word — a substring test also matches "female".
+ */
+const MALE_LABEL = /\bmale\b/;
+/** Lower-bandwidth variants of otherwise good voices ("Daniel (Compact)"). */
+const COMPACT_LABEL = /\bcompact\b/;
 /** Voices whose delivery fights the intent (novelty, or clearly not a narrator). */
 const REJECTED_NAMES = [
   'whisper', 'bells', 'bubbles', 'organ', 'cellos', 'trinoids', 'zarvox', 'wobble',
   'bahh', 'boing', 'jester', 'superstar', 'bad news', 'good news', 'albert', 'eddy',
-  'flo', 'grandma', 'grandpa', 'reed', 'rocko', 'sandy', 'shelley', 'junior', 'kathy',
-  'novelty', 'compact',
+  'grandma', 'grandpa', 'rocko', 'sandy', 'shelley', 'junior', 'novelty',
 ];
 const FEMALE_NAMES = [
   'female', 'samantha', 'karen', 'moira', 'tessa', 'fiona', 'serena', 'kate', 'zira',
@@ -123,12 +129,16 @@ const FEMALE_NAMES = [
 const containsAny = (haystack: string, needles: string[]): boolean =>
   needles.some((n) => haystack.includes(n));
 
-/** Higher is a better narrator. Negative means unusable. */
-export function voiceScore(voice: NarrationVoice): number {
+/**
+ * Higher is a better narrator; `null` is disqualified (not English, or a
+ * novelty voice). A merely unappealing voice still scores, because reading the
+ * campaign in the wrong language is worse than reading it in the wrong timbre.
+ */
+export function voiceScore(voice: NarrationVoice): number | null {
   const name = voice.name.toLowerCase();
   const lang = voice.lang.toLowerCase().replace('_', '-');
-  if (!lang.startsWith('en')) return -1;
-  if (containsAny(name, REJECTED_NAMES)) return -1;
+  if (!lang.startsWith('en')) return null;
+  if (containsAny(name, REJECTED_NAMES)) return null;
 
   let score = 0;
   // A British read carries the Wallace-era campaigns best; other English
@@ -138,23 +148,27 @@ export function voiceScore(voice: NarrationVoice): number {
   else if (lang.startsWith('en-za') || lang.startsWith('en-in')) score += 16;
   else score += 8;
 
-  if (containsAny(name, PREFERRED_NAMES)) score += 30;
+  if (containsAny(name, PREFERRED_NAMES) || MALE_LABEL.test(name)) score += 30;
   if (containsAny(name, FEMALE_NAMES)) score -= 20;
+  if (COMPACT_LABEL.test(name)) score -= 4;
   // Network voices sound better but stall offline; local wins the tiebreak.
   if (voice.localService) score += 6;
   if (voice.default) score += 2;
   return score;
 }
 
-/** The best installed narrator voice, or null to let the platform default read. */
+/**
+ * The best installed narrator voice, or null when none is usable — the
+ * platform default reads instead.
+ */
 export function pickNarrationVoice(voices: readonly NarrationVoice[]): NarrationVoice | null {
   let best: NarrationVoice | null = null;
-  let bestScore = 0;
+  let bestScore = -Infinity;
   for (const v of voices) {
     const score = voiceScore(v);
     // Strictly greater keeps the first of equally ranked voices — the platform
     // list order is stable, so the pick does not shift between sessions.
-    if (score > bestScore) {
+    if (score !== null && score > bestScore) {
       best = v;
       bestScore = score;
     }
@@ -194,6 +208,15 @@ export class Narrator {
   private voice: NarrationVoice | null = null;
   private voicesResolved = false;
   private active: { startedAt: number; timeoutMs: number } | null = null;
+  /**
+   * Bumped on every speak/cancel. `cancel()` makes the outgoing utterance
+   * report completion asynchronously, so a stale callback must not clear the
+   * state of the line that replaced it — that would drop the banner hold and
+   * chop every following line mid-sentence.
+   */
+  private generation = 0;
+  private muted = false;
+  private silenced = false;
   private disposers: Array<() => void> = [];
   private readonly isHidden: () => boolean;
   private readonly readSettings: () => GameSettings;
@@ -209,6 +232,39 @@ export class Narrator {
     this.disposers.push(onSettingsChanged((s) => {
       if (!s.narrationEnabled || this.gain(s) <= 0) this.cancel();
     }));
+    if (typeof document !== 'undefined') {
+      // A line already in flight keeps talking through a backgrounding unless
+      // it is stopped here — the speech queue is not on any of the gain buses
+      // AudioEngine mutes, and `pagehide` covers leaving the match entirely.
+      const stop = (): void => {
+        if (this.isHidden()) this.cancel();
+      };
+      document.addEventListener('visibilitychange', stop);
+      this.disposers.push(() => document.removeEventListener('visibilitychange', stop));
+      const onLeave = (): void => this.cancel();
+      window.addEventListener('pagehide', onLeave);
+      this.disposers.push(() => window.removeEventListener('pagehide', onLeave));
+    }
+  }
+
+  /**
+   * Silence while the match is paused. Unlike `silence()` this is reversible —
+   * the ticker keeps advancing the banner behind the pause overlay, and a
+   * paused game must not keep narrating.
+   */
+  setMuted(muted: boolean): void {
+    this.muted = muted;
+    if (muted) this.cancel();
+  }
+
+  /**
+   * Stop for the rest of the match (the end screen is up). Latched: scenarios
+   * queue their closing lines in the same effect batch as the victory, so a
+   * one-shot cancel would be undone by the very next banner frame.
+   */
+  silence(): void {
+    this.silenced = true;
+    this.cancel();
   }
 
   private gain(s: GameSettings): number {
@@ -238,7 +294,7 @@ export class Narrator {
 
   /** Speak a banner line, replacing anything already being read. */
   speak(line: NarrationLine, now: number): void {
-    if (!this.seam) return;
+    if (!this.seam || this.muted || this.silenced) return;
     const settings = this.readSettings();
     const volume = this.gain(settings);
     if (!settings.narrationEnabled || volume <= 0 || this.isHidden()) return;
@@ -247,6 +303,7 @@ export class Narrator {
     const delivery = deliveryFor(line.speaker);
     try {
       this.seam.cancel(); // barge-in: the newest line always wins
+      const generation = ++this.generation;
       this.active = {
         startedAt: now,
         timeoutMs: estimateSpeechMs(text, delivery.rate) * SPEECH_TIMEOUT_FACTOR,
@@ -258,7 +315,7 @@ export class Narrator {
         pitch: delivery.pitch,
         volume,
         onDone: () => {
-          this.active = null;
+          if (generation === this.generation) this.active = null;
         },
       };
       this.seam.speak(request);
@@ -280,9 +337,10 @@ export class Narrator {
     return true;
   }
 
-  /** Stop immediately (dismissed line, match ended, narration switched off). */
+  /** Stop immediately (dismissed line, paused, narration switched off). */
   cancel(): void {
     this.active = null;
+    this.generation++; // orphan the in-flight utterance's completion callback
     try {
       this.seam?.cancel();
     } catch {

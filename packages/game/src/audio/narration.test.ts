@@ -88,19 +88,37 @@ describe('deliveryFor', () => {
   });
 });
 
+/** voiceScore returns null for a disqualified voice; these compare rankings. */
+const rank = (v: NarrationVoice): number => {
+  const score = voiceScore(v);
+  expect(score).not.toBeNull();
+  return score as number;
+};
+
 describe('voiceScore', () => {
   it('rules out non-English and novelty voices', () => {
-    expect(voiceScore(voice('Amélie', 'fr-FR'))).toBeLessThan(0);
-    expect(voiceScore(voice('Bad News', 'en-US'))).toBeLessThan(0);
-    expect(voiceScore(voice('Bubbles', 'en-GB'))).toBeLessThan(0);
+    expect(voiceScore(voice('Amélie', 'fr-FR'))).toBeNull();
+    expect(voiceScore(voice('Bad News', 'en-US'))).toBeNull();
+    expect(voiceScore(voice('Bubbles', 'en-GB'))).toBeNull();
   });
 
   it('ranks a British storyteller above other English voices', () => {
-    expect(voiceScore(voice('Daniel', 'en-GB')))
-      .toBeGreaterThan(voiceScore(voice('Alex', 'en-US')));
-    expect(voiceScore(voice('Google UK English Male', 'en-GB')))
-      .toBeGreaterThan(voiceScore(voice('Google UK English Female', 'en-GB')));
-    expect(voiceScore(voice('Daniel', 'en_GB'))).toBeGreaterThan(0); // underscore locales
+    expect(rank(voice('Daniel', 'en-GB'))).toBeGreaterThan(rank(voice('Alex', 'en-US')));
+    expect(rank(voice('Daniel', 'en_GB'))).toBeGreaterThan(0); // underscore locales
+  });
+
+  it('reads "male" as a label, not as a substring of "female"', () => {
+    expect(rank(voice('Google UK English Male', 'en-GB')))
+      .toBeGreaterThan(rank(voice('Google UK English Female', 'en-GB')));
+    expect(rank(voice('Google UK English Female', 'en-GB')))
+      .toBeLessThan(rank(voice('Microsoft Sonia', 'en-GB')));
+  });
+
+  it('keeps a usable English voice ranked, however unappealing', () => {
+    // Negative but not disqualified: reading the campaign in the wrong timbre
+    // beats reading it in the wrong language.
+    expect(voiceScore(voice('Samantha', 'en-US'))).toBeLessThan(0);
+    expect(rank(voice('Daniel (Compact)', 'en-GB'))).toBeLessThan(rank(voice('Daniel', 'en-GB')));
   });
 });
 
@@ -118,6 +136,11 @@ describe('pickNarrationVoice', () => {
   it('falls back to the platform default when nothing is usable', () => {
     expect(pickNarrationVoice([])).toBeNull();
     expect(pickNarrationVoice([voice('Anna', 'de-DE'), voice('Zarvox', 'en-US')])).toBeNull();
+  });
+
+  it('takes a low-ranked English voice over a non-English one', () => {
+    const picked = pickNarrationVoice([voice('Anna', 'de-DE'), voice('Samantha', 'en-US')]);
+    expect(picked?.name).toBe('Samantha');
   });
 });
 
@@ -197,6 +220,48 @@ describe('Narrator', () => {
     n.cancel();
     expect(seam.cancels).toBe(3);
     expect(n.isSpeaking(11)).toBe(false);
+    n.dispose();
+  });
+
+  it('ignores a cancelled line reporting completion late', () => {
+    // speechSynthesis fires end/error for the utterance cancel() interrupts,
+    // and it arrives after the replacement has started talking.
+    const seam = new FakeSeam();
+    const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
+    n.speak({ text: 'The first long line of the chapter.', speaker: 'Narrator' }, 0);
+    const interrupted = seam.last!;
+    n.speak({ text: 'The second long line of the chapter.', speaker: 'Wallace' }, 10);
+    interrupted.onDone(); // late completion of the line that was cut off
+    expect(n.isSpeaking(20)).toBe(true); // the new line is still reading
+    seam.last!.onDone();
+    expect(n.isSpeaking(30)).toBe(false);
+    n.dispose();
+  });
+
+  it('stops for a paused match and speaks again on resume', () => {
+    const seam = new FakeSeam();
+    const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
+    n.speak({ text: 'Before the pause.', speaker: 'Narrator' }, 0);
+    n.setMuted(true);
+    expect(n.isSpeaking(10)).toBe(false);
+    n.speak({ text: 'While paused.', speaker: 'Wallace' }, 20);
+    expect(seam.spoken).toHaveLength(1);
+    n.setMuted(false);
+    n.speak({ text: 'After the pause.', speaker: 'Wallace' }, 30);
+    expect(seam.last?.text).toBe('After the pause.');
+    n.dispose();
+  });
+
+  it('stays silenced once the match is over', () => {
+    const seam = new FakeSeam();
+    const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
+    n.speak({ text: 'The last stand.', speaker: 'Narrator' }, 0);
+    n.silence();
+    expect(n.isSpeaking(10)).toBe(false);
+    // The closing lines are queued in the same effect batch as the victory.
+    n.speak({ text: 'Heselrig is dead.', speaker: 'Narrator' }, 20);
+    n.speak({ text: 'Men begin to count spears.', speaker: 'Narrator' }, 30);
+    expect(seam.spoken).toHaveLength(1);
     n.dispose();
   });
 

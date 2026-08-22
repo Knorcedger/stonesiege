@@ -638,7 +638,10 @@ async function bootGame(
     endShown = true;
     clearSnapshot(plan.slot); // a finished match must never be offered for resume
     deselect();
-    narrator.cancel(); // no dialogue talking over the end screen
+    // Latched, not a one-shot cancel: scenarios queue their closing lines in
+    // the same effect batch as the victory, and the end screen covers the
+    // banner — so nothing more is read once the match is over.
+    narrator.silence();
     audioEngine.play(victory ? 'hornVictory' : 'hornDefeat');
     const summary = deriveMatchSummary(getState(), humanPlayer, tallies);
     // One fire per match: the endShown guard above already guarantees it, and a
@@ -755,6 +758,9 @@ async function bootGame(
 
   // --------------------------------------------------------------- sim loop
   const loop = new SimLoop(game, {
+    // The render ticker keeps advancing the banner behind the pause overlay,
+    // so narration has to be told to stop with the match.
+    onPauseChanged: (paused) => narrator.setMuted(paused),
     onTick: (events) => {
       const st = getState();
       for (const bot of bots.values()) {

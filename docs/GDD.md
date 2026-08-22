@@ -214,8 +214,10 @@ device's own speech synthesizer, steered into a slow, low, deliberate delivery. 
 and `Chronicle` lines get the deepest, slowest read, and every other speaker keeps a pitch
 derived from its name, so Wallace and Cressingham stay apart by ear across chapters. The banner
 holds until the voice finishes (capped at 20s) so a line is never cut off mid-sentence, and a
-tap dismisses text and voice together. **Narration** volume and a **Campaign narration**
-switch sit with the other audio settings; off sends nothing to the synthesizer at all.
+tap dismisses text and voice together. Narration stops with the match: pausing, backgrounding
+the app, or reaching the end screen silences it, and the closing lines are not read over the
+victory or defeat fanfare. **Narration** volume and a **Campaign narration** switch sit with
+the other audio settings; off sends nothing to the synthesizer at all.
 Devices without speech synthesis simply read nothing and play exactly as before. Recorded
 voice-over remains on the roadmap and can replace the synthesizer behind the same seam.
 
