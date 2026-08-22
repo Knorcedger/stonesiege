@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  currentScreen, flowAtScenarioList, flowReducer, initialFlow,
+  currentScreen, flowAtEpilogue, flowAtScenarioList, flowReducer, initialFlow,
   type FlowEvent, type FlowState,
 } from './flow';
 
@@ -28,6 +28,38 @@ describe('menu flow', () => {
       { kind: 'openBriefing', campaignId: 'wallace', scenarioId: 'wallace-1' },
     );
     expect(currentScreen(s)).toEqual({ id: 'briefing', campaignId: 'wallace', scenarioId: 'wallace-1' });
+  });
+
+  it('opens the campaign story pages from the chapter list and back returns to it', () => {
+    const list = run(
+      initialFlow(),
+      { kind: 'openPlay' },
+      { kind: 'openCampaigns' },
+      { kind: 'openScenarios', campaignId: 'wallace' },
+    );
+    for (const ev of [
+      { kind: 'openPrologue', campaignId: 'wallace' },
+      { kind: 'openEpilogue', campaignId: 'wallace' },
+    ] as const) {
+      const page = flowReducer(list, ev);
+      expect(currentScreen(page).id).toBe(ev.kind === 'openPrologue' ? 'prologue' : 'epilogue');
+      expect(currentScreen(flowReducer(page, { kind: 'back' })))
+        .toEqual({ id: 'scenarioList', campaignId: 'wallace' });
+    }
+  });
+
+  it('rejects a story page opened from anywhere but its own chapter list', () => {
+    const play = run(initialFlow(), { kind: 'openPlay' });
+    expect(flowReducer(play, { kind: 'openPrologue', campaignId: 'wallace' })).toBe(play);
+    const list = run(play, { kind: 'openCampaigns' }, { kind: 'openScenarios', campaignId: 'wallace' });
+    expect(flowReducer(list, { kind: 'openEpilogue', campaignId: 'joan' })).toBe(list);
+  });
+
+  it('deep-links to an epilogue with the chapter list behind it', () => {
+    let s = flowAtEpilogue('wallace');
+    expect(currentScreen(s)).toEqual({ id: 'epilogue', campaignId: 'wallace' });
+    s = flowReducer(s, { kind: 'back' });
+    expect(currentScreen(s)).toEqual({ id: 'scenarioList', campaignId: 'wallace' });
   });
 
   it('back pops one screen at a time until the title, then no-ops', () => {

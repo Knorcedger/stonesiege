@@ -6,6 +6,20 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Added
 
+- **Campaign prologues and epilogues.** Every campaign now opens on an artwork page explaining
+  the situation the chapters are about — for William Wallace, what Edward I had already done to
+  Scotland by 1297 — shown the first time the campaign is opened and re-readable from the chapter
+  list at any time. Finishing the last chapter of a campaign opens its closing page instead of
+  dropping you back on a list of completed chapters.
+- **Chapter aftermath pages.** Winning a campaign chapter now shows what the victory actually
+  changed — historically, not just numerically — before the statistics panel. Where a mission
+  compresses or dramatizes the record, the page says so.
+- **Difficulty ratings.** Every chapter carries a 1–5 rating with a rank name and a line saying
+  what makes it hard. Ratings appear on campaign cards, on every chapter row (including locked
+  ones), and on the briefing. A campaign's own rating is derived from its chapters.
+- **Briefings that introduce the people in them.** Each chapter briefing now opens with what is
+  at stake if it is lost, and lists who you are fighting with and against, so the names in the
+  dialogue mean something the first time they are spoken.
 - Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud with a
   slow, low delivery, with the narrator and each named character kept apart by ear. The banner
   waits for the voice to finish the sentence before moving on, and a tap dismisses the line and
@@ -19,6 +33,13 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Changed
 
+- Every chapter in every campaign now carries story while it is being played, not only an opening
+  and a closing line. The twelve William Wallace chapters gained 57 new spoken beats; the six
+  legendary campaigns gained 72, and their missions are no longer narrated end to end by a single
+  "Chronicle" voice — Henry, Joan, Charles VII, Temüjin, Bohemond, Richard the Lionheart and the
+  rest speak for themselves.
+- Chapter briefings state what is lost if the chapter fails, rather than repeating the line that
+  sets the scene.
 - Battles can be read by ear. Every blow used to play the same steel clash, so a battering ram
   pounding a Town Center sounded exactly like two swordsmen trading hits, and arrows and boulders
   landed in silence. Now the sound is the weapon plus what it lands on: a ram booms into a gate
