@@ -26,6 +26,11 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   ordering an attack on a fleeing enemy never traces its path through the fog. The undo toast
   names the building too: **Building House** and **Repairing Barracks** instead of a bare
   *Build* / *Repair*.
+- Soldiers answer a tower together. A man shot while standing with his squad used to charge
+  the tower alone while everyone beside him watched; now whatever struck him pulls in the
+  troops inside their guard circle, and they set off with him instead of trickling in one at a
+  time. Ordering an assault on a building still sends exactly the units you sent — nobody
+  parked nearby gets dragged along.
 
 ## 0.1.2 — 2026-08-20
 
