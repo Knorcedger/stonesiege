@@ -66,7 +66,12 @@ export interface HudHost {
   startPlacement(defId: string): void;
   confirmPlacement(): void;
   cancelPlacement(): void;
-  getPlacement(): { defId: string; valid: boolean; affordable: boolean } | null;
+  getPlacement(): {
+    defId: string;
+    valid: boolean;
+    needsVisibility?: boolean;
+    affordable: boolean;
+  } | null;
   stopSelection(): void;
   /** Trebuchets: pack (fold to move) or unpack (deploy to fire) the selected trebs. */
   packSelection(pack: boolean): void;
@@ -1970,7 +1975,9 @@ export class Hud {
     // an unmet building prereq blocks EVERY tile (sim canPlace → hasBuildPrereqs);
     // name the missing building instead of showing a bare 'Blocked'
     let blockedText = 'Blocked';
-    if (!placement.valid && def?.requiresBuildings) {
+    if (placement.needsVisibility) {
+      blockedText = 'Reveal this area';
+    } else if (!placement.valid && def?.requiresBuildings) {
       const completed = new Set(this.completedBuildingDefIds(this.host.getState()));
       const missing = def.requiresBuildings.find((req) => !completed.has(req));
       if (missing !== undefined) {

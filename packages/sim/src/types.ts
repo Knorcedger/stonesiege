@@ -59,6 +59,8 @@ export interface TrainQueueItem {
   paid?: Partial<Stockpile>;
   /** True once the item reached the front and reserved population (additive, sim-internal). */
   started?: boolean;
+  /** Client-local provenance for precise short-lived Undo; not a gameplay rule. */
+  requestId?: number;
   /**
    * Set = this queue slot is a RESEARCH, not a unit (AoE2: research occupies the same
    * production queue). defId mirrors the tech id; no population is reserved (additive).
@@ -94,6 +96,8 @@ export interface Entity {
   facing: number; // 0..7, 0 = south, clockwise (see ASSET_CONTRACT.md)
   hp: number; maxHp: number;
   activity: UnitActivity; // renderer picks animation from this
+  /** Client-local provenance for precise short-lived foundation Undo. */
+  requestId?: number;
   // units
   targetId?: EntityId;
   carrying?: { type: ResourceType; amount: number };
@@ -180,14 +184,18 @@ export type Command =
   | { kind: 'gather'; player: PlayerId; units: EntityId[]; targetId: EntityId }
   | {
       kind: 'build'; player: PlayerId; units: EntityId[]; defId: string; tileX: number; tileY: number;
+      requestId?: number;
       /** Shift-placement: place now, but builders already constructing finish their queue first. */
       queue?: boolean;
     }
   | { kind: 'repair'; player: PlayerId; units: EntityId[]; targetId: EntityId }
-  | { kind: 'train'; player: PlayerId; buildingId: EntityId; defId: string }
-  | { kind: 'cancelTrain'; player: PlayerId; buildingId: EntityId; index: number }
-  | { kind: 'research'; player: PlayerId; buildingId: EntityId; techId: string }
-  | { kind: 'cancelResearch'; player: PlayerId; buildingId: EntityId }
+  | { kind: 'train'; player: PlayerId; buildingId: EntityId; defId: string; requestId?: number }
+  | {
+      kind: 'cancelTrain'; player: PlayerId; buildingId: EntityId;
+      index?: number; requestId?: number;
+    }
+  | { kind: 'research'; player: PlayerId; buildingId: EntityId; techId: string; requestId?: number }
+  | { kind: 'cancelResearch'; player: PlayerId; buildingId: EntityId; requestId?: number }
   | { kind: 'setRally'; player: PlayerId; buildingId: EntityId; x: Fixed; y: Fixed; targetId?: EntityId }
   | { kind: 'stop'; player: PlayerId; units: EntityId[] }
   | { kind: 'garrison'; player: PlayerId; units: EntityId[]; targetId: EntityId }

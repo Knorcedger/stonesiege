@@ -56,14 +56,14 @@ export function createEconomy(ctx: Ctx): EconomyManager {
    * in the ring around the footprint, else a farm dropped into an enclosed pocket
    * between other farms can never be raised.
    */
-  const accessible = (defId: string, x: number, y: number): boolean => {
+  const accessible = (snap: Snapshot, defId: string, x: number, y: number): boolean => {
     const size = gameData.buildings[defId]?.size ?? 1;
     let open = 0;
     for (let dy = -1; dy <= size; dy++) {
       for (let dx = -1; dx <= size; dx++) {
         const onRing = dx === -1 || dy === -1 || dx === size || dy === size;
         if (!onRing) continue;
-        if (game.isWalkable(x + dx, y + dy)) open++;
+        if (snap.observedMap.isWalkable(x + dx, y + dy)) open++;
         if (open >= 3) return true;
       }
     }
@@ -80,7 +80,7 @@ export function createEconomy(ctx: Ctx): EconomyManager {
    * edge of a local window must still reach it once the footprint is blocked.
    */
   const SEAL_WINDOW = 9;
-  const wouldSealPocket = (defId: string, bx: number, by: number): boolean => {
+  const wouldSealPocket = (snap: Snapshot, defId: string, bx: number, by: number): boolean => {
     const size = gameData.buildings[defId]?.size ?? 1;
     const x0 = bx - SEAL_WINDOW;
     const y0 = by - SEAL_WINDOW;
@@ -96,7 +96,7 @@ export function createEconomy(ctx: Ctx): EconomyManager {
         const i = (y - y0) * w + (x - x0);
         if (seen[i]) return;
         if (blockFoot && inFoot(x, y)) return;
-        if (!game.isWalkable(x, y)) return;
+        if (!snap.observedMap.isWalkable(x, y)) return;
         seen[i] = 1;
         queue.push(i);
       };
@@ -129,7 +129,13 @@ export function createEconomy(ctx: Ctx): EconomyManager {
   };
 
   /** First valid, reachable top-left placement tile in a deterministic ring scan. */
-  const findSpot = (defId: string, cx: number, cy: number, maxR = 14): { x: number; y: number } | null => {
+  const findSpot = (
+    snap: Snapshot,
+    defId: string,
+    cx: number,
+    cy: number,
+    maxR = 14,
+  ): { x: number; y: number } | null => {
     for (let r = 1; r <= maxR; r++) {
       for (let dy = -r; dy <= r; dy++) {
         for (let dx = -r; dx <= r; dx++) {
@@ -137,8 +143,8 @@ export function createEconomy(ctx: Ctx): EconomyManager {
           const x = cx + dx;
           const y = cy + dy;
           if (deadSpots.has(`${defId}:${x}:${y}`)) continue;
-          if (game.canPlace(player, defId, x, y) && accessible(defId, x, y)
-            && !wouldSealPocket(defId, x, y)) return { x, y };
+          if (snap.observedMap.canPlace(defId, x, y) && accessible(snap, defId, x, y)
+            && !wouldSealPocket(snap, defId, x, y)) return { x, y };
         }
       }
     }
@@ -174,7 +180,8 @@ export function createEconomy(ctx: Ctx): EconomyManager {
     for (let i = -3; i <= 3; i++) {
       const x = cx + px * i;
       const y = cy + py * i;
-      if (game.canPlace(player, 'stoneWall', x, y) && accessible('stoneWall', x, y)) return { x, y };
+      if (snap.observedMap.canPlace('stoneWall', x, y)
+        && accessible(snap, 'stoneWall', x, y)) return { x, y };
     }
     return null;
   };
@@ -186,9 +193,9 @@ export function createEconomy(ctx: Ctx): EconomyManager {
     const castle = AGES.indexOf(p.age) >= 2;
     const has = (defId: string): boolean => (own[defId]?.length ?? 0) > 0
       || foundations.some((f) => f.defId === defId);
-    // Camp/mill sites must sit inside the gather leash: the snapshot sees EVERY node
-    // on the map, and an unleashed "nearest" berry patch could be the ENEMY's — the
-    // mill went up under their TC, each builder walked across the map into arrow
+    // Camp/mill sites must sit inside the gather leash: remembered observations can
+    // include a distant enemy-side patch. Before the leash, a bot's mill could go
+    // up under the enemy TC, each builder walked across the map into arrow
     // fire, and the "mill" need blocked farm wood forever while villagers bled out.
     const leashed = (e: Entity | null): Entity | null =>
       e !== null && cheb(e.tileX, e.tileY, baseX, baseY) <= GATHER_LEASH ? e : null;
@@ -325,7 +332,7 @@ export function createEconomy(ctx: Ctx): EconomyManager {
     // wood banked. Villagers happily work fields up to GATHER_LEASH out.
     const spot = firstNeed.exact === true
       ? { x: firstNeed.nx, y: firstNeed.ny }
-      : findSpot(firstNeed.defId, firstNeed.nx, firstNeed.ny,
+      : findSpot(snap, firstNeed.defId, firstNeed.nx, firstNeed.ny,
         firstNeed.defId === 'farm' ? GATHER_LEASH - 4 : 14);
     const v = spot ? freeVill(spot.x, spot.y) : null;
     if (spot && v) {

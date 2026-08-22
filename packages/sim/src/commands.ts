@@ -37,7 +37,7 @@ function validPlayer(state: SimState, player: PlayerId): boolean {
 
 const NUMERIC_FIELDS = [
   'x', 'y', 'tileX', 'tileY', 'targetId', 'buildingId', 'entityId', 'farmId', 'index',
-  'amount', 'multiplier',
+  'amount', 'multiplier', 'requestId',
 ] as const;
 const RESOURCE_FIELDS = ['sell', 'buy'] as const;
 const RESOURCES = new Set(['food', 'wood', 'gold', 'stone']);
@@ -50,7 +50,7 @@ const REQUIRED: Record<Command['kind'], readonly string[]> = {
   attack: ['units', 'targetId'], gather: ['units', 'targetId'], repair: ['units', 'targetId'],
   garrison: ['units', 'targetId'], convert: ['units', 'targetId'], heal: ['units', 'targetId'],
   build: ['units', 'defId', 'tileX', 'tileY'], stop: ['units'], pack: ['units'], unpack: ['units'],
-  train: ['buildingId', 'defId'], cancelTrain: ['buildingId', 'index'],
+  train: ['buildingId', 'defId'], cancelTrain: ['buildingId'],
   research: ['buildingId', 'techId'], cancelResearch: ['buildingId'],
   setRally: ['buildingId', 'x', 'y'], townBell: ['buildingId'], ungarrison: ['buildingId'],
   deleteEntity: ['entityId'], reseedFarm: ['farmId'], queueReseed: [],
@@ -84,6 +84,10 @@ function wellFormedCommand(kind: Command['kind'], cmd: Record<string, unknown>):
   for (const f of NUMERIC_FIELDS) {
     if (f in cmd && !Number.isInteger(cmd[f] as number)) return false;
   }
+  if ('requestId' in cmd && cmd.requestId !== undefined
+    && (!Number.isSafeInteger(cmd.requestId) || (cmd.requestId as number) <= 0)) return false;
+  if (kind === 'cancelTrain'
+    && !Number.isInteger(cmd.index) && !Number.isSafeInteger(cmd.requestId)) return false;
   // def ids must name a real def (own-property lookup blocks prototype pollution).
   if ('defId' in cmd && !(own(gameData.units, cmd.defId) || own(gameData.buildings, cmd.defId))) return false;
   if ('techId' in cmd && !own(gameData.techs, cmd.techId)) return false;
@@ -216,14 +220,18 @@ const handleTrain: Handler<'train'> = (state, cmd) => {
     totalTicks: stats.trainTimeTicks,
     paid: { food: cost.food, wood: cost.wood, gold: cost.gold, stone: cost.stone },
     started: false,
+    ...(cmd.requestId === undefined ? {} : { requestId: cmd.requestId }),
   });
 };
 
 const handleCancelTrain: Handler<'cancelTrain'> = (state, cmd) => {
   const building = ownedBuilding(state, cmd.player, cmd.buildingId);
   if (!building || !building.trainQueue) return;
-  if (cmd.index < 0 || cmd.index >= building.trainQueue.length) return;
-  const [item] = building.trainQueue.splice(cmd.index, 1);
+  const index = cmd.requestId === undefined
+    ? cmd.index ?? -1
+    : building.trainQueue.findIndex((item) => item.requestId === cmd.requestId);
+  if (index < 0 || index >= building.trainQueue.length) return;
+  const [item] = building.trainQueue.splice(index, 1);
   refundItem(state, cmd.player, item);
 };
 
