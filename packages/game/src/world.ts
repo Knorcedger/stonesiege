@@ -13,7 +13,8 @@ import {
 import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets } from './assets';
 import {
-  animForActivity, animFrameIndex, facingFromDelta, unitRig, villagerWorkAnim, type AnimName,
+  animForActivity, animFrameIndex, buildingFrameChoice, buildingSpriteScale, facingFromDelta,
+  unitRig, villagerWorkAnim, type AnimName, type FrameChoice,
 } from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
@@ -30,23 +31,13 @@ const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
 const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
+const GHOST_ALPHA = 0.8;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
 const OCCLUDER_ALPHA = 0.8;
 const GATE_OPEN_RADIUS_FP = 2 * FP;
 const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
-interface ArtScale { x: number; y: number }
-const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
-  // Wall endpoints stay close to one mechanical tile while the masonry grows
-  // vertically to building scale. Uniform 2.25x scaling made every segment
-  // overlap its neighbours and is what caused the broken-looking corners.
-  stoneWall: { x: 1.16, y: 1.82 },
-  gate: { x: 2.5, y: 2.5 },
-  watchTower: { x: 2.55, y: 2.55 },
-  guardTower: { x: 2.72, y: 2.72 },
-  keep: { x: 2.95, y: 2.95 },
-};
 
 /**
  * The wall sheet is authored along the screen's NW→SE isometric axis. Mirror the
@@ -177,6 +168,12 @@ function unitWorldRect(view: EntityView): WorldRect {
   };
 }
 
+/**
+ * Everything needed to redraw a building exactly as the player last saw it,
+ * captured while its tile was visible. Kept complete on purpose: the live entity
+ * may be gone, upgraded (watchTower -> guardTower -> keep mutates defId in place)
+ * or finished building by the time the ghost is drawn.
+ */
 interface GhostRecord {
   defId: string;
   player: PlayerId;
@@ -185,6 +182,18 @@ interface GhostRecord {
   wx: number;
   wy: number;
   age: string;
+  /** Construction stage when last seen (1000 = complete). */
+  buildProgress: number;
+  /** Farms only: distinguishes the mature field from the exhausted plot. */
+  amountLeft: number;
+  /** Wall runs on the tile-Y axis mirror the authored NW->SE sheet. */
+  mirrored: boolean;
+}
+
+interface GhostView {
+  sprite: Sprite;
+  /** Frame/scale inputs the sprite was last built from; '' before the first draw. */
+  key: string;
 }
 
 export interface PickResult {
@@ -202,7 +211,7 @@ export class WorldLayer {
   private aggroLayer = new Container();
   private aggroViews = new Map<EntityId, { graphic: Graphics; range: number }>();
   private views = new Map<EntityId, EntityView>();
-  private ghostViews = new Map<EntityId, Sprite>();
+  private ghostViews = new Map<EntityId, GhostView>();
   private ghosts = new Map<EntityId, GhostRecord>();
   /** Rally flag markers for selected own production buildings (GDD: rally shown as a flag). */
   private rallyFlags = new Graphics();
@@ -596,21 +605,11 @@ export class WorldLayer {
     const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
     const key = `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
     if (key !== view.lastFrameKey) {
-      let frame = null;
-      let resolvedName = candidates[candidates.length - 1];
-      for (let i = 0; i < candidates.length - 1 && !frame; i++) {
-        frame = this.assets.tryResolve(candidates[i], colorIdx);
-        if (frame) resolvedName = candidates[i];
-      }
-      frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
+      const { frame, name: resolvedName } = this.assets.resolveFirst(candidates, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? { x: 1, y: 1 };
-      const mirrorX = frame.mirrored !== mirrorWall;
-      view.sprite.scale.set(
-        mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
-        frame.renderScale * artScale.y,
-      );
+      const scale = buildingSpriteScale(e.defId, frame.renderScale, frame.mirrored !== mirrorWall);
+      view.sprite.scale.set(scale.x, scale.y);
 
       if (corner) {
         view.cornerSprite.texture = frame.texture;
@@ -641,11 +640,10 @@ export class WorldLayer {
       if (doorFrame) {
         view.gateDoor.texture = doorFrame.texture;
         view.gateDoor.anchor.set(doorFrame.anchorX, doorFrame.anchorY);
-        const doorMirrorX = doorFrame.mirrored !== mirrorWall;
-        view.gateDoor.scale.set(
-          doorMirrorX ? -doorFrame.renderScale * artScale.x : doorFrame.renderScale * artScale.x,
-          doorFrame.renderScale * artScale.y,
+        const doorScale = buildingSpriteScale(
+          e.defId, doorFrame.renderScale, doorFrame.mirrored !== mirrorWall,
         );
+        view.gateDoor.scale.set(doorScale.x, doorScale.y);
         view.gateDoor.visible = true;
       } else {
         view.gateDoor.visible = false;
@@ -655,8 +653,7 @@ export class WorldLayer {
       // Trimmed visible top (frames carry transparent headroom): overlays like
       // the health bar must anchor to pixels, not the texture rect.
       view.spriteTopPx = Math.round(
-        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height)
-          * frame.renderScale * artScale.y,
+        (this.assets.contentTopPx(resolvedName) - frame.anchorY * frame.texture.height) * scale.y,
       );
       view.lastFrameKey = key;
     }
@@ -875,6 +872,9 @@ export class WorldLayer {
       wx: pos.x,
       wy: pos.y,
       age: state.players[e.player]?.age ?? 'dark',
+      buildProgress: e.buildProgress ?? 1000,
+      amountLeft: e.amountLeft ?? 1,
+      mirrored: this.mirroredWalls.has(e.id),
     });
   }
 
@@ -882,49 +882,60 @@ export class WorldLayer {
     for (const [id, g] of this.ghosts) {
       const tv = this.tileVis(vis, state, g.tileX, g.tileY);
       if (tv === 2) {
+        const view = this.ghostViews.get(id);
         if (!liveIds.has(id)) {
           // We can see the spot and the building is gone: forget it.
           this.ghosts.delete(id);
-          const spr = this.ghostViews.get(id);
-          if (spr) {
-            spr.destroy();
+          if (view) {
+            view.sprite.destroy();
             this.ghostViews.delete(id);
           }
-        } else {
-          const spr = this.ghostViews.get(id);
-          if (spr) spr.visible = false;
+        } else if (view) {
+          view.sprite.visible = false;
         }
         continue;
       }
       // explored-but-not-visible: show the last-seen ghost
-      const wantVisible = tv === 1 && g.player !== this.humanPlayer;
       // own buildings render live anyway (always visible to their owner in our draw rule)
-      let spr = this.ghostViews.get(id);
-      if (wantVisible) {
-        if (!spr) {
-          spr = new Sprite();
-          spr.tint = GHOST_TINT;
-          spr.alpha = 0.8;
-          this.ghostViews.set(id, spr);
-          this.container.addChild(spr);
-          const colorIdx = state.players[g.player]?.setup.color;
-          // Farms have no bld/ frames (ART_BIBLE §4.4): remember them as a mature
-          // field (obj/farm/2) instead of the missing bld/farm/done placeholder.
-          const frame = g.defId === 'farm'
-            ? this.assets.resolveFrame('obj/farm/2', colorIdx)
-            : this.assets.tryResolve(`bld/${g.defId}/${g.age}/done`, colorIdx) ??
-              this.assets.resolveFrame(`bld/${g.defId}/done`, colorIdx);
-          spr.texture = frame.texture;
-          spr.anchor.set(frame.anchorX, frame.anchorY);
-          spr.scale.set(frame.renderScale);
-          spr.position.set(Math.round(g.wx), Math.round(g.wy));
-          spr.zIndex = g.wy;
-        }
-        spr.visible = true;
-      } else if (spr) {
-        spr.visible = false;
+      const wantVisible = tv === 1 && g.player !== this.humanPlayer;
+      let view = this.ghostViews.get(id);
+      if (!wantVisible) {
+        if (view) view.sprite.visible = false;
+        continue;
       }
+      if (!view) {
+        const sprite = new Sprite();
+        sprite.tint = GHOST_TINT;
+        view = { sprite, key: '' };
+        this.ghostViews.set(id, view);
+        this.container.addChild(sprite);
+      }
+      // A building upgraded, aged up or completed out of sight must not keep the
+      // art (or the scale) it was first drawn with.
+      const choice = buildingFrameChoice(g.defId, g.buildProgress, g.age, g.amountLeft);
+      const key = ghostFrameKey(g, choice);
+      if (key !== view.key) {
+        view.key = key;
+        this.drawGhost(state, g, choice, view.sprite);
+      }
+      view.sprite.visible = true;
     }
+  }
+
+  /** Build a ghost sprite through the exact frame + art-scale path live buildings use. */
+  private drawGhost(state: GameState, g: GhostRecord, choice: FrameChoice, sprite: Sprite): void {
+    const colorIdx = state.players[g.player]?.setup.color;
+    const { frame } = this.assets.resolveFirst(choice.candidates, colorIdx);
+    // Fortification art is authored well under one footprint: without the art
+    // scale a remembered tower, keep, gate or wall draws at a fraction of the
+    // size of the live sprite it stands in for.
+    const scale = buildingSpriteScale(g.defId, frame.renderScale, frame.mirrored !== g.mirrored);
+    sprite.texture = frame.texture;
+    sprite.anchor.set(frame.anchorX, frame.anchorY);
+    sprite.scale.set(scale.x, scale.y);
+    sprite.alpha = GHOST_ALPHA * choice.alpha;
+    sprite.position.set(Math.round(g.wx), Math.round(g.wy));
+    sprite.zIndex = g.wy;
   }
 
   private prunePositions(seen: Set<EntityId>): void {
@@ -1025,23 +1036,19 @@ export function resourceFrameName(e: Entity, map?: GameMap): string {
   }
 }
 
-function buildingFrame(state: GameState, e: Entity): { candidates: string[]; alpha: number } {
-  const progress = e.buildProgress ?? 1000;
-  if (e.defId === 'farm') {
-    // ART_BIBLE §4.4: farms have no construct/rubble frames — obj/farm/<stage>,
-    // with a build-progress dropout (approximated here with alpha ramp).
-    if (progress < 1000) {
-      return { candidates: ['obj/farm/0'], alpha: 0.35 + (progress / 1000) * 0.65 };
-    }
-    const stage = (e.amountLeft ?? 1) <= 0 ? 4 : 3;
-    return { candidates: [`obj/farm/${stage}`], alpha: 1 };
-  }
-  if (progress < 1000) {
-    const stage = progress < 334 ? 0 : progress < 667 ? 1 : 2;
-    return { candidates: [`bld/${e.defId}/construct${stage}`], alpha: 1 };
-  }
-  const age = state.players[e.player]?.age ?? 'dark';
-  // TC/house have per-age variants (`bld/<defId>/<age>/done`); everything else
-  // is authored once as `bld/<defId>/done` — try the variant, fall back.
-  return { candidates: [`bld/${e.defId}/${age}/done`, `bld/${e.defId}/done`], alpha: 1 };
+/**
+ * Identity of everything that decides how a ghost sprite is built. Recomputing
+ * the sprite only when this changes keeps the fog layer allocation-free per frame.
+ */
+function ghostFrameKey(g: GhostRecord, choice: FrameChoice): string {
+  return `${g.player}|${g.mirrored ? 'wall-y' : ''}|${choice.alpha}|${choice.candidates.join('|')}`;
+}
+
+function buildingFrame(state: GameState, e: Entity): FrameChoice {
+  return buildingFrameChoice(
+    e.defId,
+    e.buildProgress ?? 1000,
+    state.players[e.player]?.age ?? 'dark',
+    e.amountLeft ?? 1,
+  );
 }

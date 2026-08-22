@@ -22,7 +22,7 @@ import {
   centroidTile, idleUnits, isTownBellSeeking, liveGroupIds, nextOwnedCompletedBuilding,
   sameIdSet, type IdleCategory,
 } from './selectionTools';
-import { placementGhostFrames } from './frames';
+import { buildingSpriteScale, placementGhostFrames } from './frames';
 import { placementStatus, type PlacementStatus } from './placement';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
@@ -922,14 +922,14 @@ async function bootGame(
     // placementGhostFrames handles the farm exception (obj/farm/2, no bld/ frames).
     const colorIdx = getState().players[humanPlayer]?.setup.color;
     const candidates = placementGhostFrames(placement.defId, getState().players[humanPlayer]?.age ?? 'dark');
-    let frame = null;
-    for (let i = 0; i < candidates.length - 1 && !frame; i++) {
-      frame = assets.tryResolve(candidates[i], colorIdx);
-    }
-    frame ??= assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
+    const { frame } = assets.resolveFirst(candidates, colorIdx);
+    // Fortification art is authored well under one footprint; the preview must
+    // apply the same art scale as the finished building or a tower previews at a
+    // fraction of the size of the tower the player is about to pay for.
+    const scale = buildingSpriteScale(placement.defId, frame.renderScale, false);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
-    ghostSprite.scale.set(frame.renderScale);
+    ghostSprite.scale.set(scale.x, scale.y);
   };
 
   const startPlacement = (defId: string): void => {

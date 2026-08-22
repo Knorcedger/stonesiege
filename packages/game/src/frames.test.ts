@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
-  ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
+  ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, buildingArtScale,
+  buildingFrameChoice, buildingSpriteScale, facingFromDelta, villagerWorkAnim,
   placementGhostFrames, resolveFrameName, unitRig,
 } from './frames';
 
@@ -75,6 +76,71 @@ describe('placementGhostFrames (building placement ghost)', () => {
       if (def.providesFood !== undefined) expect(frames).toEqual(['obj/farm/2']);
       else expect(frames[0].startsWith('bld/')).toBe(true);
     }
+  });
+});
+
+describe('buildingSpriteScale (one art scale for every drawn bld/ frame)', () => {
+  // Regression: the fog-remembered ghost and the placement preview each scaled by
+  // frame.renderScale alone, so a scouted watch tower redrew at 1/2.55 of the size
+  // of the live tower — a doll house sitting in the fog.
+  const FORTIFICATIONS = ['stoneWall', 'gate', 'watchTower', 'guardTower', 'keep'];
+
+  it('scales fortification art up to building scale', () => {
+    for (const defId of FORTIFICATIONS) {
+      const art = buildingArtScale(defId);
+      expect(art.x).toBeGreaterThan(1);
+      expect(art.y).toBeGreaterThan(1);
+      expect(buildingSpriteScale(defId, 0.5, false)).toEqual({ x: 0.5 * art.x, y: 0.5 * art.y });
+    }
+  });
+
+  it('leaves every other building — and every unit frame — at the atlas density scale', () => {
+    for (const def of Object.values(gameData.buildings)) {
+      if (FORTIFICATIONS.includes(def.id)) continue;
+      expect(buildingSpriteScale(def.id, 0.5, false)).toEqual({ x: 0.5, y: 0.5 });
+    }
+    expect(buildingSpriteScale('villager', 0.25, false)).toEqual({ x: 0.25, y: 0.25 });
+  });
+
+  it('flips only x when mirrored, keeping the drawn size identical', () => {
+    const plain = buildingSpriteScale('stoneWall', 0.5, false);
+    const mirrored = buildingSpriteScale('stoneWall', 0.5, true);
+    expect(mirrored.x).toBe(-plain.x);
+    expect(mirrored.y).toBe(plain.y);
+  });
+
+  it('never mutates the shared no-scale record', () => {
+    buildingSpriteScale('house', 2, true);
+    expect(buildingArtScale('house')).toEqual({ x: 1, y: 1 });
+  });
+});
+
+describe('buildingFrameChoice (shared by the live sprite and the fog ghost)', () => {
+  it('walks the three construct stages before the done frame', () => {
+    expect(buildingFrameChoice('watchTower', 0, 'feudal').candidates).toEqual(['bld/watchTower/construct0']);
+    expect(buildingFrameChoice('watchTower', 333, 'feudal').candidates).toEqual(['bld/watchTower/construct0']);
+    expect(buildingFrameChoice('watchTower', 334, 'feudal').candidates).toEqual(['bld/watchTower/construct1']);
+    expect(buildingFrameChoice('watchTower', 666, 'feudal').candidates).toEqual(['bld/watchTower/construct1']);
+    expect(buildingFrameChoice('watchTower', 667, 'feudal').candidates).toEqual(['bld/watchTower/construct2']);
+    expect(buildingFrameChoice('watchTower', 1000, 'feudal').candidates)
+      .toEqual(['bld/watchTower/feudal/done', 'bld/watchTower/done']);
+  });
+
+  it('tries the per-age variant first and always keeps a resolvable fallback last', () => {
+    for (const age of ['dark', 'feudal', 'castle', 'imperial']) {
+      const { candidates } = buildingFrameChoice('townCenter', 1000, age);
+      expect(candidates[0]).toBe(`bld/townCenter/${age}/done`);
+      expect(candidates[candidates.length - 1]).toBe('bld/townCenter/done');
+    }
+  });
+
+  it('draws farms as obj/farm/<stage>, exhausted plots included', () => {
+    expect(buildingFrameChoice('farm', 1000, 'dark', 120).candidates).toEqual(['obj/farm/3']);
+    expect(buildingFrameChoice('farm', 1000, 'dark', 0).candidates).toEqual(['obj/farm/4']);
+    const seeded = buildingFrameChoice('farm', 500, 'dark');
+    expect(seeded.candidates).toEqual(['obj/farm/0']);
+    expect(seeded.alpha).toBeCloseTo(0.675);
+    expect(buildingFrameChoice('farm', 1000, 'dark').alpha).toBe(1);
   });
 });
 

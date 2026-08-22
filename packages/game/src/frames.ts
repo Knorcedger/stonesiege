@@ -47,6 +47,85 @@ export function placementGhostFrames(defId: string, age: string): string[] {
   return [`bld/${defId}/${age}/done`, `bld/${defId}/done`];
 }
 
+export interface ArtScale {
+  x: number;
+  y: number;
+}
+
+const NO_ART_SCALE: ArtScale = { x: 1, y: 1 };
+
+/**
+ * Fortification art is authored far smaller than one building footprint, so the
+ * renderer scales it up to building scale. Wall endpoints stay close to one
+ * mechanical tile while the masonry grows vertically: uniform 2.25x scaling made
+ * every segment overlap its neighbours and is what caused the broken-looking
+ * corners. Everything else is authored at its final size and scales 1:1.
+ *
+ * Every path that draws a `bld/` frame — the live sprite, the fog-remembered
+ * ghost and the placement preview — must scale through `buildingSpriteScale`,
+ * or the same tower renders at two different sizes depending on how it is drawn.
+ */
+const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
+  stoneWall: { x: 1.16, y: 1.82 },
+  gate: { x: 2.5, y: 2.5 },
+  watchTower: { x: 2.55, y: 2.55 },
+  guardTower: { x: 2.72, y: 2.72 },
+  keep: { x: 2.95, y: 2.95 },
+};
+
+/** Extra art-authoring scale for a building def (1x1 for everything unfortified). */
+export function buildingArtScale(defId: string): ArtScale {
+  return FORTIFICATION_ART_SCALE[defId] ?? NO_ART_SCALE;
+}
+
+/**
+ * Final `sprite.scale` for a drawn building frame: the atlas density scale from
+ * `ResolvedFrame.renderScale`, times the art-authoring scale, times the mirror
+ * flip. The single place the art scale is applied, so the live sprite, the
+ * fog-remembered ghost and the placement preview cannot disagree about how big
+ * a watch tower is.
+ */
+export function buildingSpriteScale(defId: string, renderScale: number, mirrorX: boolean): ArtScale {
+  const art = buildingArtScale(defId);
+  return { x: (mirrorX ? -renderScale : renderScale) * art.x, y: renderScale * art.y };
+}
+
+export interface FrameChoice {
+  /** Most specific first; callers tryResolve all but the last, resolveFrame the last. */
+  candidates: string[];
+  alpha: number;
+}
+
+/**
+ * The frame a building shows at a given construction stage — shared by the live
+ * renderer and the fog-of-war ghost so a remembered building can never disagree
+ * with the sprite the player last saw.
+ *
+ * `amountLeft` only matters for farms (mature field vs. exhausted plot).
+ */
+export function buildingFrameChoice(
+  defId: string,
+  buildProgress: number,
+  age: string,
+  amountLeft = 1,
+): FrameChoice {
+  if (defId === 'farm') {
+    // ART_BIBLE §4.4: farms have no construct/rubble frames — obj/farm/<stage>,
+    // with a build-progress dropout (approximated here with alpha ramp).
+    if (buildProgress < 1000) {
+      return { candidates: ['obj/farm/0'], alpha: 0.35 + (buildProgress / 1000) * 0.65 };
+    }
+    return { candidates: [`obj/farm/${amountLeft <= 0 ? 4 : 3}`], alpha: 1 };
+  }
+  if (buildProgress < 1000) {
+    const stage = buildProgress < 334 ? 0 : buildProgress < 667 ? 1 : 2;
+    return { candidates: [`bld/${defId}/construct${stage}`], alpha: 1 };
+  }
+  // TC/house have per-age variants (`bld/<defId>/<age>/done`); everything else
+  // is authored once as `bld/<defId>/done` — try the variant, fall back.
+  return { candidates: [`bld/${defId}/${age}/done`, `bld/${defId}/done`], alpha: 1 };
+}
+
 /**
  * Atlas rig for a unit def. Hero defs carry a `sprite` alias onto an existing rig
  * (heroWallace -> unit/champion/...); everything else rigs under its own id.

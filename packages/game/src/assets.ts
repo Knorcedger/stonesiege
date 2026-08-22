@@ -248,6 +248,24 @@ export class GameAssets {
     return { texture: this.placeholder, mirrored: false, anchorX: 0.5, anchorY: 0.5, renderScale: 1 };
   }
 
+  /**
+   * Resolve the first available frame from a most-specific-first candidate list
+   * (see `buildingFrameChoice`). Every candidate but the last is optional; the
+   * last goes through `resolveFrame`, so a genuinely missing frame still
+   * surfaces the diagnosable magenta placeholder instead of drawing nothing.
+   */
+  resolveFirst(
+    candidates: readonly string[],
+    playerColor?: number,
+  ): { frame: ResolvedFrame; name: string } {
+    for (let i = 0; i < candidates.length - 1; i++) {
+      const hit = this.tryResolve(candidates[i], playerColor);
+      if (hit) return { frame: hit, name: candidates[i] };
+    }
+    const name = candidates[candidates.length - 1] ?? '';
+    return { frame: this.resolveFrame(name, playerColor), name };
+  }
+
   /** Like resolveFrame but returns null for missing frames (optional decor: transitions, age variants). */
   tryResolve(name: string, playerColor?: number): ResolvedFrame | null {
     const { name: phys, mirrored } = resolveFrameName(name);
