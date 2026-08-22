@@ -16,6 +16,17 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
+### Changed
+
+- Orders now land visibly on the thing you aimed them at, instead of only in the corner toast.
+  Sending a villager to finish an unfinished house pulses that house's outline twice, and the
+  site keeps an amber ring for the whole job — so the walk over no longer looks like a command
+  that was dropped. The same pulse confirms gather, repair, garrison, convert and heal orders;
+  attack orders pulse red. The pulse follows a target only while you can still see it, so
+  ordering an attack on a fleeing enemy never traces its path through the fog. The undo toast
+  names the building too: **Building House** and **Repairing Barracks** instead of a bare
+  *Build* / *Repair*.
+
 ## 0.1.2 — 2026-08-20
 
 ### Added
