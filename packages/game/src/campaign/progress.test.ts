@@ -4,8 +4,9 @@
 import { describe, expect, it } from 'vitest';
 import type { CampaignDef } from '@bf/scenarios';
 import {
-  completeScenario, decodeProgress, emptyProgress, loadProgress, nextScenarioId,
-  saveProgress, scenarioStatuses,
+  campaignEpilogueDue, completeScenario, decodeProgress, emptyProgress, hasSeenPrologue,
+  isCampaignComplete, loadProgress, markPrologueSeen, nextScenarioId, saveProgress,
+  scenarioStatuses,
 } from './progress';
 import { makeMemoryStorage } from '../storage';
 
@@ -15,6 +16,14 @@ const campaign: CampaignDef = {
   description: '',
   cover: '/campaign/wallace/act-2-stirling.webp',
   coverAlt: '',
+  prologue: {
+    kicker: '', title: 'Prologue', image: '/campaign/wallace/act-1-lanark.webp',
+    imageAlt: '', paragraphs: [], cta: 'Begin',
+  },
+  epilogue: {
+    kicker: '', title: 'Epilogue', image: '/campaign/wallace/act-5-unbroken.webp',
+    imageAlt: '', paragraphs: [], cta: 'Return',
+  },
   scenarioIds: ['w1', 'w2', 'w3'],
 };
 
@@ -61,7 +70,8 @@ describe('progress storage', () => {
     expect(decodeProgress(null)).toEqual(emptyProgress());
     expect(decodeProgress('{oops')).toEqual(emptyProgress());
     expect(decodeProgress('{"completed":"w1"}')).toEqual(emptyProgress());
-    expect(decodeProgress('{"completed":["w1", 7]}')).toEqual({ completed: ['w1'] });
+    expect(decodeProgress('{"completed":["w1", 7]}'))
+      .toEqual({ completed: ['w1'], prologuesSeen: [] });
   });
 
   it('migrates each completed legacy Wallace scenario to its two focused chapters', () => {
@@ -73,5 +83,69 @@ describe('progress storage', () => {
       'wallace-05-two-risings',
       'wallace-06-stirling',
     ]);
+  });
+});
+
+describe('campaign story state', () => {
+  it('shows a prologue once and remembers it', () => {
+    let progress = emptyProgress();
+    expect(hasSeenPrologue(progress, 'wallace')).toBe(false);
+    progress = markPrologueSeen(progress, 'wallace');
+    expect(hasSeenPrologue(progress, 'wallace')).toBe(true);
+    // Idempotent, and one campaign's opening says nothing about another's.
+    expect(markPrologueSeen(progress, 'wallace')).toBe(progress);
+    expect(hasSeenPrologue(progress, 'joan')).toBe(false);
+  });
+
+  it('keeps completion and prologue state independent', () => {
+    const progress = completeScenario(markPrologueSeen(emptyProgress(), 'wallace'), 'w1');
+    expect(progress.prologuesSeen).toEqual(['wallace']);
+    expect(progress.completed).toEqual(['w1']);
+  });
+
+  it('unlocks the epilogue only once every chapter is complete', () => {
+    let progress = emptyProgress();
+    expect(isCampaignComplete(campaign, progress)).toBe(false);
+    progress = completeScenario(completeScenario(progress, 'w1'), 'w2');
+    expect(isCampaignComplete(campaign, progress)).toBe(false);
+    progress = completeScenario(progress, 'w3');
+    expect(isCampaignComplete(campaign, progress)).toBe(true);
+  });
+
+  it('reads a record written before campaigns had opening pages', () => {
+    const decoded = decodeProgress(JSON.stringify({ completed: ['wallace-01-ledger'] }));
+    expect(decoded.prologuesSeen).toEqual([]);
+    expect(decoded.completed).toContain('wallace-01-ledger');
+  });
+
+  it('round-trips prologue state through storage', () => {
+    const store = makeMemoryStorage();
+    saveProgress(markPrologueSeen(emptyProgress(), 'wallace'), store);
+    expect(loadProgress(store).prologuesSeen).toEqual(['wallace']);
+  });
+});
+
+describe('campaignEpilogueDue', () => {
+  const finished = { completed: ['w1', 'w2', 'w3'], prologuesSeen: [] };
+
+  it('is due when the final chapter completes the campaign', () => {
+    expect(campaignEpilogueDue(campaign, finished, 'w3')).toBe(true);
+  });
+
+  it('is not due for a replay of an earlier chapter of a finished campaign', () => {
+    // Replay is an offered flow at COMPLETE, and it must end on the chapter
+    // list — not drop the player back at the ending they have already read.
+    expect(campaignEpilogueDue(campaign, finished, 'w1')).toBe(false);
+    expect(campaignEpilogueDue(campaign, finished, 'w2')).toBe(false);
+  });
+
+  it('is not due while any earlier chapter is still unplayed', () => {
+    const skipped = { completed: ['w1', 'w3'], prologuesSeen: [] };
+    expect(campaignEpilogueDue(campaign, skipped, 'w3')).toBe(false);
+  });
+
+  it('is never due for a scenario outside any known campaign', () => {
+    expect(campaignEpilogueDue(undefined, finished, 'w3')).toBe(false);
+    expect(campaignEpilogueDue(campaign, finished, 'showcase-citadel')).toBe(false);
   });
 });

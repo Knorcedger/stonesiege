@@ -2,6 +2,8 @@
 // - age-advance celebration banner (transient, Cinzel display face)
 // - wonder countdown banner (persistent strip while a wonder stands)
 // - under-attack screen-edge red pulse
+// - campaign aftermath page (what the chapter just won actually changed),
+//   shown ahead of the end screen so the story lands before the arithmetic
 // - victory / defeat end screen (ART_BIBLE dark wood + parchment + gold),
 //   with match time + full match statistics and navigation actions.
 // Pure-DOM presentation; all game data arrives pre-derived (hud/summary.ts).
@@ -58,6 +60,39 @@ const OVERLAY_CSS = `
 .bf-end-btn:hover { background:linear-gradient(#F7EBCB,#E4CBA0); }
 .bf-end-btn:active { transform:translateY(1px); box-shadow:0 1px 0 #8A6414; }
 .bf-end-btn.ghost { background:none; color:#DABE8D; border-color:#64492B; box-shadow:none; }
+/* Aftermath page. Wider and left-aligned where the end screen is narrow and
+   centred: this is prose to be read, not a scoreboard to be scanned. */
+.bf-after-panel { width:min(600px, 92%); max-height:92%; overflow-y:auto; box-sizing:border-box;
+  text-align:left; color:#EFDDB5; background:linear-gradient(#3a2a18,#2C1F12);
+  border:2px solid #1A1208; border-radius:6px;
+  box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.65); }
+.bf-after-art { position:relative; overflow:hidden; aspect-ratio:16/6; background:#16100a;
+  border-bottom:1px solid #8A6414; }
+.bf-after-art img { display:block; width:100%; height:100%; object-fit:cover; object-position:center 42%; }
+.bf-after-art::after { content:""; position:absolute; inset:0; pointer-events:none;
+  background:linear-gradient(rgba(16,10,5,0) 30%, rgba(16,10,5,.78) 72%, #2C1F12); }
+.bf-after-head { position:absolute; left:22px; right:22px; bottom:10px; z-index:1; }
+.bf-after-kicker { display:block; font-size:11px; letter-spacing:1.3px; text-transform:uppercase;
+  color:#E6C04A; text-shadow:0 1px 4px #0b0703; }
+.bf-after-title { margin:2px 0 0; font-family:"Cinzel","Georgia",serif; font-weight:700; font-size:26px;
+  line-height:1.1; color:#F4E7C6; text-shadow:0 2px 6px #0b0703, 0 0 18px rgba(0,0,0,.7); }
+.bf-after-body { padding:18px 24px 4px; font-size:15px; line-height:1.6; }
+.bf-after-body p { margin:0 0 12px; }
+.bf-after-quote { margin:14px 0 4px; padding:11px 14px; border-left:3px solid #8A6414;
+  border-radius:0 4px 4px 0; background:rgba(16,10,5,.36); }
+.bf-after-quote p { margin:0; font-family:"Cinzel","Georgia",serif; font-size:14px; font-style:italic;
+  line-height:1.5; color:#F4E7C6; }
+.bf-after-quote cite { display:block; margin-top:7px; font-size:11px; font-style:normal; color:#B99A6B; }
+.bf-after-note { margin:2px 0 0; padding:9px 12px; border-radius:4px; background:rgba(16,10,5,.3);
+  font-size:12px; line-height:1.45; color:#9C8A6B; }
+/* Sticky inside the panel's own scroll: the aftermath runs long, and Continue
+   has to stay reachable without scrolling to the end of the prose first. */
+.bf-after-actions { position:sticky; bottom:0; padding:10px 24px 18px;
+  background:linear-gradient(rgba(44,31,18,0), #2C1F12 30%); }
+@media (max-height:520px) and (orientation:landscape) {
+  .bf-after-art { aspect-ratio:16/4; }
+  .bf-after-body { padding-top:12px; font-size:14px; }
+}
 `;
 
 const AGE_FLAVOR: Record<string, string> = {
@@ -75,7 +110,9 @@ export class Overlays {
   private wonderStrip: HTMLDivElement;
   private attackPulse: HTMLDivElement;
   private endScreen: HTMLDivElement;
+  private storyScreen!: HTMLDivElement;
   private endShown = false;
+  private aftermathShown = false;
 
   constructor(root: HTMLElement) {
     if (!document.getElementById('bf-overlay-style')) {
@@ -106,6 +143,12 @@ export class Overlays {
     this.endScreen = document.createElement('div');
     this.endScreen.className = 'bf-end';
     this.el.appendChild(this.endScreen);
+
+    // Its own layer, so the end screen can be built underneath it while the
+    // aftermath is still being read.
+    this.storyScreen = document.createElement('div');
+    this.storyScreen.className = 'bf-end';
+    this.el.appendChild(this.storyScreen);
   }
 
   destroy(): void {
@@ -146,6 +189,112 @@ export class Overlays {
 
   get endScreenShown(): boolean {
     return this.endShown;
+  }
+
+  get aftermathScreenShown(): boolean {
+    return this.aftermathShown;
+  }
+
+  /**
+   * Campaign aftermath: the story consequence of the chapter just won, shown
+   * before the statistics panel. Shown once per match; `onContinue` is what
+   * moves on (game.ts hands it the end screen), and it fires exactly once
+   * however the page is dismissed.
+   */
+  showAftermath(
+    page: {
+      kicker: string;
+      title: string;
+      image?: string;
+      imageAlt?: string;
+      paragraphs: string[];
+      quote?: { text: string; source: string };
+      note?: string;
+    },
+    onContinue: () => void,
+  ): void {
+    if (this.aftermathShown) {
+      onContinue();
+      return;
+    }
+    this.aftermathShown = true;
+    this.storyScreen.replaceChildren();
+    const panel = document.createElement('div');
+    panel.className = 'bf-after-panel';
+
+    if (page.image) {
+      const art = document.createElement('figure');
+      art.className = 'bf-after-art';
+      art.style.margin = '0';
+      const image = document.createElement('img');
+      image.src = page.image;
+      image.alt = page.imageAlt ?? '';
+      image.decoding = 'async';
+      art.appendChild(image);
+      const head = document.createElement('div');
+      head.className = 'bf-after-head';
+      const kicker = document.createElement('span');
+      kicker.className = 'bf-after-kicker';
+      kicker.textContent = page.kicker;
+      const title = document.createElement('h2');
+      title.className = 'bf-after-title';
+      title.textContent = page.title;
+      head.append(kicker, title);
+      art.appendChild(head);
+      panel.appendChild(art);
+    } else {
+      const head = document.createElement('div');
+      head.style.padding = '20px 24px 0';
+      const kicker = document.createElement('span');
+      kicker.className = 'bf-after-kicker';
+      kicker.textContent = page.kicker;
+      const title = document.createElement('h2');
+      title.className = 'bf-after-title';
+      title.textContent = page.title;
+      head.append(kicker, title);
+      panel.appendChild(head);
+    }
+
+    const body = document.createElement('div');
+    body.className = 'bf-after-body';
+    for (const paragraph of page.paragraphs) {
+      const p = document.createElement('p');
+      p.textContent = paragraph;
+      body.appendChild(p);
+    }
+    if (page.quote) {
+      const quote = document.createElement('blockquote');
+      quote.className = 'bf-after-quote';
+      const text = document.createElement('p');
+      text.textContent = `“${page.quote.text}”`;
+      const cite = document.createElement('cite');
+      cite.textContent = page.quote.source;
+      quote.append(text, cite);
+      body.appendChild(quote);
+    }
+    if (page.note) {
+      const note = document.createElement('p');
+      note.className = 'bf-after-note';
+      note.textContent = `The record: ${page.note}`;
+      body.appendChild(note);
+    }
+    panel.appendChild(body);
+
+    const actions = document.createElement('div');
+    actions.className = 'bf-after-actions';
+    const btn = document.createElement('button');
+    btn.className = 'bf-end-btn';
+    // One exit, and it opens the statistics panel underneath.
+    btn.textContent = 'Continue';
+    btn.addEventListener('click', () => {
+      this.storyScreen.classList.remove('show');
+      onContinue();
+    }, { once: true });
+    actions.appendChild(btn);
+    panel.appendChild(actions);
+
+    this.storyScreen.appendChild(panel);
+    this.storyScreen.classList.add('show');
   }
 
   /**
