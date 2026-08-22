@@ -38,7 +38,7 @@ export interface AssetLoadOptions {
   onProgress?(progress: AssetLoadProgress): void;
   /** Developer comparison mode. Standard skips optional HD discovery and overrides. */
   artworkMode?: ArtworkMode;
-  /** Aborting skips optional HD overrides while preserving the complete base atlases. */
+  /** Aborting HD work makes normal startup fail coherently; standard mode does not load it. */
   optionalSignal?: AbortSignal;
 }
 
@@ -91,7 +91,7 @@ export interface ResolvedFrame {
   renderScale: number;
 }
 
-interface HdManifest { atlases?: string[]; frameCount?: number }
+export interface HdManifest { atlases?: string[]; frameCount?: number }
 
 export function parseHdManifest(value: unknown): HdManifest {
   if (!value || typeof value !== 'object') return { atlases: [] };
@@ -111,6 +111,29 @@ export function parseHdManifest(value: unknown): HdManifest {
     atlases,
     ...(frameCount !== undefined ? { frameCount } : {}),
   };
+}
+
+/**
+ * Normal play must never combine HD and pixel-source frames inside one
+ * animation. The baseline atlases remain available for the explicit developer
+ * comparison mode, but an incomplete HD set is a recoverable startup failure.
+ */
+export function assertCompleteHdArtwork(
+  mode: ArtworkMode | undefined,
+  manifest: HdManifest,
+  loadedFrameCount: number,
+): void {
+  if (!shouldLoadHdArtwork(mode)) return;
+  const expectedFrameCount = manifest.frameCount;
+  if (!manifest.atlases?.length || expectedFrameCount === undefined || expectedFrameCount <= 0) {
+    throw new Error('Loading battlefield artwork failed because the HD manifest was unavailable.');
+  }
+  if (loadedFrameCount !== expectedFrameCount) {
+    throw new Error(
+      `Loading battlefield artwork failed because only ${loadedFrameCount} of `
+      + `${expectedFrameCount} HD frames loaded.`,
+    );
+  }
 }
 
 interface ColorPage {
@@ -182,7 +205,7 @@ export class GameAssets {
     };
 
     // Start the complete base art first so the browser gives it the first
-    // network slots. HD packs are optional and can be aborted independently.
+    // network slots. It remains the explicit developer comparison set.
     const baseLoad = Promise.all(ATLAS_NAMES.map(async (name) => {
       const atlas = await loadAtlas(name);
       this.atlases.set(name, atlas);
@@ -190,16 +213,7 @@ export class GameAssets {
     }));
     const hdLoad = this.loadHdOverrides(hdFiles, options.optionalSignal, settled);
     await Promise.all([baseLoad, hdLoad]);
-    if (
-      !options.optionalSignal?.aborted
-      && hdManifest.frameCount !== undefined
-      && this.hdFrames.size !== hdManifest.frameCount
-    ) {
-      console.warn(
-        `[assets] HD manifest loaded ${this.hdFrames.size}/${hdManifest.frameCount} frames; `
-        + 'missing frames use fallback art',
-      );
-    }
+    assertCompleteHdArtwork(options.artworkMode, hdManifest, this.hdFrames.size);
     const missing = ATLAS_NAMES.filter((n) => this.atlases.get(n)!.missing);
     if (missing.length > 0) {
       console.warn(
@@ -489,8 +503,8 @@ export class GameAssets {
       if (!signal?.aborted) onSettled(atlas.missing);
       return atlas;
     }));
-    // Cancelling optional artwork must never let late HD requests alter frame
-    // resolution after the battlefield has begun drawing.
+    // An aborted request must not let late HD work mutate the resolved set.
+    // The completeness assertion in load() rejects the resulting partial set.
     if (signal?.aborted) return;
     // Promise.all preserves manifest order, so intentional later overrides
     // (the hand-finished Town Center) remain authoritative.

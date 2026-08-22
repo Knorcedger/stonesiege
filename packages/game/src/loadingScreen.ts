@@ -25,7 +25,7 @@ export function artworkLoadingStage(
   const completed = Math.min(total, Math.max(0, progress.completed));
   const fallback = Math.min(completed, Math.max(0, progress.fallback));
   const fallbackDetail = fallback > 0
-    ? ` · ${fallback} ${fallback === 1 ? 'pack is' : 'packs are'} using fallback art`
+    ? ` · ${fallback} ${fallback === 1 ? 'pack could' : 'packs could'} not be loaded`
     : '';
   return {
     title: resuming ? 'Restoring saved match' : 'Mustering the banners',
