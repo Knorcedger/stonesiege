@@ -949,10 +949,14 @@ export class WorldLayer {
       if (!seen.has(id)) {
         this.curPos.delete(id);
         this.prevPos.delete(id);
-        this.damagedUntil.delete(id);
-        this.lastSwingTick.delete(id);
       }
     }
+    // curPos/prevPos are rebuilt from the live entity map every tick, so their keys
+    // are always a subset of `seen` — the per-entity effect timers have to be swept
+    // against their OWN keys or a long match keeps one entry per unit that ever
+    // took a hit or threw a punch.
+    for (const id of this.damagedUntil.keys()) if (!seen.has(id)) this.damagedUntil.delete(id);
+    for (const id of this.lastSwingTick.keys()) if (!seen.has(id)) this.lastSwingTick.delete(id);
   }
 }
 
