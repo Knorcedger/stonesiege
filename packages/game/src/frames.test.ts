@@ -204,7 +204,7 @@ describe('hero art (campaign protagonists share a rank-and-file rig)', () => {
   it('draws heroes a step larger than the rank and file', () => {
     expect(heroDrawScale('heroWallace')).toBe(HERO_DRAW_SCALE);
     expect(HERO_DRAW_SCALE).toBeGreaterThan(1);
-    expect(HERO_DRAW_SCALE).toBeLessThan(1.3); // must still sit on its tile
+    expect(HERO_DRAW_SCALE).toBeLessThanOrEqual(1.35); // must still sit on its tile
     expect(heroDrawScale('militia')).toBe(1);
   });
 });

@@ -98,19 +98,26 @@ export function heroTintFor(defId: string): number | undefined {
   if (!cloth) return undefined;
   const [r, g, b] = hexToRgb(cloth[0]);
   const peak = Math.max(r, g, b, 1);
-  const lift = (v: number): number => Math.min(255, Math.round((v * HERO_TINT_PEAK) / peak));
+  // Normalise the dominant channel up to the peak, then push the other two DOWN by
+  // the saturation exponent. Deepening this way keeps the sprite as bright as before
+  // while the hue gets much stronger — scaling all three channels down instead would
+  // just turn the hero into a dark smudge.
+  const lift = (v: number): number =>
+    Math.min(255, Math.round(HERO_TINT_PEAK * (v / peak) ** HERO_TINT_SATURATION));
   return (lift(r) << 16) | (lift(g) << 8) | lift(b);
 }
 
-/** Brightest channel a hero tint may reach: keeps the multiply gentle. */
+/** Brightest channel a hero tint may reach: keeps the multiply from muddying the art. */
 const HERO_TINT_PEAK = 0xe8;
+/** >1 deepens the non-dominant channels, i.e. how strongly the hero reads as dyed. */
+const HERO_TINT_SATURATION = 1.45;
 
 /**
  * Campaign heroes draw a little larger than the rank-and-file rig they alias, so the
  * protagonist reads as the protagonist even in a press of his own bodyguard. Kept
  * modest: the rig still has to sit on its tile and inside its rings.
  */
-export const HERO_DRAW_SCALE = 1.15;
+export const HERO_DRAW_SCALE = 1.3;
 
 /** Draw-scale multiplier for a unit def's art — 1 for everyone except heroes. */
 export function heroDrawScale(defId: string): number {

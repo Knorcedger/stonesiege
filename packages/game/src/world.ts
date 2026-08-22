@@ -31,8 +31,14 @@ const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
 const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
-const HERO_RING = 0xe6c04a;
-const HERO_RING_INNER = 0xf4eedd;
+/**
+ * Hero marker. Deliberately NOT the amber ellipse used for gather targets, rally
+ * flags, garrison badges and impact flashes: heroes get their own shape (stars) in
+ * their own accent colour, with a pale core so a dark or green hero still separates
+ * from grass.
+ */
+const HERO_MARK_CORE = 0xf4eedd;
+const HERO_MARK_FALLBACK = 0xe6c04a;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
@@ -96,6 +102,28 @@ export function wallCornerJoins(entities: Iterable<Entity>): Map<EntityId, WallC
 }
 
 /**
+ * Vertices of a `points`-pointed star, alternating outer and inner radii, as a flat
+ * [x0,y0,x1,y1,...] list for Graphics.poly. Radii are given per axis so a marker laid
+ * on the ground can be squashed onto the isometric floor plane, and `rotation` (in
+ * turns) aims the first point — 0 = straight down-screen, -0.25 = straight up.
+ */
+export function starPoly(
+  points: number,
+  outerX: number,
+  outerY: number,
+  innerRatio: number,
+  rotation = 0,
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < points * 2; i++) {
+    const t = (i / (points * 2) + rotation) * Math.PI * 2;
+    const scale = i % 2 === 0 ? 1 : innerRatio;
+    out.push(Math.sin(t) * outerX * scale, Math.cos(t) * outerY * scale);
+  }
+  return out;
+}
+
+/**
  * Draw scale for an entity's art. Fortifications keep their bespoke masonry scales;
  * campaign heroes get the hero bump; everything else renders 1:1.
  */
@@ -141,6 +169,9 @@ interface EntityView {
   badge: Container | null;
   badgeText: Text | null;
   lastBadgeKey: string;
+  /** Floating star over a campaign hero's head. */
+  heroStar: Graphics | null;
+  lastHeroStarKey: string;
 }
 
 export interface WorldRect {
@@ -539,6 +570,7 @@ export class WorldLayer {
       lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0,
       renderFacing: 0,
       carry: null, lastCarryKey: '', badge: null, badgeText: null, lastBadgeKey: '',
+      heroStar: null, lastHeroStarKey: '',
     };
   }
 
@@ -706,9 +738,42 @@ export class WorldLayer {
     view.gateDoor.tint = tint;
 
     this.drawRing(e, view);
+    this.drawHeroStar(e, view);
     this.drawHpBar(e, view);
     this.updateCarryIcon(e, view);
     this.updateGarrisonBadge(e, view);
+  }
+
+  /**
+   * Floating star over a hero's head — the marker that survives a crowd, where the
+   * ground star is hidden behind whoever is standing in front of him. Own shape and
+   * own colour on purpose: every other overhead marker in the game is an amber flag
+   * or a resource icon.
+   */
+  private drawHeroStar(e: Entity, view: EntityView): void {
+    const hero = e.kind === 'unit' && e.activity !== 'dying' && isHeroUnit(e.defId);
+    const color = hero ? heroTintFor(e.defId) ?? HERO_MARK_FALLBACK : 0;
+    const key = hero ? `${color}` : '';
+    if (key !== view.lastHeroStarKey) {
+      view.lastHeroStarKey = key;
+      if (!key) {
+        if (view.heroStar) view.heroStar.visible = false;
+      } else {
+        const star = view.heroStar ?? new Graphics();
+        if (!view.heroStar) {
+          view.heroStar = star;
+          view.root.addChild(star);
+        }
+        star.clear();
+        const points = starPoly(5, 7, 7, 0.44, -0.5);
+        star.poly(points).fill({ color: OUTLINE, alpha: 0.55 });
+        star.poly(points).stroke({ width: 1.5, color });
+        star.poly(starPoly(5, 3.4, 3.4, 0.44, -0.5)).fill(HERO_MARK_CORE);
+        star.visible = true;
+      }
+    }
+    // Above the HP bar, which itself sits above the tallest hero rig.
+    if (view.heroStar?.visible) view.heroStar.position.set(0, Math.min(view.spriteTopPx, -34) - 11);
   }
 
   /** Small resource icon over a laden villager (entity.carrying). */
@@ -850,10 +915,15 @@ export class WorldLayer {
       const cav = (gameData.units[e.defId]?.speed ?? 0) > 1.1;
       const [rx, ry] = resourceRadius ?? (cav ? [14, 7] : [10, 5]);
       if (hero) {
-        // One step outside the selection ellipse so both stay readable at once.
-        view.ring.ellipse(0, 1, rx + 3, ry + 3).stroke({ width: 1, color: OUTLINE });
-        view.ring.ellipse(0, 0, rx + 3, ry + 2).stroke({ width: 1.5, color: HERO_RING });
-        view.ring.ellipse(0, -1, rx + 3, ry + 2).stroke({ width: 1, color: HERO_RING_INNER });
+        // Four-pointed compass star on the ground, one step outside the selection
+        // ellipse so both stay readable at once. Squashed onto the floor plane and
+        // filled in the hero's own colour over a dark rim.
+        const mark = heroTintFor(e.defId) ?? HERO_MARK_FALLBACK;
+        const star = starPoly(4, rx + 6, ry + 5, 0.34);
+        view.ring.poly(star).fill({ color: OUTLINE, alpha: 0.5 });
+        view.ring.poly(star).stroke({ width: 1.5, color: mark });
+        view.ring.poly(starPoly(4, rx + 3, ry + 2.5, 0.34))
+          .stroke({ width: 1, color: HERO_MARK_CORE, alpha: 0.75 });
       }
       if (!selected && !highlighted) return;
       view.ring.ellipse(0, 1, rx, ry + 1).stroke({ width: 1, color: OUTLINE });
@@ -876,7 +946,7 @@ export class WorldLayer {
     // tall frames carry transparent headroom. Integer px; part of the key so
     // the bar follows construct-stage frame changes.
     const isB = e.kind === 'building';
-    const yOff = isB ? buildingHpBarY(view.spriteTopPx) : -34;
+    const yOff = isB ? buildingHpBarY(view.spriteTopPx) : unitHpBarY(e.defId, view.spriteTopPx);
     const key = showHp
       ? `${frac.toFixed(2)}:${researchFrac?.toFixed(3) ?? ''}:${e.kind}:${e.defId}:${yOff}`
       : '';
@@ -1003,6 +1073,16 @@ const TILE_W_SAFE = HALF_W * 2;
  */
 export function buildingHpBarY(spriteTopPx: number): number {
   return Math.round(spriteTopPx) - 10;
+}
+
+/**
+ * Unit health-bar offset. The fixed -34 assumes a rank-and-file rig; a hero draws at
+ * HERO_DRAW_SCALE and is that much taller, so his bar would sit across his chest.
+ * Anchor his to the sprite's trimmed visible top instead, like a building's.
+ */
+export function unitHpBarY(defId: string, spriteTopPx: number): number {
+  const base = -34;
+  return isHeroUnit(defId) ? Math.min(base, Math.round(spriteTopPx) - 4) : base;
 }
 
 /** Compact building bars: exactly half the old near-full-footprint width. */

@@ -672,9 +672,14 @@ These are drawn by the renderer, not assetgen, but must stay on-palette:
   instead of the atlas. Per hero, from `UnitDef.heroCloth` (a master-palette ramp,
   light/mid/dark): the rig's cloth AND metal ramps are palette-swapped to it — which
   of the two a rig uses depends on its tier, so both are needed — the sprite is
-  multiplied by the ramp's light tone lifted to a `0xE8` peak (the accent's only
-  carrier on pre-rendered HD art), the art draws at 1.15×, and a permanent gilded
-  `goldShine` ring sits at the feet with a matching pip on the minimap. The
+  multiplied by the ramp's light tone, lifted to a `0xE8` peak and deepened by a
+  saturation exponent (the accent's only carrier on pre-rendered HD art), and the art
+  draws at 1.3×. The marker is a pair of stars in that same hero colour over a dark
+  rim with a `highlight` core — a four-pointed compass star squashed onto the floor
+  plane at the feet, and a five-pointed star above the health bar — deliberately not
+  the amber ellipse that gather targets, rally flags and garrison badges already use.
+  The minimap adds a matching gold pip. Hero health bars anchor to the sprite's
+  visible top rather than the fixed unit offset, which the larger art would cross. The
   player-colour band keeps its own ramp so ownership still reads; hero ramps must
   stay clear of the cloth and metal ramps and be saturated enough to tint (a grey or
   near-white ramp multiplies to nothing).
