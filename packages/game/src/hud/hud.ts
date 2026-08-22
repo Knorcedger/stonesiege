@@ -4,10 +4,10 @@
 // military verbs) with cost tooltips + queue progress, control-group chips,
 // undo toast (~2 s), pause overlay, placement confirm/cancel.
 // Styling follows ART_BIBLE §8 (dark wood + parchment + gold).
-// Fonts: Jacquard 12 = display/headers only; Pixelify Sans = body text; all
-// NUMERALS use VT323 (.bf-num) — Pixelify's 2/5 glyphs read as S and make
-// HP/resource/pop counts ambiguous at a glance. Current/max counters (pop, HP)
-// go through formatRatio: VT323's S-shaped '5' merges with an unspaced slash.
+// Fonts: Cinzel = display/headers only; Alegreya Sans = body text. NUMERALS
+// (.bf-num) add tabular-nums so counters keep a fixed width and do not jitter
+// as values change. Current/max counters (pop, HP) go through formatRatio for
+// a spaced, unambiguous "4 / 5" read.
 // Every tappable control has a ≥44px hit area (mobile-first): visually small
 // buttons get an invisible centered ::after hit-area expansion.
 
@@ -195,13 +195,13 @@ const HUD_CSS = `
 .bf-btn { position:relative; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:inherit; font-size:14px; padding:3px 10px; cursor:pointer; }
 .bf-btn:active { transform:translate(1px,1px); }
 .bf-btn:disabled { color:#8a8a8a; border-color:#5a5a5a; cursor:default; }
-.bf-helpbtn { box-sizing:border-box; width:28px; height:28px; padding:0; font:bold 19px/26px "VT323",monospace; }
+.bf-helpbtn { box-sizing:border-box; width:28px; height:28px; padding:0; font:bold 17px/26px "Alegreya Sans","Trebuchet MS",sans-serif; }
 /* ≥44px touch targets (mobile-first): invisible centered hit-area expansion keeps visuals small */
 .bf-btn::after, .bf-idle::after, .bf-mbtn::after { content:""; position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); width:max(100%,44px); height:max(100%,44px); }
 .bf-idle { position:relative; display:flex; align-items:center; gap:3px; background:#46331F; border:1px solid #8A6414; border-radius:3px; padding:1px 5px; cursor:pointer; pointer-events:auto; color:#EFDDB5; font-family:inherit; }
 .bf-idle canvas { width:22px; height:22px; image-rendering:auto; }
 .bf-idle:disabled { opacity:0.4; cursor:default; }
-.bf-idlecount { font-family:"VT323",monospace; font-size:18px; line-height:1; color:#E6C04A; min-width:11px; text-align:center; }
+.bf-idlecount { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:15px; line-height:1; color:#E6C04A; min-width:11px; text-align:center; }
 .bf-rightcluster { position:absolute; right:6px; bottom:6px; width:264px; display:flex; flex-direction:column; align-items:stretch; gap:6px; pointer-events:none; }
 .bf-selpanel { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-selpanel.show { display:block; }
@@ -214,7 +214,7 @@ const HUD_CSS = `
 .bf-selcarry { display:none; align-items:center; gap:5px; min-height:22px; font-size:16px; color:#E6C04A; }
 .bf-selcarry.show { display:flex; }
 .bf-selcarry canvas { width:22px; height:22px; border:0; image-rendering:auto; }
-.bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:14px/1.05 "VT323",monospace; }
+.bf-selstats { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:2px 8px; margin-top:6px; padding-top:5px; border-top:1px solid #64492B; color:#DABE8D; font:13px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-selstats:empty { display:none; }
 .bf-selstat { min-width:0; white-space:nowrap; cursor:help; outline:none; }
 .bf-selstat:focus-visible { box-shadow:0 1px 0 #E6C04A; }
@@ -227,7 +227,7 @@ const HUD_CSS = `
 .bf-cardtitle.with-icon canvas { width:32px; height:32px; flex:0 0 32px; image-rendering:auto; border:1px solid #8A6414; background:#2C1F12; }
 .bf-cardtitle.with-icon .bf-buildingtitle { min-width:0; line-height:1.15; }
 .bf-grid { display:grid; grid-template-columns:repeat(5,44px); gap:4px; }
-.bf-cardsection { grid-column:1/-1; padding-top:3px; color:#E6C04A; font:14px/1 "VT323",monospace; letter-spacing:.5px; border-bottom:1px solid #64492B; }
+.bf-cardsection { grid-column:1/-1; padding-top:3px; color:#E6C04A; font:13px/1.2 "Alegreya Sans","Trebuchet MS",sans-serif; letter-spacing:.5px; border-bottom:1px solid #64492B; }
 .bf-cardsection.hint { color:#DABE8D; border-bottom:0; padding-top:1px; }
 /* border-box: 44px means 44px INCLUDING border+padding, so buttons fill the grid's
    44px tracks exactly and the 4px gaps stay real (content-box made them 48px,
@@ -244,26 +244,26 @@ const HUD_CSS = `
 .bf-quicknav { display:flex; gap:4px; height:44px; }
 .bf-quickbtn { width:44px; height:44px; padding:1px; border:1px solid #8A6414; border-radius:3px; background:#2C1F12; cursor:pointer; pointer-events:auto; }
 .bf-quickbtn canvas { width:40px; height:40px; display:block; image-rendering:auto; }
-.bf-cmddir { position:absolute; right:1px; bottom:1px; min-width:25px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.92); border:1px solid #C29422; color:#F4EEDD; font:12px/12px "VT323",monospace; text-align:center; pointer-events:none; }
+.bf-cmddir { position:absolute; right:1px; bottom:1px; min-width:25px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.92); border:1px solid #C29422; color:#F4EEDD; font:11px/12px "Alegreya Sans","Trebuchet MS",sans-serif; text-align:center; pointer-events:none; }
 .bf-cmddir.out { color:#9ED0FF; border-color:#6D9CC4; }
 /* non-blocking warning badge (housed): the order still queues — never grays the button */
 .bf-cmdbadge { position:absolute; top:0; right:2px; font-size:13px; line-height:1; color:#E6C04A; text-shadow:1px 1px 0 #1A1208, -1px 1px 0 #1A1208, 1px -1px 0 #1A1208, -1px -1px 0 #1A1208; pointer-events:none; }
-.bf-cmdkey { position:absolute; left:1px; top:1px; min-width:12px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.9); color:#E6C04A; border:1px solid #64492B; font:12px/12px "VT323",monospace; text-align:center; pointer-events:none; }
+.bf-cmdkey { position:absolute; left:1px; top:1px; min-width:12px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.9); color:#E6C04A; border:1px solid #64492B; font:11px/12px "Alegreya Sans","Trebuchet MS",sans-serif; text-align:center; pointer-events:none; }
 /* wrap: TRAIN_QUEUE_CAP is 15 — 3 rows of 5 border-box 44px chips fit the 246px
    card. min-height is set from JS (QUEUE_BLOCK_PX) for buildings that can queue:
    the FULL block is reserved up front so chips appearing/completing never move
    the bottom-anchored card's train buttons under the player's thumb */
 .bf-queue { display:flex; flex-wrap:wrap; gap:4px; margin-top:6px; }
 .bf-queue:empty { margin-top:6px; } /* reserve spacing: first queued unit must not move the card */
-.bf-queuetitle { display:none; margin:7px 2px 0; padding-top:4px; border-top:1px solid #64492B; color:#E6C04A; font:14px/1 "VT323",monospace; }
+.bf-queuetitle { display:none; margin:7px 2px 0; padding-top:4px; border-top:1px solid #64492B; color:#E6C04A; font:13px/1.2 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-queuetitle.show { display:block; }
 .bf-queuetitle.stalled { margin-top:7px; padding:5px 6px; color:#FFD08A; background:rgba(132,35,24,.7); border:1px solid #D56A45; border-radius:3px; }
 .bf-qitem { position:relative; box-sizing:border-box; flex-shrink:0; width:44px; height:44px; padding:1px; border:1px solid #64492B; background:#2C1F12; cursor:pointer; pointer-events:auto; } /* 44px hard floor: cancel-a-unit mis-taps are costly */
 .bf-qitem.blocked { border-color:#E06B48; box-shadow:0 0 0 1px rgba(224,107,72,.55); }
 .bf-qitem canvas { width:40px; height:40px; image-rendering:auto; display:block; }
 .bf-qprog { position:absolute; left:0; bottom:0; height:3px; background:#C29422; }
-.bf-qcount { position:absolute; right:1px; bottom:3px; min-width:20px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.94); color:#F4EEDD; font:15px/14px "VT323",monospace; text-align:center; pointer-events:none; }
-.bf-qblocked { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(78,18,13,.62); color:#FFD08A; font:bold 19px/1 "VT323",monospace; pointer-events:none; }
+.bf-qcount { position:absolute; right:1px; bottom:3px; min-width:20px; padding:0 2px; box-sizing:border-box; background:rgba(26,18,8,.94); color:#F4EEDD; font:13px/14px "Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; text-align:center; pointer-events:none; }
+.bf-qblocked { position:absolute; inset:0; display:flex; align-items:center; justify-content:center; background:rgba(78,18,13,.62); color:#FFD08A; font:bold 17px/1 "Alegreya Sans","Trebuchet MS",sans-serif; pointer-events:none; }
 .bf-note { font-size:13px; color:#DABE8D; margin:5px 2px 0; min-height:0; }
 .bf-note:empty { display:none; }
 .bf-market { display:none; flex-direction:column; gap:6px; margin-top:6px; }
@@ -272,7 +272,7 @@ const HUD_CSS = `
 .bf-mrow canvas { width:22px; height:22px; image-rendering:auto; }
 /* native ≥44px height (touch-target contract): trades mutate the stockpile
    instantly, so a thumb tap must never land on the adjacent resource row */
-.bf-mbtn { position:relative; box-sizing:border-box; flex:1; min-height:44px; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:"VT323",monospace; font-size:15px; padding:4px 2px; cursor:pointer; }
+.bf-mbtn { position:relative; box-sizing:border-box; flex:1; min-height:44px; pointer-events:auto; background:#46331F; color:#EFDDB5; border:1px solid #8A6414; border-radius:3px; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-size:15px; padding:4px 2px; cursor:pointer; }
 .bf-mbtn.disabled { color:#8a8a8a; border-color:#5a5a5a; }
 .bf-garrison { display:none; margin-top:6px; }
 .bf-garrison.show { display:block; }
@@ -288,11 +288,11 @@ const HUD_CSS = `
 .bf-pausebox { box-sizing:border-box; width:min(680px,100%); max-height:100%; min-height:0; margin:auto;
   display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:10px; padding:16px; pointer-events:auto; }
 .bf-pausehead { display:flex; align-items:center; justify-content:space-between; gap:16px; }
-.bf-pause h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:40px; line-height:1; color:#E6C04A; margin:0; }
+.bf-pause h2 { font-family:"Cinzel","Georgia",serif; font-weight:700; font-size:34px; line-height:1; color:#E6C04A; margin:0; }
 .bf-pauseresume { min-width:132px; min-height:44px; font-size:18px; }
 .bf-pausetabs { display:grid; grid-template-columns:repeat(3,1fr); gap:6px; }
 .bf-pausetab { min-height:44px; padding:7px 10px; color:#DABE8D; background:#241809;
-  border:1px solid #64492B; border-radius:4px; font:15px/1 "Pixelify Sans",monospace; cursor:pointer; }
+  border:1px solid #64492B; border-radius:4px; font:15px/1 "Alegreya Sans","Trebuchet MS",sans-serif; cursor:pointer; }
 .bf-pausetab[aria-selected="true"] { color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D);
   border-color:#B99A6B; box-shadow:0 1px 0 #8A6414; }
 .bf-pausetab:focus-visible, .bf-pauseresume:focus-visible { outline:3px solid #FFE98A; outline-offset:2px; }
@@ -303,27 +303,27 @@ const HUD_CSS = `
 /* in-match settings (same controls as the menu screen — see settingsUi.ts) */
 .bf-pausesettings { box-sizing:border-box; width:100%; max-width:520px; margin:0 auto; padding:2px 10px 10px; text-align:left; }
 .bf-pausesection { box-sizing:border-box; width:100%; padding:12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
-.bf-pausetitle { color:#E6C04A; font:15px/1 "Pixelify Sans",monospace; letter-spacing:1px; }
-.bf-pausehint { margin-top:5px; font:14px/1.25 "VT323",monospace; }
+.bf-pausetitle { color:#E6C04A; font:600 15px/1 "Cinzel","Georgia",serif; letter-spacing:1px; }
+.bf-pausehint { margin-top:5px; font:14px/1.4 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-pausesaverow { display:flex; align-items:center; gap:10px; margin-top:8px; }
-.bf-pausestate { color:#E6C04A; font:15px/1 "VT323",monospace; }
+.bf-pausestate { color:#E6C04A; font:14px/1 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-pauseleave { display:flex; flex-direction:column; }
 .bf-pauseleave .bf-btn { width:100%; min-height:44px; margin-top:auto; }
 .bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }
 .bf-help.show { display:flex; }
 .bf-helpbox { box-sizing:border-box; width:min(430px,calc(100% - 24px)); margin:auto; padding:20px; }
 .bf-helphead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
-.bf-helphead h2 { margin:0; color:#E6C04A; font:32px/1 "Jacquard 12","Pixelify Sans",monospace; }
-.bf-helptext { color:#DABE8D; font:15px/1.35 "Pixelify Sans",monospace; }
+.bf-helphead h2 { margin:0; color:#E6C04A; font:700 26px/1 "Cinzel","Georgia",serif; }
+.bf-helptext { color:#DABE8D; font:15px/1.45 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-helptext strong { color:#E6C04A; font-weight:normal; }
 .bf-helptoggle { width:100%; min-height:44px; margin:12px 0; padding:8px 12px; display:flex; align-items:center; justify-content:space-between; gap:10px; text-align:left; }
-.bf-helpstate { color:#E6C04A; font:18px/1 "VT323",monospace; }
+.bf-helpstate { color:#E6C04A; font:16px/1 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-place { position:absolute; left:50%; bottom:14px; transform:translateX(-50%); padding:8px 10px; display:none; gap:10px; pointer-events:auto; }
 .bf-place.show { display:flex; }
 /* Control groups live in Pause: useful on demand without permanently covering the battlefield. */
 .bf-chips { display:flex; justify-content:center; gap:6px; margin-top:8px; pointer-events:auto; }
 .bf-chips.hide { display:none; }
-.bf-chip { position:relative; width:44px; height:44px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
+.bf-chip { position:relative; width:44px; height:44px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:18px; line-height:1; cursor:pointer; pointer-events:auto; }
 .bf-chip.empty { background:#3a2a18; color:#B99A6B; border-color:#64492B; box-shadow:none; }
 .bf-chipcount { position:absolute; right:3px; bottom:1px; font-size:14px; color:#64492B; }
 /* ---- narrow widths (portrait phones): compress the top bar. It may wrap to a
@@ -527,7 +527,7 @@ export class Hud {
         const span = this.resSpans.get(r);
         if (span) span.textContent = String(Math.floor(p.stockpile[r] ?? 0));
       }
-      // formatRatio, NOT `${pop}/${popCap}`: an unspaced '/5' merges into '$' in VT323
+      // formatRatio, NOT `${pop}/${popCap}`: the spaced form keeps the housed read scannable
       this.popSpan.textContent = formatRatio(p.pop, p.popCap);
       this.ageSpan.textContent = AGE_LABEL[p.age] ?? p.age;
     }

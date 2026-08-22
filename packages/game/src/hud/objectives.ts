@@ -165,7 +165,7 @@ export function objectiveMarkerPlacement(
 
 const OBJ_CSS = `
 .bf-objectives { position:absolute; right:6px; top:40px; width:min(300px, 60vw); z-index:24;
-  font-family:"Pixelify Sans",monospace; pointer-events:auto; }
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; pointer-events:auto; }
 .bf-obj-head { display:grid; grid-template-columns:minmax(0,1fr) 44px; align-items:stretch;
   background:linear-gradient(#3a2a18,#2C1F12); border:1px solid #64492B; border-radius:4px;
   box-shadow:0 0 0 1px #1A1208; }
@@ -203,7 +203,7 @@ const OBJ_CSS = `
 .bf-obj-chip.done { color:#9BCB70; border-color:#527033; }
 .bf-obj-item.complete .bf-obj-chip { color:#8f8268; border-color:#46331F; }
 .bf-obj-row-focus { box-sizing:border-box; width:44px; height:44px; padding:0; border:1px solid #8A6414; border-radius:3px;
-  background:#241809; color:#E6C04A; font:16px "Pixelify Sans",monospace; cursor:pointer; }
+  background:#241809; color:#E6C04A; font:16px "Alegreya Sans","Trebuchet MS",sans-serif; cursor:pointer; }
 .bf-obj-item.flash { animation:bfObjFlash 0.9s ease-out; }
 @keyframes bfObjFlash { 0% { background:rgba(230,192,74,0.35); } 100% { background:transparent; } }
 .bf-obj-head.flash { animation:bfObjHeadFlash 0.9s ease-out; }
@@ -218,14 +218,14 @@ const OBJ_CSS = `
   border:2px solid #E6C04A; border-radius:50%; box-shadow:0 0 0 1px #1A1208,0 0 9px rgba(230,192,74,.8);
   animation:bfObjBeaconRing 1.2s ease-in-out infinite; }
 .bf-obj-marker.beacon::after { content:"◆"; position:absolute; left:13px; top:0; width:18px;
-  color:#E6C04A; font:18px "Pixelify Sans",monospace; text-shadow:0 1px #1A1208,0 0 7px #E6C04A;
+  color:#E6C04A; font:18px "Alegreya Sans","Trebuchet MS",sans-serif; text-shadow:0 1px #1A1208,0 0 7px #E6C04A;
   animation:bfObjBeaconPin 1.2s ease-in-out infinite; }
 @keyframes bfObjBeaconRing { 0%,100% { transform:scale(.82); opacity:.75; } 50% { transform:scale(1.12); opacity:1; } }
 @keyframes bfObjBeaconPin { 0%,100% { transform:translateY(0); } 50% { transform:translateY(-5px); } }
 .bf-obj-marker.edge { border:1px solid #8A6414; border-radius:50%; background:#241809;
   box-shadow:0 0 0 1px #1A1208,0 0 8px rgba(230,192,74,.7); animation:bfObjEdgePulse 1s ease-in-out infinite; }
 .bf-obj-marker.edge::after { content:"➤"; position:absolute; inset:9px; color:#E6C04A;
-  font:20px/24px "Pixelify Sans",monospace; transform:rotate(var(--bf-obj-angle)); }
+  font:20px/24px "Alegreya Sans","Trebuchet MS",sans-serif; transform:rotate(var(--bf-obj-angle)); }
 @keyframes bfObjEdgePulse { 0%,100% { opacity:.72; } 50% { opacity:1; } }
 `;
 

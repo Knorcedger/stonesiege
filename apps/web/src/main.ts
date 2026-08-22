@@ -4,10 +4,6 @@ import '@fontsource/alegreya-sans/latin-500.css';
 import '@fontsource/alegreya-sans/latin-700.css';
 import '@fontsource/cinzel/latin-600.css';
 import '@fontsource/cinzel/latin-700.css';
-import '@fontsource/jacquard-12/latin-400.css';
-import '@fontsource/pixelify-sans/latin-400.css';
-import '@fontsource/pixelify-sans/latin-600.css';
-import '@fontsource/vt323/latin-400.css';
 
 import { appOpenEvent } from '@bf/game/analytics/events';
 import { installNativeBridge, nativePlatform } from './native';
