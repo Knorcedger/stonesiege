@@ -263,8 +263,10 @@ describe('complete HD art override contract', () => {
     // leaking into the atlas there was no gait left in it at all, so the line
     // slid across the ground on frozen legs; the build now synthesizes one.
     // Measured over the boot band, consecutive poses used to differ by as
-    // little as 5.5% of it, against 23% now and 16-46% for every family with
-    // an authored stride.
+    // little as 5.5% of it, against 26.5% now. The threshold below is a floor,
+    // not a target: authored families span 3.1% (pikeman, a genuine but shallow
+    // stride) to 51.0% (mamluk), so run tools/hd-art/qa-walk-grid.ts and read a
+    // family against its neighbours rather than against this number.
     for (const id of ['militia', 'manAtArms', 'longswordsman', 'champion'] as const) {
       for (let dir = 0; dir < 5; dir++) {
         const bands = Array.from({ length: 6 }, (_, frame) =>
