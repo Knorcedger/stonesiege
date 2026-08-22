@@ -55,6 +55,25 @@ function projection(resource: RememberedResource): Entity {
   return { ...resource, kind: 'resource', player: GAIA };
 }
 
+/**
+ * True when a live resource still matches its stored observation field for field.
+ * Static scenery dominates every map (a 120x120 practice map carries ~1900 trees),
+ * so re-snapshotting each one on every refresh allocated a throwaway object per
+ * resource per call for no change at all. Comparing first keeps the stored record
+ * — identical in value, and free.
+ */
+function matchesObservation(seen: RememberedResource, entity: Entity): boolean {
+  return seen.defId === entity.defId
+    && seen.x === entity.x && seen.y === entity.y
+    && seen.tileX === entity.tileX && seen.tileY === entity.tileY
+    && seen.facing === entity.facing
+    && seen.hp === entity.hp && seen.maxHp === entity.maxHp
+    && seen.activity === entity.activity
+    && seen.amountLeft === entity.amountLeft
+    && seen.resourceType === entity.resourceType
+    && seen.stump === entity.stump;
+}
+
 const isSafeInt = (value: unknown): value is number =>
   typeof value === 'number' && Number.isSafeInteger(value);
 
@@ -110,24 +129,53 @@ export function canonicalResourceMemorySnapshot(value: unknown): ResourceMemoryS
 /** Last-seen static resource state owned by the presentation layer. */
 export class PlayerResourceMemory {
   private readonly seen = new Map<EntityId, RememberedResource>();
+  /** Reused across refreshes so a per-frame scan allocates no set of its own. */
+  private readonly visibleScratch = new Set<EntityId>();
+  /**
+   * Entity projections handed to the renderer, cached per stored observation.
+   * A fogged forest asks for one projection per tree per frame; minting them
+   * fresh each time was pure allocation churn. `refresh` keeps a record object
+   * identical while nothing about it changed, so caching on that identity is
+   * safe — a real change swaps in a new record and misses the cache.
+   */
+  private readonly projections = new Map<EntityId, { from: RememberedResource; entity: Entity }>();
 
   constructor(readonly player: PlayerId) {}
+
+  private projectionFor(resource: RememberedResource): Entity {
+    const cached = this.projections.get(resource.id);
+    if (cached !== undefined && cached.from === resource) return cached.entity;
+    const entity = projection(resource);
+    this.projections.set(resource.id, { from: resource, entity });
+    return entity;
+  }
 
   refresh(state: GameState): void {
     const visibility = state.players[this.player]?.visibility;
     if (!visibility) return;
     const width = state.map.width;
-    const visibleIds = new Set<EntityId>();
+    const visibleIds = this.visibleScratch;
+    visibleIds.clear();
     for (const entity of state.entities.values()) {
       if (entity.kind !== 'resource' || entity.player !== GAIA) continue;
       if (visibility[entity.tileY * width + entity.tileX] !== 2) continue;
       visibleIds.add(entity.id);
+      const previous = this.seen.get(entity.id);
+      // The delete/set pair keeps insertion order meaning "least recently seen
+      // first"; reusing an unchanged record preserves that order exactly while
+      // skipping the snapshot allocation.
       this.seen.delete(entity.id);
-      this.seen.set(entity.id, remember(entity));
+      this.seen.set(
+        entity.id,
+        previous !== undefined && matchesObservation(previous, entity) ? previous : remember(entity),
+      );
     }
     for (const [id, resource] of this.seen) {
       if (visibility[resource.tileY * width + resource.tileX] === 2
-        && !visibleIds.has(id)) this.seen.delete(id);
+        && !visibleIds.has(id)) {
+        this.seen.delete(id);
+        this.projections.delete(id);
+      }
     }
   }
 
@@ -139,7 +187,7 @@ export class PlayerResourceMemory {
     if (tileVis === 2) return entity;
     if (tileVis !== 1) return null;
     const remembered = this.seen.get(entity.id);
-    return remembered ? projection(remembered) : null;
+    return remembered ? this.projectionFor(remembered) : null;
   }
 
   /** Resources removed from the live sim while their last-seen tile remains hidden. */
@@ -150,7 +198,7 @@ export class PlayerResourceMemory {
     for (const [id, resource] of this.seen) {
       if (!state.entities.has(id)
         && visibility[resource.tileY * state.map.width + resource.tileX] === 1) {
-        out.push(projection(resource));
+        out.push(this.projectionFor(resource));
       }
     }
     return out;
@@ -180,6 +228,7 @@ export class PlayerResourceMemory {
         || live.tileY !== resource.tileY)) return false;
     }
     this.seen.clear();
+    this.projections.clear();
     for (const resource of snapshot.resources) this.seen.set(resource.id, { ...resource });
     this.refresh(state);
     return true;

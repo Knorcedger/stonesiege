@@ -96,7 +96,7 @@ export function advanceGateOpenProgress(current: number, open: boolean, elapsedT
   return Math.max(0, Math.min(1, current + direction * Math.max(0, elapsedTicks) / GATE_OPEN_TICKS));
 }
 
-interface EntityView {
+export interface EntityView {
   root: Container;
   ring: Graphics;
   /** Perpendicular half-segment used only for a true L-shaped wall corner. */
@@ -146,7 +146,7 @@ export function shouldFadeForUnit(
     && unit.bottom > occluder.top && unit.top < occluder.bottom;
 }
 
-function spriteWorldRect(view: EntityView): WorldRect {
+function writeSpriteWorldRect(view: EntityView, out: WorldRect): WorldRect {
   const sprite = view.sprite;
   const width = sprite.texture.width;
   const height = sprite.texture.height;
@@ -154,28 +154,56 @@ function spriteWorldRect(view: EntityView): WorldRect {
   const x1 = (1 - sprite.anchor.x) * width * sprite.scale.x;
   const y0 = (0 - sprite.anchor.y) * height * sprite.scale.y;
   const y1 = (1 - sprite.anchor.y) * height * sprite.scale.y;
-  return {
-    left: view.root.position.x + Math.min(x0, x1),
-    right: view.root.position.x + Math.max(x0, x1),
-    // Ignore transparent texture headroom so nearby units do not cause false fades.
-    top: view.root.position.y + Math.max(Math.min(y0, y1), view.spriteTopPx),
-    bottom: view.root.position.y + Math.max(y0, y1),
-  };
+  out.left = view.root.position.x + Math.min(x0, x1);
+  out.right = view.root.position.x + Math.max(x0, x1);
+  // Ignore transparent texture headroom so nearby units do not cause false fades.
+  out.top = view.root.position.y + Math.max(Math.min(y0, y1), view.spriteTopPx);
+  out.bottom = view.root.position.y + Math.max(y0, y1);
+  return out;
 }
 
-function unitWorldRect(view: EntityView): WorldRect {
-  const bounds = spriteWorldRect(view);
+/** Exported for the differential test that pins the occluder-fade broad phase. */
+export function spriteWorldRect(view: EntityView): WorldRect {
+  return writeSpriteWorldRect(view, { left: 0, right: 0, top: 0, bottom: 0 });
+}
+
+function writeUnitWorldRect(view: EntityView, out: WorldRect): WorldRect {
+  writeSpriteWorldRect(view, out);
   // A unit's readable body is centred around its feet. Keeping the horizontal
   // extent bounded prevents transparent cavalry-sheet gutters from fading a
   // building when the horse is merely beside it.
-  const halfWidth = Math.min(24, Math.max(7, (bounds.right - bounds.left) * 0.4));
-  return {
-    left: view.root.position.x - halfWidth,
-    right: view.root.position.x + halfWidth,
-    top: bounds.top,
-    bottom: view.root.position.y + 2,
-  };
+  const halfWidth = Math.min(24, Math.max(7, (out.right - out.left) * 0.4));
+  out.left = view.root.position.x - halfWidth;
+  out.right = view.root.position.x + halfWidth;
+  out.bottom = view.root.position.y + 2;
+  return out;
 }
+
+/** Exported for the differential test that pins the occluder-fade broad phase. */
+export function unitWorldRect(view: EntityView): WorldRect {
+  return writeUnitWorldRect(view, { left: 0, right: 0, top: 0, bottom: 0 });
+}
+
+/** Screen-space bucket edge (world px) for the occluder-fade broad phase. */
+const FADE_CELL = 128;
+/** Row stride for packing a (cellX, cellY) pair into one numeric bucket key. */
+const FADE_BUCKET_STRIDE = 1 << 16;
+/**
+ * Margins (world px) around the camera view inside which entities still render.
+ * Sprites are anchored at their feet and drawn upward, so the geometry is not
+ * symmetric: artwork whose feet sit below the viewport can still reach up into
+ * it by its full height, while artwork whose feet sit above the viewport is
+ * already entirely off-screen.
+ *
+ * The tallest frame the atlases can produce measures ~700 world px once its
+ * fortification art scale is applied (an HD keep), and the widest ~640 px (a
+ * wonder), so these margins clear the real worst case with room for larger art
+ * later. Over-padding only means a few extra off-screen updates; under-padding
+ * means visible pop-in, so they lean generous.
+ */
+const CULL_PAD_BELOW = 1024;
+const CULL_PAD_ABOVE = 128;
+const CULL_PAD_SIDE = 512;
 
 interface GhostRecord {
   defId: string;
@@ -218,6 +246,19 @@ export class WorldLayer {
   private damagedUntil = new Map<EntityId, number>();
   /** Resource/target ids highlighted because selected villagers gather them. */
   private gatherTargets = new Set<EntityId>();
+  // Scratch buffers for the occluder-fade broad phase, reused every frame so the
+  // pass allocates nothing per entity.
+  private fadeUnitRects: WorldRect[] = [];
+  private fadeUnitDepths: number[] = [];
+  private fadeBuckets = new Map<number, number[]>();
+  private fadeTested: number[] = [];
+  private fadePass = 0;
+  private fadeOccluderRect: WorldRect = { left: 0, right: 0, top: 0, bottom: 0 };
+  /** Sim tick the resource memory was last refreshed for (-1 = never). */
+  private resourceMemoryTick = -1;
+  private readonly seenScratch = new Set<EntityId>();
+  private readonly visibleUnitsScratch: Array<{ entity: Entity; view: EntityView }> = [];
+  private readonly posScratch = { x: 0, y: 0 };
 
   constructor(
     private assets: GameAssets,
@@ -233,10 +274,23 @@ export class WorldLayer {
 
   /** Snapshot positions at each tick boundary (for interpolation). */
   onTick(state: GameState): void {
+    // Ping-pong the two position maps and refill the recycled one in place.
+    // Building a fresh Map plus a point object per entity every tick allocated
+    // thousands of short-lived objects a second on a populated map, for values
+    // that are simply overwritten.
+    const recycled = this.prevPos;
     this.prevPos = this.curPos;
-    const next = new Map<EntityId, { x: number; y: number }>();
-    for (const e of state.entities.values()) next.set(e.id, { x: e.x, y: e.y });
-    this.curPos = next;
+    this.curPos = recycled;
+    const cur = this.curPos;
+    for (const id of cur.keys()) {
+      if (!state.entities.has(id)) cur.delete(id);
+    }
+    for (const e of state.entities.values()) {
+      const point = cur.get(e.id);
+      // The maps never share point objects, so overwriting `cur` cannot disturb
+      // the previous tick's positions that interpolation reads from `prevPos`.
+      if (point) { point.x = e.x; point.y = e.y; } else cur.set(e.id, { x: e.x, y: e.y });
+    }
     this.mirroredWalls = mirroredWallIds(state.entities.values());
     this.wallCorners = wallCornerJoins(state.entities.values());
   }
@@ -251,13 +305,20 @@ export class WorldLayer {
   }
 
   /** Main per-frame update. tickFloat = state.tick + alpha. */
-  update(state: GameState, alpha: number, tickFloat: number): void {
-    this.resourceMemory.refresh(state);
+  update(
+    state: GameState,
+    alpha: number,
+    tickFloat: number,
+    worldView?: { x0: number; y0: number; x1: number; y1: number },
+  ): void {
+    this.syncResourceMemory(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
-    const seen = new Set<EntityId>();
+    const seen = this.seenScratch;
+    seen.clear();
     this.refreshGatherTargets(state);
     this.refreshOpenGates(state);
-    const visibleUnits: Array<{ entity: Entity; view: EntityView }> = [];
+    const visibleUnits = this.visibleUnitsScratch;
+    visibleUnits.length = 0;
 
     for (const e of state.entities.values()) {
       seen.add(e.id);
@@ -275,7 +336,7 @@ export class WorldLayer {
       );
 
       let view = this.views.get(e.id);
-      if (!visible) {
+      if (!visible || this.offCamera(displayed, alpha, worldView)) {
         if (view) view.root.visible = false;
         continue;
       }
@@ -292,6 +353,10 @@ export class WorldLayer {
     for (const remembered of this.resourceMemory.hiddenMissing(state)) {
       seen.add(remembered.id);
       let view = this.views.get(remembered.id);
+      if (this.offCamera(remembered, alpha, worldView)) {
+        if (view) view.root.visible = false;
+        continue;
+      }
       if (!view) {
         view = this.createView();
         this.views.set(remembered.id, view);
@@ -428,11 +493,43 @@ export class WorldLayer {
 
   /** Interpolated world position of an entity. */
   entityWorldPos(e: Entity, alpha: number): { x: number; y: number } {
+    const p = this.readWorldPos(e, alpha);
+    return { x: p.x, y: p.y };
+  }
+
+  /**
+   * entityWorldPos into a shared scratch object. Called for every entity every
+   * frame, so the result must NOT be retained across calls — copy what you need.
+   */
+  private readWorldPos(e: Entity, alpha: number): { x: number; y: number } {
     const prev = this.prevPos.get(e.id);
-    const cur = this.curPos.get(e.id) ?? { x: e.x, y: e.y };
-    const fx = prev ? prev.x + (cur.x - prev.x) * alpha : cur.x;
-    const fy = prev ? prev.y + (cur.y - prev.y) * alpha : cur.y;
-    return tileToWorld(fx / FP, fy / FP);
+    const cur = this.curPos.get(e.id);
+    const curX = cur ? cur.x : e.x;
+    const curY = cur ? cur.y : e.y;
+    const fx = prev ? prev.x + (curX - prev.x) * alpha : curX;
+    const fy = prev ? prev.y + (curY - prev.y) * alpha : curY;
+    const p = tileToWorld(fx / FP, fy / FP);
+    this.posScratch.x = p.x;
+    this.posScratch.y = p.y;
+    return this.posScratch;
+  }
+
+  /**
+   * Off-screen entities keep their state but skip the whole per-frame view
+   * refresh. A walked-over map holds thousands of trees while only a screenful
+   * is ever on camera, and updating the rest cost more than everything the
+   * player can actually see. Omitting `worldView` disables culling entirely
+   * (tests and any caller without a camera).
+   */
+  private offCamera(
+    e: Entity | null,
+    alpha: number,
+    worldView?: { x0: number; y0: number; x1: number; y1: number },
+  ): boolean {
+    if (!worldView || !e) return false;
+    const p = this.readWorldPos(e, alpha);
+    return p.x < worldView.x0 - CULL_PAD_SIDE || p.x > worldView.x1 + CULL_PAD_SIDE
+      || p.y < worldView.y0 - CULL_PAD_ABOVE || p.y > worldView.y1 + CULL_PAD_BELOW;
   }
 
   /**
@@ -440,7 +537,7 @@ export class WorldLayer {
    * sorted by distance; the input layer applies GDD snap priority.
    */
   pickAt(state: GameState, wx: number, wy: number, slop: number): PickResult[] {
-    this.resourceMemory.refresh(state);
+    this.syncResourceMemory(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const results: PickResult[] = [];
     for (const e of state.entities.values()) {
@@ -495,6 +592,19 @@ export class WorldLayer {
 
   // ------------------------------------------------------------------ internals
 
+  /**
+   * Resource memory only ever changes when the sim advances: both of its inputs
+   * (the entity table and the player's visibility grid) are written during a tick.
+   * Rescanning every entity three times per tick at 60fps — and again on every tap
+   * through pickAt — was the single most expensive thing in the frame, so run it
+   * once per tick and reuse the result.
+   */
+  private syncResourceMemory(state: GameState): void {
+    if (state.tick === this.resourceMemoryTick) return;
+    this.resourceMemoryTick = state.tick;
+    this.resourceMemory.refresh(state);
+  }
+
   private tileVis(vis: Uint8Array | null, state: GameState, tx: number, ty: number): number {
     if (!vis) return 2;
     if (tx < 0 || ty < 0 || tx >= state.map.width || ty >= state.map.height) return 0;
@@ -536,28 +646,78 @@ export class WorldLayer {
     visibleUnits: Array<{ entity: Entity; view: EntityView }>,
   ): void {
     if (visibleUnits.length === 0) return;
+
+    // Broad phase. The naive form tested every occluder against every unit and
+    // rebuilt each unit's rect inside that inner loop, so cost grew with
+    // occluders x army size (measurably ~3ms/frame at 23 units on a 120x120 map,
+    // and still climbing). Each unit rect is now built once and filed into a
+    // coarse world-space grid, so an occluder only ever tests the handful of
+    // units standing near it. The fade decision itself is unchanged.
+    const rects = this.fadeUnitRects;
+    const depths = this.fadeUnitDepths;
+    const buckets = this.fadeBuckets;
+    for (const cell of buckets.values()) cell.length = 0;
+    for (let i = 0; i < visibleUnits.length; i++) {
+      const unitView = visibleUnits[i].view;
+      const rect = rects[i] ?? (rects[i] = { left: 0, right: 0, top: 0, bottom: 0 });
+      writeUnitWorldRect(unitView, rect);
+      depths[i] = unitView.root.zIndex;
+      const cx0 = Math.floor(rect.left / FADE_CELL), cx1 = Math.floor(rect.right / FADE_CELL);
+      const cy0 = Math.floor(rect.top / FADE_CELL), cy1 = Math.floor(rect.bottom / FADE_CELL);
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const key = cy * FADE_BUCKET_STRIDE + cx;
+          let cell = buckets.get(key);
+          if (!cell) { cell = []; buckets.set(key, cell); }
+          cell.push(i);
+        }
+      }
+    }
+
+    const occluderBounds = this.fadeOccluderRect;
+    const tested = this.fadeTested;
+    let pass = this.fadePass;
     for (const e of state.entities.values()) {
       if ((e.kind !== 'building' && e.kind !== 'resource') || e.hp <= 0) continue;
       const view = this.views.get(e.id);
       if (!view?.root.visible || !view.sprite.visible) continue;
       // Flat artwork does not conceal a unit and should not pulse as feet cross it.
       if (e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250)) continue;
-      const occluderBounds = spriteWorldRect(view);
-      const covered = visibleUnits.some(({ view: unitView }) => shouldFadeForUnit(
-        occluderBounds,
-        view.root.zIndex,
-        unitWorldRect(unitView),
-        unitView.root.zIndex,
-      ));
+      writeSpriteWorldRect(view, occluderBounds);
+      const depth = view.root.zIndex;
+      pass++;
+      let covered = false;
+      const cx0 = Math.floor(occluderBounds.left / FADE_CELL);
+      const cx1 = Math.floor(occluderBounds.right / FADE_CELL);
+      const cy0 = Math.floor(occluderBounds.top / FADE_CELL);
+      const cy1 = Math.floor(occluderBounds.bottom / FADE_CELL);
+      scan: for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const cell = buckets.get(cy * FADE_BUCKET_STRIDE + cx);
+          if (cell === undefined) continue;
+          for (let k = 0; k < cell.length; k++) {
+            const i = cell[k];
+            // A unit spanning several cells appears in each of them; the stamp
+            // keeps it to one rect test per occluder.
+            if (tested[i] === pass) continue;
+            tested[i] = pass;
+            if (shouldFadeForUnit(occluderBounds, depth, rects[i], depths[i])) {
+              covered = true;
+              break scan;
+            }
+          }
+        }
+      }
       if (!covered) continue;
       view.sprite.alpha *= OCCLUDER_ALPHA;
       view.cornerSprite.alpha *= OCCLUDER_ALPHA;
       view.gateDoor.alpha *= OCCLUDER_ALPHA;
     }
+    this.fadePass = pass;
   }
 
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
-    const pos = this.entityWorldPos(e, alpha);
+    const pos = this.readWorldPos(e, alpha);
     view.root.position.set(Math.round(pos.x), Math.round(pos.y));
     // flat things (farms, foundations-stage-0) sort under everything else
     const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);

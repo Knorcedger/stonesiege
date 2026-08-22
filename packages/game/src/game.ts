@@ -598,10 +598,21 @@ async function bootGame(
 
   // Idle-unit cycling (GDD: top-bar idle-villager/-military badges = touch `.` hotkey).
   const idleCursor: Record<IdleCategory, number> = { villager: 0, military: 0 };
-  const getIdleCounts = (): Record<IdleCategory, number> => ({
-    villager: idleUnits(getState(), humanPlayer, 'villager').length,
-    military: idleUnits(getState(), humanPlayer, 'military').length,
-  });
+  // Both idle scans walk every entity on the map, and the HUD asks for them on
+  // every frame while the answer can only change when the sim advances.
+  let idleCountsTick = -1;
+  let idleCountsCache: Record<IdleCategory, number> = { villager: 0, military: 0 };
+  const getIdleCounts = (): Record<IdleCategory, number> => {
+    const st = getState();
+    if (st.tick !== idleCountsTick) {
+      idleCountsTick = st.tick;
+      idleCountsCache = {
+        villager: idleUnits(st, humanPlayer, 'villager').length,
+        military: idleUnits(st, humanPlayer, 'military').length,
+      };
+    }
+    return idleCountsCache;
+  };
   const cycleIdle = (cat: IdleCategory): void => {
     const list = idleUnits(getState(), humanPlayer, cat);
     if (list.length === 0) return;
@@ -1360,8 +1371,9 @@ async function bootGame(
 
     const st = getState();
     const alpha = loop.alpha;
-    terrain.update(camera.getWorldView());
-    world.update(st, alpha, st.tick + alpha);
+    const worldView = camera.getWorldView();
+    terrain.update(worldView);
+    world.update(st, alpha, st.tick + alpha, worldView);
     fx.update(st, st.tick + alpha);
     if (placement) refreshGhost();
     hud.update();

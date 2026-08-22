@@ -16,6 +16,14 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
+### Fixed
+
+- Frame rate no longer degrades as your army grows. The renderer used to compare every object on
+  the map against every visible soldier each frame, so the game ran smoothly with a scouting
+  party and began to stutter at around twenty troops. Per-frame renderer cost on a walked
+  120x120 map dropped from ~13 ms to under 2 ms, and it no longer rises with army size. Tapping
+  to select is faster for the same reason.
+
 ## 0.1.2 — 2026-08-20
 
 ### Added

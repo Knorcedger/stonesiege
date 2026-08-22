@@ -85,3 +85,58 @@ describe('PlayerResourceMemory', () => {
     expect(canonicalResourceMemorySnapshot({ ...snapshot, player: 0 })).toBeNull();
   });
 });
+
+describe('PlayerResourceMemory refresh cost', () => {
+  it('keeps the stored record for an unchanged resource and replaces a changed one', () => {
+    // Refresh runs for every resource on the map on every sim tick, so an
+    // unchanged tree must not mint a new observation object each time.
+    const visibility = new Uint8Array(64).fill(2);
+    const gold = resource();
+    const state = makeState(gold, visibility);
+    const memory = new PlayerResourceMemory(HUMAN);
+
+    memory.refresh(state);
+    const first = memory.snapshot().resources[0];
+    memory.refresh(state);
+    expect(memory.snapshot().resources[0]).toEqual(first);
+
+    gold.amountLeft = 500;
+    memory.refresh(state);
+    expect(memory.snapshot().resources[0].amountLeft).toBe(500);
+  });
+
+  it('reuses one projection per observation but re-projects after a change', () => {
+    const visibility = new Uint8Array(64).fill(2);
+    const gold = resource();
+    const state = makeState(gold, visibility);
+    const memory = new PlayerResourceMemory(HUMAN);
+    memory.refresh(state);
+
+    visibility[gold.tileY * 8 + gold.tileX] = 1;
+    const a = memory.entityFor(state, gold);
+    const b = memory.entityFor(state, gold);
+    expect(a).toBe(b); // same object: no per-frame allocation for fogged scenery
+
+    visibility[gold.tileY * 8 + gold.tileX] = 2;
+    gold.amountLeft = 42;
+    memory.refresh(state);
+    visibility[gold.tileY * 8 + gold.tileX] = 1;
+    const c = memory.entityFor(state, gold);
+    expect(c).not.toBe(a);
+    expect(c?.amountLeft).toBe(42);
+  });
+
+  it('forgets projections for resources it stops remembering', () => {
+    const visibility = new Uint8Array(64).fill(2);
+    const gold = resource();
+    const state = makeState(gold, visibility);
+    const memory = new PlayerResourceMemory(HUMAN);
+    memory.refresh(state);
+
+    // Mined out in full view: the memory drops it and reports nothing hidden.
+    (state.entities as Map<EntityId, Entity>).delete(gold.id);
+    memory.refresh(state);
+    expect(memory.hiddenMissing(state)).toEqual([]);
+    expect(memory.snapshot().resources).toEqual([]);
+  });
+});
