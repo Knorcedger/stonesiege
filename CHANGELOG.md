@@ -16,6 +16,7 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
+
 ### Changed
 
 - Battles can be read by ear. Every blow used to play the same steel clash, so a battering ram
@@ -48,6 +49,13 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   party and began to stutter at around twenty troops. Per-frame renderer cost on a walked
   120x120 map dropped from ~13 ms to under 2 ms, and it no longer rises with army size. Tapping
   to select is faster for the same reason.
+- Siege engines and soldiers now roll right up against the building they are attacking. They
+  used to stop wherever the approach walk ended — up to a tile of open ground short of the wall,
+  worst on the diagonal — and swing at nothing.
+- One attack animation per attack. Every unit looped its half-second swing continuously, so a
+  Battering Ram flailed ten times for each blow it actually landed and read as if it barely
+  scratched a house. It now winds up, slams once, and holds its ready pose until the next hit
+  (its damage is unchanged: 152 to a house, four hits to bring one down).
 
 ## 0.1.2 — 2026-08-20
 

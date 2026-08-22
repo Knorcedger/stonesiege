@@ -40,6 +40,25 @@ function tryStep(state: SimState, e: Entity, nx: Fixed, ny: Fixed): boolean {
   return false;
 }
 
+/**
+ * Slide a unit straight toward (tx, ty) by at most `maxStepFp`, honoring terrain but
+ * without pathing. Combat uses it to close the last fraction of a tile onto a building
+ * it is battering: the chase walk stops within ARRIVE_DIST of its ring slot, which is
+ * open ground rather than the wall. Returns true if the unit actually moved.
+ */
+export function stepToward(state: SimState, e: Entity, tx: Fixed, ty: Fixed, maxStepFp: number): boolean {
+  if (maxStepFp <= 0) return false;
+  const dx = tx - e.x, dy = ty - e.y;
+  const dist = isqrt(dx * dx + dy * dy);
+  if (dist === 0) return false;
+  const step = Math.min(maxStepFp, dist);
+  const sx = Math.round(dx * step / dist), sy = Math.round(dy * step / dist);
+  if (sx === 0 && sy === 0) return false;
+  const beforeX = e.x, beforeY = e.y;
+  tryStep(state, e, e.x + sx, e.y + sy);
+  return e.x !== beforeX || e.y !== beforeY;
+}
+
 function applyPosition(state: SimState, e: Entity, nx: Fixed, ny: Fixed): void {
   if (nx === e.x && ny === e.y) return;
   e.x = nx; e.y = ny;
