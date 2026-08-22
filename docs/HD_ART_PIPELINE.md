@@ -92,6 +92,17 @@ both the legacy pixel-source set and HD overrides.
 3. Units: villagers, infantry, archers, cavalry, monks, siege, sheep, deer, and
    wolves use authored direction masters. Walk, attack, death, and decay motion
    stays on stable grounded canvases and retains the player-color contract.
+   A movement grid is a walk-in-place cycle: the subject's own bounds must hold
+   still from cell to cell, because the simulation moves the unit and the sheet
+   must only move its legs. A sheet that instead translates the subject across
+   the strip carries no gait, and `tools/hd-art/build.ts` registers every pose
+   on its subject, so that translation is discarded rather than shipped as a
+   slide-and-snap. `champion-walk-grid-cutout-v1.png` (the militia line and the
+   heroes aliasing it) is such a sheet — its six cells hold one standing pose —
+   so that family opts into `syntheticGait`, which derives the cycle from a
+   single cell with a hip-pivot leg swing phased off the authored facing.
+   Re-authoring the sheet with a genuine six-pose stride retires the opt-in;
+   never switch it on for a family whose sheet already strides.
 4. UI: typography and panel treatment are refreshed. Every world-entity icon is
    derived from the matching authored render; command, resource, and technology
    symbols retain the legible deterministic material treatment.
