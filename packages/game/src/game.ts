@@ -32,6 +32,7 @@ import { FogLayer } from './fog';
 import { SimLoop, TICK_MS } from './simloop';
 import { CommandAdmission } from './admission';
 import { AudioEngine } from './audio/engine';
+import { Narrator, createBrowserSpeech, primeSpeechOnGesture } from './audio/narration';
 import { GameAudio } from './audio/events';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
@@ -320,6 +321,12 @@ async function bootGame(
   // ------------------------------------------------------------------ audio
   const audioEngine = new AudioEngine();
   audioEngine.ambientOn();
+  // Campaign dialogue is read aloud through the platform speech synthesizer.
+  // iOS wants a gesture before the first utterance, so one is spent silently on
+  // the first press rather than on the opening narrator line.
+  const speech = createBrowserSpeech();
+  const narrator = new Narrator(speech);
+  primeSpeechOnGesture(speech);
   // every button press anywhere in the match UI clicks (capture: HUD buttons
   // stopPropagation freely)
   root.addEventListener('pointerdown', (e) => {
@@ -653,6 +660,10 @@ async function bootGame(
     endShown = true;
     clearSnapshot(plan.slot); // a finished match must never be offered for resume
     deselect();
+    // Latched, not a one-shot cancel: scenarios queue their closing lines in
+    // the same effect batch as the victory, and the end screen covers the
+    // banner — so nothing more is read once the match is over.
+    narrator.silence();
     audioEngine.play(victory ? 'hornVictory' : 'hornDefeat');
     const summary = deriveMatchSummary(getState(), humanPlayer, tallies);
     // One fire per match: the endShown guard above already guarantees it, and a
@@ -769,6 +780,9 @@ async function bootGame(
 
   // --------------------------------------------------------------- sim loop
   const loop = new SimLoop(game, {
+    // The render ticker keeps advancing the banner behind the pause overlay,
+    // so narration has to be told to stop with the match.
+    onPauseChanged: (paused) => narrator.setMuted(paused),
     onTick: (events) => {
       const st = getState();
       for (const bot of bots.values()) {
@@ -1126,7 +1140,7 @@ async function bootGame(
       (target) => startCameraPan(target.x, target.y),
       objectiveGuides.map((guide) => guide.id),
     );
-    messageBanner = new MessageBanner(hudRoot);
+    messageBanner = new MessageBanner(hudRoot, narrator);
     for (const op of pendingObjectiveOps) op(objectivesPanel); // resume-replayed state
     pendingObjectiveOps.length = 0;
   }

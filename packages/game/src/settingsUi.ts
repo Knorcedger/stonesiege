@@ -42,8 +42,9 @@ export interface SettingsControlsOptions {
 }
 
 /**
- * Append the full settings control set (master/sfx/ambient volume, camera
- * speed, production speed, HP-bar visibility, anonymous-stats opt-out) to
+ * Append the full settings control set (master/sfx/ambient/narration volume,
+ * camera speed, production speed, campaign narration, HP-bar visibility,
+ * anonymous-stats opt-out) to
  * `container`. Controls read the live settings at build time and write through
  * updateSettings on every interaction.
  */
@@ -94,6 +95,8 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
     (v) => updateSettings({ sfxVolume: v / 100 }));
   slider('AMBIENT', s.ambientVolume * 100, 0, 100, (v) => `${v}%`,
     (v) => updateSettings({ ambientVolume: v / 100 }));
+  slider('NARRATION', s.narrationVolume * 100, 0, 100, (v) => `${v}%`,
+    (v) => updateSettings({ narrationVolume: v / 100 }));
   slider('CAMERA SPEED', s.cameraSpeed * 100, 50, 200, (v) => `${v}%`,
     (v) => updateSettings({ cameraSpeed: v / 100 }));
   slider('HUD SIZE', s.hudScale * 100, 75, 125, (v) => `${v}%`,
@@ -166,6 +169,19 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
     }
     container.appendChild(seg);
   };
+
+  // Spoken campaign dialogue. Off is a real off: nothing is sent to the
+  // synthesizer at all, and anything mid-sentence stops on the switch.
+  booleanToggle(
+    'CAMPAIGN NARRATION', 'Spoken', 'Silent',
+    () => getSettings().narrationEnabled,
+    (on) => void updateSettings({ narrationEnabled: on }),
+  );
+  const narrationHint = document.createElement('div');
+  narrationHint.className = 'bf-set-hint';
+  narrationHint.textContent = 'Reads campaign dialogue aloud using the voices installed on your device. '
+    + 'The delivery and accent depend on what your device provides.';
+  container.appendChild(narrationHint);
 
   booleanToggle(
     'HEALTH BARS', 'Shown', 'Hidden',
