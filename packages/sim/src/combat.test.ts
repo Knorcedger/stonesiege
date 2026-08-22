@@ -6,8 +6,9 @@
 // underAttack alerts.
 
 import { describe, expect, it } from 'vitest';
+import { gameData } from '@bf/data';
 import type { EntityId, Game, SimEvent } from './types';
-import { fp } from './types';
+import { fp, TICKS_PER_SECOND } from './types';
 import { createGame } from './game';
 import type { SimState } from './internal';
 import { grassMap, player, scenarioConfig } from './testutil';
@@ -107,6 +108,84 @@ describe('melee matchups (exact AoE2 formula)', () => {
     // the counter wins: 30 HP archer falls to 6 skirm arrows long before 30 land back
     expect(evs.some((e) => e.ev.kind === 'entityDied' && e.ev.id === archer)).toBe(true);
     expect(game.state.entities.get(skirm)!.hp).toBeGreaterThan(0);
+  });
+});
+
+describe('striking a target that is riding past', () => {
+  /** Militia standing in a clump; a scout gallops down `lane` past them. */
+  function flyby(lane: number): { game: Game; horse: EntityId; militia: EntityId[] } {
+    const game = createGame(scenarioConfig(140, grassMap(60, 60), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'm0' },
+      { defId: 'militia', player: P1, tileX: 10, tileY: 11, ref: 'm1' },
+      { defId: 'militia', player: P1, tileX: 10, tileY: 12, ref: 'm2' },
+      { defId: 'scout', player: P2, tileX: lane, tileY: 2, ref: 'horse' },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const horse = game.state.refs.get('horse')!;
+    const militia = ['m0', 'm1', 'm2'].map((r) => game.state.refs.get(r)!);
+    game.advance([{ kind: 'move', player: P2, units: [horse], x: fp(lane), y: fp(58) }]);
+    return { game, horse, militia };
+  }
+
+  it('the first blow lands the tick the target comes into reach, the second after the reload', () => {
+    const game = createGame(scenarioConfig(141, grassMap(30, 30), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'militia' },
+      { defId: 'scout', player: P2, tileX: 20, tileY: 10, ref: 'horse' },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const state = game.state;
+    const militia = state.refs.get('militia')!;
+    const horse = state.refs.get('horse')!;
+    game.advance([{ kind: 'attack', player: P1, units: [militia], targetId: horse }]);
+
+    // MELEE_REACH_FP past both collision radii, in the sim's own integer distance
+    const inReach = (): boolean => {
+      const a = state.entities.get(militia)!, b = state.entities.get(horse)!;
+      const dx = a.x - b.x, dy = a.y - b.y;
+      return Math.max(0, Math.floor(Math.sqrt(dx * dx + dy * dy)) - 2 * 64) <= 128;
+    };
+    let reachedTick = -1;
+    const swings: number[] = [];
+    for (let step = 0; step < 400; step++) {
+      const tick = state.tick;
+      for (const ev of game.advance([])) {
+        if (ev.kind === 'attackImpact' && ev.attackerId === militia) swings.push(tick);
+      }
+      if (reachedTick < 0 && inReach()) reachedTick = tick;
+    }
+
+    expect(reachedTick).toBeGreaterThan(0);
+    expect(swings.length).toBeGreaterThanOrEqual(2);
+    // the militia walks in and strikes on arrival — no rate-of-fire wait before swing one
+    expect(swings[0]).toBe(reachedTick);
+    // only the SECOND swing waits out the militia's 2 s reload
+    expect(swings[1] - swings[0]).toBe(2 * TICKS_PER_SECOND);
+  });
+
+  it('three militia ordered onto a scout riding past their post get their blows in', () => {
+    for (const lane of [11, 12, 13]) {
+      const { game, horse, militia } = flyby(lane);
+      game.advance([{ kind: 'attack', player: P1, units: militia, targetId: horse }]);
+      const evs: Timed[] = [];
+      run(game, 600, evs);
+      expect(impacts(evs).length, `lane ${lane}`).toBeGreaterThan(0);
+    }
+  });
+
+  it('but a scout with a clear head start still rides away untouched (AoE2 counter)', () => {
+    const game = createGame(scenarioConfig(142, grassMap(60, 60), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 30, ref: 'militia' },
+      { defId: 'scout', player: P2, tileX: 13, tileY: 30, ref: 'horse' },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const militia = game.state.refs.get('militia')!;
+    const horse = game.state.refs.get('horse')!;
+    game.advance([
+      { kind: 'move', player: P2, units: [horse], x: fp(58), y: fp(30) },
+      { kind: 'attack', player: P1, units: [militia], targetId: horse },
+    ]);
+    const evs: Timed[] = [];
+    run(game, 600, evs);
+
+    expect(impacts(evs)).toHaveLength(0);
+    expect(game.state.entities.get(horse)!.hp).toBe(gameData.units.scout.hp);
   });
 });
 
