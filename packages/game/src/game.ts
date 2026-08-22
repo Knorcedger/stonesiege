@@ -26,7 +26,7 @@ import { placementGhostFrames } from './frames';
 import { placementStatus, type PlacementStatus } from './placement';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
-import { WorldLayer } from './world';
+import { artScaleForFrame, WorldLayer } from './world';
 import { FxLayer } from './fx';
 import { FogLayer } from './fog';
 import { SimLoop, TICK_MS } from './simloop';
@@ -508,7 +508,7 @@ async function bootGame(
     (defId) => unitDisplayStats(game, humanPlayer, defId)?.los ?? gameData.units[defId]?.los ?? 0,
     resourceMemory,
   );
-  const fx = new FxLayer(assets);
+  const fx = new FxLayer(assets, humanPlayer);
   const fog = new FogLayer(game.state.map);
   const ghostLayer = new Container();
   const ghostFoot = new Graphics();
@@ -598,10 +598,21 @@ async function bootGame(
 
   // Idle-unit cycling (GDD: top-bar idle-villager/-military badges = touch `.` hotkey).
   const idleCursor: Record<IdleCategory, number> = { villager: 0, military: 0 };
-  const getIdleCounts = (): Record<IdleCategory, number> => ({
-    villager: idleUnits(getState(), humanPlayer, 'villager').length,
-    military: idleUnits(getState(), humanPlayer, 'military').length,
-  });
+  // Both idle scans walk every entity on the map, and the HUD asks for them on
+  // every frame while the answer can only change when the sim advances.
+  let idleCountsTick = -1;
+  let idleCountsCache: Record<IdleCategory, number> = { villager: 0, military: 0 };
+  const getIdleCounts = (): Record<IdleCategory, number> => {
+    const st = getState();
+    if (st.tick !== idleCountsTick) {
+      idleCountsTick = st.tick;
+      idleCountsCache = {
+        villager: idleUnits(st, humanPlayer, 'villager').length,
+        military: idleUnits(st, humanPlayer, 'military').length,
+      };
+    }
+    return idleCountsCache;
+  };
   const cycleIdle = (cat: IdleCategory): void => {
     const list = idleUnits(getState(), humanPlayer, cat);
     if (list.length === 0) return;
@@ -876,13 +887,31 @@ async function bootGame(
       kind: 'setProductionSpeed', player: humanPlayer, multiplier: preferredProductionSpeed,
     });
   }
+  /**
+   * World-space confirmation for an accepted player order: ground orders drop a
+   * destination arrow, target-aimed ones pulse the target itself. Without this
+   * a build/gather/attack order only ever showed up in the corner toast, which
+   * reads as a dropped command while the unit is still walking over.
+   */
+  const showOrderFeedback = (cmd: Command): void => {
+    const st = getState();
+    if (cmd.kind === 'move') {
+      fx.showMoveMarker(cmd.x, cmd.y, st.tick);
+      return;
+    }
+    if (cmd.kind === 'attack' || cmd.kind === 'gather' || cmd.kind === 'repair'
+      || cmd.kind === 'garrison' || cmd.kind === 'convert' || cmd.kind === 'heal') {
+      const target = st.entities.get(cmd.targetId);
+      if (target) fx.showTargetPing(target, st.tick, cmd.kind === 'attack' ? 'attack' : 'work');
+    }
+  };
   const issueWithUndo = (
     cmd: Command,
     label: string,
     undo: (() => void) | null,
   ): boolean => {
     const accepted = admission.issueWithUndo(cmd, label, undo);
-    if (accepted && cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
+    if (accepted) showOrderFeedback(cmd);
     return accepted;
   };
 
@@ -923,13 +952,19 @@ async function bootGame(
     const colorIdx = getState().players[humanPlayer]?.setup.color;
     const candidates = placementGhostFrames(placement.defId, getState().players[humanPlayer]?.age ?? 'dark');
     let frame = null;
+    let resolvedName = candidates[candidates.length - 1];
     for (let i = 0; i < candidates.length - 1 && !frame; i++) {
       frame = assets.tryResolve(candidates[i], colorIdx);
+      if (frame) resolvedName = candidates[i];
     }
-    frame ??= assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
+    frame ??= assets.resolveFrame(resolvedName, colorIdx);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
-    ghostSprite.scale.set(frame.renderScale);
+    // Same art scale the live building will be drawn at, so the preview is the
+    // size of what actually gets built (#116): without it a keep previewed at
+    // roughly a third of the tower the player ends up with.
+    const artScale = artScaleForFrame(placement.defId, resolvedName);
+    ghostSprite.scale.set(frame.renderScale * artScale.x, frame.renderScale * artScale.y);
   };
 
   const startPlacement = (defId: string): void => {
@@ -1360,8 +1395,9 @@ async function bootGame(
 
     const st = getState();
     const alpha = loop.alpha;
-    terrain.update(camera.getWorldView());
-    world.update(st, alpha, st.tick + alpha);
+    const worldView = camera.getWorldView();
+    terrain.update(worldView);
+    world.update(st, alpha, st.tick + alpha, worldView);
     fx.update(st, st.tick + alpha);
     if (placement) refreshGhost();
     hud.update();

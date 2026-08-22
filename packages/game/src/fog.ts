@@ -10,6 +10,22 @@ import { HALF_H, HALF_W } from './camera';
 
 const EXPLORED_ALPHA = Math.round(255 * 0.45);
 
+/**
+ * Visibility level of a tile for the fog owner: 0 unexplored, 1 explored, 2
+ * visible. Off-map reads as unexplored; a match with no fog grid reads as fully
+ * visible. Shared by every layer that must not draw what the player cannot see.
+ */
+export function tileVisibility(
+  visibility: Uint8Array | null,
+  map: GameMap,
+  tx: number,
+  ty: number,
+): number {
+  if (!visibility) return 2;
+  if (tx < 0 || ty < 0 || tx >= map.width || ty >= map.height) return 0;
+  return visibility[ty * map.width + tx];
+}
+
 export class FogLayer {
   readonly sprite: Sprite;
   private canvas: HTMLCanvasElement;
