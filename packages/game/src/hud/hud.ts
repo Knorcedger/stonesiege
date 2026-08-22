@@ -95,8 +95,8 @@ export interface HudHost {
   playUiSound(): void;
   /** Back to the title screen — the pause overlay's exit while spectating a finished match. */
   returnToTitle(): void;
-  /** Persist the current resumable match snapshot on this device immediately. */
-  saveGame(): void;
+  /** Epoch ms of the last autosave that actually reached storage, or null. */
+  getLastSaveTime(): number | null;
   /** Idle-unit badges (GDD: touch answer to AoE2's `.` hotkey). */
   getIdleCounts(): Record<IdleCategory, number>;
   cycleIdle(cat: IdleCategory): void;
@@ -118,6 +118,26 @@ const CARD_COLS = 5;
 /** Three five-button rows, excluding WASD so camera movement always wins. */
 export const COMMAND_HOTKEYS = ['q', 'e', 'r', 't', 'y', 'f', 'g', 'h', 'j', 'k', 'z', 'x', 'c', 'v', 'b'] as const;
 export const PAUSE_SAVE_HINT = 'StoneSiege keeps one resumable match for each campaign, plus one practice match, locally on this device. It autosaves every 15 seconds and when the app is backgrounded.';
+
+const SAVE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+
+/**
+ * The pause overlay's autosave line. There is no manual save button: opening
+ * the overlay already writes a snapshot, so the only thing left to tell the
+ * player is when their progress was last kept. Formatted from the local-time
+ * getters rather than toLocaleString so the wording is stable everywhere the
+ * game runs (and testable without pinning a timezone).
+ */
+export function pauseSaveStatus(savedAt: Date | null): string {
+  if (savedAt === null) return 'No autosave stored on this device yet.';
+  const day = savedAt.getDate();
+  const month = SAVE_MONTHS[savedAt.getMonth()];
+  const year = savedAt.getFullYear();
+  const hh = String(savedAt.getHours()).padStart(2, '0');
+  const mm = String(savedAt.getMinutes()).padStart(2, '0');
+  const ss = String(savedAt.getSeconds()).padStart(2, '0');
+  return `Last autosaved ${day} ${month} ${year}, ${hh}:${mm}:${ss}`;
+}
 
 export function commandRepeatCount(shiftKey: boolean, shiftRepeat: number): number {
   return shiftKey ? Math.max(1, shiftRepeat) : 1;
@@ -324,8 +344,9 @@ const HUD_CSS = `
 .bf-pausesection { box-sizing:border-box; width:100%; padding:12px; color:#DABE8D; background:rgba(36,24,9,.72); border:1px solid #64492B; border-radius:4px; }
 .bf-pausetitle { color:#E6C04A; font:600 15px/1 "Cinzel","Georgia",serif; letter-spacing:1px; }
 .bf-pausehint { margin-top:5px; font:14px/1.4 "Alegreya Sans","Trebuchet MS",sans-serif; }
-.bf-pausesaverow { display:flex; align-items:center; gap:10px; margin-top:8px; }
-.bf-pausestate { color:#E6C04A; font:14px/1 "Alegreya Sans","Trebuchet MS",sans-serif; }
+.bf-pausesaveline { margin-top:8px; }
+/* a wrapping sentence now, not the old one-word "Saved locally" span: same leading as the hint */
+.bf-pausestate { color:#E6C04A; font:14px/1.4 "Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-pauseleave { display:flex; flex-direction:column; }
 .bf-pauseleave .bf-btn { width:100%; min-height:44px; margin-top:auto; }
 .bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:${HUD_LAYER.helpOverlay}; }
@@ -460,6 +481,9 @@ export class Hud {
   private chipStrip!: HTMLDivElement;
   private chipEls: Array<{ btn: HTMLButtonElement; count: HTMLSpanElement }> = [];
   private pauseGroups!: HTMLDivElement;
+  private saveState!: HTMLDivElement;
+  /** Last value rendered into saveState, so the line only rewrites on change. */
+  private saveShown: number | null | undefined;
   private groupStatus!: HTMLDivElement;
   private pauseResumeBtn!: HTMLButtonElement;
   private pausePanelScroller!: HTMLDivElement;
@@ -896,24 +920,16 @@ export class Hud {
     saveSection.className = 'bf-pausesection';
     const saveTitle = document.createElement('div');
     saveTitle.className = 'bf-pausetitle';
-    saveTitle.textContent = 'SAVE GAME';
+    saveTitle.textContent = 'AUTOSAVE';
     const saveHint = document.createElement('div');
     saveHint.className = 'bf-pausehint';
     saveHint.textContent = PAUSE_SAVE_HINT;
-    const saveRow = document.createElement('div');
-    saveRow.className = 'bf-pausesaverow';
-    const saveBtn = document.createElement('button');
-    saveBtn.className = 'bf-btn';
-    saveBtn.textContent = 'Save now';
-    const saveState = document.createElement('span');
-    saveState.className = 'bf-pausestate';
-    saveState.setAttribute('aria-live', 'polite');
-    saveBtn.addEventListener('click', () => {
-      this.host.saveGame();
-      saveState.textContent = 'Saved locally';
-    });
-    saveRow.append(saveBtn, saveState);
-    saveSection.append(saveTitle, saveHint, saveRow);
+    // No manual save: opening this overlay pauses the loop, which snapshots the
+    // match, so a button here would only re-save what was just written.
+    this.saveState = document.createElement('div');
+    this.saveState.className = 'bf-pausestate bf-pausesaveline';
+    this.saveState.setAttribute('aria-live', 'polite');
+    saveSection.append(saveTitle, saveHint, this.saveState);
     gamePanel.appendChild(saveSection);
 
     this.pauseGroups = document.createElement('div');
@@ -993,6 +1009,14 @@ export class Hud {
       this.matchFinished,
       paused,
     );
+    if (paused) {
+      // Pausing saves, so the stamp is refreshed while the overlay is open.
+      const savedAt = this.host.getLastSaveTime();
+      if (savedAt !== this.saveShown) {
+        this.saveShown = savedAt;
+        this.saveState.textContent = pauseSaveStatus(savedAt === null ? null : new Date(savedAt));
+      }
+    }
     if (paused && !this.pauseWasOpen) {
       this.selectPauseTab('game', false);
       this.pauseResumeBtn.focus();

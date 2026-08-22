@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  activatePauseControl, PAUSE_SAVE_HINT, pauseTabIndexAfterKey, resignControlAction,
-  syncPausePresentation, unitStatRows,
+  activatePauseControl, PAUSE_SAVE_HINT, pauseSaveStatus, pauseTabIndexAfterKey,
+  resignControlAction, syncPausePresentation, unitStatRows,
   type PausePresentationTarget,
 } from './hud';
 
@@ -21,6 +21,21 @@ describe('pause presentation', () => {
     expect(PAUSE_SAVE_HINT).toBe(
       'StoneSiege keeps one resumable match for each campaign, plus one practice match, locally on this device. It autosaves every 15 seconds and when the app is backgrounded.',
     );
+  });
+
+  it('reports when the match was last autosaved instead of offering a manual save', () => {
+    // local-component constructor: the same wall clock in any timezone
+    expect(pauseSaveStatus(new Date(2026, 7, 22, 14, 32, 5)))
+      .toBe('Last autosaved 22 Aug 2026, 14:32:05');
+  });
+
+  it('pads a single-digit clock so the stamp never reads 14:3:5', () => {
+    expect(pauseSaveStatus(new Date(2026, 0, 3, 9, 4, 7)))
+      .toBe('Last autosaved 3 Jan 2026, 09:04:07');
+  });
+
+  it('says so plainly when nothing has been stored yet', () => {
+    expect(pauseSaveStatus(null)).toBe('No autosave stored on this device yet.');
   });
 
   it('runs the pause action on click instead of only changing the icon', () => {

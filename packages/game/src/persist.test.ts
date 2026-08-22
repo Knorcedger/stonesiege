@@ -420,6 +420,17 @@ describe('per-campaign save slots', () => {
       .toBe('Saved match from an earlier or incompatible version');
   }));
 
+  it('reports whether the snapshot reached storage, so the pause line cannot lie', () => {
+    fresh(() => {
+      expect(saveSnapshot(scenarioSave('wallace-01-ledger', 100))).toBe(true);
+    });
+    // a device with no room left and no other save to evict keeps nothing
+    withStore(0)(() => {
+      expect(saveSnapshot(scenarioSave('wallace-01-ledger', 100))).toBe(false);
+      expect(hasSnapshot(campaignSlot('wallace'))).toBe(false);
+    });
+  });
+
   it('evicts the oldest other save rather than dropping the one being written', () => {
     // room for roughly two campaign saves
     const one = encodeSnapshot(scenarioSave('wallace-01-ledger', 100)).length;

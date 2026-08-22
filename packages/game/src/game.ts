@@ -810,13 +810,21 @@ async function bootGame(
   // and dev-server reloads. Cleared the moment the match ends. When @bf/sim's
   // serialize() exists the blob rides along as a fast practice-resume path.
   let lastSavedTick = game.state.tick;
+  // Wall-clock stamp of the last save that reached storage — presentation only
+  // (the pause overlay's autosave line); never read by the sim.
+  let lastSavedAt: number | null = null;
+  let wasPausedLastFrame = false;
   const saveMatch = (): void => {
     const st = getState();
     if (endShown || st.finished) return;
+    // Every pause path asks for a save, and a paused sim cannot change: one
+    // stored snapshot per tick is all any of them can produce.
+    if (lastSavedAt !== null && st.tick === lastSavedTick) return;
     const serialized = trySerialize(game);
     const withBlob = serialized !== undefined ? { serialized } : {};
+    let stored = false;
     if (plan.mode === 'scenario' && meta) {
-      saveSnapshot({
+      stored = saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId: meta.id,
         // content stamp: the resume is only valid against identical authored
         // def + game data ('' can never match, degrading to "no resume")
@@ -825,13 +833,14 @@ async function bootGame(
         tallies: copyTallies(tallies), resourceMemory: resourceMemory.snapshot(), ...withBlob,
       });
     } else if (plan.setup) {
-      saveSnapshot({
+      stored = saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'practice', config, setup: plan.setup,
         tick: st.tick, log: commandLog, tallies: copyTallies(tallies),
         resourceMemory: resourceMemory.snapshot(), ...withBlob,
       });
     }
     lastSavedTick = st.tick;
+    if (stored) lastSavedAt = Date.now();
   };
   const onVisibility = (): void => {
     if (document.hidden) saveMatch();
@@ -1116,7 +1125,7 @@ async function bootGame(
     // commands post-finish, so Resign is swapped for this) — same full reboot
     // the end screen's Return to Title performs
     returnToTitle: () => reloadTo(meta ? { kind: 'scenarioList', campaignId: meta.campaign } : null),
-    saveGame: saveMatch,
+    getLastSaveTime: () => lastSavedAt,
     getIdleCounts,
     cycleIdle,
     focusBuilding,
@@ -1322,6 +1331,14 @@ async function bootGame(
     // dev speed: each extra pass is a normal accumulator update — the catchup
     // clamp inside SimLoop still bounds each call to 5 ticks
     for (let i = 0; i < simSpeed; i++) loop.update(dt);
+    // Snapshot on every entry into pause, whatever caused it: the pause button,
+    // the P hotkey, or attachAutoPause on a hidden tab. A paused sim stops
+    // reaching the periodic save below, so this is the last chance to store the
+    // match — and it is what the pause overlay reports as the last autosave.
+    if (loop.paused !== wasPausedLastFrame) {
+      wasPausedLastFrame = loop.paused;
+      if (loop.paused) saveMatch();
+    }
     input.update(dt, now);
     camera.update(dt);
 
