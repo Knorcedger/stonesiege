@@ -20,6 +20,7 @@ import {
 import type { CombatInfo, SimState } from './internal';
 import { resolveBuildingStats, resolveUnitStats } from './stats';
 import { orderMove } from './path';
+import { stepToward } from './movement';
 import { applyHit, isEnemy, tickCorpses, unitAttackDamage } from './damage';
 import { fireProjectile } from './projectiles';
 import { cancelQueuedBuilds } from './construction';
@@ -282,6 +283,21 @@ function continueBuildingAssault(state: SimState, e: Entity, info: CombatInfo): 
   return true;
 }
 
+/**
+ * Roll a melee attacker the last stretch onto the building it is striking, so the blow
+ * lands on the wall instead of on the dirt in front of it. `gap` is the current
+ * edge-to-edge distance, so the step stops exactly where the soft body meets the
+ * footprint; terrain keeps the unit out of the structure itself.
+ */
+function closeToContact(state: SimState, e: Entity, target: Entity, speedFp: number, gap: number): void {
+  const size = gameData.buildings[target.defId]?.size ?? 1;
+  const x0 = target.tileX * FP, y0 = target.tileY * FP;
+  const x1 = (target.tileX + size) * FP, y1 = (target.tileY + size) * FP;
+  const px = Math.max(x0, Math.min(x1, e.x));
+  const py = Math.max(y0, Math.min(y1, e.y));
+  stepToward(state, e, px, py, Math.min(speedFp, gap));
+}
+
 /** Any friendly (own/allied) unit inside the blast a shot at `target` would make? */
 function friendlyInBlast(state: SimState, player: number, target: Entity, splashFp: number): boolean {
   state.unitsGrid.queryCircle(target.x, target.y, splashFp, queryBuf);
@@ -318,9 +334,15 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
   // Melee vs a building: standing anywhere on the footprint ring IS in reach.
   // Separation shoves can push effDist past MELEE_REACH_FP for a unit wedged on a
   // ring corner, leaving it 'idle' with a live engagement, never striking (deadlock).
-  if (!ranged && target.kind === 'building' && dist > rangeFp
+  if (!ranged && target.kind === 'building' && dist > 0
     && adjacentToFootprint(e, target.tileX, target.tileY, gameData.buildings[target.defId]?.size ?? 1)) {
-    dist = rangeFp;
+    // ...but reach is not contact. The chase walk ends within ARRIVE_DIST of its ring
+    // slot (sooner on a crowded ring), so an attacker can settle a full tile of open
+    // ground short of the wall and hammer at nothing — glaring on a ram. Creep the
+    // remainder onto the footprint; the reach rule above stays as the deadlock
+    // fallback for an attacker that is wedged and cannot close.
+    closeToContact(state, e, target, stats.speedFp, dist);
+    dist = Math.min(effDistFp(state, e, target), rangeFp);
   }
 
   // trebuchet: mobile only while packed; deploys automatically once in position

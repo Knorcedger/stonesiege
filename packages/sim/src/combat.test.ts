@@ -9,6 +9,7 @@ import { describe, expect, it } from 'vitest';
 import type { EntityId, Game, SimEvent } from './types';
 import { fp } from './types';
 import { createGame } from './game';
+import { effDistFp } from './internal';
 import type { SimState } from './internal';
 import { grassMap, player, scenarioConfig } from './testutil';
 
@@ -426,6 +427,32 @@ describe('rams (anti-building siege + garrison rules)', () => {
       return g.state.entities.get(r)!.x;
     };
     expect(speedGame(true)).toBeGreaterThan(speedGame(false));
+  });
+
+  it('rolls into contact with the house from every approach angle, corners included', () => {
+    // The chase walk ends within half a tile of its ring slot (sooner on a crowded
+    // ring), so without the contact creep a ram batters a house from a tile of open
+    // ground. Every angle must end up touching the 2x2 footprint.
+    const starts: Array<[number, number]> = [
+      [8, 10], [8, 14], [16, 6], [17, 14], [12, 6], [12, 16], [6, 6], [18, 18],
+    ];
+    const game = createGame(scenarioConfig(114, grassMap(40, 30), [
+      ...starts.map(([x, y], i) => ({ defId: 'batteringRam', player: P1, tileX: x, tileY: y, ref: `r${i}` })),
+      // survives the assault, so the rams stay parked on it for the whole run
+      { defId: 'house', player: P2, tileX: 12, tileY: 10, ref: 'house', hp: 100000 },
+    ], [player(), player({ civ: 'english' })]));
+    const rams = starts.map((_, i) => game.state.refs.get(`r${i}`)!);
+    const house = game.state.refs.get('house')!;
+    game.advance([{ kind: 'attack', player: P1, units: rams, targetId: house }]);
+    run(game, 500);
+
+    const target = game.state.entities.get(house)!;
+    for (const id of rams) {
+      const ram = game.state.entities.get(id)!;
+      expect(ram.activity, `ram ${id} should be battering the house`).toBe('attacking');
+      // edge-to-edge: 0 = soft body against the wall
+      expect(effDistFp(game.state as unknown as SimState, ram, target)).toBe(0);
+    }
   });
 
   it('a destroyed ram ejects its garrison ALIVE (buildings kill theirs)', () => {

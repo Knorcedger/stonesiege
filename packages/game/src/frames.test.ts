@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
-  ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
+  ANIM_FPS, animForActivity, animFrameIndex, attackSwingFrameIndex, bakedColorName, facingFromDelta,
+  villagerWorkAnim,
   placementGhostFrames, resolveFrameName, unitRig,
 } from './frames';
 
@@ -115,6 +116,16 @@ describe('anim helpers', () => {
     expect(animFrameIndex('walk', 10, 6)).toBe((10 * 10) % 6);
     expect(animFrameIndex('die', 100, 5)).toBe(4);
     expect(animFrameIndex('idle', 5, 1)).toBe(0);
+  });
+
+  it('plays one swing per attack and then holds the ready pose', () => {
+    // A ram's rate of fire is 5 s against a 0.5 s attack sheet: looping it made the
+    // engine flail ten times per blow and read as if it barely scratched the wall.
+    const swing = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 1, 3, 4.9]
+      .map((seconds) => attackSwingFrameIndex(seconds, 5));
+    expect(swing).toEqual([0, 1, 2, 3, 4, 0, 0, 0, 0]);
+    expect(attackSwingFrameIndex(-1, 5)).toBe(0);
+    expect(attackSwingFrameIndex(0.3, 1)).toBe(0); // single-frame rigs have no cycle
   });
 
   it('never returns a negative frame for a negative animation age', () => {

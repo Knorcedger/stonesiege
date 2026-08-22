@@ -164,6 +164,18 @@ const WORK_FRAME_SEQUENCE: Partial<Readonly<Record<AnimName, readonly number[]>>
   build: [0, 1, 2, 2, 3, 0],
 };
 
+/**
+ * Frame index for ONE combat swing, `ageSeconds` after the blow it belongs to.
+ * The attack sheet is a 0.5 s cycle but rate of fire is 2 s for a militia and 5 s
+ * for a ram, so looping it freely makes a siege engine flail ten times per hit and
+ * read as ineffectual. Play the sheet once per attack, then hold the ready pose.
+ */
+export function attackSwingFrameIndex(ageSeconds: number, frameCount: number): number {
+  if (frameCount <= 1) return 0;
+  const raw = Math.max(0, Math.floor(ageSeconds * ANIM_FPS.attack));
+  return raw >= frameCount ? 0 : raw;
+}
+
 /** Frame index for an anim at a given sim-time (seconds). die/decay clamp; others loop. */
 export function animFrameIndex(anim: AnimName, animAgeSeconds: number, frameCount: number): number {
   if (frameCount <= 1) return 0;

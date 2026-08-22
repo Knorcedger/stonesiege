@@ -16,6 +16,16 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
+### Fixed
+
+- Siege engines and soldiers now roll right up against the building they are attacking. They
+  used to stop wherever the approach walk ended — up to a tile of open ground short of the wall,
+  worst on the diagonal — and swing at nothing.
+- One attack animation per attack. Every unit looped its half-second swing continuously, so a
+  Battering Ram flailed ten times for each blow it actually landed and read as if it barely
+  scratched a house. It now winds up, slams once, and holds its ready pose until the next hit
+  (its damage is unchanged: 152 to a house, four hits to bring one down).
+
 ## 0.1.2 — 2026-08-20
 
 ### Added

@@ -13,7 +13,8 @@ import {
 import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets } from './assets';
 import {
-  animForActivity, animFrameIndex, facingFromDelta, unitRig, villagerWorkAnim, type AnimName,
+  animForActivity, animFrameIndex, attackSwingFrameIndex, facingFromDelta, unitRig,
+  villagerWorkAnim, type AnimName,
 } from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
@@ -216,6 +217,8 @@ export class WorldLayer {
   private frameCounts = new Map<string, number>();
   /** entityId -> tick until which the damage-taken red blink lasts. */
   private damagedUntil = new Map<EntityId, number>();
+  /** attackerId -> tick of its last blow, so one swing plays per attack (not a loop). */
+  private lastSwingTick = new Map<EntityId, number>();
   /** Resource/target ids highlighted because selected villagers gather them. */
   private gatherTargets = new Set<EntityId>();
 
@@ -246,6 +249,10 @@ export class WorldLayer {
       if (ev.kind === 'attackImpact') {
         // damage-taken red blink (~4 ticks); the impact flash itself is fx.ts
         this.damagedUntil.set(ev.targetId, tick + 4);
+        // melee: the blow IS the swing — start the attacker's animation cycle here
+        if (ev.melee) this.lastSwingTick.set(ev.attackerId, tick);
+      } else if (ev.kind === 'projectileFired') {
+        this.lastSwingTick.set(ev.fromId, tick); // ranged: the loose, not the impact
       }
     }
   }
@@ -785,6 +792,16 @@ export class WorldLayer {
       }
       return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/0`], alpha: 1 };
     }
+    // A fighting unit swings once per attack, not on a free 0.5 s loop: sync the
+    // cycle to the blow the sim actually landed (or the arrow it loosed) and hold
+    // the ready pose in between. Healing/converting monks and villager work keep
+    // their own looping cadence — only `attacking` is rate-of-fire bound.
+    const swingTick = e.activity === 'attacking' ? this.lastSwingTick.get(e.id) : undefined;
+    if (swingTick !== undefined && anim === 'attack') {
+      const swingAge = (tickFloat - Math.max(swingTick, view.animStartTick)) / TICKS_PER_SECOND;
+      const swingFrame = attackSwingFrameIndex(swingAge, count);
+      return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/${swingFrame}`], alpha: 1 };
+    }
     const ageSec = (tickFloat - view.animStartTick) / TICKS_PER_SECOND;
     const frame = animFrameIndex(anim, ageSec, count);
     return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/${frame}`], alpha: 1 };
@@ -933,6 +950,7 @@ export class WorldLayer {
         this.curPos.delete(id);
         this.prevPos.delete(id);
         this.damagedUntil.delete(id);
+        this.lastSwingTick.delete(id);
       }
     }
   }
