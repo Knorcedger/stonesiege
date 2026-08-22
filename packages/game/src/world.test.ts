@@ -231,6 +231,20 @@ describe('starPoly (hero marker geometry)', () => {
     expect(down[1]).toBeCloseTo(8, 5);
   });
 
+  it('shortens every second point into a compass rose when asked', () => {
+    const rose = starPoly(8, 20, 20, 0.3, 0, 0.6);
+    const radii = [];
+    for (let i = 0; i < rose.length; i += 2) radii.push(Math.hypot(rose[i], rose[i + 1]));
+    const outer = radii.filter((_, i) => i % 2 === 0);
+    expect(outer.filter((r) => Math.abs(r - 20) < 1e-6)).toHaveLength(4); // cardinals
+    expect(outer.filter((r) => Math.abs(r - 12) < 1e-6)).toHaveLength(4); // diagonals
+    // Uniform points at marker size just fill in as a circle, hence the default.
+    const uniform = starPoly(8, 20, 20, 0.3);
+    for (let i = 0; i < uniform.length; i += 4) {
+      expect(Math.hypot(uniform[i], uniform[i + 1])).toBeCloseTo(20, 5);
+    }
+  });
+
   it('squashes onto the floor plane for the ground marker', () => {
     const ground = starPoly(4, 16, 9, 0.34);
     const xs = ground.filter((_, i) => i % 2 === 0).map(Math.abs);

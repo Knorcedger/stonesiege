@@ -675,7 +675,8 @@ These are drawn by the renderer, not assetgen, but must stay on-palette:
   multiplied by the ramp's light tone, lifted to a `0xE8` peak and deepened by a
   saturation exponent (the accent's only carrier on pre-rendered HD art), and the art
   draws at 1.3×. The marker is a pair of stars in that same hero colour over a dark
-  rim with a `highlight` core — a four-pointed compass star squashed onto the floor
+  rim with a `highlight` core — an eight-pointed compass rose (long cardinals, short
+  diagonals; uniform points fill in as a circle at this size) squashed onto the floor
   plane at the feet, and a five-pointed star above the health bar — deliberately not
   the amber ellipse that gather targets, rally flags and garrison badges already use.
   The minimap adds a matching gold pip. Hero health bars anchor to the sprite's
