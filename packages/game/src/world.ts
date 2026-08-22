@@ -11,7 +11,7 @@ import {
   type Entity, type EntityId, type GameMap, type GameState, type PlayerId, type SimEvent,
 } from '@bf/sim/types';
 import { gameData, unitAggroRange } from '@bf/data';
-import type { GameAssets } from './assets';
+import type { GameAssets, ResolvedFrame } from './assets';
 import {
   animForActivity, animFrameIndex, buildingFrameChoice, buildingSpriteScale, facingFromDelta,
   unitRig, villagerWorkAnim, type AnimName, type FrameChoice,
@@ -62,6 +62,83 @@ export interface WallCornerJoin {
   xDir: -1 | 1;
   /** Connected neighbour on the tile Y axis. */
   yDir: -1 | 1;
+}
+
+/**
+ * Ground-level artwork: farms and barely-started foundations. It never conceals
+ * a unit and it sorts below every upright sprite. `buildProgress` is null for
+ * anything that is not a building.
+ */
+export function isFlatArtwork(defId: string, buildProgress: number | null): boolean {
+  return defId === 'farm' || (buildProgress !== null && buildProgress < 250);
+}
+
+/**
+ * y-sort depth for an entity rig. Flat artwork sinks far below every upright
+ * sprite so units and buildings draw over it; gatehouses lift one row above
+ * their immediately adjacent wall caps, or a later-sorted wall hides half the
+ * arch and the gate reads as a breach.
+ *
+ * Shared with the fog-remembered ghost: a scouted foundation must keep sorting
+ * like a slab once its tile falls into fog, not pop in front of its neighbours.
+ */
+export function entitySortDepth(defId: string, worldY: number, buildProgress: number | null): number {
+  if (isFlatArtwork(defId, buildProgress)) return worldY - 4000;
+  return worldY + (defId === 'gate' ? HALF_H + 1 : 0);
+}
+
+/**
+ * The four display objects an L-corner join needs: the wall sprite, its mirrored
+ * twin, and the half-masks that clip each to one axis. Both the live entity view
+ * and the fog-remembered ghost satisfy it, so a remembered corner joins exactly
+ * like the live one.
+ */
+interface CornerJoinTarget {
+  sprite: Sprite;
+  cornerSprite: Sprite;
+  cornerPrimaryMask: Graphics;
+  cornerSecondaryMask: Graphics;
+}
+
+/** Half-plane clip in root-local pixels, meeting at the shared corner post. */
+function drawCornerHalfMask(mask: Graphics, screenSide: -1 | 1): void {
+  mask.clear();
+  mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
+}
+
+/**
+ * Clip an exact L-corner into two half-walls meeting at the shared post: the
+ * authored sprite covers the tile-X arm, its mirror covers the tile-Y arm.
+ * `target.sprite.scale` must already be set — the twin mirrors it.
+ *
+ * Each half is clipped to the screen side its arm points at (+tileX and -tileY
+ * both point right, +tileY and -tileX both point left), so the two corner
+ * orientations whose arms share a screen side overlap by design. That is
+ * invisible at full opacity; a translucent fog ghost blends the shared band
+ * twice and its post reads slightly darker than the rest of the run.
+ */
+function applyWallCornerJoin(
+  target: CornerJoinTarget,
+  corner: WallCornerJoin | undefined,
+  frame: ResolvedFrame,
+): void {
+  if (!corner) {
+    target.cornerSprite.visible = false;
+    target.sprite.mask = null;
+    target.cornerSprite.mask = null;
+    target.cornerPrimaryMask.clear();
+    target.cornerSecondaryMask.clear();
+    return;
+  }
+  target.cornerSprite.texture = frame.texture;
+  target.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
+  target.cornerSprite.scale.set(-target.sprite.scale.x, target.sprite.scale.y);
+  target.cornerSprite.visible = true;
+  // +tileX projects down-right; +tileY projects down-left.
+  drawCornerHalfMask(target.cornerPrimaryMask, corner.xDir);
+  drawCornerHalfMask(target.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
+  target.sprite.mask = target.cornerPrimaryMask;
+  target.cornerSprite.mask = target.cornerSecondaryMask;
 }
 
 /** Exact L-corners. The renderer clips one sprite per axis at the shared post. */
@@ -154,6 +231,11 @@ function spriteWorldRect(view: EntityView): WorldRect {
   };
 }
 
+/** Build progress for a building, null for anything that is not one. */
+function buildingProgressOf(e: Entity): number | null {
+  return e.kind === 'building' ? e.buildProgress ?? 1000 : null;
+}
+
 function unitWorldRect(view: EntityView): WorldRect {
   const bounds = spriteWorldRect(view);
   // A unit's readable body is centred around its feet. Keeping the horizontal
@@ -188,10 +270,12 @@ interface GhostRecord {
   amountLeft: number;
   /** Wall runs on the tile-Y axis mirror the authored NW->SE sheet. */
   mirrored: boolean;
+  /** L-corner join when last seen; the live neighbours may be gone by now. */
+  corner: WallCornerJoin | undefined;
 }
 
-interface GhostView {
-  sprite: Sprite;
+interface GhostView extends CornerJoinTarget {
+  root: Container;
   /** Frame/scale inputs the sprite was last built from; '' before the first draw. */
   key: string;
 }
@@ -550,7 +634,7 @@ export class WorldLayer {
       const view = this.views.get(e.id);
       if (!view?.root.visible || !view.sprite.visible) continue;
       // Flat artwork does not conceal a unit and should not pulse as feet cross it.
-      if (e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250)) continue;
+      if (isFlatArtwork(e.defId, buildingProgressOf(e))) continue;
       const occluderBounds = spriteWorldRect(view);
       const covered = visibleUnits.some(({ view: unitView }) => shouldFadeForUnit(
         occluderBounds,
@@ -568,12 +652,7 @@ export class WorldLayer {
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
     const pos = this.entityWorldPos(e, alpha);
     view.root.position.set(Math.round(pos.x), Math.round(pos.y));
-    // flat things (farms, foundations-stage-0) sort under everything else
-    const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);
-    // Gatehouses render over their immediately adjacent wall caps; otherwise a
-    // later-sorted wall can hide half the arch and make it read as a breach.
-    const gateLayer = e.defId === 'gate' ? HALF_H + 1 : 0;
-    view.root.zIndex = flat ? pos.y - 4000 : pos.y + gateLayer;
+    view.root.zIndex = entitySortDepth(e.defId, pos.y, buildingProgressOf(e));
 
     const prev = this.prevPos.get(e.id);
     const cur = this.curPos.get(e.id);
@@ -611,28 +690,7 @@ export class WorldLayer {
       const scale = buildingSpriteScale(e.defId, frame.renderScale, frame.mirrored !== mirrorWall);
       view.sprite.scale.set(scale.x, scale.y);
 
-      if (corner) {
-        view.cornerSprite.texture = frame.texture;
-        view.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
-        view.cornerSprite.scale.set(-view.sprite.scale.x, view.sprite.scale.y);
-        view.cornerSprite.visible = true;
-
-        const drawHalfMask = (mask: Graphics, screenSide: -1 | 1): void => {
-          mask.clear();
-          mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
-        };
-        // +tileX projects down-right; +tileY projects down-left.
-        drawHalfMask(view.cornerPrimaryMask, corner.xDir);
-        drawHalfMask(view.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
-        view.sprite.mask = view.cornerPrimaryMask;
-        view.cornerSprite.mask = view.cornerSecondaryMask;
-      } else {
-        view.cornerSprite.visible = false;
-        view.sprite.mask = null;
-        view.cornerSprite.mask = null;
-        view.cornerPrimaryMask.clear();
-        view.cornerSecondaryMask.clear();
-      }
+      applyWallCornerJoin(view, corner, frame);
 
       const doorFrame = gateOperational && resolvedName === 'bld/gate/open'
         ? this.assets.tryResolve('bld/gate/door', colorIdx)
@@ -875,6 +933,7 @@ export class WorldLayer {
       buildProgress: e.buildProgress ?? 1000,
       amountLeft: e.amountLeft ?? 1,
       mirrored: this.mirroredWalls.has(e.id),
+      corner: e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined,
     });
   }
 
@@ -887,11 +946,11 @@ export class WorldLayer {
           // We can see the spot and the building is gone: forget it.
           this.ghosts.delete(id);
           if (view) {
-            view.sprite.destroy();
+            view.root.destroy({ children: true });
             this.ghostViews.delete(id);
           }
         } else if (view) {
-          view.sprite.visible = false;
+          view.root.visible = false;
         }
         continue;
       }
@@ -900,15 +959,12 @@ export class WorldLayer {
       const wantVisible = tv === 1 && g.player !== this.humanPlayer;
       let view = this.ghostViews.get(id);
       if (!wantVisible) {
-        if (view) view.sprite.visible = false;
+        if (view) view.root.visible = false;
         continue;
       }
       if (!view) {
-        const sprite = new Sprite();
-        sprite.tint = GHOST_TINT;
-        view = { sprite, key: '' };
+        view = this.createGhostView();
         this.ghostViews.set(id, view);
-        this.container.addChild(sprite);
       }
       // A building upgraded, aged up or completed out of sight must not keep the
       // art (or the scale) it was first drawn with.
@@ -916,26 +972,57 @@ export class WorldLayer {
       const key = ghostFrameKey(g, choice);
       if (key !== view.key) {
         view.key = key;
-        this.drawGhost(state, g, choice, view.sprite);
+        this.drawGhost(state, g, choice, view);
       }
-      view.sprite.visible = true;
+      // Placement is deliberately not cached behind the frame key: build progress
+      // crosses the flat/upright sort threshold at 250 while the construct0 frame
+      // holds to 334, so a foundation re-scouted across that gap would keep a
+      // stale depth and stay buried under the ground it stands on.
+      this.placeGhost(g, choice, view);
+      view.root.visible = true;
     }
   }
 
+  /**
+   * Ghosts mirror the live view's corner-join rig (sprite + mirrored twin + two
+   * half-masks) so a remembered wall corner joins instead of reading as two
+   * separated segments.
+   */
+  private createGhostView(): GhostView {
+    const root = new Container();
+    const sprite = new Sprite();
+    const cornerSprite = new Sprite();
+    const cornerPrimaryMask = new Graphics();
+    const cornerSecondaryMask = new Graphics();
+    sprite.tint = GHOST_TINT;
+    cornerSprite.tint = GHOST_TINT;
+    cornerSprite.visible = false;
+    root.addChild(cornerSprite, sprite, cornerPrimaryMask, cornerSecondaryMask);
+    this.container.addChild(root);
+    return { root, sprite, cornerSprite, cornerPrimaryMask, cornerSecondaryMask, key: '' };
+  }
+
+  /** Depth, fade and world position for a remembered building. Cheap; runs per frame. */
+  private placeGhost(g: GhostRecord, choice: FrameChoice, view: GhostView): void {
+    // Fade the rig rather than the sprites: a joined corner owns two of them and
+    // both must carry the same fog opacity.
+    view.root.alpha = GHOST_ALPHA * choice.alpha;
+    view.root.position.set(Math.round(g.wx), Math.round(g.wy));
+    view.root.zIndex = entitySortDepth(g.defId, g.wy, g.buildProgress);
+  }
+
   /** Build a ghost sprite through the exact frame + art-scale path live buildings use. */
-  private drawGhost(state: GameState, g: GhostRecord, choice: FrameChoice, sprite: Sprite): void {
+  private drawGhost(state: GameState, g: GhostRecord, choice: FrameChoice, view: GhostView): void {
     const colorIdx = state.players[g.player]?.setup.color;
     const { frame } = this.assets.resolveFirst(choice.candidates, colorIdx);
     // Fortification art is authored well under one footprint: without the art
     // scale a remembered tower, keep, gate or wall draws at a fraction of the
     // size of the live sprite it stands in for.
     const scale = buildingSpriteScale(g.defId, frame.renderScale, frame.mirrored !== g.mirrored);
-    sprite.texture = frame.texture;
-    sprite.anchor.set(frame.anchorX, frame.anchorY);
-    sprite.scale.set(scale.x, scale.y);
-    sprite.alpha = GHOST_ALPHA * choice.alpha;
-    sprite.position.set(Math.round(g.wx), Math.round(g.wy));
-    sprite.zIndex = g.wy;
+    view.sprite.texture = frame.texture;
+    view.sprite.anchor.set(frame.anchorX, frame.anchorY);
+    view.sprite.scale.set(scale.x, scale.y);
+    applyWallCornerJoin(view, g.corner, frame);
   }
 
   private prunePositions(seen: Set<EntityId>): void {
@@ -1041,7 +1128,10 @@ export function resourceFrameName(e: Entity, map?: GameMap): string {
  * the sprite only when this changes keeps the fog layer allocation-free per frame.
  */
 function ghostFrameKey(g: GhostRecord, choice: FrameChoice): string {
-  return `${g.player}|${g.mirrored ? 'wall-y' : ''}|${choice.alpha}|${choice.candidates.join('|')}`;
+  const joinKey = g.corner
+    ? `corner:${g.corner.xDir},${g.corner.yDir}`
+    : g.mirrored ? 'wall-y' : '';
+  return `${g.player}|${joinKey}|${choice.alpha}|${choice.candidates.join('|')}`;
 }
 
 function buildingFrame(state: GameState, e: Entity): FrameChoice {

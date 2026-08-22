@@ -3,8 +3,8 @@ import { FP, type Entity, type GameMap, type GameState, type PlayerId } from '@b
 import { tileToWorld } from './camera';
 import {
   advanceGateOpenProgress, buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
-  mirroredWallIds, ownedResearchProgress, resourceFrameName, wallCornerJoins,
-  rallyFlagWorldPoint, shouldFadeForUnit,
+  entitySortDepth, isFlatArtwork, mirroredWallIds, ownedResearchProgress, resourceFrameName,
+  wallCornerJoins, rallyFlagWorldPoint, shouldFadeForUnit,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -50,6 +50,33 @@ describe('resourceFrameName', () => {
       resourceFrameName(resource({ tileX: 17, tileY: 17 }), map),
     ]);
     expect(regions.size).toBeGreaterThan(1);
+  });
+});
+
+describe('entitySortDepth (shared by live sprites and fog ghosts)', () => {
+  it('sinks flat artwork below every upright sprite', () => {
+    expect(isFlatArtwork('farm', 1000)).toBe(true);
+    expect(isFlatArtwork('barracks', 249)).toBe(true);
+    expect(isFlatArtwork('barracks', 250)).toBe(false);
+    // a unit standing on the same row is not a building and never sorts flat
+    expect(isFlatArtwork('villager', null)).toBe(false);
+    expect(entitySortDepth('farm', 400, 1000)).toBeLessThan(entitySortDepth('house', 0, 1000));
+    expect(entitySortDepth('barracks', 400, 100)).toBe(400 - 4000);
+  });
+
+  it('lifts a gatehouse one row over its adjacent wall caps', () => {
+    expect(entitySortDepth('gate', 400, 1000)).toBeGreaterThan(entitySortDepth('stoneWall', 400, 1000));
+    expect(entitySortDepth('stoneWall', 400, 1000)).toBe(400);
+  });
+
+  it('gives a remembered foundation the same depth it had while visible', () => {
+    // regression: fog ghosts sorted on raw world y, so a scouted stage-0
+    // foundation popped in front of its neighbours the moment its tile fogged
+    for (const progress of [0, 249, 250, 1000]) {
+      expect(entitySortDepth('barracks', 400, progress)).toBe(progress < 250 ? -3600 : 400);
+    }
+    // a remembered farm keeps sinking below the units that walk over it
+    expect(entitySortDepth('farm', 400, 1000)).toBe(-3600);
   });
 });
 
