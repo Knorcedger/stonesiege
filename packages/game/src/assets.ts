@@ -4,7 +4,9 @@
 //   meta.bannerfall.maskPalette/playerRamps schema and
 //   builds per-color recolored canvases at match load for the colors in the match.
 //   (If an atlas declares strategy 'baked' with @p<idx> frames, those are used instead.)
-// - resolveFrame(name, playerColor) is THE sprite-frame lookup used everywhere: it
+// - Hero accents: an optional second palette swap layered on the player color, so a
+//   campaign hero aliasing a rank-and-file rig wears his own cloth (see frames.ts).
+// - resolveFrame(name, playerColor, accent) is THE sprite-frame lookup used everywhere: it
 //   remaps mirrored dirs 5-7 to 3/2/1 (+mirrored flag), falls back to procedural mock
 //   frames when an atlas is missing (assetgen runs in parallel), and returns a magenta
 //   placeholder + console.warn for genuinely unknown frames. It never throws.
@@ -13,8 +15,8 @@ import { Rectangle, Texture, TextureSource } from 'pixi.js';
 import { gameData } from '@bf/data';
 import { resolveFrameName, bakedColorName } from './frames';
 import {
-  swapPalette, containsMask, hexToRgb, FALLBACK_PLAYER_RAMPS, FALLBACK_MASK_PALETTE,
-  GAIA_NEUTRAL_COLOR, GAIA_NEUTRAL_RAMP, type Rgb,
+  applyEntityPalette, containsMask, hexToRgb, FALLBACK_PLAYER_RAMPS, FALLBACK_MASK_PALETTE,
+  GAIA_NEUTRAL_COLOR, GAIA_NEUTRAL_RAMP, type ColorAccent, type Rgb,
 } from './recolor';
 import { makeMockFrame } from './dev/mockAtlas';
 import type { ArtworkMode } from './developerTools';
@@ -237,8 +239,8 @@ export class GameAssets {
    * The single sprite-frame resolver. Handles mirrored dirs 5-7, player-color
    * variants, mock fallback and the magenta placeholder. Never throws.
    */
-  resolveFrame(name: string, playerColor?: number): ResolvedFrame {
-    const hit = this.tryResolve(name, playerColor);
+  resolveFrame(name: string, playerColor?: number, accent?: ColorAccent): ResolvedFrame {
+    const hit = this.tryResolve(name, playerColor, accent);
     if (hit) return hit;
     if (!this.warned.has(name)) {
       this.warned.add(name);
@@ -249,7 +251,7 @@ export class GameAssets {
   }
 
   /** Like resolveFrame but returns null for missing frames (optional decor: transitions, age variants). */
-  tryResolve(name: string, playerColor?: number): ResolvedFrame | null {
+  tryResolve(name: string, playerColor?: number, accent?: ColorAccent): ResolvedFrame | null {
     const { name: phys, mirrored } = resolveFrameName(name);
     const atlasName = atlasNameFor(phys);
     if (!atlasName) return null;
@@ -261,8 +263,8 @@ export class GameAssets {
       if (playerColor !== undefined && atlas.strategy === 'baked') {
         tex = atlas.frames.get(bakedColorName(phys, playerColor));
       }
-      if (!tex && playerColor !== undefined && atlas.strategy === 'runtime-swap') {
-        tex = this.playerColoredTexture(atlas, phys, playerColor);
+      if (!tex && (playerColor !== undefined || accent) && atlas.strategy === 'runtime-swap') {
+        tex = this.playerColoredTexture(atlas, phys, playerColor, accent);
       }
       tex ??= atlas.frames.get(phys);
       if (tex) {
@@ -273,7 +275,7 @@ export class GameAssets {
     }
 
     // Atlas missing: procedural mock frame (dev), cached per name+color.
-    const key = `${phys}@${playerColor ?? 'n'}`;
+    const key = `${phys}@${playerColor ?? 'n'}@${accent?.id ?? ''}`;
     const cached = this.mockCache.get(key);
     if (cached) return { ...cached, mirrored };
     const mock = makeMockFrame(phys, playerColor);
@@ -395,8 +397,13 @@ export class GameAssets {
     return [...this.atlases.values(), ...new Set(this.hdFrames.values())];
   }
 
-  private playerColoredTexture(atlas: Atlas, frameName: string, color: number): Texture | undefined {
-    const key = `${atlas.name}|${frameName}|${color}`;
+  private playerColoredTexture(
+    atlas: Atlas,
+    frameName: string,
+    color: number | undefined,
+    accent?: ColorAccent,
+  ): Texture | undefined {
+    const key = `${atlas.name}|${frameName}|${color ?? 'n'}|${accent?.id ?? ''}`;
     const cached = this.colorCache.get(key);
     if (cached) return cached;
     const fd = atlas.frameData.get(frameName);
@@ -410,24 +417,24 @@ export class GameAssets {
     const scratchCtx = scratch.getContext('2d')!;
     scratchCtx.drawImage(atlas.image, x, y, w, h, 0, 0, w, h);
     const pixels = scratchCtx.getImageData(0, 0, w, h);
-    // Terrain, UI, and many world frames contain no ownership pixels. Reuse
-    // their plain atlas texture without allocating player-specific storage.
-    if (!containsMask(pixels.data, atlas.maskPalette)) {
+
+    const ramps = atlas.playerRamps ?? FALLBACK_PLAYER_RAMPS.map((r) => r.map(hexToRgb));
+    const ramp = color === undefined
+      ? undefined
+      : color === GAIA_NEUTRAL_COLOR
+        ? GAIA_NEUTRAL_RAMP.map(hexToRgb)
+        : ramps[color] ?? ramps[0];
+    // Terrain, UI, and many world frames carry neither ownership nor accent pixels.
+    // Reuse their plain atlas texture without allocating a per-variant copy.
+    if (!applyEntityPalette(pixels.data, atlas.maskPalette, ramp, accent)) {
       this.colorCache.set(key, plain);
       return plain;
     }
-
-    const ramps = atlas.playerRamps ?? FALLBACK_PLAYER_RAMPS.map((r) => r.map(hexToRgb));
-    const ramp = color === GAIA_NEUTRAL_COLOR
-      ? GAIA_NEUTRAL_RAMP.map(hexToRgb)
-      : ramps[color] ?? ramps[0];
-    if (!ramp) return plain;
-    swapPalette(pixels.data, atlas.maskPalette, ramp);
-    if (DEV_ASSERTS && containsMask(pixels.data, atlas.maskPalette)) {
+    if (DEV_ASSERTS && ramp && containsMask(pixels.data, atlas.maskPalette)) {
       console.error(`[assets] ${atlas.name}:${frameName} retained raw player-mask pixels`);
     }
 
-    const placed = this.placeColorFrame(color, atlas.density, pixels);
+    const placed = this.placeColorFrame(`${color ?? 'n'}|${accent?.id ?? ''}`, atlas.density, pixels);
     const texture = new Texture({
       source: placed.page.source,
       frame: new Rectangle(placed.x, placed.y, w, h),
@@ -438,14 +445,14 @@ export class GameAssets {
   }
 
   private placeColorFrame(
-    color: number,
+    variant: string,
     density: number,
     pixels: ImageData,
   ): { page: ColorPage; x: number; y: number } {
     if (pixels.width + COLOR_PAGE_PAD * 2 > COLOR_PAGE_SIZE || pixels.height + COLOR_PAGE_PAD * 2 > COLOR_PAGE_SIZE) {
       throw new Error(`player-colored frame ${pixels.width}x${pixels.height} exceeds ${COLOR_PAGE_SIZE}px page`);
     }
-    const key = `${color}@${density}`;
+    const key = `${variant}@${density}`;
     const pages = this.colorPages.get(key) ?? [];
     let page = pages[pages.length - 1];
     if (!page) {

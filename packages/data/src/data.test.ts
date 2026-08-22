@@ -2,6 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { AGES } from '@bf/sim/types';
 import type { AgeId } from '@bf/sim/types';
 import { gameData } from './index';
+// The renderer paints hero accents straight onto sprite pixels, so their colors must
+// come from the same master palette assetgen is allowed to use (ART_BIBLE §1).
+import { PALETTE as paletteColors, rgbToHex } from '../../../tools/assetgen/src/palette.ts';
 import type { Cost, TechEffect } from './schema';
 
 const { units, buildings, techs, civs, resources } = gameData;
@@ -178,6 +181,78 @@ describe('icons', () => {
     for (const b of Object.values(buildings)) expect(b.icon, `building ${b.id}`).toMatch(/^icon\//);
     for (const t of Object.values(techs)) expect(t.icon, `tech ${t.id}`).toMatch(/^icon\/tech\//);
     for (const r of Object.values(resources)) expect(r.icon, `resource ${r.id}`).toMatch(/^icon\//);
+  });
+});
+
+describe('campaign heroes', () => {
+  // Heroes render through a rank-and-file rig (`sprite`), so the flag + accent cloth
+  // below are the only things keeping William Wallace from looking like one more
+  // militiaman in his own warband.
+  const heroes = Object.values(units).filter((u) => u.hero);
+  const PALETTE = new Set(
+    Object.values(paletteColors).map((c) => rgbToHex(c).toLowerCase()),
+  );
+
+  it('marks every scenario-placed hero and nobody else', () => {
+    expect(heroes.map((u) => u.id)).toContain('heroWallace');
+    expect(heroes.length).toBeGreaterThanOrEqual(15);
+    for (const u of heroes) {
+      expect(u.trainedAt, `${u.id} trainedAt`).toEqual([]);
+      expect(u.conversionResist, `${u.id} conversionResist`).toBe(100);
+    }
+    for (const id of ['militia', 'champion', 'knight', 'villager', 'wolf']) {
+      expect(units[id].hero, id).toBeUndefined();
+    }
+  });
+
+  it('gives every hero an accent ramp painted from the master palette', () => {
+    for (const u of heroes) {
+      expect(u.heroCloth, `${u.id} heroCloth`).toBeDefined();
+      expect(u.heroCloth, `${u.id} heroCloth`).toHaveLength(3);
+      for (const hex of u.heroCloth!) {
+        expect(hex, `${u.id} ${hex}`).toMatch(/^#[0-9A-Fa-f]{6}$/);
+        // ART_BIBLE §1/§9.1: the renderer may only ever paint master-palette colors.
+        expect(PALETTE.has(hex.toLowerCase()), `${u.id} ${hex} is not a palette color`).toBe(true);
+      }
+    }
+  });
+
+  it('keeps every accent saturated enough to survive as a sprite tint', () => {
+    // The HD art pack carries no palette colors, so there the accent lands as a
+    // multiply tint of the ramp's light tone. A grey or near-white ramp multiplies
+    // to nothing (or to a dimmer copy of the same soldier) and the hero is lost again.
+    for (const u of heroes) {
+      const [r, g, b] = [1, 3, 5].map((i) => parseInt(u.heroCloth![0].slice(i, i + 2), 16));
+      expect(Math.max(r, g, b) - Math.min(r, g, b), `${u.id} light tone saturation`)
+        .toBeGreaterThan(40);
+    }
+  });
+
+  it('never dresses a hero in the outfit tones the renderer repaints', () => {
+    // The accent recolors the rig's cloth AND metal ramps, so a hero ramp equal to
+    // either one is a no-op: he would render exactly like the soldiers beside him.
+    const cloth = ['#b89e73', '#957c56', '#6e5940'];
+    const metal = ['#a7b1ba', '#78828c', '#4a505a'];
+    for (const u of heroes) {
+      const ramp = u.heroCloth!.map((c) => c.toLowerCase());
+      expect(ramp, `${u.id} vs rank-and-file cloth`).not.toEqual(cloth);
+      expect(ramp, `${u.id} vs rank-and-file metal`).not.toEqual(metal);
+    }
+  });
+
+  it('keeps heroes who share a battlefield visually apart', () => {
+    // Casts taken from the authored scenarios (packages/scenarios): heroes only need
+    // to differ from the ones they can actually stand next to.
+    const casts: Record<string, string[]> = {
+      'wallace ch1': ['heroWallace', 'heroHeselrig'],
+      'wallace ch3': ['heroWallace', 'heroMoray', 'heroCressingham', 'heroWarenne'],
+      'wallace ch5': ['heroWallace', 'heroGraham', 'heroEdward'],
+      'wallace ch6': ['heroWallace', 'heroFraser', 'heroValence'],
+    };
+    for (const [cast, ids] of Object.entries(casts)) {
+      const ramps = ids.map((id) => units[id].heroCloth!.join(',').toLowerCase());
+      expect(new Set(ramps).size, `${cast} ramps`).toBe(ids.length);
+    }
   });
 });
 

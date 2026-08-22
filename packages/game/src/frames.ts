@@ -3,6 +3,7 @@
 
 import type { UnitActivity } from '@bf/sim/types';
 import { gameData } from '@bf/data';
+import { hexToRgb, UNIT_CLOTH_RAMP, UNIT_METAL_RAMP, type ColorAccent } from './recolor';
 
 export interface FrameRef {
   /** Atlas frame name to actually look up (dirs 5-7 remapped to 3/2/1). */
@@ -56,6 +57,64 @@ export function unitRig(defId: string): { spriteId: string; prefix: 'unit' | 'ob
   const spriteId = gameData.units[defId]?.sprite ?? defId;
   const def = gameData.units[spriteId];
   return { spriteId, prefix: def && def.trainedAt.length === 0 ? 'obj' : 'unit' };
+}
+
+/** True for campaign hero defs (the `hero` flag in @bf/data), which get accent art. */
+export function isHeroUnit(defId: string): boolean {
+  return gameData.units[defId]?.hero === true;
+}
+
+/**
+ * Hero accent for a unit def, or undefined for everyone else. Heroes alias a
+ * rank-and-file rig, so the renderer repaints that rig's outfit — cloth AND metal,
+ * since the tier decides which one the rig is actually painted with — in the hero's
+ * own colours: William Wallace stops being one more soldier in the line, while his
+ * player-colour band is left alone so ownership still reads. Heroes without an
+ * authored ramp (should be none) simply render unaccented.
+ */
+export function heroAccentFor(defId: string): ColorAccent | undefined {
+  const cloth = gameData.units[defId]?.heroCloth;
+  if (!cloth) return undefined;
+  const ramp = cloth.map(hexToRgb);
+  return {
+    id: defId,
+    from: [...UNIT_CLOTH_RAMP, ...UNIT_METAL_RAMP].map(hexToRgb),
+    to: [...ramp, ...ramp],
+  };
+}
+
+/**
+ * Multiply tint for a hero's sprite, or undefined for everyone else.
+ *
+ * The palette accent above only bites on art painted from the master palette. The HD
+ * pack is pre-rendered 3D with thousands of blended colours — and its champion and
+ * militia frames are the SAME art — so there the hero needs a tint instead. The hero's
+ * light tone is normalised up to a fixed brightness first: multiplying by a mid or
+ * dark tone would just smother the sprite, while the normalised hue reads as dyed
+ * cloth and keeps the shading underneath.
+ */
+export function heroTintFor(defId: string): number | undefined {
+  const cloth = gameData.units[defId]?.heroCloth;
+  if (!cloth) return undefined;
+  const [r, g, b] = hexToRgb(cloth[0]);
+  const peak = Math.max(r, g, b, 1);
+  const lift = (v: number): number => Math.min(255, Math.round((v * HERO_TINT_PEAK) / peak));
+  return (lift(r) << 16) | (lift(g) << 8) | lift(b);
+}
+
+/** Brightest channel a hero tint may reach: keeps the multiply gentle. */
+const HERO_TINT_PEAK = 0xe8;
+
+/**
+ * Campaign heroes draw a little larger than the rank-and-file rig they alias, so the
+ * protagonist reads as the protagonist even in a press of his own bodyguard. Kept
+ * modest: the rig still has to sit on its tile and inside its rings.
+ */
+export const HERO_DRAW_SCALE = 1.15;
+
+/** Draw-scale multiplier for a unit def's art — 1 for everyone except heroes. */
+export function heroDrawScale(defId: string): number {
+  return isHeroUnit(defId) ? HERO_DRAW_SCALE : 1;
 }
 
 /** Insert the baked player-color token into a frame name: unit/villager/... -> unit/villager@p2/... */

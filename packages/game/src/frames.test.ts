@@ -3,7 +3,9 @@ import { gameData } from '@bf/data';
 import {
   ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
   placementGhostFrames, resolveFrameName, unitRig,
+  heroAccentFor, heroDrawScale, heroTintFor, isHeroUnit, HERO_DRAW_SCALE,
 } from './frames';
+import { hexToRgb, UNIT_CLOTH_RAMP, UNIT_METAL_RAMP } from './recolor';
 
 describe('resolveFrameName (mirrored dirs per ASSET_CONTRACT)', () => {
   it('passes through authored dirs 0-4', () => {
@@ -143,5 +145,66 @@ describe('anim helpers', () => {
       .map((seconds) => animFrameIndex('mine', seconds, 4));
     expect(frames).toEqual([0, 1, 2, 2, 3, 0, 0]);
     expect(ANIM_FPS.mine).toBeLessThan(ANIM_FPS.attack);
+  });
+});
+
+describe('hero art (campaign protagonists share a rank-and-file rig)', () => {
+  it('knows a hero from the soldiers he fights beside', () => {
+    expect(isHeroUnit('heroWallace')).toBe(true);
+    expect(isHeroUnit('heroEdward')).toBe(true);
+    expect(isHeroUnit('militia')).toBe(false);
+    expect(isHeroUnit('champion')).toBe(false);
+    expect(isHeroUnit('nosuchunit')).toBe(false);
+  });
+
+  it('accents a hero onto both outfit ramps of the rig he aliases', () => {
+    const wallace = heroAccentFor('heroWallace');
+    expect(wallace).toBeDefined();
+    expect(wallace!.id).toBe('heroWallace');
+    // Cloth AND metal: a militia rig is all tunic, a champion rig is all harness and
+    // carries no cloth pixel at all, so aiming at one family only would miss half the
+    // roster (packages/game/src/heroArt.test.ts measures this against the real atlas).
+    expect(wallace!.from).toEqual([...UNIT_CLOTH_RAMP, ...UNIT_METAL_RAMP].map(hexToRgb));
+    expect(wallace!.to).toHaveLength(wallace!.from.length);
+    expect(wallace!.to).not.toEqual(wallace!.from);
+    // Both families land on the same hero ramp, light→light and dark→dark.
+    expect(wallace!.to.slice(0, 3)).toEqual(wallace!.to.slice(3));
+  });
+
+  it('gives Wallace a different tunic from the militia rig he renders as', () => {
+    expect(unitRig('heroWallace').spriteId).toBe('champion');
+    expect(heroAccentFor('champion')).toBeUndefined();
+    expect(heroAccentFor('militia')).toBeUndefined();
+  });
+
+  it('tints a hero with a lifted version of his own hue', () => {
+    const wallace = heroTintFor('heroWallace')!;
+    expect(wallace).toBeDefined();
+    const [r, g, b] = [(wallace >> 16) & 0xff, (wallace >> 8) & 0xff, wallace & 0xff];
+    // Normalised to a fixed peak: a raw mid/dark tone would smother the sprite.
+    expect(Math.max(r, g, b)).toBe(0xe8);
+    // Water blue: the hue of the authored ramp survives the lift.
+    expect(b).toBeGreaterThan(g);
+    expect(g).toBeGreaterThan(r);
+    expect(heroTintFor('militia')).toBeUndefined();
+    expect(heroTintFor('champion')).toBeUndefined();
+  });
+
+  it('keeps every hero tint bright enough to read as dye, not soot', () => {
+    for (const u of Object.values(gameData.units).filter((d) => d.hero)) {
+      const tint = heroTintFor(u.id)!;
+      const channels = [(tint >> 16) & 0xff, (tint >> 8) & 0xff, tint & 0xff];
+      expect(Math.max(...channels), u.id).toBe(0xe8);
+      // A grey tint multiplies to a dimmer copy of the same unit — no accent at all.
+      expect(Math.max(...channels) - Math.min(...channels), `${u.id} saturation`)
+        .toBeGreaterThan(40);
+    }
+  });
+
+  it('draws heroes a step larger than the rank and file', () => {
+    expect(heroDrawScale('heroWallace')).toBe(HERO_DRAW_SCALE);
+    expect(HERO_DRAW_SCALE).toBeGreaterThan(1);
+    expect(HERO_DRAW_SCALE).toBeLessThan(1.3); // must still sit on its tile
+    expect(heroDrawScale('militia')).toBe(1);
   });
 });

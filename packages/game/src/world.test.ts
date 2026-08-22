@@ -4,7 +4,7 @@ import { tileToWorld } from './camera';
 import {
   advanceGateOpenProgress, buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
   mirroredWallIds, ownedResearchProgress, resourceFrameName, wallCornerJoins,
-  rallyFlagWorldPoint, shouldFadeForUnit,
+  rallyFlagWorldPoint, shouldFadeForUnit, artScaleFor,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -193,5 +193,21 @@ describe('advanceGateOpenProgress', () => {
     expect(advanceGateOpenProgress(0.5, true, 999)).toBe(1);
     expect(advanceGateOpenProgress(0.5, false, 999)).toBe(0);
     expect(advanceGateOpenProgress(0.5, false, -1)).toBe(0.5);
+  });
+});
+
+describe('artScaleFor', () => {
+  it('draws campaign heroes larger than the rig they alias', () => {
+    const hero = artScaleFor('unit', 'heroWallace');
+    expect(hero.x).toBeGreaterThan(1);
+    expect(hero.y).toBe(hero.x); // uniform: a stretched hero would leave his tile
+    expect(artScaleFor('unit', 'champion')).toEqual({ x: 1, y: 1 });
+    expect(artScaleFor('unit', 'militia')).toEqual({ x: 1, y: 1 });
+  });
+
+  it('leaves fortification masonry scales alone', () => {
+    expect(artScaleFor('building', 'keep').x).toBeGreaterThan(2);
+    expect(artScaleFor('building', 'stoneWall').y).toBeGreaterThan(1);
+    expect(artScaleFor('resource', 'tree')).toEqual({ x: 1, y: 1 });
   });
 });

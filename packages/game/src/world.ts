@@ -13,7 +13,8 @@ import {
 import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets } from './assets';
 import {
-  animForActivity, animFrameIndex, facingFromDelta, unitRig, villagerWorkAnim, type AnimName,
+  animForActivity, animFrameIndex, facingFromDelta, heroAccentFor, heroTintFor, isHeroUnit,
+  unitRig, villagerWorkAnim, HERO_DRAW_SCALE, type AnimName,
 } from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
@@ -30,6 +31,8 @@ const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
 const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
+const HERO_RING = 0xe6c04a;
+const HERO_RING_INNER = 0xf4eedd;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
@@ -37,6 +40,8 @@ const OCCLUDER_ALPHA = 0.8;
 const GATE_OPEN_RADIUS_FP = 2 * FP;
 const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
 interface ArtScale { x: number; y: number }
+const NO_ART_SCALE: ArtScale = { x: 1, y: 1 };
+const HERO_ART_SCALE: ArtScale = { x: HERO_DRAW_SCALE, y: HERO_DRAW_SCALE };
 const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
   // Wall endpoints stay close to one mechanical tile while the masonry grows
   // vertically to building scale. Uniform 2.25x scaling made every segment
@@ -88,6 +93,17 @@ export function wallCornerJoins(entities: Iterable<Entity>): Map<EntityId, WallC
     corners.set(e.id, { xDir: xPos ? 1 : -1, yDir: yPos ? 1 : -1 });
   }
   return corners;
+}
+
+/**
+ * Draw scale for an entity's art. Fortifications keep their bespoke masonry scales;
+ * campaign heroes get the hero bump; everything else renders 1:1.
+ */
+export function artScaleFor(kind: Entity['kind'], defId: string): ArtScale {
+  const fortification = FORTIFICATION_ART_SCALE[defId];
+  if (fortification) return fortification;
+  if (kind === 'unit' && isHeroUnit(defId)) return HERO_ART_SCALE;
+  return NO_ART_SCALE;
 }
 
 /** Deterministic gate-leaf tween used for both opening and closing. */
@@ -581,6 +597,10 @@ export class WorldLayer {
     // Gaia entities use the neutral swap: some (sheep) carry a real mask band that
     // must never render raw magenta. Atlases without masks serve the plain frame.
     const colorIdx = e.player === GAIA ? GAIA_NEUTRAL_COLOR : state.players[e.player]?.setup.color;
+    // Campaign heroes share a rank-and-file rig: repaint its cloth with the hero's own
+    // ramp so William Wallace is not one more militia tunic (issue #110). The player
+    // color band is untouched, so a hero still shows whose side he is on.
+    const accent = e.kind === 'unit' ? heroAccentFor(e.defId) : undefined;
     const frameChoice = this.frameNameFor(state, e, tickFloat, view);
     const gateOperational = e.kind === 'building' && e.defId === 'gate' && e.hp > 0
       && (e.buildProgress ?? 1000) >= 1000;
@@ -594,18 +614,18 @@ export class WorldLayer {
     const mirrorWall = this.mirroredWalls.has(e.id);
     const corner = e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined;
     const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
-    const key = `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
+    const key = `${colorIdx ?? 'none'}|${accent?.id ?? ''}|${joinKey}${candidates.join('|')}`;
     if (key !== view.lastFrameKey) {
       let frame = null;
       let resolvedName = candidates[candidates.length - 1];
       for (let i = 0; i < candidates.length - 1 && !frame; i++) {
-        frame = this.assets.tryResolve(candidates[i], colorIdx);
+        frame = this.assets.tryResolve(candidates[i], colorIdx, accent);
         if (frame) resolvedName = candidates[i];
       }
-      frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
+      frame ??= this.assets.resolveFrame(resolvedName, colorIdx, accent);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? { x: 1, y: 1 };
+      const artScale = artScaleFor(e.kind, e.defId);
       const mirrorX = frame.mirrored !== mirrorWall;
       view.sprite.scale.set(
         mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
@@ -675,8 +695,12 @@ export class WorldLayer {
     view.sprite.alpha = sprAlpha;
     view.cornerSprite.alpha = sprAlpha;
     view.gateDoor.alpha = sprAlpha;
-    // damage-taken red blink (attackImpact recorded in onSimEvents)
-    const tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat ? 0xff8070 : 0xffffff;
+    // damage-taken red blink (attackImpact recorded in onSimEvents), else the hero
+    // tint. The blink deliberately wins: a hero being hurt is the more urgent read,
+    // and the accent returns the moment the blink expires.
+    const tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat
+      ? 0xff8070
+      : (e.kind === 'unit' ? heroTintFor(e.defId) : undefined) ?? 0xffffff;
     view.sprite.tint = tint;
     view.cornerSprite.tint = tint;
     view.gateDoor.tint = tint;
@@ -794,11 +818,17 @@ export class WorldLayer {
     const selected = this.selection.has(e.id);
     // gather-target highlight: amber ring on what the selected villagers work
     const highlighted = !selected && this.gatherTargets.has(e.id);
-    const key = selected ? `1:${e.kind}:${e.defId}` : highlighted ? `h:${e.kind}:${e.defId}` : '';
+    // Campaign heroes keep a permanent gilded ring: the one cue that survives a
+    // crowded melee, where an accent tunic can be hidden behind other sprites.
+    const hero = e.kind === 'unit' && e.activity !== 'dying' && isHeroUnit(e.defId);
+    const ringState = selected ? '1' : highlighted ? 'h' : '0';
+    const key = selected || highlighted || hero
+      ? `${ringState}${hero ? 'H' : ''}:${e.kind}:${e.defId}`
+      : '';
     if (key === view.lastRingKey) return;
     view.lastRingKey = key;
     view.ring.clear();
-    if (!selected && !highlighted) return;
+    if (!selected && !highlighted && !hero) return;
     const color = selected ? HIGHLIGHT : GATHER_HIGHLIGHT;
     if (e.kind === 'building') {
       const size = gameData.buildings[e.defId]?.size ?? 1;
@@ -819,6 +849,13 @@ export class WorldLayer {
         : undefined;
       const cav = (gameData.units[e.defId]?.speed ?? 0) > 1.1;
       const [rx, ry] = resourceRadius ?? (cav ? [14, 7] : [10, 5]);
+      if (hero) {
+        // One step outside the selection ellipse so both stay readable at once.
+        view.ring.ellipse(0, 1, rx + 3, ry + 3).stroke({ width: 1, color: OUTLINE });
+        view.ring.ellipse(0, 0, rx + 3, ry + 2).stroke({ width: 1.5, color: HERO_RING });
+        view.ring.ellipse(0, -1, rx + 3, ry + 2).stroke({ width: 1, color: HERO_RING_INNER });
+      }
+      if (!selected && !highlighted) return;
       view.ring.ellipse(0, 1, rx, ry + 1).stroke({ width: 1, color: OUTLINE });
       view.ring.ellipse(0, 0, rx, ry).stroke({ width: 1, color });
     }

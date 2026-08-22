@@ -6,6 +6,12 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Added
 
+- Campaign heroes now stand out from the troops around them. William Wallace and every
+  other named hero wear their own colour, draw slightly larger, keep a gold ring at
+  their feet, and show a gold pip on the minimap, so the one unit a chapter can be lost
+  with is findable at a glance. Player colours are unchanged, so a hero still shows
+  whose side he is on.
+
 - Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud with a
   slow, low delivery, with the narrator and each named character kept apart by ear. The banner
   waits for the voice to finish the sentence before moving on, and a tap dismisses the line and

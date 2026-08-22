@@ -667,6 +667,17 @@ These are drawn by the renderer, not assetgen, but must stay on-palette:
   overlay; remembered buildings are drawn desaturated by luma-mapping onto the stone
   ramp (the same recipe as `icon/<id>/gray`), so memory reads as "stone-gray past".
   Visible = untouched.
+- **Campaign heroes**: heroes alias a rank-and-file rig (`UnitDef.sprite`), and in the
+  HD pack a hero and his militia are the same frames, so the renderer marks them
+  instead of the atlas. Per hero, from `UnitDef.heroCloth` (a master-palette ramp,
+  light/mid/dark): the rig's cloth AND metal ramps are palette-swapped to it — which
+  of the two a rig uses depends on its tier, so both are needed — the sprite is
+  multiplied by the ramp's light tone lifted to a `0xE8` peak (the accent's only
+  carrier on pre-rendered HD art), the art draws at 1.15×, and a permanent gilded
+  `goldShine` ring sits at the feet with a matching pip on the minimap. The
+  player-colour band keeps its own ramp so ownership still reads; hero ramps must
+  stay clear of the cloth and metal ramps and be saturated enough to tint (a grey or
+  near-white ramp multiplies to nothing).
 - **Band-select box**: 1 px `highlight` rect while dragging (no fill).
 - **Control-group chips**: parchment mini-panels (§8.1 parchment inset, 20×20) with
   the group numeral in Alegreya Sans `outline`-colored text.
