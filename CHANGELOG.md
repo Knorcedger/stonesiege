@@ -6,15 +6,17 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Added
 
-- Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud with a
-  slow, low delivery, with the narrator and each named character kept apart by ear. The banner
-  waits for the voice to finish the sentence before moving on, and a tap dismisses the line and
-  the voice together. Narration stops with the match — pausing, backgrounding the app, or
-  finishing a chapter silences it.
-- A **Narration** volume slider and a **Campaign narration** switch in Settings. Narration uses
-  the voices already installed on the device — no download, and nothing is spoken when the switch
-  is off, the volume is zero, the game is paused or in the background, or the device has no
-  speech support.
+- Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud, in the
+  English (UK) **Martha** voice where the device has her and the best English voice installed
+  otherwise. Lines are read in phrases with silence held between them rather than at a forced low
+  pitch, which is what made earlier builds sound synthetic, and the narrator and each named
+  character stay apart by ear. The banner waits for the voice to finish the sentence before moving
+  on, and a tap dismisses the line and the voice together. Narration stops with the match —
+  pausing, backgrounding the app, or finishing a chapter silences it.
+- A **Narration** volume slider and a **Campaign narration** switch in Settings, with a hint
+  naming the Martha voice the campaign is written for. Narration uses the voices already installed
+  on the device — no download is required, and nothing is spoken when the switch is off, the volume
+  is zero, the game is paused or in the background, or the device has no speech support.
 
 ## 0.1.2 — 2026-08-20
 

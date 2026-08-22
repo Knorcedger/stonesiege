@@ -2,12 +2,14 @@
 // voice ranking, and the Narrator's settings and visibility gating. The speech
 // API is replaced by a fake seam, so these run under the `node` environment.
 
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   Narrator,
   deliveryFor,
+  estimateLineMs,
   estimateSpeechMs,
   pickNarrationVoice,
+  speechBeats,
   speechText,
   voiceScore,
   type NarrationRequest,
@@ -22,7 +24,7 @@ const voice = (name: string, lang: string, localService = true): NarrationVoice 
 class FakeSeam implements SpeechSeam {
   spoken: NarrationRequest[] = [];
   cancels = 0;
-  constructor(private voices: NarrationVoice[] = [voice('Daniel', 'en-GB')]) {}
+  constructor(private voices: NarrationVoice[] = [voice('Martha', 'en-GB')]) {}
   getVoices(): NarrationVoice[] {
     return this.voices;
   }
@@ -44,16 +46,39 @@ const settingsOf = (patch: Partial<GameSettings> = {}) =>
   () => ({ ...DEFAULT_SETTINGS, ...patch });
 
 describe('speechText', () => {
-  it('turns dashes into pauses and collapses authored whitespace', () => {
-    expect(speechText({ text: 'Settled. Aye — the way a boot settles on a neck.' }))
-      .toBe('Settled. Aye, the way a boot settles on a neck.');
+  it('collapses authored whitespace and spells out an ellipsis', () => {
     expect(speechText({ text: 'Lanark,\n  beyond   the river bend.' }))
       .toBe('Lanark, beyond the river bend.');
     expect(speechText({ text: 'Wait…' })).toBe('Wait...');
   });
 
+  it('leaves dashes standing for speechBeats to turn into silence', () => {
+    expect(speechText({ text: 'Settled. Aye — the way a boot settles on a neck.' }))
+      .toBe('Settled. Aye — the way a boot settles on a neck.');
+  });
+
   it('never returns padding for an empty line', () => {
     expect(speechText({ text: '   ' })).toBe('');
+  });
+});
+
+describe('speechBeats', () => {
+  it('breaks the line where a storyteller draws breath', () => {
+    expect(speechBeats('Settled. Aye — the way a boot settles on a neck.'))
+      .toEqual(['Settled.', 'Aye', 'the way a boot settles on a neck.']);
+    expect(speechBeats('The sheriff is dead: the news runs faster than any horse; nobody rides.'))
+      .toEqual(['The sheriff is dead:', 'the news runs faster than any horse;', 'nobody rides.']);
+  });
+
+  it('keeps a date apart from a decimal', () => {
+    expect(speechBeats('Lanarkshire, May 1297. The English think Scotland is settled.'))
+      .toEqual(['Lanarkshire, May 1297.', 'The English think Scotland is settled.']);
+    expect(speechBeats('The ford is 1.5 miles north.')).toEqual(['The ford is 1.5 miles north.']);
+  });
+
+  it('yields nothing to say for an empty line', () => {
+    expect(speechBeats('')).toEqual([]);
+    expect(speechBeats(' — ')).toEqual([]);
   });
 });
 
@@ -65,6 +90,8 @@ describe('deliveryFor', () => {
     const wallace = deliveryFor('Wallace');
     expect(narrator.rate).toBeLessThan(wallace.rate);
     expect(narrator.pitch).toBeLessThan(wallace.pitch);
+    // The storyteller's weight comes from the silences, not from the pitch.
+    expect(narrator.beatMs).toBeGreaterThan(wallace.beatMs);
   });
 
   it('keeps a character on one pitch across chapters but apart from others', () => {
@@ -80,7 +107,9 @@ describe('deliveryFor', () => {
     for (const s of ['Wallace', 'Graham', 'Douglas', 'Fraser', 'Moray', 'Warenne', 'Valence',
       'Menteith', 'Heselrig', 'Cressingham', 'Narrator', 'Chronicle']) {
       const d = deliveryFor(s);
-      expect(d.pitch).toBeGreaterThan(0);
+      // Below roughly 0.85 a neural voice stops sounding like a person, which
+      // is the artefact this delivery exists to avoid.
+      expect(d.pitch).toBeGreaterThanOrEqual(0.85);
       expect(d.pitch).toBeLessThanOrEqual(2);
       expect(d.rate).toBeGreaterThanOrEqual(0.1);
       expect(d.rate).toBeLessThanOrEqual(2);
@@ -107,23 +136,44 @@ describe('voiceScore', () => {
     expect(rank(voice('Daniel', 'en_GB'))).toBeGreaterThan(0); // underscore locales
   });
 
-  it('reads "male" as a label, not as a substring of "female"', () => {
-    expect(rank(voice('Google UK English Male', 'en-GB')))
-      .toBeGreaterThan(rank(voice('Google UK English Female', 'en-GB')));
-    expect(rank(voice('Google UK English Female', 'en-GB')))
-      .toBeLessThan(rank(voice('Microsoft Sonia', 'en-GB')));
+  it('puts the chosen narrator above every other installed voice', () => {
+    expect(rank(voice('Martha', 'en-GB'))).toBeGreaterThan(rank(voice('Arthur (Premium)', 'en-GB')));
+    // Among her own variants the downloaded one wins.
+    expect(rank(voice('Martha (Premium)', 'en-GB'))).toBeGreaterThan(rank(voice('Martha', 'en-GB')));
+    // A voice that merely contains the letters is not her.
+    expect(rank(voice('Marthana', 'en-GB'))).toBeLessThan(rank(voice('Martha', 'en-GB')));
+  });
+
+  it('ranks a named fallback above an unnamed voice of the same locale', () => {
+    expect(rank(voice('Microsoft Sonia', 'en-GB'))).toBeGreaterThan(rank(voice('Rosalind', 'en-GB')));
+  });
+
+  it('prefers a neural engine to a formant one', () => {
+    expect(rank(voice('Sonia (Natural)', 'en-GB'))).toBeGreaterThan(rank(voice('Sonia', 'en-GB')));
+    expect(rank(voice('Daniel (Compact)', 'en-GB'))).toBeLessThan(rank(voice('Daniel', 'en-GB')));
+    expect(rank(voice('English (Great Britain) espeak', 'en-GB')))
+      .toBeLessThan(rank(voice('Google UK English', 'en-GB', false)));
   });
 
   it('keeps a usable English voice ranked, however unappealing', () => {
-    // Negative but not disqualified: reading the campaign in the wrong timbre
-    // beats reading it in the wrong language.
-    expect(voiceScore(voice('Samantha', 'en-US'))).toBeLessThan(0);
-    expect(rank(voice('Daniel (Compact)', 'en-GB'))).toBeLessThan(rank(voice('Daniel', 'en-GB')));
+    // Reading the campaign in the wrong timbre beats reading it in the wrong
+    // language, so an unlisted English voice still scores.
+    expect(rank(voice('Zira', 'en-US'))).toBeGreaterThan(0);
+    expect(rank(voice('Zira', 'en-US'))).toBeLessThan(rank(voice('Martha', 'en-GB')));
   });
 });
 
 describe('pickNarrationVoice', () => {
-  it('picks the best-ranked installed voice', () => {
+  it('takes the chosen narrator whenever the device has her', () => {
+    const picked = pickNarrationVoice([
+      voice('Arthur (Premium)', 'en-GB'),
+      voice('Martha', 'en-GB'),
+      voice('Google UK English Male', 'en-GB', false),
+    ]);
+    expect(picked?.name).toBe('Martha');
+  });
+
+  it('falls back to the best-ranked installed voice', () => {
     const picked = pickNarrationVoice([
       voice('Samantha', 'en-US'),
       voice('Anna', 'de-DE'),
@@ -153,13 +203,26 @@ describe('estimateSpeechMs', () => {
   });
 });
 
+describe('estimateLineMs', () => {
+  it('counts the silence between beats as well as the words', () => {
+    const delivery = deliveryFor('Narrator');
+    expect(estimateLineMs(['Hold the line.'], delivery))
+      .toBe(estimateSpeechMs('Hold the line.', delivery.rate));
+    expect(estimateLineMs(['Hold the line.', 'For Scotland.'], delivery))
+      .toBe(estimateSpeechMs('Hold the line.', delivery.rate)
+        + estimateSpeechMs('For Scotland.', delivery.rate)
+        + delivery.beatMs);
+    expect(estimateLineMs([], delivery)).toBe(0);
+  });
+});
+
 describe('Narrator', () => {
   it('speaks a line with the chosen voice, delivery and gain', () => {
     const seam = new FakeSeam();
     const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
     n.speak({ text: 'Lanarkshire, May 1297.', speaker: 'Narrator' }, 0);
     expect(seam.last?.text).toBe('Lanarkshire, May 1297.');
-    expect(seam.last?.voice?.name).toBe('Daniel');
+    expect(seam.last?.voice?.name).toBe('Martha');
     expect(seam.last?.rate).toBe(deliveryFor('Narrator').rate);
     expect(seam.last?.volume).toBeCloseTo(DEFAULT_SETTINGS.masterVolume * DEFAULT_SETTINGS.narrationVolume);
     n.dispose();
@@ -265,6 +328,44 @@ describe('Narrator', () => {
     n.dispose();
   });
 
+  it('reads a line as beats with silence held between them', () => {
+    vi.useFakeTimers();
+    const seam = new FakeSeam();
+    const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
+    const beat = deliveryFor('Wallace').beatMs;
+    n.speak({ text: 'Settled. Aye — the way a boot settles on a neck.', speaker: 'Wallace' }, 0);
+
+    expect(seam.spoken.map((r) => r.text)).toEqual(['Settled.']);
+    seam.last!.onDone();
+    expect(seam.spoken).toHaveLength(1); // the silence between beats
+    vi.advanceTimersByTime(beat);
+    expect(seam.spoken.map((r) => r.text)).toEqual(['Settled.', 'Aye']);
+
+    seam.last!.onDone();
+    vi.advanceTimersByTime(beat);
+    expect(seam.spoken).toHaveLength(3);
+    expect(n.isSpeaking(100)).toBe(true); // the banner waits for the last beat
+    seam.last!.onDone();
+    expect(n.isSpeaking(100)).toBe(false);
+
+    n.dispose();
+    vi.useRealTimers();
+  });
+
+  it('drops a queued beat when the line is cut off mid-read', () => {
+    vi.useFakeTimers();
+    const seam = new FakeSeam();
+    const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
+    n.speak({ text: 'Hold the line — for Scotland.', speaker: 'Narrator' }, 0);
+    seam.last!.onDone(); // first beat done, the next is waiting out the silence
+    n.cancel();
+    vi.advanceTimersByTime(5000);
+    expect(seam.spoken.map((r) => r.text)).toEqual(['Hold the line']);
+    expect(n.isSpeaking(5000)).toBe(false);
+    n.dispose();
+    vi.useRealTimers();
+  });
+
   it('is inert on a platform without speech synthesis', () => {
     const n = new Narrator(null, { isHidden: () => false, readSettings: settingsOf() });
     expect(() => n.speak({ text: 'Nothing to speak with.' }, 0)).not.toThrow();
@@ -278,9 +379,9 @@ describe('Narrator', () => {
     const n = new Narrator(seam, { isHidden: () => false, readSettings: settingsOf() });
     n.speak({ text: 'Early line.' }, 0);
     expect(seam.last?.voice).toBeNull();
-    seam.getVoices = () => [voice('Daniel', 'en-GB')];
+    seam.getVoices = () => [voice('Martha', 'en-GB')];
     n.speak({ text: 'Later line.' }, 100);
-    expect(seam.last?.voice?.name).toBe('Daniel');
+    expect(seam.last?.voice?.name).toBe('Martha');
     n.dispose();
   });
 });

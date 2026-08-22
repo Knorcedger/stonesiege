@@ -180,7 +180,9 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
   const narrationHint = document.createElement('div');
   narrationHint.className = 'bf-set-hint';
   narrationHint.textContent = 'Reads campaign dialogue aloud using the voices installed on your device. '
-    + 'The delivery and accent depend on what your device provides.';
+    + 'The campaign is written for the English (UK) Martha voice — add it in your device\'s speech '
+    + 'or accessibility settings for the intended read. Without it, the best English voice '
+    + 'installed reads instead.';
   container.appendChild(narrationHint);
 
   booleanToggle(

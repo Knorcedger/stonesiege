@@ -210,9 +210,14 @@ placement, horn stings for age-up and attack warnings, UI clicks). Ambient loop.
 
 **Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as
 spoken story rather than silent text. There is no recorded voice-over: the lines go to the
-device's own speech synthesizer, steered into a slow, low, deliberate delivery. The `Narrator`
-and `Chronicle` lines get the deepest, slowest read, and every other speaker keeps a pitch
-derived from its name, so Wallace and Cressingham stay apart by ear across chapters. The banner
+device's own speech synthesizer, which is steered by voice choice and phrasing rather than by
+pitch. The campaign is written for the English (UK) **Martha** voice and prefers her wherever
+the device has her, falling back to the best-quality English voice installed; a line is spoken
+as a sequence of beats split at sentence ends, dashes, colons and semicolons, with silence held
+between them, and every voice stays within a whole tone of its own register — dragging the pitch
+down instead is what makes a modern voice sound synthetic. The `Narrator` and `Chronicle` lines
+get the slowest read and the longest silences, and every other speaker keeps a slight pitch
+offset derived from its name, so Wallace and Cressingham stay apart by ear across chapters. The banner
 holds until the voice finishes (capped at 20s) so a line is never cut off mid-sentence, and a
 tap dismisses text and voice together. Narration stops with the match: pausing, backgrounding
 the app, or reaching the end screen silences it, and the closing lines are not read over the
