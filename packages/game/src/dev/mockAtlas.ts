@@ -26,12 +26,13 @@ const SIEGE_IDS = new Set(['batteringRam', 'cappedRam', 'siegeRam', 'mangonel', 
 const TERRAIN_COLORS: Record<string, string> = {
   grass: '#6B8C3F', dirt: '#8A683E', sand: '#C2A268', water: '#2C6283',
   shallows: '#4884A4', road: '#A8854F', farmland: '#7A5E38', snow: '#D9D9E2', cliff: '#55555E',
-  // presentation-only crossing tile (see TerrainLayer): shallow water over a road bed
-  ford: '#7E9A86',
+  // presentation-only tiles (see TerrainLayer): the crossing, and a road drawn
+  // for the axis it runs along
+  ford: '#7E9A86', 'road-x': '#A8854F', 'road-y': '#A8854F',
 };
 const TERRAIN_VARIANTS: Record<string, number> = {
   grass: 4, dirt: 3, sand: 3, water: 4, shallows: 3, road: 4, farmland: 2, snow: 3, cliff: 3,
-  ford: 4,
+  ford: 4, 'road-x': 4, 'road-y': 4,
 };
 
 function hashStr(s: string): number {

@@ -43,8 +43,18 @@ The asset generator (`tools/assetgen`) emits Pixi spritesheet atlases into
     `terrain.png` — recipe in ART_BIBLE §3.2). The renderer picks the variant per tile
     coordinate, so one wobbling boundary is never repeated down a whole shoreline; it falls
     back to an unnumbered `terr/<hi>_<lo>/<edge>` when an atlas ships without variants.
-  - Presentation-only tiles (no sim `TerrainId`): `terr/ford/<variant>` (ART_BIBLE §3.3),
-    drawn in place of a `shallows` tile that the renderer resolves as a river crossing.
+  - Presentation-only families (no sim `TerrainId`), all resolved from the map by the
+    renderer — ART_BIBLE §3.3:
+    - `terr/ford/<variant>`, drawn in place of a `shallows` tile that resolves as a river
+      crossing;
+    - `terr/road-<axis>/<entry><exit>/<variant>`, `axis` ∈ {`x`, `y`}, `entry`/`exit` ∈
+      {0, 1, 2}, drawn in place of a `road` tile that runs along one map axis; the offsets
+      say where the track crosses each tile edge, and a tile's exit is its neighbour's
+      entry, so the road meanders as one continuous line. `terr/road/<variant>` remains the
+      junction tile (bend, crossroads, lone tile);
+    - `terr/verge/<lo>/<edge>/<variant>`, `lo` ∈ {`grass`, `dirt`, `sand`, `snow`}, the low
+      terrain creeping back over a road tile's edge (variants are creep depth, shallow to
+      deep).
 - Units: `unit/<defId>/<anim>/<dir>/<frame>`
   - anims: `idle`, `walk`, `attack`, `gather` (villager), `carry` (villager), `die`, `decay`
   - dir: 0..7, **0 = facing south (toward camera), clockwise** (1 = SW, 2 = W, 3 = NW, 4 = N…).

@@ -11,7 +11,10 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gameData } from '@bf/data';
-import { EDGE_VARIANTS, EDGES, PRESENTATION_TILES, TERRAINS, edgePairs } from './gen-terrain.ts';
+import {
+  EDGE_VARIANTS, EDGES, PRESENTATION_TILES, ROAD_AXES, ROAD_JOINT_VARIANTS, ROAD_OFFSETS,
+  TERRAINS, VERGE_REACH, VERGE_TERRAINS, edgePairs,
+} from './gen-terrain.ts';
 import { CMD_VERBS } from './gen-icons.ts';
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '../../../apps/web/public/assets');
@@ -101,6 +104,34 @@ describe('terrain atlas', () => {
       for (let v = 0; v < spec.variants; v++) wanted.push(`terr/${spec.id}/${v}`);
     }
     expect(PRESENTATION_TILES.map((t) => t.id)).toEqual(['ford']);
+    expectFrames(terrain, wanted);
+  });
+
+  it('has every road joint: run direction x entry x exit x variant', () => {
+    const wanted: string[] = [];
+    for (const axis of ROAD_AXES) {
+      for (let entry = 0; entry < ROAD_OFFSETS.length; entry++) {
+        for (let exit = 0; exit < ROAD_OFFSETS.length; exit++) {
+          for (let v = 0; v < ROAD_JOINT_VARIANTS; v++) {
+            wanted.push(`terr/road-${axis}/${entry}${exit}/${v}`);
+          }
+        }
+      }
+    }
+    // Every entry offset must pair with every exit offset, or a road's track
+    // would break where two tiles meet.
+    expect(wanted.length).toBe(2 * ROAD_OFFSETS.length * ROAD_OFFSETS.length * ROAD_JOINT_VARIANTS);
+    expectFrames(terrain, wanted);
+  });
+
+  it('has verge frames at every depth for everything that reclaims a road', () => {
+    const wanted: string[] = [];
+    for (const lo of VERGE_TERRAINS) {
+      for (const edge of EDGES) {
+        for (let v = 0; v < VERGE_REACH.length; v++) wanted.push(`terr/verge/${lo}/${edge}/${v}`);
+      }
+    }
+    expect(VERGE_REACH.length).toBeGreaterThanOrEqual(3); // shallow / middling / deep
     expectFrames(terrain, wanted);
   });
 

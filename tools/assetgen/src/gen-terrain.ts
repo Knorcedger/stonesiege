@@ -45,6 +45,40 @@ export const PRESENTATION_TILES = [
   { id: 'ford', variants: 4 },
 ] as const;
 
+/**
+ * Road tiles are drawn per run direction and per joint, `terr/road-<axis>/<in><out>/<v>`.
+ *
+ * A road runs along one map axis, entering and leaving its tile at the midpoints
+ * of two opposite edges. `in` and `out` index ROAD_OFFSETS: how far the track sits
+ * off that midpoint where it crosses into the neighbouring tile. The renderer
+ * derives both ends from the tiles themselves, so a tile's exit offset is its
+ * neighbour's entry offset and the track wanders across the tile grid as one
+ * continuous, meandering line — the last thing that still made a road read as
+ * ruled with a straightedge.
+ */
+export const ROAD_AXES = ['x', 'y'] as const;
+export type RoadAxis = (typeof ROAD_AXES)[number];
+/** Track offset at a tile edge, in screen px across the road. */
+export const ROAD_OFFSETS = [-4.5, 0, 4.5] as const;
+/** Surface variants per joint; the last one is a stretch the traffic has abandoned. */
+export const ROAD_JOINT_VARIANTS = 3;
+
+/**
+ * Terrain that creeps back OVER a road it borders (`terr/verge/<lo>/<edge>/<v>`).
+ * Edge transitions only ever run high priority into low, so without this a road's
+ * own border is the one edge in the game nothing can encroach on — and a track
+ * nothing has encroached on is a track that was laid this morning.
+ */
+export const VERGE_TERRAINS = ['grass', 'dirt', 'sand', 'snow'] as const;
+
+/**
+ * Verge variants, shallow to deep. The renderer picks by which way the track
+ * meanders inside the tile: the side it swings away from is reclaimed deeper, so
+ * the bare earth is a ribbon that follows the road rather than a band of fixed
+ * width laid between two parallel lines.
+ */
+export const VERGE_REACH = [2.4, 4.0, 6.8] as const;
+
 /** Transition variants per (hi, lo, edge) — a single frame would repeat its wobble on every tile. */
 export const EDGE_VARIANTS = 2;
 
@@ -270,12 +304,10 @@ function fordTile(r: Raster, rng: Rng, variant: number): void {
 }
 
 /**
- * An ancient track, not a paved lane: earth churned into uneven damp and dry
- * patches, wheel ruts that wander and fade out, loose stones, shallow potholes,
- * and weeds holding wherever the traffic thinned. Straight, evenly toned ruts on
- * one flat fill are what made the old tile read as laid yesterday by machines.
+ * Shared surface of every road frame: packed earth, never one flat tone —
+ * uneven damp and dry patches, grit, loose stones, shallow potholes.
  */
-function roadTile(r: Raster, rng: Rng, variant: number): void {
+function packedEarth(r: Raster, rng: Rng, variant: number): void {
   baseDiamond(r, PALETTE.dirtLight);
 
   const patches = 4 + (variant % 2);
@@ -294,24 +326,12 @@ function roadTile(r: Raster, rng: Rng, variant: number): void {
     );
   }
 
-  speckle(r, rng, 46, [
-    [PALETTE.dirtBase, 40],
-    [PALETTE.dirtPale, 30],
-    [PALETTE.dirtDark, 20],
+  speckle(r, rng, 40, [
+    [PALETTE.dirtBase, 34],
+    [PALETTE.dirtPale, 38],
+    [PALETTE.dirtDark, 18],
     [PALETTE.stoneLight, 10],
   ]);
-
-  // Two wheel ruts along the long axis that drift, thin, and break.
-  for (const lane of [-3, 2]) {
-    let drift = 0;
-    for (let x = 3; x < TILE_W - 3; x++) {
-      if ((x + variant) % 7 === 0) drift = Math.max(-2, Math.min(2, drift + rng.int(-1, 1)));
-      if (rng.chance(0.24)) continue;
-      const y = Math.round(TILE_H / 2 + lane + drift);
-      if (inTile(x, y)) r.set(x, y, PALETTE.dirtDark);
-      if (rng.chance(0.3) && inTile(x, y - 1)) r.set(x, y - 1, PALETTE.dirtBase);
-    }
-  }
 
   const stones = rng.int(3, 5);
   for (let i = 0; i < stones; i++) {
@@ -335,15 +355,128 @@ function roadTile(r: Raster, rng: Rng, variant: number): void {
       }
     }
   }
+}
 
-  // Weeds take the crown and the verges wherever the wheels stopped running.
-  const weeds = rng.int(5, 8);
-  for (let i = 0; i < weeds; i++) {
+/**
+ * Distance across a road running along one map axis, in screen pixels, measured
+ * from the line joining the two edge midpoints the road passes through: 0 on the
+ * crown, ±16 at the tile's far corners.
+ *
+ * Both lines are continuous across tiles by construction — the neighbour tile
+ * along the road is drawn at (±32, +16), which maps the same line onto itself —
+ * so ruts, crown and verges thread from tile to tile instead of restarting.
+ */
+function acrossRoad(x: number, y: number, axis: 'x' | 'y'): number {
+  return axis === 'x' ? y - x / 2 : y + x / 2 - 32;
+}
+
+/** Weeds and stray tufts, denser toward the untravelled margins of the tile. */
+function roadWeeds(r: Raster, rng: Rng, count: number, margin: (x: number, y: number) => number): void {
+  for (let i = 0; i < count; i++) {
     const [x, y] = samplePoint(rng);
+    if (rng.next() > margin(x, y)) continue;
     r.set(x, y, PALETTE.grassDark);
-    if (rng.chance(0.5) && inTile(x, y - 1)) r.set(x, y - 1, PALETTE.grassBase);
+    if (rng.chance(0.55) && inTile(x, y - 1)) r.set(x, y - 1, PALETTE.grassBase);
     if (rng.chance(0.4) && inTile(x + 1, y)) r.set(x + 1, y, PALETTE.grassDark);
+    if (rng.chance(0.25) && inTile(x - 1, y)) r.set(x - 1, y, PALETTE.grassShadow);
   }
+}
+
+/**
+ * A road running along one map axis: a crown polished pale by traffic, two cart
+ * ruts either side of it that wander and break, damp shoulders, and weeds
+ * thickening toward the margins. The last variant is a stretch the traffic has
+ * nearly abandoned — grass has taken most of it back and only a thread of rut is
+ * left.
+ *
+ * The whole surface is a function of the across-road distance from a centre line
+ * that slides from `inOffset` at the entry edge midpoint to `outOffset` at the
+ * exit one. Both ends are shared with the neighbouring tile, so a run of these
+ * tiles draws ONE continuous track that meanders across the grid — neither of
+ * which the old per-tile dashes could do, and the reason a road used to read as
+ * churned mud ruled along a straightedge.
+ */
+function orientedRoadTile(
+  r: Raster, rng: Rng, variant: number, axis: RoadAxis, inOffset: number, outOffset: number,
+): void {
+  packedEarth(r, rng, variant);
+  const seed = hashString(`terr/road-${axis}/${inOffset}${outOffset}/${variant}`);
+  const overgrown = variant === ROAD_JOINT_VARIANTS - 1;
+  const enter = ROAD_OFFSETS[inOffset];
+  const leave = ROAD_OFFSETS[outOffset];
+
+  /** Centre of the track at a point `along` the tile (-16 entry .. +16 exit). */
+  const centre = (along: number): number => {
+    const t = Math.max(0, Math.min(1, (along + 16) / 32));
+    return enter + (leave - enter) * t * t * (3 - 2 * t);
+  };
+
+  for (let y = 0; y < TILE_H; y++) {
+    const row = diamondRow(y, TILE_W, TILE_H);
+    if (!row) continue;
+    for (let x = row[0]; x < row[1]; x++) {
+      const d = acrossRoad(x, y, axis) - centre(x - 32);
+      const grain = pixelHash(seed, x, y);
+      // crown: the middle of the track is worn smooth and pale
+      if (Math.abs(d) < 5.5 && grain > (overgrown ? 0.62 : 0.26)) r.set(x, y, PALETTE.dirtPale);
+      // shoulders: damp shaded earth where the wheels never run, broken up so the
+      // track is not outlined by a solid band
+      else if (Math.abs(d) > 10.5 && grain > 0.55 + valueNoise(seed ^ 0x3b, (x - 32) / 7) * 0.2) {
+        r.set(x, y, PALETTE.dirtBase);
+      }
+      if (Math.abs(d) > 13.5 && grain > 0.78) r.set(x, y, PALETTE.dirtDark);
+    }
+  }
+
+  // Two cart ruts, each wandering about its own lane on top of the track's own
+  // meander. Their wander tapers to zero at both edge midpoints, so the rut
+  // leaving one tile is the rut entering the next.
+  for (const lane of [-6, 4.5]) {
+    for (let step = 0; step <= 68; step++) {
+      const along = step / 2 - 17;
+      const taper = Math.max(0, 1 - Math.abs(along) / 17);
+      const wander = valueNoise(seed ^ (lane < 0 ? 0x11 : 0x77), along / 4.5) * 2.6 * taper;
+      const d = centre(along) + lane + wander;
+      const x = 32 + along;
+      const y = axis === 'x' ? x / 2 + d : 32 - x / 2 + d;
+      if (!inTile(x, y)) continue;
+      const grain = pixelHash(seed ^ 0x2f, step, Math.round(d * 4));
+      if (grain < (overgrown ? 0.62 : 0.3)) continue; // the rut thins out and picks up again
+      r.set(x, y, PALETTE.dirtDark);
+      if (grain > 0.82 && inTile(x, y - 1)) r.set(x, y - 1, PALETTE.dirtBase);
+      if (grain > 0.94 && inTile(x + 1, y)) r.set(x + 1, y, PALETTE.dirtDark);
+    }
+  }
+
+  roadWeeds(r, rng, overgrown ? 32 : 11, (x, y) => {
+    const d = Math.abs(acrossRoad(x, y, axis) - centre(x - 32));
+    if (overgrown) return d < 5 ? 0.35 : 0.9;
+    return d < 6 ? 0.08 : d < 11 ? 0.3 : 0.62;
+  });
+}
+
+/**
+ * The junction tile: a crossroads, a corner, or a widening where no single run
+ * direction wins. Scuffed in every direction rather than ruled by one pair of
+ * ruts, so it joins whatever meets it.
+ */
+function roadTile(r: Raster, rng: Rng, variant: number): void {
+  packedEarth(r, rng, variant);
+  const seed = hashString(`terr/road/${variant}`);
+  for (const axis of ['x', 'y'] as const) {
+    for (let step = 0; step <= 34; step++) {
+      const along = step - 17;
+      const x = 32 + along;
+      const y = axis === 'x' ? x / 2 : 32 - x / 2;
+      for (const lane of [-6, 4.5]) {
+        const py = y + lane;
+        if (!inTile(x, py)) continue;
+        if (pixelHash(seed ^ (axis === 'x' ? 0x5 : 0xb), step, lane) < 0.45) continue;
+        r.set(x, py, PALETTE.dirtBase);
+      }
+    }
+  }
+  roadWeeds(r, rng, 10, () => 0.5);
 }
 
 function farmlandTile(r: Raster, _rng: Rng, variant: number): void {
@@ -543,6 +676,47 @@ const PRESENTATION_PAINTERS: Record<string, (r: Raster, rng: Rng, variant: numbe
   ford: fordTile,
 };
 
+const VERGE_COLORS: Record<string, Array<[RGB, number]>> = {
+  grass: [[PALETTE.grassDark, 45], [PALETTE.grassBase, 30], [PALETTE.grassShadow, 25]],
+  dirt: [[PALETTE.dirtBase, 55], [PALETTE.dirtDark, 45]],
+  sand: [[PALETTE.dirtPale, 60], [PALETTE.thatchLight, 40]],
+  snow: [[PALETTE.highlight, 60], [PALETTE.stonePale, 40]],
+};
+
+/**
+ * The neighbour terrain reclaiming the edge of a road tile: a noise-broken tongue
+ * a few pixels deep, thinning inward, with tufts reaching further. Painted over
+ * the road's own surface, so the two terrains interlock instead of meeting on a
+ * ruled line — the road bleeds out, the verge bites back.
+ */
+function vergeFrame(lo: string, edge: Edge, variant: number): Raster {
+  const r = new Raster(TILE_W, TILE_H);
+  const seed = hashString(`terr/verge/${lo}/${edge}/${variant}`);
+  const depth = VERGE_REACH[variant];
+  const weights = VERGE_COLORS[lo];
+  const total = weights.reduce((sum, [, w]) => sum + w, 0);
+  for (let y = 0; y < TILE_H; y++) {
+    for (let x = 0; x < TILE_W; x++) {
+      if (!inTile(x, y)) continue;
+      const t = edgeDepth(x, y, edge);
+      const along = edgeAlong(x, y, edge);
+      const taper = Math.max(0, 1 - Math.abs(along) / 16);
+      const reach = depth + taper * (
+        valueNoise(seed, along / 4.5) * 2.4 + valueNoise(seed ^ 0x77a1, along / 1.6) * 1.1
+      );
+      if (t > reach) continue;
+      const grain = pixelHash(seed, x, y);
+      if (grain > 0.96 - 0.7 * (t / Math.max(1, reach))) continue; // thins inward
+      let roll = pixelHash(seed ^ 0x3c5b, x, y) * total;
+      for (const [c, w] of weights) {
+        roll -= w;
+        if (roll <= 0) { r.set(x, y, c); break; }
+      }
+    }
+  }
+  return r;
+}
+
 export function genTerrain(): FrameDef[] {
   const frames: FrameDef[] = [];
   const anchor = { x: TILE_W / 2, y: TILE_H / 2 };
@@ -558,6 +732,25 @@ export function genTerrain(): FrameDef[] {
       const r = new Raster(TILE_W, TILE_H);
       PRESENTATION_PAINTERS[spec.id](r, new Rng(`terr/${spec.id}/${v}`), v);
       frames.push({ name: `terr/${spec.id}/${v}`, raster: r, anchor });
+    }
+  }
+  for (const axis of ROAD_AXES) {
+    for (let inOffset = 0; inOffset < ROAD_OFFSETS.length; inOffset++) {
+      for (let outOffset = 0; outOffset < ROAD_OFFSETS.length; outOffset++) {
+        for (let v = 0; v < ROAD_JOINT_VARIANTS; v++) {
+          const raster = new Raster(TILE_W, TILE_H);
+          const name = `terr/road-${axis}/${inOffset}${outOffset}/${v}`;
+          orientedRoadTile(raster, new Rng(name), v, axis, inOffset, outOffset);
+          frames.push({ name, raster, anchor });
+        }
+      }
+    }
+  }
+  for (const lo of VERGE_TERRAINS) {
+    for (const edge of EDGES) {
+      for (let v = 0; v < VERGE_REACH.length; v++) {
+        frames.push({ name: `terr/verge/${lo}/${edge}/${v}`, raster: vergeFrame(lo, edge, v), anchor });
+      }
     }
   }
   for (const [hiId, loId] of edgePairs()) {

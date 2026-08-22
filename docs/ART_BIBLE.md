@@ -174,7 +174,7 @@ picking variants per-coordinate hash at runtime.
 | `water` | `waterBase` | 3 horizontal shimmer bands: rows y=8/16/24 dashed `waterLight` (dash 4 px, gap 6 px, x-offset differs per variant); ~10 px `waterDeep` speckle below center; 1–2 single `highlight` sparkle px | 4 (band offsets shift +2 px per variant — tiling water looks alive without animation) |
 | `shallows` | `waterLight` | broad dithered sand/gravel bed patches (`dirtPale`/`dirtLight`) so the bottom is plainly visible, sparse `waterBase`/`stoneLight` speckle, 1–2 stones breaking the surface, broken `highlight` ripple bands | 3 |
 | `sand` | `dirtPale` | sparse earth/thatch flecks and short wind-ripple dashes | 3 |
-| `road` | `dirtLight` | an ancient track, never one flat tone: 4–5 dithered damp/dry patches (`dirtBase`/`dirtPale`), ~46 px earth+stone fleck, two wheel ruts along the long axis that drift ±2 px and break (~1 px in 4 missing), 3–5 loose stones, 1–2 potholes (`dirtDark` core, dithered `dirtBase` rim), 5–8 weed tufts (`grassDark`/`grassBase`) | 4 |
+| `road` | `dirtLight` | packed earth, never one flat tone: 4–5 dithered damp/dry patches (`dirtBase`/`dirtPale`), ~40 px earth+stone fleck, 3–5 loose stones, 1–2 potholes (`dirtDark` core, dithered `dirtBase` rim), weed tufts. This is the **junction** tile — a bend, a crossroads or a lone tile, scuffed in both directions. A road that runs draws from the oriented families instead (§3.3) | 4 |
 | `farmland` (under farm objects, optional) | `dirtBase` | plow rows: 1 px `dirtDark` lines parallel to the NW edge every 4 px, `dirtLight` line adjacent (furrow highlight) | 2 |
 | `snow` | `highlight` | cool stone/parchment speckle with short pale drift lines | 3 |
 | `cliff` (blocked) | `stoneDark` | raised `stoneBase`/`stoneLight` shelf over dark layered strata, broken seams, cracks, and stone flecks | 3 |
@@ -217,10 +217,13 @@ This reads as soft, hand-blended, organic edges at 1×.
 
 ### 3.3 Presentation-only tiles
 
-`ford` (`terr/ford/<variant>`, 4 variants) is not a sim `TerrainId`. The renderer draws it
-in place of a `shallows` tile that belongs to a crossing — a shallows region with land on
-both sides of one axis and water on both sides of the other, i.e. a shallow bar carrying a
-route from bank to bank (`fordTiles` in `packages/game/src/terrain.ts`).
+These families have no sim `TerrainId`. The renderer resolves them from the map and draws
+them in place of the terrain they stand for (`packages/game/src/terrain.ts`), so the sim,
+pathing, the minimap and replays never see them.
+
+**`ford`** (`terr/ford/<variant>`, 4 variants) replaces a `shallows` tile that belongs to a
+crossing — a shallows region with land on both sides of one axis and water on both sides of
+the other, i.e. a shallow bar carrying a route from bank to bank.
 
 Recipe: `waterLight` base; gravel bars laid on smooth value noise in the road's own earth
 tones (`dirtLight`/`dirtPale`, ~45% of the diamond) so the track reads as continuing under
@@ -229,10 +232,34 @@ the water; ~26 px `waterBase`/`stoneLight` speckle; 4–5 stepping stones (`ston
 `highlight` current lines. Water still covers most of the tile: a crossing must never read
 as dry ground standing in the middle of a river.
 
-The renderer applies one more presentation-only rule with no frames of its own: a share of
-the road tiles bordering open land draw as `dirt`, so a verge is ragged at tile granularity
-instead of running a straight full-strength line across the field. Road tiles within one
-tile of water are exempt — those are authored bridges and ford ramps.
+**`road-x` / `road-y`** (`terr/road-<axis>/<entry><exit>/<variant>`, 3 variants per joint)
+draw a road that RUNS, as opposed to the junction tile it turns or ends on. A road enters
+and leaves its tile at the midpoints of two opposite edges, and the neighbouring tile along
+the road is drawn at exactly (±32, +16) — which maps the line joining those midpoints onto
+itself. Everything is therefore authored against the across-road distance from that line:
+
+- a crown ~11 px wide polished pale (`dirtPale`) by traffic;
+- two cart ruts (`dirtDark`) at −6 and +4.5 px, each wandering ±2.6 px on value noise and
+  breaking (~30% of pixels missing, ~62% on the abandoned variant);
+- damp shoulders (`dirtBase`, `dirtDark` past 13.5 px), broken up by noise so the track is
+  never outlined by a solid band;
+- weeds thickening outward from the crown; the last variant is a stretch the traffic has
+  nearly abandoned, mostly grass with a thread of rut left.
+
+`entry` and `exit` index `ROAD_OFFSETS` (−4.5, 0, +4.5 px): where the track crosses into the
+neighbouring tile. The renderer derives both ends from the tile coordinates, so one tile's
+exit offset IS its neighbour's entry offset, and the whole road meanders across the grid as
+one continuous line. Ruts drawn per tile without this restart in every diamond and read as
+churned mud; a fixed centre line reads as ruled with a straightedge.
+
+**`verge`** (`terr/verge/<lo>/<edge>/<variant>`, `lo` ∈ grass/dirt/sand/snow, 3 depths) is
+the neighbour terrain creeping back OVER a road tile's edge: a noise-broken tongue
+(`VERGE_REACH` 2.4 / 4.0 / 6.8 px, wobbled ±3.5) thinning inward. Edge transitions only run
+high priority into low, so without it a road — the second-highest terrain there is — would
+be the one edge in the game nothing can encroach on, and a track nothing has encroached on
+is a track laid this morning. The renderer picks the depth from the tile's own meander: the
+flank the track swings away from is reclaimed deeper, so the bare earth is a ribbon that
+follows the road rather than a band of fixed width between two parallel lines.
 
 ---
 

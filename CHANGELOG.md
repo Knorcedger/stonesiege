@@ -18,12 +18,17 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Changed
 
-- Roads look their age. The road tile is now an uneven, rutted earth track — wandering wheel
-  ruts that fade in and out, potholes, loose stones, weeds on the verges — a step darker than
-  sand so a road running down to a river no longer merges into the bank. Every terrain border
-  wanders too: the baked edge fringes follow a noise-broken boundary with scattered outliers
-  instead of a straight three-band ramp, two variants are baked per pair and edge, and road
-  verges wear through to dirt tile by tile. No more ruler-straight, machine-cut terrain edges.
+- Roads look their age. A road that runs is now drawn as one continuous track rather than a
+  tile of hatching repeated down a line: a crown polished pale by traffic, two cart ruts that
+  wander and break, damp shoulders, weeds, and — the point — a centre line that meanders from
+  tile to tile, so the track wanders across the field instead of being ruled with a
+  straightedge. Bends, crossroads and dead ends get a scuffed junction tile. Grass, dirt, sand
+  and snow creep back over a road's verges, deeper on the side the track swings away from, so
+  the bare earth is a ribbon that follows the road rather than a band of fixed width. Road
+  earth is a step darker than sand, so a road running down to a river no longer merges into
+  the bank. Every other terrain border wanders too: the baked edge fringes follow a
+  noise-broken boundary with scattered outliers instead of a straight three-band ramp, with
+  two variants per pair and edge picked by tile. No more machine-cut terrain edges.
 - River crossings are visible as crossings. A shallows band that spans a channel now draws as
   a ford — a gravel causeway lying under shin-deep water, with stepping stones standing out of
   it — so a player following a road to the water can see where the army wades across. Deep
