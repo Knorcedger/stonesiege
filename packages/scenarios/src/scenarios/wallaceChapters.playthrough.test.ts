@@ -126,7 +126,12 @@ function play(scenario: ScenarioDef, driver: Driver, maxTicks = 80000) {
     return candidate && alive(candidate) ? candidate : undefined;
   };
   const nearestResource = (defId: string, x: number, y: number) => [...state.entities.values()]
-    .filter((candidate) => candidate.kind === 'resource' && candidate.defId === defId && alive(candidate))
+    // A chopped-out tree stays on the map as a stump: it is still a live 'tree'
+    // entity but holds nothing, and a gather order on it is silently dropped. Without
+    // the amount filter the driver keeps sending workers at the same dead stump and
+    // the economy stalls the moment the forest beside the base runs out.
+    .filter((candidate) => candidate.kind === 'resource' && candidate.defId === defId
+      && alive(candidate) && (candidate.amountLeft ?? 0) > 0)
     .sort((a, b) => (
       Math.abs(a.tileX - x) + Math.abs(a.tileY - y)
       - Math.abs(b.tileX - x) - Math.abs(b.tileY - y)
@@ -211,8 +216,25 @@ function economyDriver(options: {
 
     const villagers = context.mine('villager');
     const idle = () => villagers.filter((candidate) => candidate.activity === 'idle');
-    const availableBuilder = () => villagers.find((candidate) => candidate.activity !== 'building');
+    const availableBuilder = () => villagers.find((candidate) => (
+      candidate.activity !== 'building' && candidate.garrisonedIn === undefined
+    ));
     const townCenter = context.entity('townCenter');
+
+    // Ring the bell back once a raid has passed. Villagers that sheltered from an
+    // attack stay inside until a player sends them out, so without this the whole
+    // economy — and this proof — hangs behind whichever raid caught them working.
+    const sheltered = villagers.some((candidate) => candidate.sheltering);
+    const raiders = [...state.entities.values()].some((candidate) => (
+      candidate.kind === 'unit' && candidate.player > 1 && alive(candidate)
+      && Math.abs(candidate.tileX - options.base.x) <= 16
+      && Math.abs(candidate.tileY - options.base.y) <= 16
+    ));
+    if (townCenter && sheltered && !raiders) {
+      commands.push({ kind: 'townBell', player: 1, buildingId: townCenter.id });
+      const wallace = context.ref('wallace'); // back into cover: the bell empties the TC
+      if (wallace) commands.push({ kind: 'garrison', player: 1, units: [wallace.id], targetId: townCenter.id });
+    }
     const stock = state.players[1]!.stockpile;
     if (townCenter && villagers.length < options.villagers && stock.food >= 50 && (townCenter.trainQueue?.length ?? 0) < 2) {
       commands.push({ kind: 'train', player: 1, buildingId: townCenter.id, defId: 'villager' });
@@ -237,7 +259,15 @@ function economyDriver(options: {
           candidate.player === 1 && candidate.defId === defId && alive(candidate)
         )).length;
         if (existing >= required || !availableBuilder()) continue;
-        const placement = options.placements[defId]?.[existing - initial];
+        // Pick the first authored site that is actually vacant rather than indexing
+        // by count: when a raid razes a building the count no longer identifies which
+        // site is free, and the driver would re-order the same occupied plot forever.
+        const placement = options.placements[defId]?.find((site) => (
+          ![...state.entities.values()].some((candidate) => (
+            candidate.player === 1 && candidate.kind === 'building' && alive(candidate)
+            && candidate.tileX === site.x && candidate.tileY === site.y
+          ))
+        ));
         if (!placement) continue;
         const builder = availableBuilder()!;
         commands.push({

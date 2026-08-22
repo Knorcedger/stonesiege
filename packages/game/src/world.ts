@@ -2,27 +2,31 @@
 // animation, interpolation between the last two sim ticks, selection rings,
 // health bars, building construct states, fog-based hiding with remembered
 // building ghosts, damage-taken blink, villager carry icons, garrison count
-// badges, and gather-target highlights. Event-driven fx (projectiles, impact
+// badges, and worksite highlights. Event-driven fx (projectiles, impact
 // flashes, corpses, rubble, conversion beams) live in fx.ts.
 
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import {
   FP, GAIA, TICKS_PER_SECOND,
-  type Entity, type EntityId, type GameMap, type GameState, type PlayerId, type SimEvent,
+  type AgeId, type Entity, type EntityId, type GameMap, type GameState, type PlayerId,
+  type SimEvent,
 } from '@bf/sim/types';
 import { gameData, unitAggroRange } from '@bf/data';
-import type { GameAssets } from './assets';
+import type { GameAssets, ResolvedFrame } from './assets';
 import {
-  animForActivity, animFrameIndex, facingFromDelta, unitRig, villagerWorkAnim, type AnimName,
+  animForActivity, animFrameIndex, attackSwingFrameIndex, buildingFrameCandidates,
+  facingFromDelta, unitRig, villagerWorkAnim, UNSEEN_FARM_FRAME,
+  type AnimName, type BuildingArtChoice,
 } from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 import { getSettings } from './settings';
+import { tileVisibility } from './fog';
 import { PlayerResourceMemory } from './resourceMemory';
 
 const HIGHLIGHT = 0xf4eedd;
-const GATHER_HIGHLIGHT = 0xe6c04a;
+const AMBER_HIGHLIGHT = 0xe6c04a;
 const OUTLINE = 0x1a1208;
 const HP_GREEN = 0x3e8c34;
 const HP_YELLOW = 0xd4a82a;
@@ -30,6 +34,7 @@ const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
 const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
+const GHOST_ALPHA = 0.8;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
@@ -37,6 +42,7 @@ const OCCLUDER_ALPHA = 0.8;
 const GATE_OPEN_RADIUS_FP = 2 * FP;
 const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
 interface ArtScale { x: number; y: number }
+const NO_ART_SCALE: ArtScale = { x: 1, y: 1 };
 const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
   // Wall endpoints stay close to one mechanical tile while the masonry grows
   // vertically to building scale. Uniform 2.25x scaling made every segment
@@ -47,6 +53,68 @@ const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
   guardTower: { x: 2.72, y: 2.72 },
   keep: { x: 2.95, y: 2.95 },
 };
+
+/**
+ * The Town Center age crescendo. Its four authored frames were fitted
+ * independently — the Dark Age hall is the bespoke 576x416 hero render while
+ * Feudal/Castle/Imperial are cutouts fitted into the systemic 512x368 building
+ * canvas — so the artwork drawn on screen was 253 / 159 / 208 / 216 px wide and
+ * ageing up visibly SHRANK the civic centre.
+ *
+ * These factors normalize the four frames against each other so the hall grows
+ * with every age instead: 210 / 223 / 237 / 251 px wide over a 256 px (4-tile)
+ * footprint, with the silhouette rising 156 -> 193 -> 196 -> 203 px. Every age
+ * still draws its texture below 1:1, so none of them is upsampled into softness.
+ */
+const AGE_ART_SCALE: Readonly<Record<string, Readonly<Record<AgeId, number>>>> = {
+  townCenter: { dark: 0.83, feudal: 1.4, castle: 1.14, imperial: 1.16 },
+  // The house ships four per-age frames that are the same 82x85 picture, so
+  // ageing up left the town's housing untouched — and that picture fills only
+  // 64% of its 2x2 plot, against 77-80% for every other size-2 building. The
+  // crescendo starts the Dark Age hut at its peers' floor (92px, 72%) and ends
+  // Imperial just above their ceiling (109px, 85%), so packed housing rows keep
+  // visible gaps. Authored per-age house art would replace this outright.
+  house: { dark: 1.12, feudal: 1.19, castle: 1.26, imperial: 1.33 },
+};
+
+const AGE_VARIANT_FRAME = /^bld\/(\w+)\/(dark|feudal|castle|imperial)\/done$/;
+/** Construction stages and rubble: authored at footprint size, never rescaled. */
+const FOOTPRINT_SIZED_FRAME = /\/(construct\d+|rubble)$/;
+
+/**
+ * Art-to-mechanics scale for the frame actually resolved for an entity — the one
+ * rule shared by the live sprite, the fog ghost and the placement preview, which
+ * each used to scale the same artwork differently (#116).
+ *
+ * Both tables correct *finished* artwork only, which is the only artwork that
+ * was authored off-footprint. Every building authors its construction stages at
+ * exactly its footprint width and its rubble at 72-74% of it, so those frames
+ * take no scale at all: a keep's 2.95x tower factor turned its 64px foundation
+ * into a 189px sprawl across three tiles, and would have piled its debris two
+ * tiles wide the moment rubble was routed through here (#134).
+ *
+ * Keyed on the resolved frame name, not on the owner's age, so a fallback frame
+ * is never scaled by a variant's factor.
+ */
+export function artScaleForFrame(defId: string, frameName: string): ArtScale {
+  if (FOOTPRINT_SIZED_FRAME.test(frameName)) return NO_ART_SCALE;
+  const variant = AGE_VARIANT_FRAME.exec(frameName);
+  const byAge = variant ? AGE_ART_SCALE[variant[1]]?.[variant[2] as AgeId] : undefined;
+  if (byAge !== undefined) return { x: byAge, y: byAge };
+  return FORTIFICATION_ART_SCALE[defId] ?? NO_ART_SCALE;
+}
+
+/**
+ * y-sort rank for a piece of world artwork. Flat things (farms, stage-0
+ * foundations) sort under everything else; gatehouses render over their
+ * immediately adjacent wall caps, since a later-sorted wall hides half the arch
+ * and makes it read as a breach. `progress` is undefined for anything that is
+ * not a building.
+ */
+export function artZIndex(defId: string, progress: number | undefined, worldY: number): number {
+  if (defId === 'farm' || (progress !== undefined && progress < 250)) return worldY - 4000;
+  return worldY + (defId === 'gate' ? HALF_H + 1 : 0);
+}
 
 /**
  * The wall sheet is authored along the screen's NW→SE isometric axis. Mirror the
@@ -96,14 +164,98 @@ export function advanceGateOpenProgress(current: number, open: boolean, elapsedT
   return Math.max(0, Math.min(1, current + direction * Math.max(0, elapsedTicks) / GATE_OPEN_TICKS));
 }
 
-interface EntityView {
-  root: Container;
-  ring: Graphics;
+/**
+ * What a selected villager is working on, for the amber worksite ring.
+ *
+ * `intent` is the durable record of the order and covers the whole job — the
+ * walk over included — so a build or repair site stays ringed from the moment
+ * the order lands until the sim clears the intent. Gathering keeps its
+ * activity fallback because a laden villager walking to a drop site still
+ * belongs to the resource it came from.
+ */
+export function villagerWorkTarget(e: Entity): EntityId | undefined {
+  const intent = e.intent;
+  if (intent && (intent.kind === 'gather' || intent.kind === 'build' || intent.kind === 'repair')) {
+    return intent.targetId;
+  }
+  if (e.activity === 'gathering' || e.activity === 'carrying') return e.targetId;
+  return undefined;
+}
+
+/**
+ * The four display objects a building's artwork needs: the sprite, plus the
+ * mirrored half and the two masks that turn an L-shaped stone-wall junction into
+ * a real corner. Both the live view and the fog ghost supply them, so both draw
+ * a remembered wall exactly the same way.
+ */
+interface WallJoinedArt {
+  sprite: Sprite;
   /** Perpendicular half-segment used only for a true L-shaped wall corner. */
   cornerSprite: Sprite;
   cornerPrimaryMask: Graphics;
   cornerSecondaryMask: Graphics;
-  sprite: Sprite;
+}
+
+/** Half-plane mask in root-local space: screenSide -1 keeps the left half. */
+function drawHalfMask(mask: Graphics, screenSide: -1 | 1): void {
+  mask.clear();
+  mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
+}
+
+/**
+ * Put one resolved building frame on a sprite pair at the drawn size the game
+ * uses for it, corner join included. The live sprite and the fog ghost both go
+ * through here: a remembered wall that skipped this drew one straight segment
+ * where the live wall draws two masked halves.
+ */
+function applyBuildingArt(
+  art: WallJoinedArt,
+  frame: ResolvedFrame,
+  artScale: ArtScale,
+  mirrorWall: boolean,
+  corner: WallCornerJoin | undefined,
+): void {
+  art.sprite.texture = frame.texture;
+  art.sprite.anchor.set(frame.anchorX, frame.anchorY);
+  const mirrorX = frame.mirrored !== mirrorWall;
+  art.sprite.scale.set(
+    mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
+    frame.renderScale * artScale.y,
+  );
+
+  if (!corner) {
+    art.cornerSprite.visible = false;
+    art.sprite.mask = null;
+    art.cornerSprite.mask = null;
+    art.cornerPrimaryMask.clear();
+    art.cornerSecondaryMask.clear();
+    return;
+  }
+  art.cornerSprite.texture = frame.texture;
+  art.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
+  art.cornerSprite.scale.set(-art.sprite.scale.x, art.sprite.scale.y);
+  art.cornerSprite.visible = true;
+  // +tileX projects down-right; +tileY projects down-left.
+  drawHalfMask(art.cornerPrimaryMask, corner.xDir);
+  drawHalfMask(art.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
+  art.sprite.mask = art.cornerPrimaryMask;
+  art.cornerSprite.mask = art.cornerSecondaryMask;
+}
+
+/** Cache key for the resolved artwork: anything here changes what is drawn. */
+export function buildingArtKey(
+  candidates: readonly string[],
+  colorIdx: number | undefined,
+  mirrorWall: boolean,
+  corner: WallCornerJoin | undefined,
+): string {
+  const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
+  return `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
+}
+
+export interface EntityView extends WallJoinedArt {
+  root: Container;
+  ring: Graphics;
   /** Independent gate leaf/portcullis layer, drawn behind the permanent arch. */
   gateDoor: Sprite;
   gateOpenProgress: number;
@@ -146,7 +298,7 @@ export function shouldFadeForUnit(
     && unit.bottom > occluder.top && unit.top < occluder.bottom;
 }
 
-function spriteWorldRect(view: EntityView): WorldRect {
+function writeSpriteWorldRect(view: EntityView, out: WorldRect): WorldRect {
   const sprite = view.sprite;
   const width = sprite.texture.width;
   const height = sprite.texture.height;
@@ -154,29 +306,64 @@ function spriteWorldRect(view: EntityView): WorldRect {
   const x1 = (1 - sprite.anchor.x) * width * sprite.scale.x;
   const y0 = (0 - sprite.anchor.y) * height * sprite.scale.y;
   const y1 = (1 - sprite.anchor.y) * height * sprite.scale.y;
-  return {
-    left: view.root.position.x + Math.min(x0, x1),
-    right: view.root.position.x + Math.max(x0, x1),
-    // Ignore transparent texture headroom so nearby units do not cause false fades.
-    top: view.root.position.y + Math.max(Math.min(y0, y1), view.spriteTopPx),
-    bottom: view.root.position.y + Math.max(y0, y1),
-  };
+  out.left = view.root.position.x + Math.min(x0, x1);
+  out.right = view.root.position.x + Math.max(x0, x1);
+  // Ignore transparent texture headroom so nearby units do not cause false fades.
+  out.top = view.root.position.y + Math.max(Math.min(y0, y1), view.spriteTopPx);
+  out.bottom = view.root.position.y + Math.max(y0, y1);
+  return out;
 }
 
-function unitWorldRect(view: EntityView): WorldRect {
-  const bounds = spriteWorldRect(view);
+/** Exported for the differential test that pins the occluder-fade broad phase. */
+export function spriteWorldRect(view: EntityView): WorldRect {
+  return writeSpriteWorldRect(view, { left: 0, right: 0, top: 0, bottom: 0 });
+}
+
+function writeUnitWorldRect(view: EntityView, out: WorldRect): WorldRect {
+  writeSpriteWorldRect(view, out);
   // A unit's readable body is centred around its feet. Keeping the horizontal
   // extent bounded prevents transparent cavalry-sheet gutters from fading a
   // building when the horse is merely beside it.
-  const halfWidth = Math.min(24, Math.max(7, (bounds.right - bounds.left) * 0.4));
-  return {
-    left: view.root.position.x - halfWidth,
-    right: view.root.position.x + halfWidth,
-    top: bounds.top,
-    bottom: view.root.position.y + 2,
-  };
+  const halfWidth = Math.min(24, Math.max(7, (out.right - out.left) * 0.4));
+  out.left = view.root.position.x - halfWidth;
+  out.right = view.root.position.x + halfWidth;
+  out.bottom = view.root.position.y + 2;
+  return out;
 }
 
+/** Exported for the differential test that pins the occluder-fade broad phase. */
+export function unitWorldRect(view: EntityView): WorldRect {
+  return writeUnitWorldRect(view, { left: 0, right: 0, top: 0, bottom: 0 });
+}
+
+/** Screen-space bucket edge (world px) for the occluder-fade broad phase. */
+const FADE_CELL = 128;
+/** Row stride for packing a (cellX, cellY) pair into one numeric bucket key. */
+const FADE_BUCKET_STRIDE = 1 << 16;
+/**
+ * Margins (world px) around the camera view inside which entities still render.
+ * Sprites are anchored at their feet and drawn upward, so the geometry is not
+ * symmetric: artwork whose feet sit below the viewport can still reach up into
+ * it by its full height, while artwork whose feet sit above the viewport is
+ * already entirely off-screen.
+ *
+ * The tallest frame the atlases can produce measures ~700 world px once its
+ * fortification art scale is applied (an HD keep), and the widest ~640 px (a
+ * wonder), so these margins clear the real worst case with room for larger art
+ * later. Over-padding only means a few extra off-screen updates; under-padding
+ * means visible pop-in, so they lean generous.
+ */
+const CULL_PAD_BELOW = 1024;
+const CULL_PAD_ABOVE = 128;
+const CULL_PAD_SIDE = 512;
+
+/**
+ * What a building looked like the last time it was actually seen. Everything the
+ * live sprite derives from the entity has to be captured here, or the ghost
+ * drifts from the building the player scouted (#116): an upgraded tower kept its
+ * old art forever, a wall run lost its mirroring, and a foundation was
+ * remembered as a finished building.
+ */
 interface GhostRecord {
   defId: string;
   player: PlayerId;
@@ -185,6 +372,14 @@ interface GhostRecord {
   wx: number;
   wy: number;
   age: string;
+  progress: number;
+  mirrored: boolean;
+  corner: WallCornerJoin | undefined;
+}
+
+interface GhostView extends WallJoinedArt {
+  root: Container;
+  lastFrameKey: string;
 }
 
 export interface PickResult {
@@ -202,7 +397,7 @@ export class WorldLayer {
   private aggroLayer = new Container();
   private aggroViews = new Map<EntityId, { graphic: Graphics; range: number }>();
   private views = new Map<EntityId, EntityView>();
-  private ghostViews = new Map<EntityId, Sprite>();
+  private ghostViews = new Map<EntityId, GhostView>();
   private ghosts = new Map<EntityId, GhostRecord>();
   /** Rally flag markers for selected own production buildings (GDD: rally shown as a flag). */
   private rallyFlags = new Graphics();
@@ -216,8 +411,24 @@ export class WorldLayer {
   private frameCounts = new Map<string, number>();
   /** entityId -> tick until which the damage-taken red blink lasts. */
   private damagedUntil = new Map<EntityId, number>();
+  /** attackerId -> tick of its last blow, so one swing plays per attack (not a loop). */
+  private lastSwingTick = new Map<EntityId, number>();
   /** Resource/target ids highlighted because selected villagers gather them. */
-  private gatherTargets = new Set<EntityId>();
+  private workTargets = new Set<EntityId>();
+  // Scratch buffers for the occluder-fade broad phase, reused every frame so the
+  // pass allocates nothing per entity.
+  private fadeUnitRects: WorldRect[] = [];
+  private fadeUnitDepths: number[] = [];
+  private fadeBuckets = new Map<number, number[]>();
+  private fadeTested: number[] = [];
+  private fadePass = 0;
+  private fadeOccluderRect: WorldRect = { left: 0, right: 0, top: 0, bottom: 0 };
+  /** Sim tick the resource memory was last refreshed for (-1 = never). */
+  private resourceMemoryTick = -1;
+  private readonly seenScratch = new Set<EntityId>();
+  /** Views of the units drawn this frame — the fade pass reads nothing else. */
+  private readonly visibleUnitsScratch: EntityView[] = [];
+  private readonly posScratch = { x: 0, y: 0 };
 
   constructor(
     private assets: GameAssets,
@@ -233,10 +444,23 @@ export class WorldLayer {
 
   /** Snapshot positions at each tick boundary (for interpolation). */
   onTick(state: GameState): void {
+    // Ping-pong the two position maps and refill the recycled one in place.
+    // Building a fresh Map plus a point object per entity every tick allocated
+    // thousands of short-lived objects a second on a populated map, for values
+    // that are simply overwritten.
+    const recycled = this.prevPos;
     this.prevPos = this.curPos;
-    const next = new Map<EntityId, { x: number; y: number }>();
-    for (const e of state.entities.values()) next.set(e.id, { x: e.x, y: e.y });
-    this.curPos = next;
+    this.curPos = recycled;
+    const cur = this.curPos;
+    for (const id of cur.keys()) {
+      if (!state.entities.has(id)) cur.delete(id);
+    }
+    for (const e of state.entities.values()) {
+      const point = cur.get(e.id);
+      // The maps never share point objects, so overwriting `cur` cannot disturb
+      // the previous tick's positions that interpolation reads from `prevPos`.
+      if (point) { point.x = e.x; point.y = e.y; } else cur.set(e.id, { x: e.x, y: e.y });
+    }
     this.mirroredWalls = mirroredWallIds(state.entities.values());
     this.wallCorners = wallCornerJoins(state.entities.values());
   }
@@ -246,18 +470,29 @@ export class WorldLayer {
       if (ev.kind === 'attackImpact') {
         // damage-taken red blink (~4 ticks); the impact flash itself is fx.ts
         this.damagedUntil.set(ev.targetId, tick + 4);
+        // melee: the blow IS the swing — start the attacker's animation cycle here
+        if (ev.melee) this.lastSwingTick.set(ev.attackerId, tick);
+      } else if (ev.kind === 'projectileFired') {
+        this.lastSwingTick.set(ev.fromId, tick); // ranged: the loose, not the impact
       }
     }
   }
 
   /** Main per-frame update. tickFloat = state.tick + alpha. */
-  update(state: GameState, alpha: number, tickFloat: number): void {
-    this.resourceMemory.refresh(state);
+  update(
+    state: GameState,
+    alpha: number,
+    tickFloat: number,
+    worldView?: { x0: number; y0: number; x1: number; y1: number },
+  ): void {
+    this.syncResourceMemory(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
-    const seen = new Set<EntityId>();
-    this.refreshGatherTargets(state);
+    const seen = this.seenScratch;
+    seen.clear();
+    this.refreshWorkTargets(state);
     this.refreshOpenGates(state);
-    const visibleUnits: Array<{ entity: Entity; view: EntityView }> = [];
+    const visibleUnits = this.visibleUnitsScratch;
+    visibleUnits.length = 0;
 
     for (const e of state.entities.values()) {
       seen.add(e.id);
@@ -269,13 +504,15 @@ export class WorldLayer {
       }
 
       const displayed = this.resourceMemory.entityFor(state, e);
-      const visible = displayed !== null && (
-        displayed.player === this.humanPlayer
-        || (displayed.kind === 'resource' ? true : tileVis === 2)
-      );
+      const visible = displayed !== null
+        && !isHiddenInHost(displayed)
+        && (
+          displayed.player === this.humanPlayer
+          || (displayed.kind === 'resource' ? true : tileVis === 2)
+        );
 
       let view = this.views.get(e.id);
-      if (!visible) {
+      if (!visible || this.offCamera(displayed, alpha, worldView)) {
         if (view) view.root.visible = false;
         continue;
       }
@@ -285,13 +522,19 @@ export class WorldLayer {
       }
       view.root.visible = true;
       this.updateView(state, displayed!, view, alpha, tickFloat);
-      if (displayed!.kind === 'unit' && displayed!.hp > 0 && displayed!.activity !== 'dying'
-        && displayed!.garrisonedIn === undefined) visibleUnits.push({ entity: displayed!, view });
+      // Garrisoned occupants never reach here: they are hidden above.
+      if (displayed!.kind === 'unit' && displayed!.hp > 0 && displayed!.activity !== 'dying') {
+        visibleUnits.push(view);
+      }
     }
 
     for (const remembered of this.resourceMemory.hiddenMissing(state)) {
       seen.add(remembered.id);
       let view = this.views.get(remembered.id);
+      if (this.offCamera(remembered, alpha, worldView)) {
+        if (view) view.root.visible = false;
+        continue;
+      }
       if (!view) {
         view = this.createView();
         this.views.set(remembered.id, view);
@@ -380,28 +623,26 @@ export class WorldLayer {
       // player-color ownership banner attached to production buildings.
       this.rallyFlags
         .ellipse(s.x, s.y, 14, 7)
-        .fill({ color: GATHER_HIGHLIGHT, alpha: 0.16 })
+        .fill({ color: AMBER_HIGHLIGHT, alpha: 0.16 })
         .stroke({ width: 2, color: OUTLINE });
-      this.rallyFlags.ellipse(s.x, s.y, 11, 5).stroke({ width: 1.5, color: GATHER_HIGHLIGHT });
+      this.rallyFlags.ellipse(s.x, s.y, 11, 5).stroke({ width: 1.5, color: AMBER_HIGHLIGHT });
       this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 3, color: OUTLINE });
-      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 1, color: GATHER_HIGHLIGHT });
+      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 1, color: AMBER_HIGHLIGHT });
       this.rallyFlags
         .poly([s.x, s.y - 32, s.x + 22, s.y - 27, s.x, s.y - 20])
-        .fill(GATHER_HIGHLIGHT)
+        .fill(AMBER_HIGHLIGHT)
         .stroke({ width: 1.5, color: OUTLINE });
     }
   }
 
   /** Targets of the currently selected villagers (GDD: gather target highlights). */
-  private refreshGatherTargets(state: GameState): void {
-    this.gatherTargets.clear();
+  private refreshWorkTargets(state: GameState): void {
+    this.workTargets.clear();
     for (const id of this.selection) {
       const e = state.entities.get(id);
       if (!e || e.kind !== 'unit' || e.player !== this.humanPlayer || e.defId !== 'villager') continue;
-      const target = e.intent?.kind === 'gather'
-        ? e.intent.targetId
-        : (e.activity === 'gathering' || e.activity === 'carrying') ? e.targetId : undefined;
-      if (target !== undefined) this.gatherTargets.add(target);
+      const target = villagerWorkTarget(e);
+      if (target !== undefined) this.workTargets.add(target);
     }
   }
 
@@ -428,11 +669,48 @@ export class WorldLayer {
 
   /** Interpolated world position of an entity. */
   entityWorldPos(e: Entity, alpha: number): { x: number; y: number } {
+    const p = this.readWorldPos(e, alpha);
+    return { x: p.x, y: p.y };
+  }
+
+  /**
+   * entityWorldPos into a shared scratch object. Called for every entity every
+   * frame, so the result must NOT be retained across calls — copy what you need.
+   *
+   * The isometric projection is inlined rather than delegated to tileToWorld
+   * because that helper returns a fresh Vec2, which would reintroduce exactly the
+   * per-entity allocation the scratch object exists to avoid. It must stay in step
+   * with tileToWorld; camera.test.ts pins that projection.
+   */
+  private readWorldPos(e: Entity, alpha: number): { x: number; y: number } {
     const prev = this.prevPos.get(e.id);
-    const cur = this.curPos.get(e.id) ?? { x: e.x, y: e.y };
-    const fx = prev ? prev.x + (cur.x - prev.x) * alpha : cur.x;
-    const fy = prev ? prev.y + (cur.y - prev.y) * alpha : cur.y;
-    return tileToWorld(fx / FP, fy / FP);
+    const cur = this.curPos.get(e.id);
+    const curX = cur ? cur.x : e.x;
+    const curY = cur ? cur.y : e.y;
+    const fx = prev ? prev.x + (curX - prev.x) * alpha : curX;
+    const fy = prev ? prev.y + (curY - prev.y) * alpha : curY;
+    const tx = fx / FP, ty = fy / FP;
+    this.posScratch.x = (tx - ty) * HALF_W;
+    this.posScratch.y = (tx + ty) * HALF_H;
+    return this.posScratch;
+  }
+
+  /**
+   * Off-screen entities keep their state but skip the whole per-frame view
+   * refresh. A walked-over map holds thousands of trees while only a screenful
+   * is ever on camera, and updating the rest cost more than everything the
+   * player can actually see. Omitting `worldView` disables culling entirely
+   * (tests and any caller without a camera).
+   */
+  private offCamera(
+    e: Entity | null,
+    alpha: number,
+    worldView?: { x0: number; y0: number; x1: number; y1: number },
+  ): boolean {
+    if (!worldView || !e) return false;
+    const p = this.readWorldPos(e, alpha);
+    return p.x < worldView.x0 - CULL_PAD_SIDE || p.x > worldView.x1 + CULL_PAD_SIDE
+      || p.y < worldView.y0 - CULL_PAD_ABOVE || p.y > worldView.y1 + CULL_PAD_BELOW;
   }
 
   /**
@@ -440,7 +718,7 @@ export class WorldLayer {
    * sorted by distance; the input layer applies GDD snap priority.
    */
   pickAt(state: GameState, wx: number, wy: number, slop: number): PickResult[] {
-    this.resourceMemory.refresh(state);
+    this.syncResourceMemory(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const results: PickResult[] = [];
     for (const e of state.entities.values()) {
@@ -495,10 +773,37 @@ export class WorldLayer {
 
   // ------------------------------------------------------------------ internals
 
+  /**
+   * Resource memory only ever changes when the sim advances: both of its inputs
+   * (the entity table and the player's visibility grid) are written during a tick.
+   * Rescanning every entity three times per tick at 60fps — and again on every tap
+   * through pickAt — was the single most expensive thing in the frame, so run it
+   * once per tick and reuse the result.
+   */
+  private syncResourceMemory(state: GameState): void {
+    if (state.tick === this.resourceMemoryTick) return;
+    this.resourceMemoryTick = state.tick;
+    this.resourceMemory.refresh(state);
+  }
+
   private tileVis(vis: Uint8Array | null, state: GameState, tx: number, ty: number): number {
-    if (!vis) return 2;
-    if (tx < 0 || ty < 0 || tx >= state.map.width || ty >= state.map.height) return 0;
-    return vis[ty * state.map.width + tx];
+    return tileVisibility(vis, state.map, tx, ty);
+  }
+
+  /** Ghost art needs the same four objects as a live building, minus the overlays. */
+  private createGhostView(): GhostView {
+    const root = new Container();
+    const sprite = new Sprite();
+    const cornerSprite = new Sprite();
+    const cornerPrimaryMask = new Graphics();
+    const cornerSecondaryMask = new Graphics();
+    cornerSprite.visible = false;
+    sprite.tint = GHOST_TINT;
+    cornerSprite.tint = GHOST_TINT;
+    root.alpha = GHOST_ALPHA;
+    root.addChild(cornerSprite, sprite, cornerPrimaryMask, cornerSecondaryMask);
+    this.container.addChild(root);
+    return { root, sprite, cornerSprite, cornerPrimaryMask, cornerSecondaryMask, lastFrameKey: '' };
   }
 
   private createView(): EntityView {
@@ -533,38 +838,102 @@ export class WorldLayer {
    */
   private fadeUnitOccluders(
     state: GameState,
-    visibleUnits: Array<{ entity: Entity; view: EntityView }>,
+    visibleUnits: EntityView[],
   ): void {
     if (visibleUnits.length === 0) return;
+
+    // Broad phase. The naive form tested every occluder against every unit and
+    // rebuilt each unit's rect inside that inner loop, so cost grew with
+    // occluders x army size (measurably ~3ms/frame at 23 units on a 120x120 map,
+    // and still climbing). Each unit rect is now built once and filed into a
+    // coarse world-space grid, so an occluder only ever tests the handful of
+    // units standing near it. The fade decision itself is unchanged.
+    const rects = this.fadeUnitRects;
+    const depths = this.fadeUnitDepths;
+    const buckets = this.fadeBuckets;
+    for (const cell of buckets.values()) cell.length = 0;
+    for (let i = 0; i < visibleUnits.length; i++) {
+      const unitView = visibleUnits[i];
+      const rect = rects[i] ?? (rects[i] = { left: 0, right: 0, top: 0, bottom: 0 });
+      writeUnitWorldRect(unitView, rect);
+      depths[i] = unitView.root.zIndex;
+      const cx0 = Math.floor(rect.left / FADE_CELL), cx1 = Math.floor(rect.right / FADE_CELL);
+      const cy0 = Math.floor(rect.top / FADE_CELL), cy1 = Math.floor(rect.bottom / FADE_CELL);
+      for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const key = cy * FADE_BUCKET_STRIDE + cx;
+          let cell = buckets.get(key);
+          if (!cell) { cell = []; buckets.set(key, cell); }
+          cell.push(i);
+        }
+      }
+    }
+
+    const occluderBounds = this.fadeOccluderRect;
+    const tested = this.fadeTested;
+    let pass = this.fadePass;
     for (const e of state.entities.values()) {
       if ((e.kind !== 'building' && e.kind !== 'resource') || e.hp <= 0) continue;
       const view = this.views.get(e.id);
       if (!view?.root.visible || !view.sprite.visible) continue;
       // Flat artwork does not conceal a unit and should not pulse as feet cross it.
       if (e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250)) continue;
-      const occluderBounds = spriteWorldRect(view);
-      const covered = visibleUnits.some(({ view: unitView }) => shouldFadeForUnit(
-        occluderBounds,
-        view.root.zIndex,
-        unitWorldRect(unitView),
-        unitView.root.zIndex,
-      ));
+      writeSpriteWorldRect(view, occluderBounds);
+      const depth = view.root.zIndex;
+      pass++;
+      let covered = false;
+      const cx0 = Math.floor(occluderBounds.left / FADE_CELL);
+      const cx1 = Math.floor(occluderBounds.right / FADE_CELL);
+      const cy0 = Math.floor(occluderBounds.top / FADE_CELL);
+      const cy1 = Math.floor(occluderBounds.bottom / FADE_CELL);
+      scan: for (let cy = cy0; cy <= cy1; cy++) {
+        for (let cx = cx0; cx <= cx1; cx++) {
+          const cell = buckets.get(cy * FADE_BUCKET_STRIDE + cx);
+          if (cell === undefined) continue;
+          for (let k = 0; k < cell.length; k++) {
+            const i = cell[k];
+            // A unit spanning several cells appears in each of them; the stamp
+            // keeps it to one rect test per occluder.
+            if (tested[i] === pass) continue;
+            tested[i] = pass;
+            if (shouldFadeForUnit(occluderBounds, depth, rects[i], depths[i])) {
+              covered = true;
+              break scan;
+            }
+          }
+        }
+      }
       if (!covered) continue;
       view.sprite.alpha *= OCCLUDER_ALPHA;
       view.cornerSprite.alpha *= OCCLUDER_ALPHA;
       view.gateDoor.alpha *= OCCLUDER_ALPHA;
     }
+    this.fadePass = pass;
+  }
+
+  /**
+   * First candidate that resolves wins; the last is resolved unconditionally so a
+   * genuinely missing frame surfaces the diagnosable placeholder rather than
+   * nothing. Returns the name that won, which is what the art scale keys on.
+   */
+  private resolveCandidates(
+    candidates: string[], colorIdx?: number,
+  ): { frame: ResolvedFrame; resolvedName: string } {
+    let resolvedName = candidates[candidates.length - 1];
+    let frame: ResolvedFrame | null = null;
+    for (let i = 0; i < candidates.length - 1 && !frame; i++) {
+      frame = this.assets.tryResolve(candidates[i], colorIdx);
+      if (frame) resolvedName = candidates[i];
+    }
+    return { frame: frame ?? this.assets.resolveFrame(resolvedName, colorIdx), resolvedName };
   }
 
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
-    const pos = this.entityWorldPos(e, alpha);
+    const pos = this.readWorldPos(e, alpha);
     view.root.position.set(Math.round(pos.x), Math.round(pos.y));
-    // flat things (farms, foundations-stage-0) sort under everything else
-    const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);
-    // Gatehouses render over their immediately adjacent wall caps; otherwise a
-    // later-sorted wall can hide half the arch and make it read as a breach.
-    const gateLayer = e.defId === 'gate' ? HALF_H + 1 : 0;
-    view.root.zIndex = flat ? pos.y - 4000 : pos.y + gateLayer;
+    view.root.zIndex = artZIndex(
+      e.defId, e.kind === 'building' ? e.buildProgress ?? 1000 : undefined, pos.y,
+    );
 
     const prev = this.prevPos.get(e.id);
     const cur = this.curPos.get(e.id);
@@ -593,47 +962,11 @@ export class WorldLayer {
     // former owner's palette until its next animation/facing transition.
     const mirrorWall = this.mirroredWalls.has(e.id);
     const corner = e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined;
-    const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
-    const key = `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
+    const key = buildingArtKey(candidates, colorIdx, mirrorWall, corner);
     if (key !== view.lastFrameKey) {
-      let frame = null;
-      let resolvedName = candidates[candidates.length - 1];
-      for (let i = 0; i < candidates.length - 1 && !frame; i++) {
-        frame = this.assets.tryResolve(candidates[i], colorIdx);
-        if (frame) resolvedName = candidates[i];
-      }
-      frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
-      view.sprite.texture = frame.texture;
-      view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? { x: 1, y: 1 };
-      const mirrorX = frame.mirrored !== mirrorWall;
-      view.sprite.scale.set(
-        mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
-        frame.renderScale * artScale.y,
-      );
-
-      if (corner) {
-        view.cornerSprite.texture = frame.texture;
-        view.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
-        view.cornerSprite.scale.set(-view.sprite.scale.x, view.sprite.scale.y);
-        view.cornerSprite.visible = true;
-
-        const drawHalfMask = (mask: Graphics, screenSide: -1 | 1): void => {
-          mask.clear();
-          mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
-        };
-        // +tileX projects down-right; +tileY projects down-left.
-        drawHalfMask(view.cornerPrimaryMask, corner.xDir);
-        drawHalfMask(view.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
-        view.sprite.mask = view.cornerPrimaryMask;
-        view.cornerSprite.mask = view.cornerSecondaryMask;
-      } else {
-        view.cornerSprite.visible = false;
-        view.sprite.mask = null;
-        view.cornerSprite.mask = null;
-        view.cornerPrimaryMask.clear();
-        view.cornerSecondaryMask.clear();
-      }
+      const { frame, resolvedName } = this.resolveCandidates(candidates, colorIdx);
+      const artScale = artScaleForFrame(e.defId, resolvedName);
+      applyBuildingArt(view, frame, artScale, mirrorWall, corner);
 
       const doorFrame = gateOperational && resolvedName === 'bld/gate/open'
         ? this.assets.tryResolve('bld/gate/door', colorIdx)
@@ -785,6 +1118,16 @@ export class WorldLayer {
       }
       return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/0`], alpha: 1 };
     }
+    // A fighting unit swings once per attack, not on a free 0.5 s loop: sync the
+    // cycle to the blow the sim actually landed (or the arrow it loosed) and hold
+    // the ready pose in between. Healing/converting monks and villager work keep
+    // their own looping cadence — only `attacking` is rate-of-fire bound.
+    const swingTick = e.activity === 'attacking' ? this.lastSwingTick.get(e.id) : undefined;
+    if (swingTick !== undefined && anim === 'attack') {
+      const swingAge = (tickFloat - Math.max(swingTick, view.animStartTick)) / TICKS_PER_SECOND;
+      const swingFrame = attackSwingFrameIndex(swingAge, count);
+      return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/${swingFrame}`], alpha: 1 };
+    }
     const ageSec = (tickFloat - view.animStartTick) / TICKS_PER_SECOND;
     const frame = animFrameIndex(anim, ageSec, count);
     return { candidates: [`${prefix}/${spriteId}/${anim}/${view.renderFacing}/${frame}`], alpha: 1 };
@@ -792,14 +1135,15 @@ export class WorldLayer {
 
   private drawRing(e: Entity, view: EntityView): void {
     const selected = this.selection.has(e.id);
-    // gather-target highlight: amber ring on what the selected villagers work
-    const highlighted = !selected && this.gatherTargets.has(e.id);
+    // worksite highlight: amber ring on whatever the selected villagers work —
+    // a resource being gathered, or a foundation being built or repaired
+    const highlighted = !selected && this.workTargets.has(e.id);
     const key = selected ? `1:${e.kind}:${e.defId}` : highlighted ? `h:${e.kind}:${e.defId}` : '';
     if (key === view.lastRingKey) return;
     view.lastRingKey = key;
     view.ring.clear();
     if (!selected && !highlighted) return;
-    const color = selected ? HIGHLIGHT : GATHER_HIGHLIGHT;
+    const color = selected ? HIGHLIGHT : AMBER_HIGHLIGHT;
     if (e.kind === 'building') {
       const size = gameData.buildings[e.defId]?.size ?? 1;
       const hw = size * HALF_W;
@@ -875,6 +1219,9 @@ export class WorldLayer {
       wx: pos.x,
       wy: pos.y,
       age: state.players[e.player]?.age ?? 'dark',
+      progress: e.buildProgress ?? 1000,
+      mirrored: this.mirroredWalls.has(e.id),
+      corner: e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined,
     });
   }
 
@@ -885,44 +1232,52 @@ export class WorldLayer {
         if (!liveIds.has(id)) {
           // We can see the spot and the building is gone: forget it.
           this.ghosts.delete(id);
-          const spr = this.ghostViews.get(id);
-          if (spr) {
-            spr.destroy();
+          const stale = this.ghostViews.get(id);
+          if (stale) {
+            stale.root.destroy({ children: true });
             this.ghostViews.delete(id);
           }
         } else {
-          const spr = this.ghostViews.get(id);
-          if (spr) spr.visible = false;
+          const live = this.ghostViews.get(id);
+          if (live) live.root.visible = false;
         }
         continue;
       }
       // explored-but-not-visible: show the last-seen ghost
       const wantVisible = tv === 1 && g.player !== this.humanPlayer;
       // own buildings render live anyway (always visible to their owner in our draw rule)
-      let spr = this.ghostViews.get(id);
+      let view = this.ghostViews.get(id);
       if (wantVisible) {
-        if (!spr) {
-          spr = new Sprite();
-          spr.tint = GHOST_TINT;
-          spr.alpha = 0.8;
-          this.ghostViews.set(id, spr);
-          this.container.addChild(spr);
-          const colorIdx = state.players[g.player]?.setup.color;
-          // Farms have no bld/ frames (ART_BIBLE §4.4): remember them as a mature
-          // field (obj/farm/2) instead of the missing bld/farm/done placeholder.
-          const frame = g.defId === 'farm'
-            ? this.assets.resolveFrame('obj/farm/2', colorIdx)
-            : this.assets.tryResolve(`bld/${g.defId}/${g.age}/done`, colorIdx) ??
-              this.assets.resolveFrame(`bld/${g.defId}/done`, colorIdx);
-          spr.texture = frame.texture;
-          spr.anchor.set(frame.anchorX, frame.anchorY);
-          spr.scale.set(frame.renderScale);
-          spr.position.set(Math.round(g.wx), Math.round(g.wy));
-          spr.zIndex = g.wy;
+        if (!view) {
+          view = this.createGhostView();
+          this.ghostViews.set(id, view);
         }
-        spr.visible = true;
-      } else if (spr) {
-        spr.visible = false;
+        // A remembered building can change between sightings — a tower upgrades
+        // in place (upgradeUnit mutates defId), its owner ages up, a foundation
+        // finishes — so the frame is re-resolved whenever the memory changes,
+        // not once at creation.
+        const colorIdx = state.players[g.player]?.setup.color;
+        // Farms have no bld/ frames (ART_BIBLE §4.4): remember them as a
+        // mid-growth field instead of the missing bld/farm/done placeholder.
+        const choice = g.defId === 'farm'
+          ? { candidates: [UNSEEN_FARM_FRAME], alpha: 1 }
+          : buildingFrameCandidates(g.defId, g.age, g.progress);
+        const key = buildingArtKey(choice.candidates, colorIdx, g.mirrored, g.corner);
+        if (key !== view.lastFrameKey) {
+          view.lastFrameKey = key;
+          const { frame, resolvedName } = this.resolveCandidates(choice.candidates, colorIdx);
+          // Same artwork, same drawn size, same wall join as the live sprite —
+          // a scouted building is remembered as the building that was scouted.
+          applyBuildingArt(
+            view, frame, artScaleForFrame(g.defId, resolvedName), g.mirrored, g.corner,
+          );
+          view.root.alpha = GHOST_ALPHA * choice.alpha;
+        }
+        view.root.position.set(Math.round(g.wx), Math.round(g.wy));
+        view.root.zIndex = artZIndex(g.defId, g.progress, g.wy);
+        view.root.visible = true;
+      } else if (view) {
+        view.root.visible = false;
       }
     }
   }
@@ -932,10 +1287,26 @@ export class WorldLayer {
       if (!seen.has(id)) {
         this.curPos.delete(id);
         this.prevPos.delete(id);
-        this.damagedUntil.delete(id);
       }
     }
+    // curPos/prevPos are rebuilt from the live entity map every tick, so their keys
+    // are always a subset of `seen` — the per-entity effect timers have to be swept
+    // against their OWN keys or a long match keeps one entry per unit that ever
+    // took a hit or threw a punch.
+    for (const id of this.damagedUntil.keys()) if (!seen.has(id)) this.damagedUntil.delete(id);
+    for (const id of this.lastSwingTick.keys()) if (!seen.has(id)) this.lastSwingTick.delete(id);
   }
+}
+
+/**
+ * A garrisoned unit is carried inside its host and sits on the host's own anchor
+ * (sim `garrisonUnit`), so drawing it stacks every occupant over the host's roof —
+ * which is what put a villager on top of the Town Center. The host's garrison flag
+ * and count badge are the only occupant indicators, for buildings and loaded rams
+ * alike.
+ */
+export function isHiddenInHost(e: Entity): boolean {
+  return e.kind === 'unit' && e.garrisonedIn !== undefined;
 }
 
 /**
@@ -1025,23 +1396,8 @@ export function resourceFrameName(e: Entity, map?: GameMap): string {
   }
 }
 
-function buildingFrame(state: GameState, e: Entity): { candidates: string[]; alpha: number } {
-  const progress = e.buildProgress ?? 1000;
-  if (e.defId === 'farm') {
-    // ART_BIBLE §4.4: farms have no construct/rubble frames — obj/farm/<stage>,
-    // with a build-progress dropout (approximated here with alpha ramp).
-    if (progress < 1000) {
-      return { candidates: ['obj/farm/0'], alpha: 0.35 + (progress / 1000) * 0.65 };
-    }
-    const stage = (e.amountLeft ?? 1) <= 0 ? 4 : 3;
-    return { candidates: [`obj/farm/${stage}`], alpha: 1 };
-  }
-  if (progress < 1000) {
-    const stage = progress < 334 ? 0 : progress < 667 ? 1 : 2;
-    return { candidates: [`bld/${e.defId}/construct${stage}`], alpha: 1 };
-  }
-  const age = state.players[e.player]?.age ?? 'dark';
-  // TC/house have per-age variants (`bld/<defId>/<age>/done`); everything else
-  // is authored once as `bld/<defId>/done` — try the variant, fall back.
-  return { candidates: [`bld/${e.defId}/${age}/done`, `bld/${e.defId}/done`], alpha: 1 };
+function buildingFrame(state: GameState, e: Entity): BuildingArtChoice {
+  return buildingFrameCandidates(
+    e.defId, state.players[e.player]?.age ?? 'dark', e.buildProgress ?? 1000, e.amountLeft,
+  );
 }

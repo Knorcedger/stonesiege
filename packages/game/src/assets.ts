@@ -25,8 +25,22 @@ const DEV_ASSERTS = typeof import.meta !== 'undefined' && !!import.meta.env?.DEV
 export const ATLAS_NAMES = ['terrain', 'units', 'buildings', 'objects', 'ui', 'icons'] as const;
 export type AtlasName = (typeof ATLAS_NAMES)[number];
 
-const ATLAS_LOAD_TIMEOUT_MS = 20_000;
+/**
+ * Per-file deadline. It only means anything because HD transfers are bounded
+ * below: a file that spends the window queued behind 35 others has not been
+ * given 30s to load, it has been given none.
+ */
+const ATLAS_LOAD_TIMEOUT_MS = 30_000;
 const HD_MANIFEST_TIMEOUT_MS = 8_000;
+/** One retry: a cold load that lost a file to a stall should not lose the match. */
+const ATLAS_LOAD_ATTEMPTS = 2;
+/**
+ * Simultaneous HD atlas transfers. The set is ~41 MB across 36 files, so
+ * starting them all at once put every deadline in a race against the whole
+ * queue rather than against its own bytes, and a first-time visitor on an
+ * ordinary connection lost most of the set (see issue #132).
+ */
+export const HD_LOAD_CONCURRENCY = 4;
 
 export interface AssetLoadProgress {
   completed: number;
@@ -493,7 +507,10 @@ export class GameAssets {
     onSettled: (usedFallback: boolean) => void,
   ): Promise<void> {
     if (files.length === 0 || signal?.aborted) return;
-    const loaded = await Promise.all(files.map(async (file) => {
+    // Bounded lanes, NOT Promise.all: every file used to start at once and race
+    // one deadline against the whole 41 MB queue, so a cold cache lost most of
+    // the set and the match refused to start (issue #132).
+    const loaded = await mapWithConcurrency(files, HD_LOAD_CONCURRENCY, async (file) => {
       const atlas = await loadAtlasFile(
         `assets/hd/${file}`,
         'assets/hd/',
@@ -502,7 +519,7 @@ export class GameAssets {
       );
       if (!signal?.aborted) onSettled(atlas.missing);
       return atlas;
-    }));
+    });
     // An aborted request must not let late HD work mutate the resolved set.
     // The completeness assertion in load() rejects the resulting partial set.
     if (signal?.aborted) return;
@@ -572,21 +589,51 @@ function scopedAbortSignal(
   };
 }
 
+/**
+ * Run `work` over `items`, at most `limit` at a time, preserving input order in
+ * the results. Workers pull from a shared cursor, so a slow item delays only
+ * itself and one lane rather than stalling a whole batch.
+ */
+export async function mapWithConcurrency<T, R>(
+  items: readonly T[],
+  limit: number,
+  work: (item: T, index: number) => Promise<R>,
+): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  const lanes = Math.max(1, Math.min(limit, items.length));
+  let next = 0;
+  await Promise.all(Array.from({ length: lanes }, async () => {
+    for (;;) {
+      const index = next;
+      next += 1;
+      if (index >= items.length) return;
+      results[index] = await work(items[index]!, index);
+    }
+  }));
+  return results;
+}
+
 /** Run one abort-aware asset operation with a deadline and a safe fallback. */
 export async function boundedAssetLoad<T>(
   start: (signal: AbortSignal) => Promise<T>,
   fallback: T,
   timeoutMs: number,
   parentSignal?: AbortSignal,
+  attempts = 1,
 ): Promise<T> {
-  const scoped = scopedAbortSignal(parentSignal, timeoutMs);
-  try {
-    return await start(scoped.signal);
-  } catch {
-    return fallback;
-  } finally {
-    scoped.dispose();
+  for (let attempt = 0; attempt < Math.max(1, attempts); attempt += 1) {
+    // A caller that gave up (or a torn-down match) must not be retried into.
+    if (parentSignal?.aborted) return fallback;
+    const scoped = scopedAbortSignal(parentSignal, timeoutMs);
+    try {
+      return await start(scoped.signal);
+    } catch {
+      // Fall through: each attempt gets its own full deadline.
+    } finally {
+      scoped.dispose();
+    }
   }
+  return fallback;
 }
 
 function loadImage(url: string, signal: AbortSignal): Promise<HTMLImageElement> {
@@ -684,7 +731,7 @@ async function loadAtlasFile(
     atlas.image = image;
     atlas.missing = false;
     return atlas;
-  }, atlas, ATLAS_LOAD_TIMEOUT_MS, parentSignal);
+  }, atlas, ATLAS_LOAD_TIMEOUT_MS, parentSignal, ATLAS_LOAD_ATTEMPTS);
 }
 
 export async function loadAssets(options: AssetLoadOptions = {}): Promise<GameAssets> {
