@@ -30,7 +30,10 @@ import { marketPanelRows, TRADE_LOT, type TradeResource } from './marketModel';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
-import { HUD_NARROW_MAX_PX, hudStageExtentPercent } from './layout';
+import {
+  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_TOP_BAR_BOTTOM_VAR, hudStageExtentPercent,
+  measuredTopBarClearPx,
+} from './layout';
 import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
 import type { UnitDisplayStats } from '../simBridge';
@@ -184,10 +187,19 @@ const QUEUE_BLOCK_PX = `${QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP}p
 
 const HUD_CSS = `
 .bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; color:#F2E6CB; user-select:none; -webkit-user-select:none; text-shadow:0 1px 1px rgba(0,0,0,.65); }
-.bf-hudstage { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform-origin:top left; }
+/* The stage's transform makes it a stacking context, so every control the
+   player taps is flattened into this one layer — see HUD_LAYER in layout.ts for
+   why it has to outrank the scenario overlays mounted beside it. */
+.bf-hudstage { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform-origin:top left; z-index:${HUD_LAYER.stage}; }
 .bf-num { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; }
 .bf-panel { background:linear-gradient(145deg,rgba(55,39,24,.96),rgba(25,17,11,.97)); border:1px solid #25170c; box-shadow:0 0 0 1px rgba(196,146,58,.7) inset, 0 0 0 3px rgba(87,57,29,.72) inset, 0 6px 18px rgba(0,0,0,.34); border-radius:6px; backdrop-filter:blur(2px); }
-.bf-top { position:absolute; top:6px; left:6px; right:6px; height:34px; display:flex; align-items:center; gap:12px; padding:0 10px; pointer-events:auto; }
+/* Wraps at ANY width, not just under the narrow media query. The query keys off
+   the viewport, but the bar lives in the scaled stage, whose logical width is
+   viewport/hudScale — at 125% a 844px landscape phone gives the bar only 675px
+   and the query never fires. With nowrap the row simply overflowed and pushed
+   the last control (the pause button) off the right edge of the screen. */
+.bf-top { position:absolute; top:6px; left:6px; right:6px; min-height:34px; display:flex;
+  flex-wrap:wrap; align-items:center; gap:2px 12px; padding:0 10px; pointer-events:auto; }
 .bf-res { display:flex; align-items:center; gap:5px; font-size:16px; }
 .bf-res canvas { width:22px; height:22px; image-rendering:auto; }
 .bf-age { margin-left:auto; font-size:16px; color:#E6C04A; letter-spacing:1px; }
@@ -283,7 +295,7 @@ const HUD_CSS = `
 /* The shell stays within the safe-area root while each tab owns its scrolling.
    A short landscape phone therefore keeps Resume + navigation on screen even
    when the Settings controls are much taller than the available viewport. */
-.bf-pause { position:absolute; inset:0; box-sizing:border-box; padding:12px; background:rgba(10,8,5,0.76); display:none; pointer-events:auto; z-index:40; }
+.bf-pause { position:absolute; inset:0; box-sizing:border-box; padding:12px; background:rgba(10,8,5,0.76); display:none; pointer-events:auto; z-index:${HUD_LAYER.pauseOverlay}; }
 .bf-pause.show { display:flex; }
 .bf-pausebox { box-sizing:border-box; width:min(680px,100%); max-height:100%; min-height:0; margin:auto;
   display:grid; grid-template-rows:auto auto minmax(0,1fr); gap:10px; padding:16px; pointer-events:auto; }
@@ -309,7 +321,7 @@ const HUD_CSS = `
 .bf-pausestate { color:#E6C04A; font:15px/1 "VT323",monospace; }
 .bf-pauseleave { display:flex; flex-direction:column; }
 .bf-pauseleave .bf-btn { width:100%; min-height:44px; margin-top:auto; }
-.bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }
+.bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:${HUD_LAYER.helpOverlay}; }
 .bf-help.show { display:flex; }
 .bf-helpbox { box-sizing:border-box; width:min(430px,calc(100% - 24px)); margin:auto; padding:20px; }
 .bf-helphead { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; }
@@ -326,11 +338,12 @@ const HUD_CSS = `
 .bf-chip { position:relative; width:44px; height:44px; padding:0; background:#DABE8D; color:#1A1208; border:1px solid #B99A6B; border-radius:3px; box-shadow:0 0 0 1px #8A6414 inset; font-family:"VT323",monospace; font-size:22px; line-height:1; cursor:pointer; pointer-events:auto; }
 .bf-chip.empty { background:#3a2a18; color:#B99A6B; border-color:#64492B; box-shadow:none; }
 .bf-chipcount { position:absolute; right:3px; bottom:1px; font-size:14px; color:#64492B; }
-/* ---- narrow widths (portrait phones): compress the top bar. It may wrap to a
-   second row, but every control — the pause button above all — stays on-screen
-   and tappable. ---- */
+/* ---- narrow widths (portrait phones): compress the top bar. Wrapping itself
+   is unconditional (see .bf-top); this only tightens the spacing and drops the
+   labels that numerals already carry. Every control — the pause button above
+   all — stays on-screen and tappable. ---- */
 @media (max-width: ${HUD_NARROW_MAX_PX}px) {
-  .bf-top { flex-wrap:wrap; height:auto; min-height:34px; gap:2px 7px; padding:3px 8px; }
+  .bf-top { gap:2px 7px; padding:3px 8px; }
   .bf-res { font-size:14px; gap:2px; }
   .bf-res canvas { width:18px; height:18px; }
   .bf-poplabel { display:none; } /* numerals carry the meaning on phones */
@@ -460,6 +473,9 @@ export class Hud {
   private nextCommandHotkey = 0;
   private hotkeyListener!: (event: KeyboardEvent) => void;
   private rightCluster!: HTMLDivElement;
+  private topBar!: HTMLDivElement;
+  private topBarObserver: ResizeObserver | null = null;
+  private viewportListener!: () => void;
 
   /** The minimap panel mounts here (bottom-left). */
   readonly minimapSlot: HTMLDivElement;
@@ -495,6 +511,8 @@ export class Hud {
     this.buildGroupChips();
     this.bindCommandHotkeys();
 
+    this.watchTopBarExtent();
+
     this.minimapSlot = document.createElement('div');
     this.minimapSlot.className = 'bf-mini';
     this.minimapSlot.style.cssText = 'position:absolute;left:6px;bottom:6px;display:flex;flex-direction:column;gap:4px;pointer-events:auto;';
@@ -507,7 +525,40 @@ export class Hud {
     if (this.toastTimer) clearTimeout(this.toastTimer);
     this.stopSettingsListener?.();
     window.removeEventListener('keydown', this.hotkeyListener);
+    window.removeEventListener('resize', this.viewportListener);
+    this.topBarObserver?.disconnect();
+    this.topBarObserver = null;
+    this.root.style.removeProperty(HUD_TOP_BAR_BOTTOM_VAR);
     this.el.remove();
+  }
+
+  /**
+   * Publish the top bar's real bottom edge so overlays outside the scaled HUD
+   * stage (the objectives panel, scenario messages) can clear it. Without this
+   * they guessed a single-row 34px bar and covered the bar's second row —
+   * swallowing taps on the controls there, the pause button included.
+   *
+   * A ResizeObserver catches content-driven re-wrapping (widening stockpile
+   * readouts) without a per-frame layout read; window resize catches a re-wrap
+   * that leaves the bar's own box unchanged; applyHudScale covers the scale
+   * setting, which moves the on-screen edge without changing layout size.
+   */
+  private watchTopBarExtent(): void {
+    this.viewportListener = () => this.publishTopBarExtent();
+    window.addEventListener('resize', this.viewportListener);
+    if (typeof ResizeObserver !== 'undefined') {
+      this.topBarObserver = new ResizeObserver(() => this.publishTopBarExtent());
+      this.topBarObserver.observe(this.topBar);
+    }
+    this.publishTopBarExtent();
+  }
+
+  private publishTopBarExtent(): void {
+    const clear = measuredTopBarClearPx(
+      this.topBar.getBoundingClientRect(),
+      this.root.getBoundingClientRect(),
+    );
+    this.root.style.setProperty(HUD_TOP_BAR_BOTTOM_VAR, `${clear}px`);
   }
 
   private applyHudScale(scale: number): void {
@@ -515,6 +566,9 @@ export class Hud {
     this.stage.style.width = `${extent}%`;
     this.stage.style.height = `${extent}%`;
     this.stage.style.transform = `scale(${scale})`;
+    // Scaling moves the bar's on-screen bottom edge without resizing its box,
+    // so the observer stays silent — republish by hand.
+    if (this.topBar) this.publishTopBarExtent();
   }
 
   // ------------------------------------------------------------------ update
@@ -564,6 +618,7 @@ export class Hud {
   private buildTopBar(): void {
     const bar = document.createElement('div');
     bar.className = 'bf-panel bf-top';
+    this.topBar = bar;
     for (const r of RESOURCES) {
       const box = document.createElement('div');
       box.className = 'bf-res';

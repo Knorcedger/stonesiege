@@ -3,7 +3,9 @@
 // guidance for spatial goals.
 
 import type { ObjectiveGuideReadout, ObjectiveTargetTile } from '@bf/scenarios';
-import { HUD_NARROW_MAX_PX } from './layout';
+import {
+  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_TOP_BAR_BOTTOM_VAR, TOP_BAR_CLEAR_PX,
+} from './layout';
 
 export type ObjectiveUiState = 'open' | 'complete' | 'failed';
 export type ObjectiveDisplayState = 'current' | 'upcoming' | 'complete' | 'failed';
@@ -164,7 +166,13 @@ export function objectiveMarkerPlacement(
 }
 
 const OBJ_CSS = `
-.bf-objectives { position:absolute; right:6px; top:40px; width:min(300px, 60vw); z-index:24;
+/* Anchored to the top bar's MEASURED bottom edge, not a constant: the bar wraps
+   to a second row on narrow viewports (and re-wraps mid-match as stockpiles
+   reach four digits) and grows with the HUD scale setting. A fixed 40px assumed
+   a single unscaled row and put this panel on top of the bar's second row,
+   where it swallowed taps meant for the controls there. */
+.bf-objectives { position:absolute; right:6px; top:var(${HUD_TOP_BAR_BOTTOM_VAR}, ${TOP_BAR_CLEAR_PX}px);
+  width:min(300px, 60vw); z-index:${HUD_LAYER.objectives};
   font-family:"Pixelify Sans",monospace; pointer-events:auto; }
 .bf-obj-head { display:grid; grid-template-columns:minmax(0,1fr) 44px; align-items:stretch;
   background:linear-gradient(#3a2a18,#2C1F12); border:1px solid #64492B; border-radius:4px;
@@ -212,7 +220,7 @@ const OBJ_CSS = `
   100% { box-shadow:0 0 0 1px #1A1208; }
 }
 .bf-obj-marker { position:absolute; display:none; width:44px; height:44px; margin:-22px 0 0 -22px;
-  padding:0; z-index:23; pointer-events:auto; cursor:pointer; border:0; background:transparent; }
+  padding:0; z-index:${HUD_LAYER.objectiveMarker}; pointer-events:auto; cursor:pointer; border:0; background:transparent; }
 .bf-obj-marker.show { display:block; }
 .bf-obj-marker.beacon::before { content:""; position:absolute; left:5px; top:21px; width:32px; height:16px;
   border:2px solid #E6C04A; border-radius:50%; box-shadow:0 0 0 1px #1A1208,0 0 9px rgba(230,192,74,.8);
