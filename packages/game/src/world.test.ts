@@ -2,9 +2,9 @@ import { describe, expect, it } from 'vitest';
 import { FP, type Entity, type GameMap, type GameState, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
 import {
-  advanceGateOpenProgress, buildingHpBarWidth, defaultRallyTilePoint, entityPickDistance,
-  mirroredWallIds, ownedResearchProgress, resourceFrameName, wallCornerJoins,
-  rallyFlagWorldPoint, shouldFadeForUnit,
+  advanceGateOpenProgress, artScaleForFrame, buildingHpBarWidth, defaultRallyTilePoint,
+  entityPickDistance, isHiddenInHost, mirroredWallIds, ownedResearchProgress, resourceFrameName,
+  wallCornerJoins, rallyFlagWorldPoint, shouldFadeForUnit,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -193,5 +193,88 @@ describe('advanceGateOpenProgress', () => {
     expect(advanceGateOpenProgress(0.5, true, 999)).toBe(1);
     expect(advanceGateOpenProgress(0.5, false, 999)).toBe(0);
     expect(advanceGateOpenProgress(0.5, false, -1)).toBe(0.5);
+  });
+});
+
+describe('isHiddenInHost', () => {
+  const villager = (patch: Partial<Entity> = {}): Entity => ({
+    id: 3, kind: 'unit', defId: 'villager', player: HUMAN,
+    x: 8 * FP, y: 8 * FP, tileX: 8, tileY: 8,
+    facing: 0, hp: 40, maxHp: 40, activity: 'idle', ...patch,
+  });
+
+  it('hides an occupant that the sim parked on its host anchor', () => {
+    // garrisonUnit() copies the host's position onto the occupant, so drawing it
+    // stacks every villager over the Town Center roof.
+    expect(isHiddenInHost(villager({ garrisonedIn: 12, activity: 'garrisoned' }))).toBe(true);
+  });
+
+  it('keeps drawing units that are only walking to a host, and the host itself', () => {
+    expect(isHiddenInHost(villager({ activity: 'moving' }))).toBe(false);
+    expect(isHiddenInHost(villager({ activity: 'fleeing' }))).toBe(false);
+    const host: Entity = {
+      id: 12, kind: 'building', defId: 'townCenter', player: HUMAN,
+      x: 10 * FP, y: 10 * FP, tileX: 10, tileY: 10,
+      facing: 0, hp: 2400, maxHp: 2400, activity: 'idle', garrison: [3],
+    };
+    expect(isHiddenInHost(host)).toBe(false);
+  });
+});
+
+describe('artScaleForFrame', () => {
+  // Alpha-measured content size of each shipped HD frame, in world px at the
+  // runtime renderScale of 1/2. The authored art alone shrinks on age-up.
+  const AUTHORED = {
+    dark: { w: 253, h: 187.5 },
+    feudal: { w: 159, h: 138 },
+    castle: { w: 208, h: 172 },
+    imperial: { w: 216.5, h: 175 },
+  } as const;
+  const AGES = ['dark', 'feudal', 'castle', 'imperial'] as const;
+  const FOOTPRINT_W = 256; // 4 tiles x 2 x HALF_W
+
+  const drawn = (age: keyof typeof AUTHORED) => {
+    const scale = artScaleForFrame('townCenter', `bld/townCenter/${age}/done`);
+    return { w: AUTHORED[age].w * scale.x, h: AUTHORED[age].h * scale.y };
+  };
+
+  it('grows the Town Center with every age instead of shrinking it', () => {
+    for (let i = 1; i < AGES.length; i++) {
+      const prev = drawn(AGES[i - 1]);
+      const next = drawn(AGES[i]);
+      expect(next.w).toBeGreaterThan(prev.w);
+      expect(next.h).toBeGreaterThan(prev.h);
+    }
+  });
+
+  it('keeps every age planted inside its own 4x4 footprint', () => {
+    for (const age of AGES) expect(drawn(age).w).toBeLessThanOrEqual(FOOTPRINT_W);
+  });
+
+  it('never upsamples an authored frame past its native resolution', () => {
+    // renderScale is 1/density (2 for the HD atlases): anything under 1 is a downscale.
+    for (const age of AGES) {
+      expect(artScaleForFrame('townCenter', `bld/townCenter/${age}/done`).x / 2)
+        .toBeLessThan(1);
+    }
+  });
+
+  it('scales ages uniformly so no hall is stretched', () => {
+    for (const age of AGES) {
+      const scale = artScaleForFrame('townCenter', `bld/townCenter/${age}/done`);
+      expect(scale.x).toBe(scale.y);
+    }
+  });
+
+  it('leaves shared Town Center frames and ordinary buildings unscaled', () => {
+    for (const name of ['bld/townCenter/done', 'bld/townCenter/construct1', 'bld/townCenter/rubble']) {
+      expect(artScaleForFrame('townCenter', name)).toEqual({ x: 1, y: 1 });
+    }
+    expect(artScaleForFrame('barracks', 'bld/barracks/done')).toEqual({ x: 1, y: 1 });
+  });
+
+  it('preserves the fortification scales, which are keyed by def', () => {
+    expect(artScaleForFrame('keep', 'bld/keep/done')).toEqual({ x: 2.95, y: 2.95 });
+    expect(artScaleForFrame('stoneWall', 'bld/stoneWall/done')).toEqual({ x: 1.16, y: 1.82 });
   });
 });

@@ -8,7 +8,8 @@
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
 import {
   FP, GAIA, TICKS_PER_SECOND,
-  type Entity, type EntityId, type GameMap, type GameState, type PlayerId, type SimEvent,
+  type AgeId, type Entity, type EntityId, type GameMap, type GameState, type PlayerId,
+  type SimEvent,
 } from '@bf/sim/types';
 import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets } from './assets';
@@ -37,6 +38,7 @@ const OCCLUDER_ALPHA = 0.8;
 const GATE_OPEN_RADIUS_FP = 2 * FP;
 const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
 interface ArtScale { x: number; y: number }
+const NO_ART_SCALE: ArtScale = { x: 1, y: 1 };
 const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
   // Wall endpoints stay close to one mechanical tile while the masonry grows
   // vertically to building scale. Uniform 2.25x scaling made every segment
@@ -47,6 +49,38 @@ const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
   guardTower: { x: 2.72, y: 2.72 },
   keep: { x: 2.95, y: 2.95 },
 };
+
+/**
+ * The Town Center age crescendo. Its four authored frames were fitted
+ * independently — the Dark Age hall is the bespoke 576x416 hero render while
+ * Feudal/Castle/Imperial are cutouts fitted into the systemic 512x368 building
+ * canvas — so the artwork drawn on screen was 253 / 159 / 208 / 216 px wide and
+ * ageing up visibly SHRANK the civic centre.
+ *
+ * These factors normalize the four frames against each other so the hall grows
+ * with every age instead: 210 / 223 / 237 / 251 px wide over a 256 px (4-tile)
+ * footprint, with the silhouette rising 156 -> 193 -> 196 -> 203 px. Every age
+ * still draws its texture below 1:1, so none of them is upsampled into softness.
+ */
+const TOWN_CENTER_AGE_ART_SCALE: Readonly<Record<AgeId, ArtScale>> = {
+  dark: { x: 0.83, y: 0.83 },
+  feudal: { x: 1.4, y: 1.4 },
+  castle: { x: 1.14, y: 1.14 },
+  imperial: { x: 1.16, y: 1.16 },
+};
+
+const TOWN_CENTER_AGE_FRAME = /^bld\/townCenter\/(dark|feudal|castle|imperial)\/done$/;
+
+/**
+ * Art-to-mechanics scale for the frame actually resolved for an entity. Keyed on
+ * the resolved frame name rather than the owner's age so a fallback frame is
+ * never scaled by a variant's factor.
+ */
+export function artScaleForFrame(defId: string, frameName: string): ArtScale {
+  const tcAge = TOWN_CENTER_AGE_FRAME.exec(frameName);
+  if (tcAge) return TOWN_CENTER_AGE_ART_SCALE[tcAge[1] as AgeId];
+  return FORTIFICATION_ART_SCALE[defId] ?? NO_ART_SCALE;
+}
 
 /**
  * The wall sheet is authored along the screen's NW→SE isometric axis. Mirror the
@@ -269,10 +303,12 @@ export class WorldLayer {
       }
 
       const displayed = this.resourceMemory.entityFor(state, e);
-      const visible = displayed !== null && (
-        displayed.player === this.humanPlayer
-        || (displayed.kind === 'resource' ? true : tileVis === 2)
-      );
+      const visible = displayed !== null
+        && !isHiddenInHost(displayed)
+        && (
+          displayed.player === this.humanPlayer
+          || (displayed.kind === 'resource' ? true : tileVis === 2)
+        );
 
       let view = this.views.get(e.id);
       if (!visible) {
@@ -285,8 +321,10 @@ export class WorldLayer {
       }
       view.root.visible = true;
       this.updateView(state, displayed!, view, alpha, tickFloat);
-      if (displayed!.kind === 'unit' && displayed!.hp > 0 && displayed!.activity !== 'dying'
-        && displayed!.garrisonedIn === undefined) visibleUnits.push({ entity: displayed!, view });
+      // Garrisoned occupants never reach here: they are hidden above.
+      if (displayed!.kind === 'unit' && displayed!.hp > 0 && displayed!.activity !== 'dying') {
+        visibleUnits.push({ entity: displayed!, view });
+      }
     }
 
     for (const remembered of this.resourceMemory.hiddenMissing(state)) {
@@ -605,7 +643,7 @@ export class WorldLayer {
       frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-      const artScale = FORTIFICATION_ART_SCALE[e.defId] ?? { x: 1, y: 1 };
+      const artScale = artScaleForFrame(e.defId, resolvedName);
       const mirrorX = frame.mirrored !== mirrorWall;
       view.sprite.scale.set(
         mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
@@ -936,6 +974,17 @@ export class WorldLayer {
       }
     }
   }
+}
+
+/**
+ * A garrisoned unit is carried inside its host and sits on the host's own anchor
+ * (sim `garrisonUnit`), so drawing it stacks every occupant over the host's roof —
+ * which is what put a villager on top of the Town Center. The host's garrison flag
+ * and count badge are the only occupant indicators, for buildings and loaded rams
+ * alike.
+ */
+export function isHiddenInHost(e: Entity): boolean {
+  return e.kind === 'unit' && e.garrisonedIn !== undefined;
 }
 
 /**
