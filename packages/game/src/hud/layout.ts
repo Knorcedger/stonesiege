@@ -27,6 +27,69 @@ export function belowTopBarPx(narrow: boolean): number {
   return narrow ? TOP_BAR_CLEAR_NARROW_PX : TOP_BAR_CLEAR_PX;
 }
 
+/**
+ * CSS variable the HUD publishes onto the safe-area root: the first clear y
+ * (px, root-relative) below the top bar as actually laid out.
+ *
+ * Overlays anchored under the bar live on the unscaled root, while the bar
+ * itself sits inside the transform-scaled HUD stage. Its on-screen bottom edge
+ * therefore moves with BOTH the HUD scale setting and content-driven wrapping
+ * (a narrow bar re-wraps once four-digit stockpiles widen the resource
+ * readouts), so no constant can predict it. Anything that must clear the bar
+ * reads this variable and falls back to the single-row contract.
+ */
+export const HUD_TOP_BAR_BOTTOM_VAR = '--bf-top-bar-bottom';
+
+/** Breathing room (px) between the bar and whatever is anchored below it. */
+export const TOP_BAR_GAP_PX = 6;
+
+/**
+ * Stacking order of the overlays mounted on the HUD root, in one place because
+ * they are declared across four CSS blocks and only make sense against one
+ * another.
+ *
+ * The HUD stage itself is NOT in this scale, and deliberately carries no
+ * z-index. Its transform already makes it a stacking context, so every control
+ * inside it collapses into one layer; giving that layer a rank would order the
+ * whole HUD against each overlay at once, and the overlays need opposite
+ * answers. The objectives panel has to stay above the bottom-right command
+ * card (which is 500px tall with a town centre selected, and reaches the panel
+ * on a landscape phone) while staying clear of the top bar. Ranking the stage
+ * above the panel buys a hit-test guarantee for the bar and pays for it by
+ * burying the panel, the wonder countdown and the objective marker under the
+ * card. Keeping overlays and controls apart is a geometry job — see
+ * HUD_TOP_BAR_BOTTOM_VAR — so the layers below only order overlay against
+ * overlay.
+ */
+export const HUD_LAYER = {
+  objectiveMarker: 23,
+  objectives: 24,
+  wonderBanner: 25,
+  messageBanner: 28,
+  ageBanner: 30,
+  attackPulse: 35,
+  pauseOverlay: 40,
+  helpOverlay: 45,
+  endScreen: 50,
+} as const;
+
+/** The subset of DOMRect the clearance math needs, so it is testable without a DOM. */
+export interface EdgeRect {
+  readonly top: number;
+  readonly bottom: number;
+  readonly height: number;
+}
+
+/**
+ * First clear y (px, relative to `root`) below the measured top bar. An
+ * unmeasured bar (height 0 before first layout) degrades to the single-row
+ * contract rather than collapsing overlays onto the bar.
+ */
+export function measuredTopBarClearPx(bar: EdgeRect, root: EdgeRect): number {
+  if (!(bar.height > 0)) return TOP_BAR_CLEAR_PX;
+  return Math.max(TOP_BAR_CLEAR_PX, Math.ceil(bar.bottom - root.top) + TOP_BAR_GAP_PX);
+}
+
 /** Expand the HUD's logical stage before scaling so it still fills its safe parent. */
 export function hudStageExtentPercent(scale: number): number {
   return 100 / scale;
