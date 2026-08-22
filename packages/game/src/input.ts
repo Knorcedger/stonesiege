@@ -766,9 +766,12 @@ export class InputController {
     if (ownBld && villagers.length > 0 && ((ownBld.buildProgress ?? 1000) < 1000 || ownBld.hp < ownBld.maxHp)) {
       const isFoundation = (ownBld.buildProgress ?? 1000) < 1000;
       if (can(isFoundation ? 'build' : 'repair')) {
+        // Name the target: a bare "Build" next to an unchanged screen reads as a
+        // no-op, and the villager may have a long walk before it starts working.
+        const name = gameData.buildings[ownBld.defId]?.name ?? ownBld.defId;
         this.host.issueWithUndo(
           { kind: 'repair', player: human, units: villagers.map((e) => e.id), targetId: ownBld.id },
-          isFoundation ? 'Build' : 'Repair', undoStop,
+          `${isFoundation ? 'Building' : 'Repairing'} ${name}`, undoStop,
         );
       } else {
         moveTo(ownBld.x, ownBld.y, unitIds, `Move (${isFoundation ? 'construction' : 'repair'} lands in wave 2)`);
