@@ -12,9 +12,10 @@ import {
   type SimEvent,
 } from '@bf/sim/types';
 import { gameData, unitAggroRange } from '@bf/data';
-import type { GameAssets } from './assets';
+import type { GameAssets, ResolvedFrame } from './assets';
 import {
-  animForActivity, animFrameIndex, facingFromDelta, unitRig, villagerWorkAnim, type AnimName,
+  animForActivity, animFrameIndex, buildingFrameCandidates, facingFromDelta, unitRig,
+  villagerWorkAnim, UNSEEN_FARM_FRAME, type AnimName, type BuildingArtChoice,
 } from './frames';
 import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
@@ -62,24 +63,47 @@ const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
  * footprint, with the silhouette rising 156 -> 193 -> 196 -> 203 px. Every age
  * still draws its texture below 1:1, so none of them is upsampled into softness.
  */
-const TOWN_CENTER_AGE_ART_SCALE: Readonly<Record<AgeId, ArtScale>> = {
-  dark: { x: 0.83, y: 0.83 },
-  feudal: { x: 1.4, y: 1.4 },
-  castle: { x: 1.14, y: 1.14 },
-  imperial: { x: 1.16, y: 1.16 },
+const AGE_ART_SCALE: Readonly<Record<string, Readonly<Record<AgeId, number>>>> = {
+  townCenter: { dark: 0.83, feudal: 1.4, castle: 1.14, imperial: 1.16 },
+  // The house ships four per-age frames that are the same 82x85 picture, so
+  // ageing up left the town's housing untouched — and that picture fills only
+  // 64% of its 2x2 plot, against 77-80% for every other size-2 building. The
+  // crescendo starts the Dark Age hut at its peers' floor (92px, 72%) and ends
+  // Imperial just above their ceiling (109px, 85%), so packed housing rows keep
+  // visible gaps. Authored per-age house art would replace this outright.
+  house: { dark: 1.12, feudal: 1.19, castle: 1.26, imperial: 1.33 },
 };
 
-const TOWN_CENTER_AGE_FRAME = /^bld\/townCenter\/(dark|feudal|castle|imperial)\/done$/;
+const AGE_VARIANT_FRAME = /^bld\/(\w+)\/(dark|feudal|castle|imperial)\/done$/;
 
 /**
- * Art-to-mechanics scale for the frame actually resolved for an entity. Keyed on
- * the resolved frame name rather than the owner's age so a fallback frame is
- * never scaled by a variant's factor.
+ * Art-to-mechanics scale for the frame actually resolved for an entity — the one
+ * rule shared by the live sprite, the fog ghost and the placement preview, which
+ * each used to scale the same artwork differently (#116).
+ *
+ * Keyed on the resolved frame name, not on the owner's age, so a fallback frame
+ * is never scaled by a variant's factor. Rubble is deliberately outside this
+ * rule: those frames are authored at a consistent 72-74% of their own footprint,
+ * fortifications included, so passing them through the table would blow a
+ * destroyed keep's debris up to twice its tile.
  */
 export function artScaleForFrame(defId: string, frameName: string): ArtScale {
-  const tcAge = TOWN_CENTER_AGE_FRAME.exec(frameName);
-  if (tcAge) return TOWN_CENTER_AGE_ART_SCALE[tcAge[1] as AgeId];
+  const variant = AGE_VARIANT_FRAME.exec(frameName);
+  const byAge = variant && AGE_ART_SCALE[variant[1]]?.[variant[2] as AgeId];
+  if (byAge !== undefined && byAge !== null) return { x: byAge, y: byAge };
   return FORTIFICATION_ART_SCALE[defId] ?? NO_ART_SCALE;
+}
+
+/**
+ * y-sort rank for a piece of world artwork. Flat things (farms, stage-0
+ * foundations) sort under everything else; gatehouses render over their
+ * immediately adjacent wall caps, since a later-sorted wall hides half the arch
+ * and makes it read as a breach. `progress` is undefined for anything that is
+ * not a building.
+ */
+export function artZIndex(defId: string, progress: number | undefined, worldY: number): number {
+  if (defId === 'farm' || (progress !== undefined && progress < 250)) return worldY - 4000;
+  return worldY + (defId === 'gate' ? HALF_H + 1 : 0);
 }
 
 /**
@@ -211,6 +235,13 @@ function unitWorldRect(view: EntityView): WorldRect {
   };
 }
 
+/**
+ * What a building looked like the last time it was actually seen. Everything the
+ * live sprite derives from the entity has to be captured here, or the ghost
+ * drifts from the building the player scouted (#116): an upgraded tower kept its
+ * old art forever, a wall run lost its mirroring, and a foundation was
+ * remembered as a finished building.
+ */
 interface GhostRecord {
   defId: string;
   player: PlayerId;
@@ -219,6 +250,13 @@ interface GhostRecord {
   wx: number;
   wy: number;
   age: string;
+  progress: number;
+  mirrored: boolean;
+}
+
+interface GhostView {
+  sprite: Sprite;
+  lastFrameKey: string;
 }
 
 export interface PickResult {
@@ -236,7 +274,7 @@ export class WorldLayer {
   private aggroLayer = new Container();
   private aggroViews = new Map<EntityId, { graphic: Graphics; range: number }>();
   private views = new Map<EntityId, EntityView>();
-  private ghostViews = new Map<EntityId, Sprite>();
+  private ghostViews = new Map<EntityId, GhostView>();
   private ghosts = new Map<EntityId, GhostRecord>();
   /** Rally flag markers for selected own production buildings (GDD: rally shown as a flag). */
   private rallyFlags = new Graphics();
@@ -594,15 +632,29 @@ export class WorldLayer {
     }
   }
 
+  /**
+   * First candidate that resolves wins; the last is resolved unconditionally so a
+   * genuinely missing frame surfaces the diagnosable placeholder rather than
+   * nothing. Returns the name that won, which is what the art scale keys on.
+   */
+  private resolveCandidates(
+    candidates: string[], colorIdx?: number,
+  ): { frame: ResolvedFrame; resolvedName: string } {
+    let resolvedName = candidates[candidates.length - 1];
+    let frame: ResolvedFrame | null = null;
+    for (let i = 0; i < candidates.length - 1 && !frame; i++) {
+      frame = this.assets.tryResolve(candidates[i], colorIdx);
+      if (frame) resolvedName = candidates[i];
+    }
+    return { frame: frame ?? this.assets.resolveFrame(resolvedName, colorIdx), resolvedName };
+  }
+
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
     const pos = this.entityWorldPos(e, alpha);
     view.root.position.set(Math.round(pos.x), Math.round(pos.y));
-    // flat things (farms, foundations-stage-0) sort under everything else
-    const flat = e.defId === 'farm' || (e.kind === 'building' && (e.buildProgress ?? 1000) < 250);
-    // Gatehouses render over their immediately adjacent wall caps; otherwise a
-    // later-sorted wall can hide half the arch and make it read as a breach.
-    const gateLayer = e.defId === 'gate' ? HALF_H + 1 : 0;
-    view.root.zIndex = flat ? pos.y - 4000 : pos.y + gateLayer;
+    view.root.zIndex = artZIndex(
+      e.defId, e.kind === 'building' ? e.buildProgress ?? 1000 : undefined, pos.y,
+    );
 
     const prev = this.prevPos.get(e.id);
     const cur = this.curPos.get(e.id);
@@ -634,13 +686,7 @@ export class WorldLayer {
     const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
     const key = `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
     if (key !== view.lastFrameKey) {
-      let frame = null;
-      let resolvedName = candidates[candidates.length - 1];
-      for (let i = 0; i < candidates.length - 1 && !frame; i++) {
-        frame = this.assets.tryResolve(candidates[i], colorIdx);
-        if (frame) resolvedName = candidates[i];
-      }
-      frame ??= this.assets.resolveFrame(resolvedName, colorIdx);
+      const { frame, resolvedName } = this.resolveCandidates(candidates, colorIdx);
       view.sprite.texture = frame.texture;
       view.sprite.anchor.set(frame.anchorX, frame.anchorY);
       const artScale = artScaleForFrame(e.defId, resolvedName);
@@ -913,6 +959,8 @@ export class WorldLayer {
       wx: pos.x,
       wy: pos.y,
       age: state.players[e.player]?.age ?? 'dark',
+      progress: e.buildProgress ?? 1000,
+      mirrored: this.mirroredWalls.has(e.id),
     });
   }
 
@@ -923,44 +971,60 @@ export class WorldLayer {
         if (!liveIds.has(id)) {
           // We can see the spot and the building is gone: forget it.
           this.ghosts.delete(id);
-          const spr = this.ghostViews.get(id);
-          if (spr) {
-            spr.destroy();
+          const stale = this.ghostViews.get(id);
+          if (stale) {
+            stale.sprite.destroy();
             this.ghostViews.delete(id);
           }
         } else {
-          const spr = this.ghostViews.get(id);
-          if (spr) spr.visible = false;
+          const live = this.ghostViews.get(id);
+          if (live) live.sprite.visible = false;
         }
         continue;
       }
       // explored-but-not-visible: show the last-seen ghost
       const wantVisible = tv === 1 && g.player !== this.humanPlayer;
       // own buildings render live anyway (always visible to their owner in our draw rule)
-      let spr = this.ghostViews.get(id);
+      let view = this.ghostViews.get(id);
       if (wantVisible) {
-        if (!spr) {
-          spr = new Sprite();
-          spr.tint = GHOST_TINT;
-          spr.alpha = 0.8;
-          this.ghostViews.set(id, spr);
-          this.container.addChild(spr);
-          const colorIdx = state.players[g.player]?.setup.color;
-          // Farms have no bld/ frames (ART_BIBLE §4.4): remember them as a mature
-          // field (obj/farm/2) instead of the missing bld/farm/done placeholder.
-          const frame = g.defId === 'farm'
-            ? this.assets.resolveFrame('obj/farm/2', colorIdx)
-            : this.assets.tryResolve(`bld/${g.defId}/${g.age}/done`, colorIdx) ??
-              this.assets.resolveFrame(`bld/${g.defId}/done`, colorIdx);
-          spr.texture = frame.texture;
-          spr.anchor.set(frame.anchorX, frame.anchorY);
-          spr.scale.set(frame.renderScale);
-          spr.position.set(Math.round(g.wx), Math.round(g.wy));
-          spr.zIndex = g.wy;
+        if (!view) {
+          const sprite = new Sprite();
+          sprite.tint = GHOST_TINT;
+          this.container.addChild(sprite);
+          view = { sprite, lastFrameKey: '' };
+          this.ghostViews.set(id, view);
         }
-        spr.visible = true;
-      } else if (spr) {
-        spr.visible = false;
+        // A remembered building can change between sightings — a tower upgrades
+        // in place (upgradeUnit mutates defId), its owner ages up, a foundation
+        // finishes — so the frame is re-resolved whenever the memory changes,
+        // not once at creation.
+        const colorIdx = state.players[g.player]?.setup.color;
+        // Farms have no bld/ frames (ART_BIBLE §4.4): remember them as a
+        // mid-growth field instead of the missing bld/farm/done placeholder.
+        const choice = g.defId === 'farm'
+          ? { candidates: [UNSEEN_FARM_FRAME], alpha: 1 }
+          : buildingFrameCandidates(g.defId, g.age, g.progress);
+        const key = `${colorIdx ?? 'none'}|${g.mirrored ? 'wall-y|' : ''}${choice.candidates.join('|')}`;
+        if (key !== view.lastFrameKey) {
+          view.lastFrameKey = key;
+          const { frame, resolvedName } = this.resolveCandidates(choice.candidates, colorIdx);
+          const artScale = artScaleForFrame(g.defId, resolvedName);
+          view.sprite.texture = frame.texture;
+          view.sprite.anchor.set(frame.anchorX, frame.anchorY);
+          // Walls are authored along one isometric axis; a remembered run along
+          // the other one has to mirror exactly as the live sprite does.
+          const mirrorX = frame.mirrored !== g.mirrored;
+          view.sprite.scale.set(
+            mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
+            frame.renderScale * artScale.y,
+          );
+          view.sprite.alpha = 0.8 * choice.alpha;
+        }
+        view.sprite.position.set(Math.round(g.wx), Math.round(g.wy));
+        view.sprite.zIndex = artZIndex(g.defId, g.progress, g.wy);
+        view.sprite.visible = true;
+      } else if (view) {
+        view.sprite.visible = false;
       }
     }
   }
@@ -1074,23 +1138,8 @@ export function resourceFrameName(e: Entity, map?: GameMap): string {
   }
 }
 
-function buildingFrame(state: GameState, e: Entity): { candidates: string[]; alpha: number } {
-  const progress = e.buildProgress ?? 1000;
-  if (e.defId === 'farm') {
-    // ART_BIBLE §4.4: farms have no construct/rubble frames — obj/farm/<stage>,
-    // with a build-progress dropout (approximated here with alpha ramp).
-    if (progress < 1000) {
-      return { candidates: ['obj/farm/0'], alpha: 0.35 + (progress / 1000) * 0.65 };
-    }
-    const stage = (e.amountLeft ?? 1) <= 0 ? 4 : 3;
-    return { candidates: [`obj/farm/${stage}`], alpha: 1 };
-  }
-  if (progress < 1000) {
-    const stage = progress < 334 ? 0 : progress < 667 ? 1 : 2;
-    return { candidates: [`bld/${e.defId}/construct${stage}`], alpha: 1 };
-  }
-  const age = state.players[e.player]?.age ?? 'dark';
-  // TC/house have per-age variants (`bld/<defId>/<age>/done`); everything else
-  // is authored once as `bld/<defId>/done` — try the variant, fall back.
-  return { candidates: [`bld/${e.defId}/${age}/done`, `bld/${e.defId}/done`], alpha: 1 };
+function buildingFrame(state: GameState, e: Entity): BuildingArtChoice {
+  return buildingFrameCandidates(
+    e.defId, state.players[e.player]?.age ?? 'dark', e.buildProgress ?? 1000, e.amountLeft,
+  );
 }

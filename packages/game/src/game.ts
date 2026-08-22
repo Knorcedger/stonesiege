@@ -26,7 +26,7 @@ import { placementGhostFrames } from './frames';
 import { placementStatus, type PlacementStatus } from './placement';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
-import { WorldLayer } from './world';
+import { artScaleForFrame, WorldLayer } from './world';
 import { FxLayer } from './fx';
 import { FogLayer } from './fog';
 import { SimLoop, TICK_MS } from './simloop';
@@ -923,13 +923,19 @@ async function bootGame(
     const colorIdx = getState().players[humanPlayer]?.setup.color;
     const candidates = placementGhostFrames(placement.defId, getState().players[humanPlayer]?.age ?? 'dark');
     let frame = null;
+    let resolvedName = candidates[candidates.length - 1];
     for (let i = 0; i < candidates.length - 1 && !frame; i++) {
       frame = assets.tryResolve(candidates[i], colorIdx);
+      if (frame) resolvedName = candidates[i];
     }
-    frame ??= assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
+    frame ??= assets.resolveFrame(resolvedName, colorIdx);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
-    ghostSprite.scale.set(frame.renderScale);
+    // Same art scale the live building will be drawn at, so the preview is the
+    // size of what actually gets built (#116): without it a keep previewed at
+    // roughly a third of the tower the player ends up with.
+    const artScale = artScaleForFrame(placement.defId, resolvedName);
+    ghostSprite.scale.set(frame.renderScale * artScale.x, frame.renderScale * artScale.y);
   };
 
   const startPlacement = (defId: string): void => {

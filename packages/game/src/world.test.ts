@@ -1,8 +1,10 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 import { FP, type Entity, type GameMap, type GameState, type PlayerId } from '@bf/sim/types';
 import { tileToWorld } from './camera';
 import {
-  advanceGateOpenProgress, artScaleForFrame, buildingHpBarWidth, defaultRallyTilePoint,
+  advanceGateOpenProgress, artScaleForFrame, artZIndex, buildingHpBarWidth, defaultRallyTilePoint,
   entityPickDistance, isHiddenInHost, mirroredWallIds, ownedResearchProgress, resourceFrameName,
   wallCornerJoins, rallyFlagWorldPoint, shouldFadeForUnit,
 } from './world';
@@ -276,5 +278,95 @@ describe('artScaleForFrame', () => {
   it('preserves the fortification scales, which are keyed by def', () => {
     expect(artScaleForFrame('keep', 'bld/keep/done')).toEqual({ x: 2.95, y: 2.95 });
     expect(artScaleForFrame('stoneWall', 'bld/stoneWall/done')).toEqual({ x: 1.16, y: 1.82 });
+  });
+
+  it('leaves rubble scale-free: those frames are authored at footprint size', () => {
+    // Passing a keep's rubble through its 2.95x tower scale would draw a debris
+    // pile twice the width of the tile the tower stood on.
+    for (const defId of ['keep', 'gate', 'watchTower', 'townCenter', 'house']) {
+      expect(artScaleForFrame(defId, `bld/${defId}/rubble`).x).toBeLessThanOrEqual(
+        artScaleForFrame(defId, `bld/${defId}/done`).x,
+      );
+    }
+    expect(artScaleForFrame('townCenter', 'bld/townCenter/rubble')).toEqual({ x: 1, y: 1 });
+  });
+});
+
+describe('artScaleForFrame — house age crescendo', () => {
+  // Alpha-measured content size of the shipped frame, in world px at the runtime
+  // renderScale of 1/2. All four house ages ship the same 82x85 picture.
+  const AUTHORED = { w: 82, h: 84.5 };
+  const AGES = ['dark', 'feudal', 'castle', 'imperial'] as const;
+  const FOOTPRINT_W = 128; // size 2
+  // Every other size-2 building: mill 102, miningCamp 102, lumberCamp 99 px wide.
+  const PEER_FLOOR = 99;
+
+  const drawn = (age: string) => {
+    const scale = artScaleForFrame('house', `bld/house/${age}/done`);
+    return { w: AUTHORED.w * scale.x, h: AUTHORED.h * scale.y };
+  };
+
+  it('makes ageing up visible on housing, which shipped four identical frames', () => {
+    for (let i = 1; i < AGES.length; i++) {
+      expect(drawn(AGES[i]).w).toBeGreaterThan(drawn(AGES[i - 1]).w);
+      expect(drawn(AGES[i]).h).toBeGreaterThan(drawn(AGES[i - 1]).h);
+    }
+  });
+
+  it('lands the class in its size-2 peers band instead of 16 points below it', () => {
+    expect(drawn('dark').w).toBeGreaterThan(AUTHORED.w);
+    expect(drawn('imperial').w).toBeGreaterThan(PEER_FLOOR);
+    // packed housing rows must keep visible gaps
+    expect(drawn('imperial').w).toBeLessThan(FOOTPRINT_W * 0.9);
+  });
+
+  it('never upsamples the authored frame', () => {
+    for (const age of AGES) {
+      expect(artScaleForFrame('house', `bld/house/${age}/done`).x / 2).toBeLessThan(1);
+    }
+  });
+});
+
+describe('artZIndex', () => {
+  it('sorts farms and fresh foundations under everything else', () => {
+    expect(artZIndex('farm', 1000, 500)).toBeLessThan(artZIndex('barracks', 1000, 500));
+    expect(artZIndex('barracks', 100, 500)).toBeLessThan(artZIndex('barracks', 1000, 500));
+    // past the flat stage a foundation sorts with the buildings again
+    expect(artZIndex('barracks', 300, 500)).toBe(500);
+  });
+
+  it('lifts a gatehouse over the wall caps it joins, so the arch is never half-hidden', () => {
+    expect(artZIndex('gate', 1000, 500)).toBeGreaterThan(artZIndex('stoneWall', 1000, 500));
+  });
+
+  it('ranks units by their world y', () => {
+    expect(artZIndex('villager', undefined, 420)).toBe(420);
+  });
+});
+
+describe('no building-art draw path may drift off the shared art scale', () => {
+  // The live sprite, the fog ghost and the placement preview each drew the same
+  // building frames from a private copy of the scale rule, so towers, gates and
+  // walls rendered at ~1/2.5 scale as ghosts and previews for as long as the
+  // three paths disagreed (#116). A drawn size derived from renderScale without
+  // the art scale is that bug coming back.
+  const read = (name: string) =>
+    readFileSync(fileURLToPath(new URL(name, import.meta.url)), 'utf8');
+
+  it('multiplies every renderScale in the entity and placement layers by artScale', () => {
+    for (const file of ['./world.ts', './game.ts']) {
+      const offenders = read(file)
+        .split('\n')
+        .map((line, i) => ({ line: line.trim(), n: i + 1 }))
+        .filter(({ line }) => line.includes('renderScale') && !line.includes('artScale'));
+      expect(offenders, `${file} draws building art without the shared art scale`).toEqual([]);
+    }
+  });
+
+  it('keeps rubble and terrain out of it, which are authored at footprint size', () => {
+    // fx.ts rubble is deliberately scale-free — asserted here so the exclusion is
+    // a decision on the record rather than an oversight.
+    expect(read('./fx.ts')).toContain('renderScale');
+    expect(read('./fx.ts')).not.toContain('artScale');
   });
 });
