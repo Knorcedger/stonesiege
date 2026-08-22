@@ -12,8 +12,8 @@ import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gameData } from '@bf/data';
 import {
-  EDGE_VARIANTS, EDGES, PRESENTATION_TILES, ROAD_AXES, ROAD_JOINT_VARIANTS, ROAD_OFFSETS,
-  TERRAINS, VERGE_REACH, VERGE_TERRAINS, edgePairs,
+  EDGE_VARIANTS, EDGES, PRESENTATION_TILES, ROAD_AXES, ROAD_BENDS, ROAD_BEND_ARMS,
+  ROAD_BEND_VARIANTS, ROAD_JOINT_VARIANTS, ROAD_OFFSETS, TERRAINS, edgePairs,
 } from './gen-terrain.ts';
 import { CMD_VERBS } from './gen-icons.ts';
 
@@ -94,7 +94,10 @@ describe('terrain atlas', () => {
       }
     }
     expect(EDGE_VARIANTS).toBeGreaterThanOrEqual(2); // one frame per edge repeats its wobble on every tile
-    expect(wanted.length).toBe(36 * 4 * EDGE_VARIANTS);
+    // `road` is drawn over its ground rather than transitioned into, so it is not
+    // one of the 8 terrains that pair up here.
+    expect(edgePairs().some(([hi, lo]) => hi === 'road' || lo === 'road')).toBe(false);
+    expect(wanted.length).toBe(28 * 4 * EDGE_VARIANTS);
     expectFrames(terrain, wanted);
   });
 
@@ -124,14 +127,16 @@ describe('terrain atlas', () => {
     expectFrames(terrain, wanted);
   });
 
-  it('has verge frames at every depth for everything that reclaims a road', () => {
+  it('has every bend: corner x what each arm hands over x variant', () => {
     const wanted: string[] = [];
-    for (const lo of VERGE_TERRAINS) {
-      for (const edge of EDGES) {
-        for (let v = 0; v < VERGE_REACH.length; v++) wanted.push(`terr/verge/${lo}/${edge}/${v}`);
+    for (const bend of ROAD_BENDS) {
+      for (const arms of ROAD_BEND_ARMS) {
+        for (let v = 0; v < ROAD_BEND_VARIANTS; v++) wanted.push(`terr/road-bend/${bend}/${arms}/${v}`);
       }
     }
-    expect(VERGE_REACH.length).toBeGreaterThanOrEqual(3); // shallow / middling / deep
+    // Every corner must exist for both arm kinds, or a road stepping between the
+    // axes would fall back to the junction tile and read as a staircase.
+    expect(ROAD_BEND_ARMS).toEqual(['ss', 'sb', 'bs', 'bb']);
     expectFrames(terrain, wanted);
   });
 

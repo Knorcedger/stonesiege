@@ -30,8 +30,8 @@ const TERRAIN_PRIORITY: Record<string, number> = {
 /** Wet terrain: the material a crossing has to span. */
 const WET_TERRAIN = new Set(['water', 'shallows']);
 
-/** Terrains that creep back over the edge of a road they border (ART_BIBLE §3.2). */
-const VERGE_TERRAINS = new Set(['grass', 'dirt', 'sand', 'snow']);
+/** What a road ribbon may be drawn over — the ground the track was worn into. */
+const ROAD_GROUND = ['grass', 'dirt', 'sand', 'snow', 'farmland'];
 
 /** How far along each axis a road's run direction is measured. */
 const ROAD_RUN_REACH = 3;
@@ -41,6 +41,12 @@ const ROAD_JOINT_VARIANTS = 3;
 
 /** Track offsets a road may cross a tile edge at (indices into the baked art). */
 const ROAD_JOINT_OFFSETS = 3;
+
+/** Surface variants per bend corner (`terr/road-bend/<corner>/<arms>/<v>`). */
+const ROAD_BEND_VARIANTS = 2;
+
+/** Variants of the half-tile fill wedge (`terr/road-fill/<edge>/<v>`). */
+const ROAD_FILL_VARIANTS = 2;
 
 /** Stable per-tile hash — the same tile always weathers (or does not) the same way. */
 function tileHash(x: number, y: number, salt: number): number {
@@ -135,13 +141,16 @@ export function displayTerrainId(
   const throughY = road(0, -1) && road(0, 1);
   if (throughX !== throughY) return throughX ? 'road-x' : 'road-y';
   if (!throughX) {
-    // A stub, a bend or a lone tile. One axis only still runs — that is a road
-    // ending at a ford or a gate, and its ruts should reach the last tile — but
-    // a bend, a crossroads and an island all take the scuffed junction tile.
-    const hasX = road(-1, 0) || road(1, 0);
-    const hasY = road(0, -1) || road(0, 1);
-    if (hasX && !hasY) return 'road-x';
-    if (hasY && !hasX) return 'road-y';
+    const west = road(-1, 0);
+    const east = road(1, 0);
+    const north = road(0, -1);
+    const south = road(0, 1);
+    // Exactly one neighbour per axis: the road turns here, and it turns on an arc.
+    if ((west !== east) && (north !== south)) return 'road-bend';
+    // One axis only still runs — a road ending at a ford or a gate, whose ruts
+    // should reach its last tile. A lone tile keeps the scuffed junction tile.
+    if (west || east) return 'road-x';
+    if (north || south) return 'road-y';
     return terrain;
   }
   // Through on both axes: a wide road, or a genuine crossroads. Whichever axis
@@ -160,63 +169,71 @@ export function displayTerrainId(
 }
 
 /**
- * Where the track crosses the edge INTO this tile, as an index into the baked
- * road offsets. Derived from the tile's own coordinates, so the neighbour along
- * the road computes the same value for the edge they share: the exit offset of
- * one tile is the entry offset of the next, and the road meanders across the grid
- * as one continuous line instead of a ruled one.
+ * Where the track crosses one tile edge, as an index into the baked road offsets.
+ *
+ * The edge is named by the tile on its far side, so both tiles sharing it compute
+ * the same value: one tile's exit offset IS its neighbour's entry offset, and the
+ * road meanders across the grid as one continuous line instead of a ruled one.
+ * Bends and junctions always take the middle offset — their art crosses at the
+ * edge midpoint — so a straight run meeting one lines up with it.
  */
-function roadOffsetAt(x: number, y: number): number {
-  return tileHash(x, y, 7) % ROAD_JOINT_OFFSETS;
+function roadEdgeOffset(map: GameMap, x: number, y: number, dx: number, dy: number, fords: ReadonlySet<number>): number {
+  const middle = (ROAD_JOINT_OFFSETS - 1) / 2;
+  const straight = (tx: number, ty: number): boolean => {
+    const family = displayTerrainId(map, tx, ty, fords);
+    return family === 'road-x' || family === 'road-y';
+  };
+  if (!straight(x, y) || !straight(x + dx, y + dy)) return middle;
+  const key = dx + dy > 0 ? [x + dx, y + dy] : [x, y];
+  return tileHash(key[0], key[1], 7) % ROAD_JOINT_OFFSETS;
 }
 
 /**
- * Frame name (without the `terr/` prefix) for a road tile drawn along one axis:
- * `road-<axis>/<entry><exit>/<variant>`.
+ * Frame name (without the `terr/` prefix) for a road tile: a straight run carries
+ * the joint it crosses each edge at, `road-<axis>/<entry><exit>/<variant>`; a bend
+ * carries the two edges it turns between, `road-bend/<corner>/<variant>`.
  */
-export function roadFrameName(x: number, y: number, family: 'road-x' | 'road-y'): string {
-  const axis = family === 'road-x' ? [1, 0] : [0, 1];
-  const entry = roadOffsetAt(x, y);
-  const exit = roadOffsetAt(x + axis[0], y + axis[1]);
+export function roadFrameName(
+  map: GameMap, x: number, y: number, family: string, fords: ReadonlySet<number>,
+): string {
+  if (family === 'road-bend') {
+    const road = (dx: number, dy: number): boolean => terrainIdAt(map, x + dx, y + dy) === 'road';
+    const alongX = road(-1, 0) ? -1 : 1;
+    const alongY = road(0, -1) ? -1 : 1;
+    const corner = `${alongX < 0 ? 'nw' : 'se'}${alongY < 0 ? 'ne' : 'sw'}`;
+    // What lies beyond each arm decides the tangent the curve leaves on: another
+    // bend hands the track over mid-turn (draw the chord, so a staircase is one
+    // straight diagonal), a straight run hands it over on its own axis.
+    const arm = (dx: number, dy: number): string => (
+      displayTerrainId(map, x + dx, y + dy, fords) === 'road-bend' ? 'b' : 's'
+    );
+    const arms = `${arm(alongX, 0)}${arm(0, alongY)}`;
+    return `road-bend/${corner}/${arms}/${tileHash(x, y, 5) % ROAD_BEND_VARIANTS}`;
+  }
+  const [dx, dy] = family === 'road-x' ? [1, 0] : [0, 1];
+  const entry = roadEdgeOffset(map, x, y, -dx, -dy, fords);
+  const exit = roadEdgeOffset(map, x, y, dx, dy, fords);
   return `${family}/${entry}${exit}/${tileHash(x, y, 3) % ROAD_JOINT_VARIANTS}`;
 }
 
 /**
- * Which verge depth an edge of a road tile gets: the side the track meanders away
- * from is reclaimed deeper, so the bare earth is a ribbon that follows the road
- * instead of a band of fixed width. Edges that are not a road's flank (and tiles
- * with no run direction) fall back to a stable per-tile pick.
+ * The ground a road tile's ribbon is drawn over: the nearest ordinary land
+ * terrain around it, so a track worn across a meadow lies on grass and one across
+ * a snowfield lies on snow. Roads are ribbons on the ground, not tile-shaped
+ * patches — that is what lets a road stepping between the tile axes read as one
+ * diagonal instead of a staircase of tile-sized jogs.
  */
-export function vergeVariantIndex(
-  x: number, y: number, edge: string, family: string | null, count: number,
-): number {
-  if (count <= 1) return 0;
-  if (family === 'road-x' || family === 'road-y') {
-    const step = family === 'road-x' ? [1, 0] : [0, 1];
-    const swing = roadOffsetAt(x, y) + roadOffsetAt(x + step[0], y + step[1]) - (ROAD_JOINT_OFFSETS - 1);
-    const near = family === 'road-x' ? 'ne' : 'nw';
-    const far = family === 'road-x' ? 'sw' : 'se';
-    if (edge === near || edge === far) {
-      const away = edge === near ? swing > 0 : swing < 0;
-      if (swing !== 0) return away ? count - 1 : 0;
-      return Math.floor((count - 1) / 2);
+export function roadGroundId(map: GameMap, x: number, y: number): string {
+  for (let radius = 1; radius <= 4; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+        const terrain = terrainIdAt(map, x + dx, y + dy);
+        if (terrain !== null && ROAD_GROUND.includes(terrain)) return terrain;
+      }
     }
   }
-  return tileHash(x, y, edge.charCodeAt(1)) % count;
-}
-
-/**
- * The neighbour terrain creeping over this tile's edge, per edge, or null.
- *
- * Edge transitions only run high priority into low, so a road — the second
- * highest terrain there is — would otherwise be the one thing in the game with
- * an edge nothing encroaches on. Grass, dirt, sand and snow bite back into a
- * road's margin, and the two interlock instead of meeting on a ruled line.
- */
-export function vergeTerrainId(map: GameMap, x: number, y: number, edgeX: number, edgeY: number): string | null {
-  if (terrainIdAt(map, x, y) !== 'road') return null;
-  const neighbor = terrainIdAt(map, x + edgeX, y + edgeY);
-  return neighbor !== null && VERGE_TERRAINS.has(neighbor) ? neighbor : null;
+  return ROAD_GROUND[0];
 }
 
 interface Chunk {
@@ -366,14 +383,22 @@ export class TerrainLayer {
     return terrain;
   }
 
+  /** The ground tile a road ribbon is drawn over. */
+  private groundFrame(x: number, y: number) {
+    const ground = roadGroundId(this.map, x, y);
+    const variants = this.variantCount(ground);
+    const variant = variants > 0 ? ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0) % variants : 0;
+    return this.assets.resolveFrame(`terr/${ground}/${variant}`);
+  }
+
   /**
    * The tile's own frame: a road resolves to its run direction and joint so the
    * track threads through and meanders; everything else picks a variant by tile
    * coordinate. Anything the atlas is missing falls back to the plain tile.
    */
   private tileFrame(x: number, y: number, family: string) {
-    if (family === 'road-x' || family === 'road-y') {
-      const road = this.assets.tryResolve(`terr/${roadFrameName(x, y, family)}`);
+    if (family === 'road-x' || family === 'road-y' || family === 'road-bend') {
+      const road = this.assets.tryResolve(`terr/${roadFrameName(this.map, x, y, family, this.fords)}`);
       if (road) return road;
       family = 'road';
     }
@@ -389,23 +414,10 @@ export class TerrainLayer {
   private transitionTerrainAt(x: number, y: number): string | null {
     const terrain = this.displayTerrainAt(x, y);
     if (terrain === 'ford') return 'shallows';
-    if (terrain === 'road-x' || terrain === 'road-y') return 'road';
+    // A road no longer transitions at all: it lies ON its ground, so the tile
+    // blends with its neighbours exactly as that ground does.
+    if (terrain !== null && terrain.startsWith('road')) return roadGroundId(this.map, x, y);
     return terrain;
-  }
-
-  /** One `terr/verge/<lo>/<edge>/<variant>` frame, or null when nothing creeps here. */
-  private vergeFrame(x: number, y: number, edgeX: number, edgeY: number, edge: string, family: string | null) {
-    const lo = vergeTerrainId(this.map, x, y, edgeX, edgeY);
-    if (lo === null) return null;
-    const prefix = `terr/verge/${lo}/${edge}`;
-    let count = this.variantCounts.get(prefix);
-    if (count === undefined) {
-      count = 0;
-      while (count < 8 && this.assets.tryResolve(`${prefix}/${count}`)) count++;
-      this.variantCounts.set(prefix, count);
-    }
-    if (count === 0) return null;
-    return this.assets.tryResolve(`${prefix}/${vergeVariantIndex(x, y, edge, family, count)}`);
   }
 
   /**
@@ -453,25 +465,41 @@ export class TerrainLayer {
         const lx = cxw - b.x0;
         const ly = cyw - b.y0;
 
+        // A road is a ribbon lying on the ground: paint the ground first, then
+        // the track over it, so its silhouette is the track and not the diamond.
+        // Where the road is wider than one tile, the half facing each road
+        // neighbour is filled in, so the lanes merge into one band and only the
+        // band's outer edge keeps the ribbon's frayed silhouette.
+        if (terr.startsWith('road')) {
+          const ground = this.groundFrame(tx, ty);
+          const gspr = new Sprite(ground.texture);
+          gspr.anchor.set(ground.anchorX, ground.anchorY);
+          gspr.scale.set(ground.renderScale);
+          gspr.position.set(lx, ly);
+          temp.addChild(gspr);
+
+          for (const [nx, ny, edge] of [
+            [0, -1, 'ne'], [1, 0, 'se'], [0, 1, 'sw'], [-1, 0, 'nw'],
+          ] as Array<[number, number, string]>) {
+            if (this.terrainAt(tx + nx, ty + ny) !== 'road') continue;
+            const fill = this.assets.tryResolve(
+              `terr/road-fill/${edge}/${tileHash(tx, ty, edge.charCodeAt(1)) % ROAD_FILL_VARIANTS}`,
+            );
+            if (!fill) continue;
+            const fspr = new Sprite(fill.texture);
+            fspr.anchor.set(fill.anchorX, fill.anchorY);
+            fspr.scale.set(fill.renderScale);
+            fspr.position.set(lx, ly);
+            temp.addChild(fspr);
+          }
+        }
+
         const frame = this.tileFrame(tx, ty, terr);
         const spr = new Sprite(frame.texture);
         spr.anchor.set(frame.anchorX, frame.anchorY);
         spr.scale.set(frame.renderScale);
         spr.position.set(lx, ly);
         temp.addChild(spr);
-
-        // Verges creep back over a road's own margin (nothing else outranks it).
-        for (const [nx, ny, edge] of [
-          [0, -1, 'ne'], [1, 0, 'se'], [0, 1, 'sw'], [-1, 0, 'nw'],
-        ] as Array<[number, number, string]>) {
-          const verge = this.vergeFrame(tx, ty, nx, ny, edge, terr);
-          if (!verge) continue;
-          const vspr = new Sprite(verge.texture);
-          vspr.anchor.set(verge.anchorX, verge.anchorY);
-          vspr.scale.set(verge.renderScale);
-          vspr.position.set(lx, ly);
-          temp.addChild(vspr);
-        }
 
         // Edge transitions: higher-priority neighbors bleed a fringe into this tile.
         const myTerr = this.transitionTerrainAt(tx, ty) ?? terr;

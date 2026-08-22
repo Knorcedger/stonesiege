@@ -174,7 +174,7 @@ picking variants per-coordinate hash at runtime.
 | `water` | `waterBase` | 3 horizontal shimmer bands: rows y=8/16/24 dashed `waterLight` (dash 4 px, gap 6 px, x-offset differs per variant); ~10 px `waterDeep` speckle below center; 1–2 single `highlight` sparkle px | 4 (band offsets shift +2 px per variant — tiling water looks alive without animation) |
 | `shallows` | `waterLight` | broad dithered sand/gravel bed patches (`dirtPale`/`dirtLight`) so the bottom is plainly visible, sparse `waterBase`/`stoneLight` speckle, 1–2 stones breaking the surface, broken `highlight` ripple bands | 3 |
 | `sand` | `dirtPale` | sparse earth/thatch flecks and short wind-ripple dashes | 3 |
-| `road` | `dirtLight` | packed earth, never one flat tone: 4–5 dithered damp/dry patches (`dirtBase`/`dirtPale`), ~40 px earth+stone fleck, 3–5 loose stones, 1–2 potholes (`dirtDark` core, dithered `dirtBase` rim), weed tufts. This is the **junction** tile — a bend, a crossroads or a lone tile, scuffed in both directions. A road that runs draws from the oriented families instead (§3.3) | 4 |
+| `road` | `dirtLight` | packed earth, never one flat tone: dithered damp/dry patches (`dirtBase`/`dirtPale`), grit fleck, 1–3 loose stones, 1–2 potholes (`dirtDark` core, dithered `dirtBase` rim), weed tufts. Unlike every other terrain this frame does NOT fill its diamond: roads are ribbons laid over the ground (§3.3), and this one is the junction patch — a crossroads or a lone tile | 4 |
 | `farmland` (under farm objects, optional) | `dirtBase` | plow rows: 1 px `dirtDark` lines parallel to the NW edge every 4 px, `dirtLight` line adjacent (furrow highlight) | 2 |
 | `snow` | `highlight` | cool stone/parchment speckle with short pale drift lines | 3 |
 | `cliff` (blocked) | `stoneDark` | raised `stoneBase`/`stoneLight` shelf over dark layered strata, broken seams, cracks, and stone flecks | 3 |
@@ -187,8 +187,10 @@ Noise placement: rejection-sample points inside the diamond via
 
 ### 3.2 Edge transitions
 
-Terrain priority (high paints over low): `cliff > road > farmland > forest > snow >
-grass > dirt > sand > shallows > water`.
+Terrain priority (high paints over low): `cliff > farmland > forest > snow > grass >
+dirt > sand > shallows > water`. `road` takes no part — it is drawn as a ribbon over the
+ground it was worn into (§3.3), so a road tile blends with its neighbours as that ground
+does, and `terr/road_*` / `terr/*_road` transition frames are not baked at all.
 
 Algorithm (baked transition frames `terr/<hi>_<lo>/<edge>/<variant>`; a tile diamond's
 four edges run diagonally on screen, so edges are named `nw`, `ne`, `sw`, `se`. These
@@ -232,34 +234,35 @@ the water; ~26 px `waterBase`/`stoneLight` speckle; 4–5 stepping stones (`ston
 `highlight` current lines. Water still covers most of the tile: a crossing must never read
 as dry ground standing in the middle of a river.
 
-**`road-x` / `road-y`** (`terr/road-<axis>/<entry><exit>/<variant>`, 3 variants per joint)
-draw a road that RUNS, as opposed to the junction tile it turns or ends on. A road enters
-and leaves its tile at the midpoints of two opposite edges, and the neighbouring tile along
-the road is drawn at exactly (±32, +16) — which maps the line joining those midpoints onto
-itself. Everything is therefore authored against the across-road distance from that line:
+#### Roads are ribbons, not tiles
 
-- a crown ~11 px wide polished pale (`dirtPale`) by traffic;
-- two cart ruts (`dirtDark`) at −6 and +4.5 px, each wandering ±2.6 px on value noise and
-  breaking (~30% of pixels missing, ~62% on the abandoned variant);
-- damp shoulders (`dirtBase`, `dirtDark` past 13.5 px), broken up by noise so the track is
-  never outlined by a solid band;
-- weeds thickening outward from the crown; the last variant is a stretch the traffic has
-  nearly abandoned, mostly grass with a thread of rut left.
+Every road frame is **transparent past the track's own edge**, and the renderer paints the
+surrounding ground (`grass`/`dirt`/`sand`/`snow`/`farmland`, whichever is nearest) under it.
+This is the whole reason a road can look like a road:
 
-`entry` and `exit` index `ROAD_OFFSETS` (−4.5, 0, +4.5 px): where the track crosses into the
-neighbouring tile. The renderer derives both ends from the tile coordinates, so one tile's
-exit offset IS its neighbour's entry offset, and the whole road meanders across the grid as
-one continuous line. Ruts drawn per tile without this restart in every diamond and read as
-churned mud; a fixed centre line reads as ruled with a straightedge.
+- a tile-shaped road patch jogs a full tile wherever the route steps between the map axes,
+  so any road that is not perfectly axis-aligned reads as a staircase;
+- a ribbon crosses its tile corner to corner, so the same route reads as one continuous
+  track, and its silhouette is the track rather than the diamond.
 
-**`verge`** (`terr/verge/<lo>/<edge>/<variant>`, `lo` ∈ grass/dirt/sand/snow, 3 depths) is
-the neighbour terrain creeping back OVER a road tile's edge: a noise-broken tongue
-(`VERGE_REACH` 2.4 / 4.0 / 6.8 px, wobbled ±3.5) thinning inward. Edge transitions only run
-high priority into low, so without it a road — the second-highest terrain there is — would
-be the one edge in the game nothing can encroach on, and a track nothing has encroached on
-is a track laid this morning. The renderer picks the depth from the tile's own meander: the
-flank the track swings away from is reclaimed deeper, so the bare earth is a ribbon that
-follows the road rather than a band of fixed width between two parallel lines.
+`roadBand` lays the ribbon: every pixel within a noisy half-width (12.5 px ±3.5, two octaves
+of value noise) of the track centre, with a 2.6 px dithered frayed rim and nothing outside
+it. On top of that: a crown ~11 px wide polished pale (`dirtPale`), damp shoulders
+(`dirtBase`, `dirtDark` past 12 px), two cart ruts (`dirtDark`) at −6 and +4.5 px wandering
+±2.6 px and breaking (~30% of pixels missing, ~62% on the abandoned variant), grit, stones,
+potholes and weeds thickening outward from the crown.
+
+Four families use it:
+
+| Family | Frames | What it draws |
+|---|---|---|
+| `road-x`, `road-y` | `terr/road-<axis>/<entry><exit>/<variant>`, 3 variants per joint | A road running along one map axis. `entry`/`exit` index `ROAD_OFFSETS` (−4.5, 0, +4.5 px): where the track crosses into the neighbouring tile. The renderer derives both from tile coordinates, so one tile's exit offset IS its neighbour's entry offset and the whole road meanders as one continuous line. The last variant is a stretch the traffic has nearly abandoned |
+| `road-bend` | `terr/road-bend/<corner>/<arms>/<variant>`, 2 variants | A road turning between the two edges `corner` names (`nw` west, `se` east, `ne` north, `sw` south), on a cubic Bezier between their midpoints. `arms` says what lies beyond each edge — `s` a straight run, `b` another bend — and sets the end tangents: a lone corner (`ss`) turns on a quarter arc tangent to both runs, while a bend between two bends (`bb`) draws the straight chord, so the staircase a curved route makes is one straight diagonal on screen instead of a sawtooth |
+| `road-fill` | `terr/road-fill/<edge>/<variant>`, 2 variants | The half of a tile facing a road tile beside it, in bare packed earth. A road wider than one tile is a row of ribbons with ground showing between them; filling the halves that face each other merges the lanes into one band while the band's outer edge keeps the frayed ribbon silhouette |
+| `road` (§3.1) | `terr/road/<variant>` | The junction patch: a crossroads, or a lone tile. Scuffed in both directions, reaching every edge midpoint so whatever meets it joins on |
+
+Maps should author roads as curves (`curveTiles` in `packages/scenarios`), not as
+axis-aligned runs meeting at right angles: no road worn by traffic turns 90° on the spot.
 
 ---
 
@@ -798,7 +801,7 @@ mirrored into ASSET_CONTRACT.md; the rest still need sign-off.
    anim, alongside `playerColorStrategy`.
 7. **Baked terrain transitions** [in contract]: `terr/<hi>_<lo>/<edge>/<variant>` with
    `edge` ∈ {`nw`, `ne`, `sw`, `se`} (§3.2), packed into `terrain.png`, alongside the
-   presentation-only `terr/ford/<variant>` crossing tile (§3.3).
+   presentation-only crossing tile and road ribbon families (§3.3).
 8. **Grayscale icon companions** [in contract]: `icon/<id>/gray` (§8.1 disabled
    buttons), packed into `icons.png`; luma-mapped onto the stone ramp, never masked.
 9. **`@p<idx>` scope & token** [in contract]: the variant token is the numeric player

@@ -8,6 +8,7 @@
 import type {
   CampaignDef, ScenarioDef, ScenarioEntity, ScenarioMap, TriggerDef,
 } from '../schema';
+import { curveTiles } from './authoring';
 
 type MissionKind = 'journey' | 'retreat' | 'battle' | 'siege' | 'defend' | 'lastStand';
 type Climate = 'temperate' | 'northern' | 'steppe' | 'mediterranean' | 'desert';
@@ -73,17 +74,27 @@ function historicalMap(climate: Climate): ScenarioMap {
     for (let y = y0; y <= y1; y++) for (let x = 33; x <= 37; x++) grid[y][x] = 's';
   }
 
-  // The road from the player's camp to the goal. It stops at the southern ford,
-  // and the route through the river is water the whole way: the crossing itself,
-  // a shallow lane up the middle of the channel, and the northern crossing back
-  // onto the east bank. Those tiles used to be painted as road, which put dry
+  // The route through the river is water the whole way: the southern ford, a
+  // shallow lane up the middle of the channel, and the northern crossing back
+  // onto the east bank. These tiles used to be painted as road, which put dry
   // ground inside the river and hid where the map is actually crossable; they
   // carry exactly the same traffic as shallows, and now they look like it.
-  for (let x = 12; x <= 32; x++) grid[54][x] = 'r';
   for (let y = 25; y <= 54; y++) grid[y][35] = 's';
   for (let x = 35; x <= 37; x++) grid[25][x] = 's';
-  for (let x = 38; x <= 58; x++) grid[25][x] = 'r';
-  for (let y = 15; y <= 25; y++) grid[y][58] = 'r';
+
+  // The road from the player's camp to the goal, laid on a curve: it wanders up
+  // the west bank, wades the southern ford, and swings north on the east bank.
+  // Nothing is painted on water, so the crossing stays shallows the player can
+  // see through and the map's passability is exactly what it was when this road
+  // ran in straight lines with right-angle corners.
+  for (const [x, y] of curveTiles([
+    [12, 57], [19, 56], [25, 54], [30, 53], [35, 53], [40, 52],
+    [43, 47], [44, 41], [43, 35], [46, 29], [51, 24], [55, 19], [58, 15],
+  ])) {
+    if (y < 0 || y >= HEIGHT || x < 0 || x >= WIDTH) continue;
+    if (grid[y][x] === 'w' || grid[y][x] === 's') continue;
+    grid[y][x] = 'r';
+  }
 
   // Gatherable pockets remain well away from the authored building footprints.
   for (const [x, y, token] of [

@@ -5,9 +5,7 @@
 
 import { describe, expect, it } from 'vitest';
 import type { GameMap, TerrainId } from '@bf/sim/types';
-import {
-  displayTerrainId, fordTiles, roadFrameName, vergeTerrainId, vergeVariantIndex,
-} from './terrain';
+import { displayTerrainId, fordTiles, roadFrameName, roadGroundId } from './terrain';
 
 const LEGEND: Record<string, TerrainId> = {
   '.': 'grass',
@@ -117,7 +115,7 @@ describe('displayTerrainId', () => {
     }
   });
 
-  it('leaves a corner, a crossroads and a lone tile on the junction tile', () => {
+  it('bends at a corner and keeps a crossroads and a lone tile on the junction tile', () => {
     const corner = mapOf([
       '.......',
       '.rrrr..',
@@ -125,7 +123,7 @@ describe('displayTerrainId', () => {
       '....r..',
       '.......',
     ]);
-    expect(display(corner, 4, 1)).toBe('road'); // the turn itself
+    expect(display(corner, 4, 1)).toBe('road-bend'); // the turn itself, on an arc
     expect(display(corner, 2, 1)).toBe('road-x');
     expect(display(corner, 4, 3)).toBe('road-y');
 
@@ -152,68 +150,123 @@ describe('displayTerrainId', () => {
 });
 
 describe('roadFrameName', () => {
+  const straight = (axis: 'x' | 'y', length: number): GameMap => mapOf(
+    axis === 'x'
+      ? Array.from({ length: 3 }, (_, y) => (y === 1 ? 'r'.repeat(length) : '.'.repeat(length)))
+      : Array.from({ length }, () => '.r.'),
+  );
+
   it('hands the next tile along the road the joint it left on', () => {
     // The track must not jump at a tile boundary: tile N's exit offset is tile
     // N+1's entry offset, which is what makes the meander one continuous line.
-    for (let x = 0; x < 24; x++) {
-      const [, joint] = roadFrameName(x, 7, 'road-x').split('/');
-      const [, next] = roadFrameName(x + 1, 7, 'road-x').split('/');
+    const alongX = straight('x', 24);
+    for (let x = 1; x < 22; x++) {
+      const joint = roadFrameName(alongX, x, 1, 'road-x', new Set()).split('/')[1];
+      const next = roadFrameName(alongX, x + 1, 1, 'road-x', new Set()).split('/')[1];
       expect(joint[1]).toBe(next[0]);
     }
-    for (let y = 0; y < 24; y++) {
-      const [, joint] = roadFrameName(3, y, 'road-y').split('/');
-      const [, next] = roadFrameName(3, y + 1, 'road-y').split('/');
+    const alongY = straight('y', 24);
+    for (let y = 1; y < 22; y++) {
+      const joint = roadFrameName(alongY, 1, y, 'road-y', new Set()).split('/')[1];
+      const next = roadFrameName(alongY, 1, y + 1, 'road-y', new Set()).split('/')[1];
       expect(joint[1]).toBe(next[0]);
     }
   });
 
   it('actually meanders: a long run uses more than one joint', () => {
+    const map = straight('x', 40);
     const joints = new Set<string>();
-    for (let x = 0; x < 40; x++) joints.add(roadFrameName(x, 7, 'road-x').split('/')[1]);
+    for (let x = 1; x < 39; x++) joints.add(roadFrameName(map, x, 1, 'road-x', new Set()).split('/')[1]);
     expect(joints.size).toBeGreaterThan(2);
+    expect(roadFrameName(map, 9, 1, 'road-x', new Set())).toMatch(/^road-x\/[012][012]\/\d$/);
+  });
+
+  it('crosses at the middle offset where a run meets a bend', () => {
+    // A bend's arc enters at the edge midpoint, so the straight tile feeding it
+    // has to arrive there too, or the track would step sideways at the join.
+    const map = mapOf([
+      '.......',
+      '.rrrr..',
+      '....r..',
+      '....r..',
+      '.......',
+    ]);
+    const fords = new Set<number>();
+    expect(display(map, 4, 1)).toBe('road-bend');
+    expect(roadFrameName(map, 3, 1, 'road-x', fords).split('/')[1][1]).toBe('1');
+    expect(roadFrameName(map, 4, 2, 'road-y', fords).split('/')[1][0]).toBe('1');
+  });
+
+  it('names the bend after the two edges the road turns between', () => {
+    const fords = new Set<number>();
+    const bendOf = (rows: string[], x: number, y: number): string =>
+      roadFrameName(mapOf(rows), x, y, 'road-bend', fords).split('/')[1];
+    // west + south
+    expect(bendOf(['.....', '.rrr.', '...r.', '...r.'], 3, 1)).toBe('nwsw');
+    // west + north
+    expect(bendOf(['...r.', '...r.', '.rrr.', '.....'], 3, 2)).toBe('nwne');
+    // east + south
+    expect(bendOf(['.....', '.rrr.', '.r...', '.r...'], 1, 1)).toBe('sesw');
+    // east + north
+    expect(bendOf(['.r...', '.r...', '.rrr.', '.....'], 1, 2)).toBe('sene');
   });
 
   it('is stable for a tile', () => {
-    expect(roadFrameName(9, 4, 'road-x')).toBe(roadFrameName(9, 4, 'road-x'));
-    expect(roadFrameName(9, 4, 'road-x')).toMatch(/^road-x\/[012][012]\/\d$/);
+    const map = straight('x', 24);
+    expect(roadFrameName(map, 9, 1, 'road-x', new Set()))
+      .toBe(roadFrameName(map, 9, 1, 'road-x', new Set()));
   });
 });
 
-describe('verges', () => {
-  const map = mapOf([
-    '.......',
-    'rrrrrrr',
-    '.......',
-    '..w....',
-    '..r....',
-  ]);
-
-  it('lets grass, dirt, sand and snow creep over a road edge', () => {
-    expect(vergeTerrainId(map, 3, 1, 0, -1)).toBe('grass');
-    expect(vergeTerrainId(map, 3, 1, 0, 1)).toBe('grass');
-  });
-
-  it('never creeps along a road-to-road edge, over water, or onto a non-road tile', () => {
-    expect(vergeTerrainId(map, 3, 1, 1, 0)).toBeNull(); // next road tile
-    expect(vergeTerrainId(map, 2, 4, 0, -1)).toBeNull(); // water above
-    expect(vergeTerrainId(map, 3, 0, 0, 1)).toBeNull(); // grass tile, not a road
-  });
-
-  it('reclaims deeper on the flank the track meanders away from', () => {
-    let sawDeep = false;
-    let sawShallow = false;
-    for (let x = 0; x < 40; x++) {
-      const near = vergeVariantIndex(x, 1, 'ne', 'road-x', 3);
-      const far = vergeVariantIndex(x, 1, 'sw', 'road-x', 3);
-      expect(near + far).toBe(2); // one flank opens exactly as much as the other closes
-      sawDeep ||= near === 2 || far === 2;
-      sawShallow ||= near === 0 || far === 0;
+describe('road bends', () => {
+  it('turns a staircase of single steps into a run of bends', () => {
+    // A road authored as a curve steps one tile at a time between the axes; every
+    // one of those steps is a turn, and every turn must draw as an arc.
+    const map = mapOf([
+      'rr.....',
+      '.rr....',
+      '..rr...',
+      '...rr..',
+      '....rr.',
+    ]);
+    let bends = 0;
+    for (let y = 0; y < 5; y++) {
+      for (let x = 0; x < 7; x++) {
+        if (display(map, x, y) === 'road-bend') bends++;
+      }
     }
-    expect(sawDeep && sawShallow).toBe(true);
+    expect(bends).toBeGreaterThanOrEqual(8);
   });
 
-  it('falls back to a stable per-tile pick off a road flank', () => {
-    expect(vergeVariantIndex(4, 1, 'nw', 'road-x', 3)).toBe(vergeVariantIndex(4, 1, 'nw', 'road-x', 3));
-    expect(vergeVariantIndex(4, 1, 'nw', 'grass', 1)).toBe(0);
+  it('keeps a real crossroads on the junction tile', () => {
+    const crossroads = mapOf([
+      '..r..',
+      '..r..',
+      'rrrrr',
+      '..r..',
+      '..r..',
+    ]);
+    expect(display(crossroads, 2, 2)).toBe('road');
+  });
+});
+
+describe('roadGroundId', () => {
+  it('lays a track on the ground around it, not on a tile of its own', () => {
+    const meadow = mapOf(['.....', '.rrr.', '.....']);
+    expect(roadGroundId(meadow, 2, 1)).toBe('grass');
+
+    const yard = mapOf(['ddddd', 'drrrd', 'ddddd']);
+    expect(roadGroundId(yard, 2, 1)).toBe('dirt');
+  });
+
+  it('reaches past a road that is wider than one tile', () => {
+    const wide = mapOf(['ddddddd', 'drrrrrd', 'drrrrrd', 'drrrrrd', 'ddddddd']);
+    expect(roadGroundId(wide, 3, 2)).toBe('dirt');
+  });
+
+  it('never lays a track on water or cliff', () => {
+    const bridge = mapOf(['..rr..', 'wwrrww', 'wwrrww', '..rr..']);
+    expect(bridge.terrainIds).toContain('water');
+    expect(roadGroundId(bridge, 2, 1)).toBe('grass');
   });
 });

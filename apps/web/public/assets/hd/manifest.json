@@ -2,8 +2,8 @@
  "version": 1,
  "density": 2,
  "style": "pre-rendered-3d",
- "frameCount": 4821,
- "convertedFrames": 679,
+ "frameCount": 4749,
+ "convertedFrames": 607,
  "bespokeFrames": 4142,
  "atlases": [
   "terrain-0.json",
