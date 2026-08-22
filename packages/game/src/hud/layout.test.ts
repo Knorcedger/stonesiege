@@ -83,22 +83,31 @@ describe('top bar layout contract', () => {
   });
 
   /**
-   * Regression: the HUD stage's transform makes it a stacking context, so every
-   * control in it shares one layer. It sat below the objectives panel, which is
-   * pointer-events:auto — so wherever the panel covered the top bar it absorbed
-   * the taps, and the pause button under it did nothing.
+   * The HUD stage must stay OUT of this scale. Ranking it above the overlays
+   * looks like a free hit-test guarantee for the top bar, but the stage's
+   * transform flattens the whole HUD into that one rank — so it also buries the
+   * objectives panel, the wonder countdown and the objective marker under the
+   * bottom-right command card, which is ~520px tall with a town centre selected
+   * and reaches all three on a landscape phone. Overlays are kept off the
+   * controls by geometry instead.
    */
-  it('ranks interactive HUD controls above the scenario overlays', () => {
-    expect(HUD_LAYER.stage).toBeGreaterThan(HUD_LAYER.objectives);
-    expect(HUD_LAYER.stage).toBeGreaterThan(HUD_LAYER.objectiveMarker);
-    expect(HUD_LAYER.stage).toBeGreaterThan(HUD_LAYER.messageBanner);
+  it('leaves the HUD stage out of the overlay stacking scale', () => {
+    expect(Object.keys(HUD_LAYER)).not.toContain('stage');
   });
 
-  it('keeps the modal overlays above the HUD they cover', () => {
-    expect(HUD_LAYER.pauseOverlay).toBeGreaterThan(HUD_LAYER.stage);
+  it('orders the overlays against each other', () => {
+    // Guidance above the panel it points out of; modals above both.
+    expect(HUD_LAYER.objectives).toBeGreaterThan(HUD_LAYER.objectiveMarker);
+    expect(HUD_LAYER.messageBanner).toBeGreaterThan(HUD_LAYER.objectives);
+    expect(HUD_LAYER.pauseOverlay).toBeGreaterThan(HUD_LAYER.messageBanner);
     expect(HUD_LAYER.helpOverlay).toBeGreaterThan(HUD_LAYER.pauseOverlay);
-    // Both are mounted on the root beside the stage, so they must also outrank
-    // the scenario overlays directly.
-    expect(HUD_LAYER.pauseOverlay).toBeGreaterThan(HUD_LAYER.objectives);
+    // The end screen is terminal — nothing may paint over it.
+    const others = Object.entries(HUD_LAYER).filter(([name]) => name !== 'endScreen');
+    for (const [, layer] of others) expect(HUD_LAYER.endScreen).toBeGreaterThan(layer);
+  });
+
+  it('keeps every overlay layer distinct so paint order is never DOM-dependent', () => {
+    const layers = Object.values(HUD_LAYER);
+    expect(new Set(layers).size).toBe(layers.length);
   });
 });

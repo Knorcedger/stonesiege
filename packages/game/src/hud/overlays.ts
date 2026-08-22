@@ -8,27 +8,32 @@
 
 import type { MatchSummary } from './summary';
 import { AGE_LABEL } from './cardModel';
+import { HUD_LAYER, HUD_TOP_BAR_BOTTOM_VAR, TOP_BAR_CLEAR_PX } from './layout';
 
 const OVERLAY_CSS = `
 .bf-agebanner { position:absolute; left:50%; top:22%; transform:translateX(-50%); text-align:center;
-  pointer-events:none; opacity:0; transition:opacity 0.5s; z-index:30; }
+  pointer-events:none; opacity:0; transition:opacity 0.5s; z-index:${HUD_LAYER.ageBanner}; }
 .bf-agebanner.show { opacity:1; }
 .bf-agebanner h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:52px; color:#E6C04A;
   text-shadow:2px 2px 0 #1A1208, 0 0 24px rgba(230,192,74,0.5); margin:0; letter-spacing:2px; }
 .bf-agebanner p { font-family:"Pixelify Sans",monospace; font-size:16px; color:#EFDDB5;
   text-shadow:1px 1px 0 #1A1208; margin:4px 0 0; }
-.bf-wonder { position:absolute; left:50%; top:48px; transform:translateX(-50%); padding:4px 14px;
+/* Same measured anchor as the objectives panel: the top bar wraps to a second
+   row on narrow viewports and grows with HUD scale, so a fixed 48px lands
+   underneath it and the bar's opaque panel hides the countdown. */
+.bf-wonder { position:absolute; left:50%; top:var(${HUD_TOP_BAR_BOTTOM_VAR}, ${TOP_BAR_CLEAR_PX}px);
+  transform:translateX(-50%); padding:4px 14px;
   display:none; font-family:"Pixelify Sans",monospace; font-size:14px; color:#1A1208;
   background:linear-gradient(#F2E3B8,#DABE8D); border:1px solid #B99A6B; border-radius:3px;
-  box-shadow:0 0 0 1px #8A6414; pointer-events:none; z-index:25; }
+  box-shadow:0 0 0 1px #8A6414; pointer-events:none; z-index:${HUD_LAYER.wonderBanner}; }
 .bf-wonder.show { display:block; }
 .bf-wonder .bf-num { font-family:"VT323",monospace; font-size:16px; }
-.bf-attackpulse { position:absolute; inset:0; pointer-events:none; opacity:0; z-index:35;
+.bf-attackpulse { position:absolute; inset:0; pointer-events:none; opacity:0; z-index:${HUD_LAYER.attackPulse};
   box-shadow:inset 0 0 0 3px rgba(179,38,30,0.9), inset 0 0 60px 18px rgba(179,38,30,0.45); }
 .bf-attackpulse.show { animation:bfAttackPulse 1.6s ease-out; }
 @keyframes bfAttackPulse { 0% {opacity:0;} 12% {opacity:1;} 55% {opacity:0.55;} 100% {opacity:0;} }
 .bf-end { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
-  background:rgba(10,8,5,0.82); pointer-events:auto; z-index:50; font-family:"Pixelify Sans",monospace; }
+  background:rgba(10,8,5,0.82); pointer-events:auto; z-index:${HUD_LAYER.endScreen}; font-family:"Pixelify Sans",monospace; }
 .bf-end.show { display:flex; }
 .bf-end-panel { width:min(520px, 88%); max-height:92%; overflow-y:auto; padding:24px 26px 20px;
   box-sizing:border-box; text-align:center; color:#EFDDB5;

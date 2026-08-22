@@ -187,10 +187,12 @@ const QUEUE_BLOCK_PX = `${QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP}p
 
 const HUD_CSS = `
 .bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; color:#F2E6CB; user-select:none; -webkit-user-select:none; text-shadow:0 1px 1px rgba(0,0,0,.65); }
-/* The stage's transform makes it a stacking context, so every control the
-   player taps is flattened into this one layer — see HUD_LAYER in layout.ts for
-   why it has to outrank the scenario overlays mounted beside it. */
-.bf-hudstage { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform-origin:top left; z-index:${HUD_LAYER.stage}; }
+/* Deliberately no z-index — see HUD_LAYER in layout.ts. The transform already
+   makes this a stacking context, so a z-index here would order the ENTIRE HUD
+   against each scenario overlay at once, and the overlays need opposite answers:
+   the objectives panel must stay above the bottom-right command card but must
+   not cover the top bar. Geometry, not stacking, keeps them apart. */
+.bf-hudstage { position:absolute; left:0; top:0; width:100%; height:100%; pointer-events:none; transform-origin:top left; }
 .bf-num { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; }
 .bf-panel { background:linear-gradient(145deg,rgba(55,39,24,.96),rgba(25,17,11,.97)); border:1px solid #25170c; box-shadow:0 0 0 1px rgba(196,146,58,.7) inset, 0 0 0 3px rgba(87,57,29,.72) inset, 0 6px 18px rgba(0,0,0,.34); border-radius:6px; backdrop-filter:blur(2px); }
 /* Wraps at ANY width, not just under the narrow media query. The query keys off

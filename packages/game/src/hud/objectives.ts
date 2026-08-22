@@ -256,6 +256,8 @@ export class ObjectivesPanel {
   private wideViewport: boolean;
   private viewportKey: string;
   private lastKey = '';
+  /** Last top-bar clearance this panel rendered against (see update()). */
+  private lastBarClear = '';
   private flashIds = new Set<string>();
 
   constructor(
@@ -394,8 +396,16 @@ export class ObjectivesPanel {
       const target = objective.readout?.target;
       return `${objective.id}:${objective.state}:${progress}:${target?.x ?? ''}:${target?.y ?? ''}`;
     }).join('|');
-    if (key === this.lastKey && this.flashIds.size === 0 && !viewportChanged) return;
+    // The panel's own top tracks the measured top bar, so it can move without
+    // any of its content changing — a mid-match re-wrap (four-digit stockpiles)
+    // or a HUD SIZE change. Re-render on that too, or the message clearance
+    // published at the end of this method goes stale and the scenario banner
+    // lands back on top of the objective head.
+    const barClear = this.root.style.getPropertyValue(HUD_TOP_BAR_BOTTOM_VAR);
+    const barMoved = barClear !== this.lastBarClear;
+    if (key === this.lastKey && this.flashIds.size === 0 && !viewportChanged && !barMoved) return;
     this.lastKey = key;
+    this.lastBarClear = barClear;
 
     const current = this.model.current;
     if (current) {

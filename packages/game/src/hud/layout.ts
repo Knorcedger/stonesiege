@@ -44,23 +44,33 @@ export const HUD_TOP_BAR_BOTTOM_VAR = '--bf-top-bar-bottom';
 export const TOP_BAR_GAP_PX = 6;
 
 /**
- * Stacking order inside the HUD root, in one place because the layers are set
- * in three different CSS blocks and only make sense against each other.
+ * Stacking order of the overlays mounted on the HUD root, in one place because
+ * they are declared across four CSS blocks and only make sense against one
+ * another.
  *
- * The HUD stage carries a transform, which makes it a stacking context: every
- * control inside it — the whole top bar included — collapses into the single
- * `stage` layer. So the stage must outrank the scenario overlays mounted beside
- * it on the root, or a decorative panel that happens to cover a control wins
- * the hit test and the control silently stops responding. The modal overlays
- * must in turn outrank the stage, since they are meant to cover the HUD.
+ * The HUD stage itself is NOT in this scale, and deliberately carries no
+ * z-index. Its transform already makes it a stacking context, so every control
+ * inside it collapses into one layer; giving that layer a rank would order the
+ * whole HUD against each overlay at once, and the overlays need opposite
+ * answers. The objectives panel has to stay above the bottom-right command
+ * card (which is 500px tall with a town centre selected, and reaches the panel
+ * on a landscape phone) while staying clear of the top bar. Ranking the stage
+ * above the panel buys a hit-test guarantee for the bar and pays for it by
+ * burying the panel, the wonder countdown and the objective marker under the
+ * card. Keeping overlays and controls apart is a geometry job — see
+ * HUD_TOP_BAR_BOTTOM_VAR — so the layers below only order overlay against
+ * overlay.
  */
 export const HUD_LAYER = {
   objectiveMarker: 23,
   objectives: 24,
+  wonderBanner: 25,
   messageBanner: 28,
-  stage: 30,
+  ageBanner: 30,
+  attackPulse: 35,
   pauseOverlay: 40,
   helpOverlay: 45,
+  endScreen: 50,
 } as const;
 
 /** The subset of DOMRect the clearance math needs, so it is testable without a DOM. */
