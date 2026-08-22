@@ -508,7 +508,7 @@ async function bootGame(
     (defId) => unitDisplayStats(game, humanPlayer, defId)?.los ?? gameData.units[defId]?.los ?? 0,
     resourceMemory,
   );
-  const fx = new FxLayer(assets);
+  const fx = new FxLayer(assets, humanPlayer);
   const fog = new FogLayer(game.state.map);
   const ghostLayer = new Container();
   const ghostFoot = new Graphics();
@@ -887,13 +887,31 @@ async function bootGame(
       kind: 'setProductionSpeed', player: humanPlayer, multiplier: preferredProductionSpeed,
     });
   }
+  /**
+   * World-space confirmation for an accepted player order: ground orders drop a
+   * destination arrow, target-aimed ones pulse the target itself. Without this
+   * a build/gather/attack order only ever showed up in the corner toast, which
+   * reads as a dropped command while the unit is still walking over.
+   */
+  const showOrderFeedback = (cmd: Command): void => {
+    const st = getState();
+    if (cmd.kind === 'move') {
+      fx.showMoveMarker(cmd.x, cmd.y, st.tick);
+      return;
+    }
+    if (cmd.kind === 'attack' || cmd.kind === 'gather' || cmd.kind === 'repair'
+      || cmd.kind === 'garrison' || cmd.kind === 'convert' || cmd.kind === 'heal') {
+      const target = st.entities.get(cmd.targetId);
+      if (target) fx.showTargetPing(target, st.tick, cmd.kind === 'attack' ? 'attack' : 'work');
+    }
+  };
   const issueWithUndo = (
     cmd: Command,
     label: string,
     undo: (() => void) | null,
   ): boolean => {
     const accepted = admission.issueWithUndo(cmd, label, undo);
-    if (accepted && cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
+    if (accepted) showOrderFeedback(cmd);
     return accepted;
   };
 

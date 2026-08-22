@@ -1,5 +1,12 @@
 // Public surface of the procedural audio system.
 export { AudioEngine, SFX_CATEGORY } from './engine';
+export {
+  attackFamily,
+  impactVoice,
+  releaseVoice,
+  voiceFalloff,
+  type AttackFamily,
+} from './combat';
 export { GameAudio, workVoice } from './events';
 export { playVoice, startAmbient, type SfxName } from './synth';
 export {

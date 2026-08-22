@@ -16,6 +16,31 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
+### Changed
+
+- Battles can be read by ear. Every blow used to play the same steel clash, so a battering ram
+  pounding a Town Center sounded exactly like two swordsmen trading hits, and arrows and boulders
+  landed in silence. Now the sound is the weapon plus what it lands on: a ram booms into a gate
+  and crushes when it catches a body, swords clash on armor but chop into timber, pikes thrust
+  and knock, cavalry sabres carry the weight of the horse, villagers strike with tools and wolves
+  bite. Arrows thud into flesh and thunk into wood, crossbow bolts punch, and mangonel and
+  trebuchet stones crush bodies or shatter masonry. Siege carries further than hand weapons, so a
+  ram working on your walls is audible before it is on screen — and a trebuchet no longer looses
+  its stone with the twang of a bow.
+- Orders now land visibly on the thing you aimed them at, instead of only in the corner toast.
+  Sending a villager to finish an unfinished house pulses that house's outline twice, and the
+  site keeps an amber ring for the whole job — so the walk over no longer looks like a command
+  that was dropped. The same pulse confirms gather, repair, garrison, convert and heal orders;
+  attack orders pulse red. The pulse follows a target only while you can still see it, so
+  ordering an attack on a fleeing enemy never traces its path through the fog. The undo toast
+  names the building too: **Building House** and **Repairing Barracks** instead of a bare
+  *Build* / *Repair*.
+- Soldiers answer a tower together. A man shot while standing with his squad used to charge
+  the tower alone while everyone beside him watched; now whatever struck him pulls in the
+  troops inside their guard circle, and they set off with him instead of trickling in one at a
+  time. Ordering an assault on a building still sends exactly the units you sent — nobody
+  parked nearby gets dragged along.
+
 ### Fixed
 
 - Frame rate no longer degrades as your army grows. The renderer used to compare every object on
