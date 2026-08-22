@@ -143,7 +143,8 @@ function renderBeat(beat: VoiceBeat, opts: RenderOptions): VoiceLineEntry {
     '-v', voiceFor(beat, opts),
     '-r', String(beat.wpm),
     '-o', aiff,
-    '--data-format=LEI16@22050',
+    // AIFF is a big-endian container: `say` rejects LEI16 with "fmt?".
+    '--data-format=BEI16@22050',
     beat.text,
   ]);
   rmSync(out, { force: true }); // afconvert refuses to overwrite
