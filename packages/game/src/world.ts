@@ -2,7 +2,7 @@
 // animation, interpolation between the last two sim ticks, selection rings,
 // health bars, building construct states, fog-based hiding with remembered
 // building ghosts, damage-taken blink, villager carry icons, garrison count
-// badges, and gather-target highlights. Event-driven fx (projectiles, impact
+// badges, and worksite highlights. Event-driven fx (projectiles, impact
 // flashes, corpses, rubble, conversion beams) live in fx.ts.
 
 import { Container, Graphics, Sprite, Text } from 'pixi.js';
@@ -20,10 +20,11 @@ import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 import { getSettings } from './settings';
+import { tileVisibility } from './fog';
 import { PlayerResourceMemory } from './resourceMemory';
 
 const HIGHLIGHT = 0xf4eedd;
-const GATHER_HIGHLIGHT = 0xe6c04a;
+const AMBER_HIGHLIGHT = 0xe6c04a;
 const OUTLINE = 0x1a1208;
 const HP_GREEN = 0x3e8c34;
 const HP_YELLOW = 0xd4a82a;
@@ -162,6 +163,24 @@ export function wallCornerJoins(entities: Iterable<Entity>): Map<EntityId, WallC
 export function advanceGateOpenProgress(current: number, open: boolean, elapsedTicks: number): number {
   const direction = open ? 1 : -1;
   return Math.max(0, Math.min(1, current + direction * Math.max(0, elapsedTicks) / GATE_OPEN_TICKS));
+}
+
+/**
+ * What a selected villager is working on, for the amber worksite ring.
+ *
+ * `intent` is the durable record of the order and covers the whole job — the
+ * walk over included — so a build or repair site stays ringed from the moment
+ * the order lands until the sim clears the intent. Gathering keeps its
+ * activity fallback because a laden villager walking to a drop site still
+ * belongs to the resource it came from.
+ */
+export function villagerWorkTarget(e: Entity): EntityId | undefined {
+  const intent = e.intent;
+  if (intent && (intent.kind === 'gather' || intent.kind === 'build' || intent.kind === 'repair')) {
+    return intent.targetId;
+  }
+  if (e.activity === 'gathering' || e.activity === 'carrying') return e.targetId;
+  return undefined;
 }
 
 interface EntityView {
@@ -310,7 +329,7 @@ export class WorldLayer {
   /** entityId -> tick until which the damage-taken red blink lasts. */
   private damagedUntil = new Map<EntityId, number>();
   /** Resource/target ids highlighted because selected villagers gather them. */
-  private gatherTargets = new Set<EntityId>();
+  private workTargets = new Set<EntityId>();
 
   constructor(
     private assets: GameAssets,
@@ -348,7 +367,7 @@ export class WorldLayer {
     this.resourceMemory.refresh(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const seen = new Set<EntityId>();
-    this.refreshGatherTargets(state);
+    this.refreshWorkTargets(state);
     this.refreshOpenGates(state);
     const visibleUnits: Array<{ entity: Entity; view: EntityView }> = [];
 
@@ -473,28 +492,26 @@ export class WorldLayer {
       // player-color ownership banner attached to production buildings.
       this.rallyFlags
         .ellipse(s.x, s.y, 14, 7)
-        .fill({ color: GATHER_HIGHLIGHT, alpha: 0.16 })
+        .fill({ color: AMBER_HIGHLIGHT, alpha: 0.16 })
         .stroke({ width: 2, color: OUTLINE });
-      this.rallyFlags.ellipse(s.x, s.y, 11, 5).stroke({ width: 1.5, color: GATHER_HIGHLIGHT });
+      this.rallyFlags.ellipse(s.x, s.y, 11, 5).stroke({ width: 1.5, color: AMBER_HIGHLIGHT });
       this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 3, color: OUTLINE });
-      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 1, color: GATHER_HIGHLIGHT });
+      this.rallyFlags.moveTo(s.x, s.y).lineTo(s.x, s.y - 32).stroke({ width: 1, color: AMBER_HIGHLIGHT });
       this.rallyFlags
         .poly([s.x, s.y - 32, s.x + 22, s.y - 27, s.x, s.y - 20])
-        .fill(GATHER_HIGHLIGHT)
+        .fill(AMBER_HIGHLIGHT)
         .stroke({ width: 1.5, color: OUTLINE });
     }
   }
 
   /** Targets of the currently selected villagers (GDD: gather target highlights). */
-  private refreshGatherTargets(state: GameState): void {
-    this.gatherTargets.clear();
+  private refreshWorkTargets(state: GameState): void {
+    this.workTargets.clear();
     for (const id of this.selection) {
       const e = state.entities.get(id);
       if (!e || e.kind !== 'unit' || e.player !== this.humanPlayer || e.defId !== 'villager') continue;
-      const target = e.intent?.kind === 'gather'
-        ? e.intent.targetId
-        : (e.activity === 'gathering' || e.activity === 'carrying') ? e.targetId : undefined;
-      if (target !== undefined) this.gatherTargets.add(target);
+      const target = villagerWorkTarget(e);
+      if (target !== undefined) this.workTargets.add(target);
     }
   }
 
@@ -589,9 +606,7 @@ export class WorldLayer {
   // ------------------------------------------------------------------ internals
 
   private tileVis(vis: Uint8Array | null, state: GameState, tx: number, ty: number): number {
-    if (!vis) return 2;
-    if (tx < 0 || ty < 0 || tx >= state.map.width || ty >= state.map.height) return 0;
-    return vis[ty * state.map.width + tx];
+    return tileVisibility(vis, state.map, tx, ty);
   }
 
   private createView(): EntityView {
@@ -847,14 +862,15 @@ export class WorldLayer {
 
   private drawRing(e: Entity, view: EntityView): void {
     const selected = this.selection.has(e.id);
-    // gather-target highlight: amber ring on what the selected villagers work
-    const highlighted = !selected && this.gatherTargets.has(e.id);
+    // worksite highlight: amber ring on whatever the selected villagers work —
+    // a resource being gathered, or a foundation being built or repaired
+    const highlighted = !selected && this.workTargets.has(e.id);
     const key = selected ? `1:${e.kind}:${e.defId}` : highlighted ? `h:${e.kind}:${e.defId}` : '';
     if (key === view.lastRingKey) return;
     view.lastRingKey = key;
     view.ring.clear();
     if (!selected && !highlighted) return;
-    const color = selected ? HIGHLIGHT : GATHER_HIGHLIGHT;
+    const color = selected ? HIGHLIGHT : AMBER_HIGHLIGHT;
     if (e.kind === 'building') {
       const size = gameData.buildings[e.defId]?.size ?? 1;
       const hw = size * HALF_W;

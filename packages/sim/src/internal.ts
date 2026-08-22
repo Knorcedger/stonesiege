@@ -101,6 +101,12 @@ export interface CombatInfo {
   auto: boolean;
   /** Joined through a nearby friendly's active fight; cannot relay awareness again. */
   supporting?: boolean;
+  /**
+   * Turned on the source of a blow that landed on this unit. The squad alarm relays a
+   * BUILDING target only from such a fight: being shot by a tower is forced on the
+   * unit, whereas acquiring a structure on an attack-move is an ordered assault.
+   */
+  retaliation?: boolean;
   /** Explicit building assault: continue into nearby hostile structures after a kill. */
   continueBuildings?: boolean;
   nextAttackTick: number;
@@ -130,6 +136,16 @@ export interface CombatInfo {
    */
   slotX?: number;
   slotY?: number;
+  /**
+   * Sampled target motion (fixed units per tick) and the sample it was measured from.
+   * A chase that always walks at where the target IS trails a faster runner forever a
+   * hair outside reach; aiming at where it WILL BE turns the walk into an interception.
+   */
+  velX?: Fixed;
+  velY?: Fixed;
+  trackTick?: number;
+  trackX?: Fixed;
+  trackY?: Fixed;
 }
 
 /** An in-flight projectile. Damage payload frozen at fire time (attacker may die). */

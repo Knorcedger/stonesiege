@@ -2,7 +2,8 @@
 // the distance-attenuation curve.
 
 import { describe, expect, it } from 'vitest';
-import { attenuation, SfxThrottle } from './throttle';
+import { SFX_CATEGORY } from './engine';
+import { attenuation, DEFAULT_POLICIES, SfxThrottle } from './throttle';
 
 const policies = {
   combat: { maxConcurrent: 2, minGapMs: 50 },
@@ -48,6 +49,17 @@ describe('SfxThrottle', () => {
     t.request('combat', 60, 500);
     expect(t.request('sting', 70, 500)).toBe(true);
     for (let i = 0; i < 10; i++) expect(t.request('nopolicy', i, 1000)).toBe(true);
+  });
+});
+
+describe('DEFAULT_POLICIES', () => {
+  // request() lets unknown categories through unthrottled, so a category named
+  // in SFX_CATEGORY but missing here fails silently: that voice would stack
+  // without limit (a wall of rams as a drum roll) with nothing to catch it.
+  it('covers every category a voice is filed under', () => {
+    for (const [name, category] of Object.entries(SFX_CATEGORY)) {
+      expect(DEFAULT_POLICIES[category], `${name} -> ${category}`).toBeDefined();
+    }
   });
 });
 
