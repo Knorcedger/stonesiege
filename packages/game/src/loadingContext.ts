@@ -19,5 +19,6 @@ export function campaignLoadingArtwork(scenarioId: string | null | undefined): L
     ...(scenario.chapter
       ? { setting: `${scenario.chapter.location} · ${scenario.chapter.date}` }
       : {}),
+    ...(scenario.story ? { stakes: scenario.story.stakes } : {}),
   };
 }

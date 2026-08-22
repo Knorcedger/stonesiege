@@ -6,6 +6,20 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Added
 
+- **Campaign prologues and epilogues.** Every campaign now opens on an artwork page explaining
+  the situation the chapters are about — for William Wallace, what Edward I had already done to
+  Scotland by 1297 — shown the first time the campaign is opened and re-readable from the chapter
+  list at any time. Finishing the last chapter of a campaign opens its closing page instead of
+  dropping you back on a list of completed chapters.
+- **Chapter aftermath pages.** Winning a campaign chapter now shows what the victory actually
+  changed — historically, not just numerically — before the statistics panel. Where a mission
+  compresses or dramatizes the record, the page says so.
+- **Difficulty ratings.** Every chapter carries a 1–5 rating with a rank name and a line saying
+  what makes it hard. Ratings appear on campaign cards, on every chapter row (including locked
+  ones), and on the briefing. A campaign's own rating is derived from its chapters.
+- **Briefings that introduce the people in them.** Each chapter briefing now opens with what is
+  at stake if it is lost, and lists who you are fighting with and against, so the names in the
+  dialogue mean something the first time they are spoken.
 - Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud with a
   slow, low delivery, with the narrator and each named character kept apart by ear. The banner
   waits for the voice to finish the sentence before moving on, and a tap dismisses the line and
@@ -15,6 +29,13 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   the voices already installed on the device — no download, and nothing is spoken when the switch
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
+
+### Changed
+
+- The twelve William Wallace chapters now carry story while they are being played, not only an
+  opening and a closing line: the campaign gained roughly fifty new spoken beats covering the
+  political situation, the arguments between Wallace and his captains, and what each fight was
+  for.
 
 ## 0.1.2 — 2026-08-20
 

@@ -13,7 +13,7 @@ import {
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import {
-  deriveObjectiveGuides, evaluateObjectiveGuide, scenariosById, TriggerRuntime,
+  campaigns, deriveObjectiveGuides, evaluateObjectiveGuide, scenariosById, TriggerRuntime,
   type AiProfile, type Rect, type ScenarioMeta,
 } from '@bf/scenarios';
 import { applyAiProfile, attackNow, createBot, type Bot } from '@bf/ai';
@@ -57,7 +57,10 @@ import {
   type MatchContext,
 } from './analytics/events';
 import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
-import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
+import {
+  completeScenario, isCampaignComplete, loadProgress, saveProgress,
+} from './campaign/progress';
+import { chapterAftermathPage } from './campaign/aftermath';
 import { setNavHint } from './screens/nav';
 import { getSettings } from './settings';
 import { activeArtworkMode } from './developerTools';
@@ -682,24 +685,46 @@ async function bootGame(
       // campaign flow: victory unlocks the next scenario; defeat offers retry
       const scenarioId = meta.id;
       const campaignId = meta.campaign;
+      let campaignFinished = false;
       if (victory) {
-        saveProgress(completeScenario(loadProgress(), scenarioId));
+        const progress = completeScenario(loadProgress(), scenarioId);
+        saveProgress(progress);
+        const campaign = campaigns[campaignId];
+        campaignFinished = !!campaign && isCampaignComplete(campaign, progress);
         analytics.track(campaignChapterCompleteEvent(matchContext, summary.durationSeconds));
       }
-      overlays.showEndScreen(victory, summary, {
-        sub: victory ? `${meta.title} — complete` : meta.title,
-        buttons: victory
-          ? [
-            { label: 'Continue', onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
-            { label: 'Replay scenario', ghost: true, onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
-            { label: 'Continue watching', ghost: true, dismiss: true },
-          ]
-          : [
-            { label: 'Retry', onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
-            { label: 'Return to scenarios', ghost: true, onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
-            { label: 'Continue watching', ghost: true, dismiss: true },
-          ],
-      });
+      // Winning the last chapter continues into the campaign's closing page
+      // rather than a list of chapters that are all finished.
+      const onwards = campaignFinished
+        ? { kind: 'campaignEpilogue' as const, campaignId }
+        : { kind: 'scenarioList' as const, campaignId };
+      const showStats = (): void => {
+        overlays.showEndScreen(victory, summary, {
+          sub: victory ? `${meta.title} — complete` : meta.title,
+          buttons: victory
+            ? [
+              {
+                label: campaignFinished ? 'Read the ending' : 'Continue',
+                onClick: () => reloadTo(onwards),
+              },
+              { label: 'Replay scenario', ghost: true, onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
+              { label: 'Continue watching', ghost: true, dismiss: true },
+            ]
+            : [
+              { label: 'Retry', onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
+              { label: 'Return to scenarios', ghost: true, onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
+              { label: 'Continue watching', ghost: true, dismiss: true },
+            ],
+        });
+      };
+      // The story payoff comes before the arithmetic: what the chapter changed,
+      // then how many sheep it took. Only on a win, and only where the chapter
+      // has an authored aftermath.
+      const aftermath = victory
+        ? chapterAftermathPage(scenarioDef, campaignFinished)
+        : null;
+      if (aftermath) overlays.showAftermath(aftermath, showStats);
+      else showStats();
     } else {
       overlays.showEndScreen(victory, summary, {
         buttons: [

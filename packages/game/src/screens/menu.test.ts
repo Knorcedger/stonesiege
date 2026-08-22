@@ -59,7 +59,7 @@ describe('campaignMenuSummary', () => {
     const completed = wallace.scenarioIds.slice(0, 6);
     const summary = campaignMenuSummary(
       wallace,
-      { completed },
+      { completed, prologuesSeen: [] },
       { scenarioId: wallace.scenarioIds[6], label: 'A Guardian’s Winter, 5:59' },
     );
 
@@ -69,7 +69,7 @@ describe('campaignMenuSummary', () => {
   });
 
   it('names the first ready chapter before a campaign begins', () => {
-    const summary = campaignMenuSummary(wallace, { completed: [] }, null);
+    const summary = campaignMenuSummary(wallace, { completed: [], prologuesSeen: [] }, null);
 
     expect(summary.progressLabel).toBe('0 of 12 chapters complete');
     expect(summary.detailLabel).toContain('Chapter 1 ready');
@@ -78,7 +78,7 @@ describe('campaignMenuSummary', () => {
 
   it('turns the completed state into an explicit replay invitation', () => {
     const summary = campaignMenuSummary(
-      wallace, { completed: [...wallace.scenarioIds] }, null,
+      wallace, { completed: [...wallace.scenarioIds], prologuesSeen: [] }, null,
     );
 
     expect(summary.ribbonLabel).toBe('COMPLETE');

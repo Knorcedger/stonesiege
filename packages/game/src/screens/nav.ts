@@ -10,6 +10,8 @@ import type { PracticeMapSize, PracticeSetup } from '../simBridge';
 
 export type NavHint =
   | { kind: 'scenarioList'; campaignId: string }
+  /** Land on the campaign's closing page: the final chapter was just won. */
+  | { kind: 'campaignEpilogue'; campaignId: string }
   | { kind: 'startScenario'; scenarioId: string }
   | { kind: 'startPractice'; setup: PracticeSetup };
 
@@ -39,6 +41,9 @@ export function parseNavHint(raw: string | null): NavHint | null {
     const h = JSON.parse(raw) as Record<string, unknown>;
     if (h.kind === 'scenarioList' && typeof h.campaignId === 'string') {
       return { kind: 'scenarioList', campaignId: h.campaignId };
+    }
+    if (h.kind === 'campaignEpilogue' && typeof h.campaignId === 'string') {
+      return { kind: 'campaignEpilogue', campaignId: h.campaignId };
     }
     if (h.kind === 'startScenario' && typeof h.scenarioId === 'string') {
       return { kind: 'startScenario', scenarioId: h.scenarioId };

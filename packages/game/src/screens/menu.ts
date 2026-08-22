@@ -5,7 +5,10 @@
 // parchment buttons, Cinzel display face, gold accents.
 
 import { gameData } from '@bf/data';
-import { campaigns, scenariosById, type CampaignDef } from '@bf/scenarios';
+import {
+  campaignDifficulty, campaigns, difficultyLabel, difficultyPips, scenariosById,
+  type CampaignDef, type ChapterDifficulty, type StoryPage,
+} from '@bf/scenarios';
 import { BOT_DIFFICULTIES, type BotDifficulty } from '@bf/ai';
 import { FALLBACK_PLAYER_COLOR_NAMES, FALLBACK_PLAYER_RAMPS } from '../recolor';
 import {
@@ -13,7 +16,8 @@ import {
   type PracticeMapSize, type PracticeSetup,
 } from '../simBridge';
 import {
-  loadProgress, nextScenarioId, scenarioStatuses, type CampaignProgress,
+  hasSeenPrologue, isCampaignComplete, loadProgress, markPrologueSeen, nextScenarioId,
+  saveProgress, scenarioStatuses, type CampaignProgress,
 } from '../campaign/progress';
 import {
   campaignSlot, mostRecentSave, PRACTICE_SLOT, savedMatchLabel, saveForCampaign,
@@ -208,6 +212,55 @@ const MENU_CSS = `
 .bf-brief-actions .bf-menu-btn { width:auto; margin:0; }
 .bf-brief-actions .bf-menu-btn.primary { flex:2; }
 .bf-brief-actions .bf-menu-btn.ghost { flex:1; }
+/* Difficulty badge: pips carry the rating for anyone skimming, the rank name
+   carries it for anyone reading, and the note explains it on the briefing. */
+.bf-diff { display:inline-flex; align-items:center; gap:5px; font-size:11px; letter-spacing:.6px;
+  color:#DABE8D; white-space:nowrap; }
+.bf-diff-pips { font-size:9px; letter-spacing:1.5px; color:#E6C04A; }
+.bf-diff.r4 .bf-diff-pips, .bf-diff.r5 .bf-diff-pips { color:#D98A3A; }
+.bf-diff.r5 .bf-diff-pips { color:#C05B4E; }
+/* Top-LEFT of the cover: the top-right corner belongs to the progress ribbon
+   ('CHAPTER 7 IN PROGRESS'), and the two would sit on top of each other. */
+.bf-diff-badge { position:absolute; left:10px; top:10px; z-index:1; padding:3px 8px; border-radius:3px;
+  background:rgba(16,10,5,.82); box-shadow:0 0 0 1px rgba(185,154,107,.5); }
+.bf-brief-diff { display:flex; align-items:baseline; gap:9px; flex-wrap:wrap; margin:0 0 14px;
+  padding:8px 11px; border-radius:4px; background:rgba(16,10,5,.4);
+  box-shadow:0 0 0 1px rgba(100,73,43,.85); text-align:left; }
+.bf-brief-diff-note { flex:1 1 220px; min-width:0; font-size:12px; line-height:1.4; color:#B99A6B; }
+/* The stakes line: one sentence saying what losing costs, set apart from the
+   history so it is read even by a player who skips the prose. */
+.bf-stakes { margin:0 0 14px; padding:10px 13px; border-left:3px solid #E6C04A; border-radius:0 4px 4px 0;
+  background:rgba(230,192,74,.07); font-family:"Cinzel","Georgia",serif; font-size:14.5px;
+  line-height:1.45; color:#F4E7C6; text-align:left; }
+.bf-cast { display:flex; flex-direction:column; gap:8px; margin:4px 0 0; text-align:left; }
+.bf-cast-row { padding:7px 11px; border-radius:4px; background:rgba(16,10,5,.34);
+  box-shadow:0 0 0 1px rgba(100,73,43,.7); }
+.bf-cast-name { display:block; color:#E6C04A; font-family:"Cinzel","Georgia",serif; font-size:13.5px; }
+.bf-cast-role { display:block; margin:1px 0 3px; color:#B99A6B; font-size:11px; letter-spacing:.5px; }
+.bf-cast-note { display:block; color:#DABE8D; font-size:12.5px; line-height:1.45; }
+/* Where the mission departs from the record. Deliberately quiet: it is a
+   footnote, not a disclaimer banner. */
+.bf-histnote { margin:12px 0 0; padding:8px 11px; border-radius:4px; background:rgba(16,10,5,.3);
+  font-size:11.5px; line-height:1.45; color:#9C8A6B; text-align:left; }
+/* Full-bleed story page: campaign prologue and epilogue. Same title-card
+   grammar as the briefing hero, with the prose given the whole panel. */
+.bf-story { text-align:left; }
+.bf-story-body { font-size:14.5px; line-height:1.6; color:#EFDDB5; }
+.bf-story-body p { margin:0 0 13px; }
+.bf-story-body p:first-child::first-letter { float:left; margin:2px 7px 0 0;
+  font-family:"Cinzel","Georgia",serif; font-size:44px; line-height:.86; color:#E6C04A; }
+.bf-quote { margin:16px 0 4px; padding:12px 15px; border-left:3px solid #8A6414; border-radius:0 4px 4px 0;
+  background:rgba(16,10,5,.36); }
+.bf-quote p { margin:0; font-family:"Cinzel","Georgia",serif; font-size:14px; line-height:1.5;
+  color:#F4E7C6; font-style:italic; }
+.bf-quote cite { display:block; margin-top:7px; font-size:11px; font-style:normal; color:#B99A6B;
+  letter-spacing:.4px; }
+/* Story-page footer matches the briefing's sticky action row. */
+.bf-story-actions { position:sticky; bottom:-22px; display:flex; gap:10px; margin:18px 0 -22px;
+  padding:12px 0 14px; background:linear-gradient(rgba(44,31,18,0), #2C1F12 24%); }
+.bf-story-actions .bf-menu-btn { flex:1; width:auto; margin:0; }
+/* Story entry points on the chapter list, above and below the chapters. */
+.bf-story-link { width:100%; margin:10px 0 0; font-size:14px; }
 @media (max-width:520px) {
   .bf-menu-panel.wide { width:96vw; padding:22px 16px 20px; }
   .bf-scn { gap:9px; padding:7px 9px 7px 7px; }
@@ -225,6 +278,9 @@ const MENU_CSS = `
   .bf-camp-hero-copy .bf-camp-title, .bf-chapter-art-copy .bf-menu-h { font-size:22px; }
   .bf-camp-sub { font-size:11.5px; letter-spacing:1px; }
   .bf-camp-action { text-align:left; }
+  .bf-story-body { font-size:14px; }
+  .bf-story-body p:first-child::first-letter { font-size:38px; }
+  .bf-diff-badge { left:8px; top:8px; padding:2px 6px; }
 }
 /* Native phones are landscape-only. Turn each tall campaign poster into a
    compact cover + summary row so the active chapter and progress are visible
@@ -242,6 +298,7 @@ const MENU_CSS = `
   .bf-camp-action { margin-top:6px; }
   .bf-camp-hero { aspect-ratio:16/4.5; }
   .bf-chapter-art { aspect-ratio:16/5.5; }
+  .bf-story-body p:first-child::first-letter { font-size:36px; }
 }
 @media (prefers-reduced-motion:reduce) {
   .bf-camp-card { transition:none; }
@@ -477,6 +534,16 @@ export function showMenu(
       else window.history.pushState({ bfMenuDepth: depth + 1 }, '', flowHash(flow));
       render();
       trackScreen();
+      if (ev.kind === 'openPrologue') {
+        saveProgress(markPrologueSeen(loadProgress(), ev.campaignId));
+      }
+      // Opening a campaign for the first time reads its opening page first.
+      // Only on an explicit tap into the campaign: a boot that lands on the
+      // chapter list mid-campaign (returning from a won chapter) must not be
+      // interrupted by a page about how the story started.
+      if (ev.kind === 'openScenarios' && !hasSeenPrologue(loadProgress(), ev.campaignId)) {
+        dispatch({ kind: 'openPrologue', campaignId: ev.campaignId });
+      }
     };
 
     // ---------------------------------------------------------- small helpers
@@ -509,6 +576,33 @@ export function showMenu(
       image.decoding = 'async';
       if (focus) image.style.objectPosition = focus;
       return image;
+    };
+    /**
+     * Difficulty badge: pips for a skim, the rank name for a read. The pips are
+     * decorative punctuation to a screen reader, so the badge carries the
+     * rating as one labelled image instead and hides them.
+     */
+    const difficultyBadge = (
+      difficulty: ChapterDifficulty, cls = '',
+    ): HTMLSpanElement => {
+      const badge = el('span', `bf-diff r${difficulty.rating}${cls ? ` ${cls}` : ''}`);
+      const label = difficultyLabel(difficulty.rating);
+      const pips = el('span', 'bf-diff-pips', difficultyPips(difficulty.rating));
+      pips.setAttribute('aria-hidden', 'true');
+      badge.append(pips, el('span', '', label));
+      badge.setAttribute('role', 'img');
+      badge.setAttribute(
+        'aria-label',
+        `Difficulty ${difficulty.rating} of 5, ${label}. ${difficulty.note}`,
+      );
+      badge.title = difficulty.note;
+      return badge;
+    };
+    const quoteBlock = (quote: { text: string; source: string }): HTMLElement => {
+      const block = el('blockquote', 'bf-quote');
+      block.appendChild(el('p', '', `“${quote.text}”`));
+      block.appendChild(el('cite', '', quote.source));
+      return block;
     };
     const progressBar = (completed: number, total: number): HTMLSpanElement => {
       const bar = el('span', 'bf-bar');
@@ -722,6 +816,18 @@ export function showMenu(
             'span', `bf-camp-ribbon${save ? ' saved' : ''}`, summary.ribbonLabel,
           ));
         }
+        // Derived from the campaign's own chapters, so the band on the card
+        // and the pips on each chapter row can never tell different stories.
+        const band = campaignDifficulty(campaign, scenariosById);
+        art.appendChild(difficultyBadge(
+          {
+            rating: band.overall,
+            note: band.min === band.max
+              ? `Every chapter is rated ${band.label}.`
+              : `Chapters range from ${band.label}.`,
+          },
+          'bf-diff-badge',
+        ));
 
         const body = el('span', 'bf-camp-body');
         body.appendChild(el('span', 'bf-camp-desc', campaign.description));
@@ -766,6 +872,14 @@ export function showMenu(
       hero.appendChild(heroCopy);
       panel.appendChild(hero);
 
+      // The opening page is pushed automatically on a first visit (see
+      // dispatch), so this is the way back to it afterwards.
+      panel.appendChild(button(
+        'Read the prologue', 'ghost bf-story-link',
+        () => dispatch({ kind: 'openPrologue', campaignId: campaign.id }),
+        campaign.prologue.title,
+      ));
+
       const actsAt = new Map(campaign.acts?.map((act) => [act.scenarioIds[0], act]) ?? []);
       campaign.scenarioIds.forEach((scenarioId, i) => {
         const act = actsAt.get(scenarioId);
@@ -794,6 +908,9 @@ export function showMenu(
             'span', 'bf-scn-meta',
             `${def.chapter.location} · ${def.chapter.date} · ${def.chapter.estimatedMinutes}`,
           ));
+          // A locked chapter still shows its rating: knowing what is coming is
+          // part of deciding whether to keep going.
+          copy.appendChild(difficultyBadge(def.chapter.difficulty));
         }
         const state = el('span', `bf-scn-state${savedHere ? ' saved' : ''}`,
           savedHere ? 'IN PROGRESS'
@@ -807,7 +924,48 @@ export function showMenu(
         }
         panel.appendChild(row);
       });
+      if (isCampaignComplete(campaign, progress)) {
+        panel.appendChild(button(
+          'Read the ending', 'primary bf-story-link',
+          () => dispatch({ kind: 'openEpilogue', campaignId: campaign.id }),
+          campaign.epilogue.title,
+        ));
+      }
       panel.appendChild(backButton());
+    };
+
+    /**
+     * Prologue and epilogue: one artwork-led page of narrative with a single
+     * way out, back to the chapter list it was opened from. Each campaign
+     * words that exit itself ("Begin the rising", "Close the book").
+     */
+    const renderStoryPage = (campaign: CampaignDef, page: StoryPage): void => {
+      const story = el('div', 'bf-story');
+      const art = el('figure', 'bf-chapter-art');
+      const image = document.createElement('img');
+      image.src = page.image;
+      image.alt = page.imageAlt;
+      image.decoding = 'async';
+      art.appendChild(image);
+      const copy = el('div', 'bf-chapter-art-copy');
+      copy.append(
+        el('div', 'bf-chapter-kicker', page.kicker),
+        el('h1', 'bf-menu-h', page.title),
+        el('div', 'bf-chapter-kicker muted', splitCampaignTitle(campaign.title).name),
+      );
+      art.appendChild(copy);
+      story.appendChild(art);
+
+      const body = el('div', 'bf-story-body');
+      for (const paragraph of page.paragraphs) body.appendChild(el('p', '', paragraph));
+      story.appendChild(body);
+      if (page.quote) story.appendChild(quoteBlock(page.quote));
+
+      // One pop, not two: Back is routed through the History API, so a second
+      // synchronous dispatch would act on a stack that has not moved yet.
+      const actions = el('div', 'bf-story-actions');
+      actions.append(button(page.cta, 'primary', () => dispatch({ kind: 'back' })));
+      panel.append(story, actions);
     };
 
     const renderBriefing = (scenarioId: string): void => {
@@ -839,11 +997,36 @@ export function showMenu(
       } else {
         brief.appendChild(el('h1', 'bf-menu-h', def.title));
       }
+      if (def.chapter) {
+        const row = el('div', 'bf-brief-diff');
+        row.append(
+          difficultyBadge(def.chapter.difficulty),
+          el('span', 'bf-brief-diff-note', def.chapter.difficulty.note),
+        );
+        brief.appendChild(row);
+      }
+      // Why this fight matters, before the history that explains how it came
+      // about: a player who reads one line should still know what is at risk.
+      if (def.story) brief.appendChild(el('p', 'bf-stakes', def.story.stakes));
       const hist = el('div', 'bf-brief-hist');
       for (const para of def.briefing.history.split('\n\n')) {
         hist.appendChild(el('p', '', para));
       }
       brief.appendChild(hist);
+      if (def.story && def.story.cast.length > 0) {
+        brief.appendChild(el('div', 'bf-menu-label', 'WHO YOU ARE FIGHTING WITH AND AGAINST'));
+        const cast = el('div', 'bf-cast');
+        for (const member of def.story.cast) {
+          const entry = el('div', 'bf-cast-row');
+          entry.append(
+            el('span', 'bf-cast-name', member.name),
+            el('span', 'bf-cast-role', member.role),
+            el('span', 'bf-cast-note', member.note),
+          );
+          cast.appendChild(entry);
+        }
+        brief.appendChild(cast);
+      }
       brief.appendChild(el('div', 'bf-menu-label', 'OBJECTIVES'));
       const objList = el('ul', 'bf-brief-list');
       for (const o of def.briefing.objectives) objList.appendChild(el('li', '', o));
@@ -852,6 +1035,9 @@ export function showMenu(
       const hintList = el('ul', 'bf-brief-list');
       for (const h of def.briefing.hints) hintList.appendChild(el('li', '', h));
       brief.appendChild(hintList);
+      if (def.story?.historyNote) {
+        brief.appendChild(el('p', 'bf-histnote', `The record: ${def.story.historyNote}`));
+      }
       // sticky footer: the primary CTA stays on screen while the text scrolls
       const actions = el('div', 'bf-brief-actions');
       const slot = campaignSlot(def.campaign);
@@ -893,7 +1079,8 @@ export function showMenu(
       const top: MenuScreen = currentScreen(flow);
       panel.classList.toggle(
         'wide',
-        top.id === 'campaigns' || top.id === 'scenarioList' || top.id === 'briefing',
+        top.id === 'campaigns' || top.id === 'scenarioList' || top.id === 'briefing'
+          || top.id === 'prologue' || top.id === 'epilogue',
       );
       switch (top.id) {
         case 'title': renderTitle(); break;
@@ -904,6 +1091,19 @@ export function showMenu(
           const campaign = campaigns[top.campaignId];
           if (campaign) renderScenarioList(campaign);
           else renderCampaigns();
+          break;
+        }
+        case 'prologue':
+        case 'epilogue': {
+          const campaign = campaigns[top.campaignId];
+          if (!campaign) {
+            dispatch({ kind: 'back' });
+            return;
+          }
+          renderStoryPage(
+            campaign,
+            top.id === 'prologue' ? campaign.prologue : campaign.epilogue,
+          );
           break;
         }
         case 'briefing': renderBriefing(top.scenarioId); break;

@@ -8,9 +8,15 @@ import { appStorage, type KeyValueStorage } from '../storage';
 export interface CampaignProgress {
   /** Completed scenario ids (any campaign; ids are globally unique). */
   completed: string[];
+  /**
+   * Campaign ids whose prologue has been shown. The opening story page is
+   * pushed automatically the first time a campaign is opened; after that it
+   * stays available from the chapter list but never interrupts again.
+   */
+  prologuesSeen: string[];
 }
 
-export const emptyProgress = (): CampaignProgress => ({ completed: [] });
+export const emptyProgress = (): CampaignProgress => ({ completed: [], prologuesSeen: [] });
 
 export type ScenarioStatus = 'locked' | 'unlocked' | 'completed';
 
@@ -20,7 +26,23 @@ export type ScenarioStatus = 'locked' | 'unlocked' | 'completed';
  */
 export function completeScenario(progress: CampaignProgress, scenarioId: string): CampaignProgress {
   if (progress.completed.includes(scenarioId)) return progress;
-  return { completed: [...progress.completed, scenarioId] };
+  return { ...progress, completed: [...progress.completed, scenarioId] };
+}
+
+/** Mark a campaign's opening page as read. Idempotent, like completeScenario. */
+export function markPrologueSeen(progress: CampaignProgress, campaignId: string): CampaignProgress {
+  if (progress.prologuesSeen.includes(campaignId)) return progress;
+  return { ...progress, prologuesSeen: [...progress.prologuesSeen, campaignId] };
+}
+
+export function hasSeenPrologue(progress: CampaignProgress, campaignId: string): boolean {
+  return progress.prologuesSeen.includes(campaignId);
+}
+
+/** True once every chapter of the campaign is complete — the epilogue's gate. */
+export function isCampaignComplete(campaign: CampaignDef, progress: CampaignProgress): boolean {
+  return campaign.scenarioIds.length > 0
+    && campaign.scenarioIds.every((id) => isCompleted(progress, id));
 }
 
 export function isCompleted(progress: CampaignProgress, scenarioId: string): boolean {
@@ -81,6 +103,11 @@ export function decodeProgress(raw: string | null): CampaignProgress {
       completed: migrateLegacyProgress(
         p.completed.filter((id): id is string => typeof id === 'string'),
       ),
+      // Absent in records written before campaigns had opening pages: those
+      // players get the prologue once, which is the right outcome anyway.
+      prologuesSeen: Array.isArray(p.prologuesSeen)
+        ? p.prologuesSeen.filter((id): id is string => typeof id === 'string')
+        : [],
     };
   } catch {
     return emptyProgress();

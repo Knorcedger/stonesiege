@@ -6,7 +6,8 @@
 // established historical chronology described in each briefing.
 
 import type {
-  CampaignDef, ScenarioDef, ScenarioEntity, ScenarioMap, TriggerDef,
+  CampaignDef, CastMember, ChapterDifficulty, DifficultyRating, ScenarioDef,
+  ScenarioEntity, ScenarioMap, StoryPage, TriggerDef,
 } from '../schema';
 
 type MissionKind = 'journey' | 'retreat' | 'battle' | 'siege' | 'defend' | 'lastStand';
@@ -25,6 +26,10 @@ interface ChapterSource {
   turningPoint: string;
   ending: string;
   hints?: string[];
+  /** What is lost if the chapter fails. Defaults to the opening line. */
+  stakes?: string;
+  /** Overrides the rating the mission kind implies (see MISSION_DIFFICULTY). */
+  difficulty?: ChapterDifficulty;
 }
 
 interface CampaignSource {
@@ -37,8 +42,59 @@ interface CampaignSource {
   climate: Climate;
   imageAlt: string;
   acts: Array<{ id: string; title: string; years: string }>;
+  /**
+   * The people the whole campaign turns on, shown on every chapter briefing so
+   * a name in the dialogue always has a face attached to it.
+   */
+  cast: CastMember[];
+  /** Where these chapters compress, dramatize, or guess past the record. */
+  historyNote: string;
+  prologue: Omit<StoryPage, 'image' | 'imageAlt'>;
+  epilogue: Omit<StoryPage, 'image' | 'imageAlt'>;
   chapters: ChapterSource[];
 }
+
+/**
+ * Difficulty follows the mission kind, because that is what actually varies
+ * across these chapters: the map factory, the age, and the army sizes are
+ * shared, so a siege is a siege whichever campaign it belongs to. A chapter
+ * that departs from its kind's shape overrides the rating itself.
+ */
+const MISSION_DIFFICULTY: Record<MissionKind, ChapterDifficulty> = {
+  journey: {
+    rating: 2,
+    note: 'Won by arriving rather than by conquering; no enemy host bars the road.',
+  },
+  retreat: {
+    rating: 3,
+    note: 'A fighting withdrawal: the protagonist has to reach the far ground alive, and pursuit does not stop.',
+  },
+  battle: {
+    rating: 4,
+    note: 'A stand-up field battle against a full historical host with no economy behind you.',
+  },
+  siege: {
+    rating: 3,
+    note: 'A prepared stronghold with towers covering the approach; siege engines need screening the whole way in.',
+  },
+  defend: {
+    rating: 4,
+    note: 'Successive assaults on a base you must keep intact while replacing losses from it.',
+  },
+  lastStand: {
+    rating: 5,
+    note: 'Deliberately unwinnable in the ordinary sense: the host is overwhelming and the chapter is about how you lose.',
+  },
+};
+
+/** 'Harfleur, Normandy' -> 'Harfleur' for aftermath headings. */
+const placeName = (location: string): string => location.split(',')[0].trim();
+
+/** The consequence half of a chapter's history, used as the aftermath's second beat. */
+const consequenceParagraph = (history: string): string => {
+  const paragraphs = history.split('\n\n');
+  return paragraphs[paragraphs.length - 1];
+};
 
 const WIDTH = 72;
 const HEIGHT = 72;
@@ -339,6 +395,16 @@ function makeChapter(source: CampaignSource, chapter: ChapterSource, index: numb
       estimatedMinutes: chapter.kind === 'defend' ? '10–15 min' : '8–12 min',
       image: `/campaign/${source.id}/cover.webp`,
       imageAlt: source.imageAlt,
+      difficulty: chapter.difficulty ?? MISSION_DIFFICULTY[chapter.kind],
+    },
+    story: {
+      stakes: chapter.stakes ?? chapter.opening,
+      cast: source.cast,
+      aftermath: {
+        title: `After ${placeName(chapter.location)}`,
+        paragraphs: [chapter.ending, consequenceParagraph(chapter.history)],
+      },
+      historyNote: source.historyNote,
     },
     briefing: {
       history: chapter.history,
@@ -380,6 +446,16 @@ function makeCampaign(source: CampaignSource, scenarios: ScenarioDef[]): Campaig
     description: `${source.description} Six playable chapters follow the documented chronology; tactical layouts and spoken narration are dramatized.`,
     cover: `/campaign/${source.id}/cover.webp`,
     coverAlt: source.imageAlt,
+    prologue: {
+      ...source.prologue,
+      image: `/campaign/${source.id}/cover.webp`,
+      imageAlt: source.imageAlt,
+    },
+    epilogue: {
+      ...source.epilogue,
+      image: `/campaign/${source.id}/cover.webp`,
+      imageAlt: source.imageAlt,
+    },
     scenarioIds: scenarios.map((scenario) => scenario.id),
     acts: source.acts.map((act, index) => ({
       ...act,
@@ -401,6 +477,48 @@ const henrySource: CampaignSource = {
     { id: 'conquest', title: 'Act II — Normandy Reclaimed', years: '1417–1419' },
     { id: 'two-crowns', title: 'Act III — Heir to France', years: '1419–1422' },
   ],
+  cast: [
+    {
+      name: 'Henry V',
+      role: 'King of England',
+      note: 'Took the throne at 26 with a rebel’s reputation to live down and an arrow scar through his face from Shrewsbury. Devout, exacting, and unusually good at logistics.',
+    },
+    {
+      name: 'Charles VI',
+      role: 'King of France',
+      note: 'Suffers recurring episodes of madness in which he does not know his own name. France is governed, and fought over, in his absence.',
+    },
+    {
+      name: 'Armagnacs and Burgundians',
+      role: 'France at war with itself',
+      note: 'Two royal factions murdering each other’s leaders. Henry’s campaigns succeed largely because France cannot unite against him.',
+    },
+  ],
+  historyNote: 'Dates, participants and outcomes follow the record; army sizes, terrain and the tactical shape of each chapter are compressed for play. Chronicle numbers for Agincourt in particular vary wildly and are not reliable.',
+  prologue: {
+    kicker: 'England and France, 1415',
+    title: 'A Claim Worth an Army',
+    paragraphs: [
+      'The English claim to the French crown was seventy-eight years old and mostly theoretical. Edward III had asserted it, won famous battles, and left his successors a war they could not finish and could not drop. By 1415 England held little more than Calais and a strip of Gascony.',
+      'Henry V had reasons to revive it. His father had taken the throne by deposing a king, and the Lancastrian line needed legitimacy that only spectacular success could supply. France, meanwhile, was tearing itself apart: a king who went mad for months at a time, and two noble factions — Armagnac and Burgundian — assassinating one another in the streets of Paris.',
+      'Henry demanded Normandy, Aquitaine, an enormous dowry and the French princess. When the negotiations failed, he sailed with an army, a siege train, and a war that would define both kingdoms for a generation.',
+    ],
+    quote: {
+      text: 'He was a prince of great justice, and kept the law without favour.',
+      source: 'The First English Life of King Henry the Fifth',
+    },
+    cta: 'Sail for Normandy',
+  },
+  epilogue: {
+    kicker: '1422–1453',
+    title: 'The Crown He Did Not Live to Wear',
+    paragraphs: [
+      'Henry V died at Vincennes on 31 August 1422, aged 35, of dysentery contracted on campaign. Charles VI outlived him by seven weeks. By the Treaty of Troyes the two crowns passed to Henry’s son — nine months old, and now nominally king of England and France.',
+      'Nothing held. The dauphin Henry had disinherited fought on as Charles VII, and in 1429 a peasant girl from Domrémy broke the siege of Orléans and had him crowned at Reims. English France drained away over the next two decades; by 1453 only Calais remained.',
+      'What Henry actually left was a conquest that required his own attention to survive, an infant heir who grew into an unstable king, and a dynastic wound that opened thirty years later as the Wars of the Roses.',
+    ],
+    cta: 'Close the book',
+  },
   chapters: [
     {
       id: 'henry-01-harfleur', title: 'The Mouth of the Seine', act: 'Act I — The 1415 Expedition',
@@ -474,6 +592,44 @@ const hardradaSource: CampaignSource = {
     { id: 'king', title: 'Act II — King of Norway', years: '1046–1064' },
     { id: 'england', title: 'Act III — The Last Invasion', years: '1066' },
   ],
+  cast: [
+    {
+      name: 'Harald Sigurdsson',
+      role: 'Hardrada, the hard ruler',
+      note: 'Fled Norway at fifteen with a wound and no prospects. Came back twenty years later with more gold than any king in the north.',
+    },
+    {
+      name: 'The Varangian Guard',
+      role: 'The emperor’s northmen',
+      note: 'Byzantium’s axe-bearing household troops, recruited from Scandinavia and Rus. Harald commanded them in Sicily, Anatolia, and the Holy Land.',
+    },
+    {
+      name: 'Harold Godwinson',
+      role: 'King of England, 1066',
+      note: 'Fights the last chapter of Harald’s life and then marches south to meet William of Normandy nineteen days later.',
+    },
+  ],
+  historyNote: 'Harald’s career is known largely through sagas written a century or more later, which are vivid and not always reliable. Dates and major campaigns are corroborated; individual exploits, especially in Byzantine service, are often legend.',
+  prologue: {
+    kicker: 'Norway, 1030',
+    title: 'The Wounded Boy at Stiklestad',
+    paragraphs: [
+      'Harald Sigurdsson was fifteen when he fought at Stiklestad in his half-brother’s army. King Olaf died there, the rebellion won, and Harald was carried off the field bleeding, hidden by farmers, and smuggled east over the mountains.',
+      'What followed was the most extraordinary apprenticeship of the Viking age. He served the Grand Prince of Kiev, then took the road to Constantinople and joined the Varangian Guard — the Byzantine emperor’s Norse household troops — fighting in Sicily, Anatolia, Bulgaria, and Jerusalem, and shipping his pay north to Kiev for safekeeping.',
+      'He came home in 1045 with a fortune, a marriage into the Rus royal house, and the intention of taking the crown he had been driven away from. He was thirty. He would spend the next twenty years fighting for Denmark, and the last year of his life gambling everything on England.',
+    ],
+    cta: 'Take the eastern road',
+  },
+  epilogue: {
+    kicker: '25 September 1066',
+    title: 'Seven Feet of English Ground',
+    paragraphs: [
+      'Harald Hardrada died at Stamford Bridge with an arrow in his throat, and the Norwegian army that had crossed the sea in some three hundred ships went home in twenty-four. Harold Godwinson had asked what he would give the Norwegian king; the answer was seven feet of English ground, or as much more as he was taller than other men.',
+      'Three days later, William of Normandy landed at Pevensey. Harold marched his exhausted army the length of England and lost it, and his life, at Hastings on 14 October.',
+      'Historians have called Stamford Bridge the end of the Viking age, which is tidier than the truth but not wrong in spirit. It was the last time a Scandinavian king tried to take an English throne by main force — and it destroyed two kingdoms in three weeks.',
+    ],
+    cta: 'Close the book',
+  },
   chapters: [
     {
       id: 'hardrada-01-stiklestad', title: 'The Wounded Exile', act: 'Act I — Exile and the Varangian Road',
@@ -501,7 +657,7 @@ const hardradaSource: CampaignSource = {
       objective: 'Bring Harald and his following safely to the Norwegian court',
       opening: 'The exile returns with silver, veterans, and a claim that can no longer be ignored.',
       turningPoint: 'Magnus offers co-rule rather than civil war. Reach the court with the army under control.',
-      ending: 'Harald becomes co-king and, after Magnus dies in 1047, sole king of Norway.',
+      ending: 'Harald becomes co-king with Magnus — a crown bought rather than won, paid for with Byzantine silver carried the length of two continents. When Magnus dies in 1047, Harald is sole king of Norway, and turns immediately on Denmark.',
     },
     {
       id: 'hardrada-04-nisa', title: 'The Long War for Denmark', act: 'Act II — King of Norway',
@@ -547,6 +703,48 @@ const joanSource: CampaignSource = {
     { id: 'coronation', title: 'Act II — The Loire and the Crown', years: '1429' },
     { id: 'captivity', title: 'Act III — Paris and Compiègne', years: '1429–1431' },
   ],
+  cast: [
+    {
+      name: 'Joan of Arc',
+      role: 'A farmer’s daughter from Domrémy',
+      note: 'Seventeen years old, illiterate, and convinced by voices she identified as saints that she was sent to relieve Orléans and crown the king.',
+    },
+    {
+      name: 'Charles VII',
+      role: 'The uncrowned dauphin',
+      note: 'Disinherited by treaty and by his own mother, holding a rump kingdom south of the Loire. He needed Reims, and he needed a miracle.',
+    },
+    {
+      name: 'John Talbot and the English captains',
+      role: 'The besiegers of Orléans',
+      note: 'Professional soldiers running a siege that had held for months, facing a relief army led by a teenager they considered a witch.',
+    },
+  ],
+  historyNote: 'Joan’s life is unusually well documented: her trial and the later nullification proceedings preserve sworn testimony from people who knew her. The battles here are compressed and dramatized; her presence, her banner, and her wound at Orléans are recorded.',
+  prologue: {
+    kicker: 'France, 1429',
+    title: 'A Kingdom Down to Its Last River',
+    paragraphs: [
+      'Ninety-two years into the Hundred Years’ War, France was losing it. The English and their Burgundian allies held Paris, Normandy, and everything north of the Loire. The dauphin Charles had been disinherited by the Treaty of Troyes, had never been crowned, and was widely written off — even by his own court — as a man waiting for the end.',
+      'Orléans was the last bridge. If the city fell, the English could cross the Loire in force and finish the war.',
+      'Into this walked a seventeen-year-old from a village on the Meuse who said that saints had told her to relieve Orléans and take the dauphin to Reims to be crowned. She had no rank, no education, and no military training whatsoever. She was examined by theologians, granted armour and a banner, and — for reasons that say more about French desperation than French judgement — given her way.',
+    ],
+    quote: {
+      text: 'I was sent for the comfort of the poor and the needy.',
+      source: 'Joan of Arc, testimony at her trial, 1431',
+    },
+    cta: 'Ride to Chinon',
+  },
+  epilogue: {
+    kicker: '1431–1456',
+    title: 'The Verdict, and the Second Verdict',
+    paragraphs: [
+      'Captured at Compiègne in May 1430 and sold to the English, Joan was tried at Rouen by a church court under English control. The charge that finally held was wearing men’s clothing. On 30 May 1431 she was burned in the marketplace; she was nineteen. Her ashes were thrown in the Seine so that nothing could be kept.',
+      'Charles VII, whom she had crowned, made no attempt to ransom her. Twenty-five years later — after he had won the war — he permitted a nullification trial that overturned the verdict and cleared her name. She was canonised in 1920.',
+      'The military judgement is harder to summarise than the legend. In the space of a year she broke a siege that had held for seven months, opened the Loire, and got an uncrowned claimant to Reims. Whatever else she was, she was the reason the war turned.',
+    ],
+    cta: 'Close the book',
+  },
   chapters: [
     {
       id: 'joan-01-chinon', title: 'A Road Through Enemy Country', act: 'Act I — The Road to Orléans',
@@ -620,6 +818,44 @@ const genghisSource: CampaignSource = {
     { id: 'unification', title: 'Act II — One Nation of the Steppe', years: '1203–1206' },
     { id: 'empire', title: 'Act III — Beyond the Steppe', years: '1211–1221' },
   ],
+  cast: [
+    {
+      name: 'Temüjin',
+      role: 'Later Chinggis Khan',
+      note: 'Son of a poisoned chief, abandoned with his family to starve on the steppe. He built a following out of oath-brothers and men of no birth.',
+    },
+    {
+      name: 'Börte',
+      role: 'Temüjin’s wife',
+      note: 'Kidnapped by the Merkit early in his rise. The war to get her back was the campaign that made his name.',
+    },
+    {
+      name: 'Jamukha and Toghrul',
+      role: 'Sworn brother and sworn father',
+      note: 'His closest allies, and then his most dangerous enemies. Unifying the steppe meant destroying the men who had raised him up.',
+    },
+  ],
+  historyNote: 'The Secret History of the Mongols is the main source and is a court document with an agenda. Dates before 1200 are approximate; the sieges of settled cities are compressed drastically, and casualty claims from Persian chroniclers are not treated as reliable.',
+  prologue: {
+    kicker: 'The Mongolian steppe, c. 1171',
+    title: 'The Abandoned Camp',
+    paragraphs: [
+      'When Yesügei was poisoned by Tatars, his followers took the herds and rode away, leaving his widow and small children on the open steppe with nothing. That was normal. A clan without a fighting head was not a clan, and steppe winters do the rest.',
+      'They survived on roots, marmots and fish, which was shameful work for the family of a chief. The eldest boy, Temüjin, killed his own half-brother in a quarrel over a fish and was later taken and held in a wooden collar by the clan that had abandoned him. He escaped.',
+      'What he built afterwards was not another tribal confederation. He broke up the old clans, promoted men for loyalty and competence rather than birth, imposed written law and a decimal army organisation, and made the whole steppe into one nation of felt-walled tents. Then he pointed it outward.',
+    ],
+    cta: 'Return to the camp',
+  },
+  epilogue: {
+    kicker: '1227 and after',
+    title: 'The Largest Land Empire There Has Ever Been',
+    paragraphs: [
+      'Chinggis Khan died in 1227 on campaign against the Tangut, of causes the sources cannot agree on, and was buried in an unmarked place that has never been found. His empire went to his sons and grandsons, who kept expanding it: Russia, Persia, Anatolia, Hungary’s doorstep, and finally all of China under Kublai.',
+      'The cost was enormous and is genuinely disputed. Cities that resisted were destroyed as policy, and parts of Persia and north China took generations to recover. Set against that: the Mongol peace opened the overland routes between Europe and China, protected merchants and envoys, tolerated every religion in the empire, and moved craftsmen, ideas and technologies across a continent that had never been connected.',
+      'It began with a boy digging roots beside a river because his father’s people had ridden off and left him.',
+    ],
+    cta: 'Close the book',
+  },
   chapters: [
     {
       id: 'genghis-01-empty-camp', title: 'The Empty Camp', act: 'Act I — Survival and Alliance',
@@ -692,6 +928,44 @@ const alexiosSource: CampaignSource = {
     { id: 'restoration', title: 'Act II — The Northern Storm', years: '1091–1096' },
     { id: 'crusade', title: 'Act III — Recovery in Anatolia', years: '1097–1116' },
   ],
+  cast: [
+    {
+      name: 'Alexios I Komnenos',
+      role: 'Emperor of the Romans',
+      note: 'Seized a throne nobody sane wanted: the treasury empty, the army destroyed, and enemies on three frontiers at once.',
+    },
+    {
+      name: 'Robert Guiscard and Bohemond',
+      role: 'Norman invaders',
+      note: 'Father and son, come from southern Italy to take the empire itself. Bohemond returns later as a crusader, which does not make him friendlier.',
+    },
+    {
+      name: 'Anna Komnene',
+      role: 'His daughter and historian',
+      note: 'Wrote the Alexiad, the fullest account of his reign — devoted, partisan, and the reason we know what these campaigns looked like from the inside.',
+    },
+  ],
+  historyNote: 'The Alexiad is the principal source and is written by the emperor’s daughter in his defence. Chapter scale is compressed heavily; the strategic situation, the sequence of enemies, and the awkwardness of the crusaders’ arrival are as recorded.',
+  prologue: {
+    kicker: 'Constantinople, 1081',
+    title: 'An Empire on Three Fronts',
+    paragraphs: [
+      'Ten years before Alexios took the throne, a Byzantine emperor was captured by the Seljuk Turks at Manzikert. The battle itself was survivable; the civil wars that followed were not. Imperial authority in Anatolia — the empire’s recruiting ground and breadbasket — simply dissolved, and Turkish groups moved into the vacuum until they were camped within sight of the capital.',
+      'Alexios Komnenos was a successful general who seized power in 1081 at twenty-four. He inherited a debased currency, an empty treasury, no field army worth the name, and simultaneous invasions: Normans from Italy in the west, Pechenegs across the Danube in the north, Turks in the east.',
+      'He survived by every means available — hard fighting, harder diplomacy, melting down church plate, buying one enemy to fight another. And in 1095 he asked the West for mercenaries, and got the First Crusade instead: tens of thousands of armed pilgrims marching through his territory, led by men including the Norman who had recently tried to take his throne.',
+    ],
+    cta: 'Hold the empire',
+  },
+  epilogue: {
+    kicker: '1118',
+    title: 'The Empire He Handed On',
+    paragraphs: [
+      'Alexios died in 1118 after thirty-seven years in power. He had not restored the empire of Basil II and never came close. What he did was stop the collapse: the coinage was reformed, the western coast of Anatolia was back in imperial hands, the Normans had been fought to a standstill, and the Pechenegs had been destroyed as a threat.',
+      'The Crusade was the sharpest double edge of his reign. It recovered Nicaea and opened Anatolia, and it planted independent Latin states in Syria that owed him nothing and resented him deeply — a grievance that ran on for a century and helped bring a crusading army to sack Constantinople in 1204.',
+      'His son and grandson ruled over what historians call the Komnenian restoration. It rested on the settlement Alexios improvised while fighting on three frontiers with no money.',
+    ],
+    cta: 'Close the book',
+  },
   chapters: [
     {
       id: 'alexios-01-dyrrhachion', title: 'The Broken Field', act: 'Act I — An Empire Under Siege',
@@ -764,6 +1038,44 @@ const saladinSource: CampaignSource = {
     { id: 'jerusalem', title: 'Act II — Defeat and Victory', years: '1177–1187' },
     { id: 'crusade', title: 'Act III — Jerusalem and the Lionheart', years: '1187–1192' },
   ],
+  cast: [
+    {
+      name: 'Salah ad-Din Yusuf ibn Ayyub',
+      role: 'Saladin',
+      note: 'A Kurdish officer sent to Egypt on someone else’s errand, who ended up ruling it — and then spent longer fighting fellow Muslims than fighting crusaders.',
+    },
+    {
+      name: 'Guy of Lusignan and Raynald of Châtillon',
+      role: 'The kingdom of Jerusalem’s war party',
+      note: 'Raynald’s raids on caravans and on the Hajj route gave Saladin both a reason and a rallying cry. Guy’s decision to march to Hattin gave him the victory.',
+    },
+    {
+      name: 'Richard I of England',
+      role: 'The Lionheart',
+      note: 'Arrives with the Third Crusade, wins his battles, and cannot take Jerusalem. He and Saladin negotiate constantly and never meet.',
+    },
+  ],
+  historyNote: 'Saladin is described by both Muslim and Frankish writers, several of whom knew him; his reputation for restraint at Jerusalem in 1187 is attested by his enemies as well as his admirers. Chapter scale and tactics are compressed for play.',
+  prologue: {
+    kicker: 'Egypt and Syria, 1169',
+    title: 'A Divided House',
+    paragraphs: [
+      'The crusader states had survived for seventy years mainly because their neighbours were divided. Egypt was ruled by a Shi‘a Fatimid caliphate in decline; Syria was a patchwork of Sunni emirs under Nur ad-Din of Damascus; and both spent as much effort on each other as on the Franks.',
+      'Salah ad-Din — a Kurdish officer in Nur ad-Din’s service — went to Egypt reluctantly as second-in-command of an expedition, and within two years was its vizier. When Nur ad-Din died, he took Damascus too. Uniting Egypt and Syria under one authority took him nearly twenty years and a great deal of war against fellow Muslims, and it is the precondition for everything else.',
+      'Only then could he turn the combined weight of both on the kingdom of Jerusalem — and he had been given a case for doing so by Raynald of Châtillon, who raided pilgrim caravans and threatened the holy cities of the Hijaz.',
+    ],
+    cta: 'Take up the command',
+  },
+  epilogue: {
+    kicker: '1192–1193',
+    title: 'What He Left, and What He Kept',
+    paragraphs: [
+      'The Third Crusade recovered the coast and could not recover Jerusalem. In 1192 Saladin and Richard agreed a truce: the Franks kept a coastal strip, Jerusalem stayed Muslim, and Christian pilgrims were guaranteed access to it. Richard sailed home and Saladin went to Damascus.',
+      'He died there in March 1193, at about 55. His treasury was so depleted by giving that it could not pay for his funeral; his family had to borrow. The empire he had spent his life assembling was divided among relatives within a generation.',
+      'His conduct at Jerusalem in 1187 — a negotiated surrender, ransoms he repeatedly waived, no massacre — was recorded with astonishment by Frankish chroniclers who remembered what their own grandfathers had done to the same city in 1099. It is the reason a man who fought the crusaders for twenty years became a hero in European literature within a century of his death.',
+    ],
+    cta: 'Close the book',
+  },
   chapters: [
     {
       id: 'saladin-01-egypt', title: 'Vizier of Egypt', act: 'Act I — Egypt and Syria',

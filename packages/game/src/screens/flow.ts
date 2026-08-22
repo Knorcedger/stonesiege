@@ -9,6 +9,10 @@ export type MenuScreen =
   | { id: 'practiceSetup' }
   | { id: 'campaigns' }
   | { id: 'scenarioList'; campaignId: string }
+  // Story pages that open and close a campaign. Both sit above the chapter
+  // list so Back from either returns to the chapters rather than the cards.
+  | { id: 'prologue'; campaignId: string }
+  | { id: 'epilogue'; campaignId: string }
   | { id: 'briefing'; campaignId: string; scenarioId: string }
   | { id: 'settings' };
 
@@ -17,6 +21,8 @@ export type FlowEvent =
   | { kind: 'openPractice' }     // play -> practice setup
   | { kind: 'openCampaigns' }    // play -> campaign cards
   | { kind: 'openScenarios'; campaignId: string }   // campaigns -> scenario list
+  | { kind: 'openPrologue'; campaignId: string }  // list -> campaign opening
+  | { kind: 'openEpilogue'; campaignId: string }  // list -> campaign ending
   | { kind: 'openBriefing'; campaignId: string; scenarioId: string } // list -> briefing
   | { kind: 'openSettings' }     // anywhere (settings pushes; back returns)
   | { kind: 'back' };
@@ -35,6 +41,12 @@ export function flowAtScenarioList(campaignId: string): FlowState {
       { id: 'scenarioList', campaignId },
     ],
   };
+}
+
+/** Deep-link stack for the campaign's closing page, with the chapters behind it. */
+export function flowAtEpilogue(campaignId: string): FlowState {
+  const below = flowAtScenarioList(campaignId);
+  return { stack: [...below.stack, { id: 'epilogue', campaignId }] };
 }
 
 export function currentScreen(state: FlowState): MenuScreen {
@@ -61,6 +73,14 @@ export function flowReducer(state: FlowState, ev: FlowEvent): FlowState {
     case 'openScenarios':
       return top.id === 'campaigns'
         ? push(state, { id: 'scenarioList', campaignId: ev.campaignId })
+        : state;
+    case 'openPrologue':
+      return top.id === 'scenarioList' && top.campaignId === ev.campaignId
+        ? push(state, { id: 'prologue', campaignId: ev.campaignId })
+        : state;
+    case 'openEpilogue':
+      return top.id === 'scenarioList' && top.campaignId === ev.campaignId
+        ? push(state, { id: 'epilogue', campaignId: ev.campaignId })
         : state;
     case 'openBriefing':
       return top.id === 'scenarioList' && top.campaignId === ev.campaignId
