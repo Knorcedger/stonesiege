@@ -246,6 +246,7 @@ export function handleBuild(state: SimState, cmd: BuildCmd, events: SimEvent[]):
   const foundation = spawnEntity(state, {
     defId: cmd.defId, player: cmd.player, tileX: cmd.tileX, tileY: cmd.tileY, buildProgress: 0,
     deferBlocking: occupants.length > 0,
+    requestId: cmd.requestId,
   });
   if (!foundation) {
     player.stockpile.food += def.cost.food ?? 0;

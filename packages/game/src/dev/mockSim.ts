@@ -243,14 +243,22 @@ class MockGame implements Game {
         if (player.pop + (def.pop ?? 1) > player.popCap) return;
         if (!this.pay(player, def.cost)) return;
         const totalTicks = Math.max(1, Math.round(def.trainTime * TICKS_PER_SECOND));
-        b.trainQueue.push({ defId: cmd.defId, ticksLeft: totalTicks, totalTicks });
+        b.trainQueue.push({
+          defId: cmd.defId,
+          ticksLeft: totalTicks,
+          totalTicks,
+          ...(cmd.requestId === undefined ? {} : { requestId: cmd.requestId }),
+        });
         break;
       }
       case 'cancelTrain': {
         const b = this.ownBuilding(cmd.player, cmd.buildingId);
         const player = this.st.players[cmd.player];
-        if (!b || !player || !b.trainQueue || !b.trainQueue[cmd.index]) return;
-        const [removed] = b.trainQueue.splice(cmd.index, 1);
+        const index = cmd.requestId === undefined
+          ? cmd.index ?? -1
+          : b?.trainQueue?.findIndex((item) => item.requestId === cmd.requestId) ?? -1;
+        if (!b || !player || !b.trainQueue || !b.trainQueue[index]) return;
+        const [removed] = b.trainQueue.splice(index, 1);
         this.refund(player, costOf(removed.defId));
         break;
       }

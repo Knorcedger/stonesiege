@@ -19,6 +19,7 @@ import { hasActiveRally } from './hud/cardModel';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 import { getSettings } from './settings';
+import { PlayerResourceMemory } from './resourceMemory';
 
 const HIGHLIGHT = 0xf4eedd;
 const GATHER_HIGHLIGHT = 0xe6c04a;
@@ -222,6 +223,7 @@ export class WorldLayer {
     private assets: GameAssets,
     private humanPlayer: PlayerId,
     private getUnitLos: (defId: string) => number = (defId) => gameData.units[defId]?.los ?? 0,
+    private resourceMemory: PlayerResourceMemory = new PlayerResourceMemory(humanPlayer),
   ) {
     this.container.sortableChildren = true;
     this.aggroLayer.zIndex = -1e9; // below every entity, above terrain
@@ -250,6 +252,7 @@ export class WorldLayer {
 
   /** Main per-frame update. tickFloat = state.tick + alpha. */
   update(state: GameState, alpha: number, tickFloat: number): void {
+    this.resourceMemory.refresh(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const seen = new Set<EntityId>();
     this.refreshGatherTargets(state);
@@ -265,9 +268,11 @@ export class WorldLayer {
         this.rememberBuilding(state, e);
       }
 
-      const visible =
-        e.player === this.humanPlayer ||
-        (e.kind === 'resource' ? tileVis >= 1 : tileVis === 2);
+      const displayed = this.resourceMemory.entityFor(state, e);
+      const visible = displayed !== null && (
+        displayed.player === this.humanPlayer
+        || (displayed.kind === 'resource' ? true : tileVis === 2)
+      );
 
       let view = this.views.get(e.id);
       if (!visible) {
@@ -279,9 +284,20 @@ export class WorldLayer {
         this.views.set(e.id, view);
       }
       view.root.visible = true;
-      this.updateView(state, e, view, alpha, tickFloat);
-      if (e.kind === 'unit' && e.hp > 0 && e.activity !== 'dying'
-        && e.garrisonedIn === undefined) visibleUnits.push({ entity: e, view });
+      this.updateView(state, displayed!, view, alpha, tickFloat);
+      if (displayed!.kind === 'unit' && displayed!.hp > 0 && displayed!.activity !== 'dying'
+        && displayed!.garrisonedIn === undefined) visibleUnits.push({ entity: displayed!, view });
+    }
+
+    for (const remembered of this.resourceMemory.hiddenMissing(state)) {
+      seen.add(remembered.id);
+      let view = this.views.get(remembered.id);
+      if (!view) {
+        view = this.createView();
+        this.views.set(remembered.id, view);
+      }
+      view.root.visible = true;
+      this.updateView(state, remembered, view, alpha, tickFloat);
     }
 
     this.fadeUnitOccluders(state, visibleUnits);
@@ -424,16 +440,23 @@ export class WorldLayer {
    * sorted by distance; the input layer applies GDD snap priority.
    */
   pickAt(state: GameState, wx: number, wy: number, slop: number): PickResult[] {
+    this.resourceMemory.refresh(state);
     const vis = state.players[this.humanPlayer]?.visibility ?? null;
     const results: PickResult[] = [];
     for (const e of state.entities.values()) {
       const tv = this.tileVis(vis, state, e.tileX, e.tileY);
-      const visible = e.player === this.humanPlayer || (e.kind === 'resource' ? tv >= 1 : tv === 2);
+      const displayed = this.resourceMemory.entityFor(state, e);
+      const visible = displayed !== null
+        && (displayed.player === this.humanPlayer || displayed.kind === 'resource' || tv === 2);
       // Garrisoned units sit at their host building's anchor but are not drawn —
       // they must never steal a tap aimed at the building itself.
-      if (!visible || e.activity === 'dying' || e.garrisonedIn !== undefined) continue;
-      const d = entityPickDistance(e, wx, wy);
-      if (d <= slop) results.push({ entity: e, dist: d });
+      if (!visible || displayed!.activity === 'dying' || displayed!.garrisonedIn !== undefined) continue;
+      const d = entityPickDistance(displayed!, wx, wy);
+      if (d <= slop) results.push({ entity: displayed!, dist: d });
+    }
+    for (const remembered of this.resourceMemory.hiddenMissing(state)) {
+      const d = entityPickDistance(remembered, wx, wy);
+      if (d <= slop) results.push({ entity: remembered, dist: d });
     }
     results.sort((a, b) => a.dist - b.dist);
     return results;

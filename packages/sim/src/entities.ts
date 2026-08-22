@@ -53,6 +53,8 @@ export interface SpawnInit {
   buildProgress?: number;
   /** Spawn a visible foundation without movement blockers until its occupied site clears. */
   deferBlocking?: boolean;
+  /** Client-local provenance copied to a newly placed foundation. */
+  requestId?: number;
 }
 
 export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
@@ -92,6 +94,7 @@ export function spawnEntity(state: SimState, init: SpawnInit): Entity | null {
       hp: init.hp ?? (buildProgress < 1000 ? 1 : def.hp), maxHp: def.hp,
       activity: 'idle',
       buildProgress, // scenario/mapgen buildings arrive complete
+      ...(init.requestId === undefined ? {} : { requestId: init.requestId }),
       ...(init.deferBlocking ? { foundationPendingClearance: true } : {}),
     };
     if (def.trains && def.trains.length > 0) e.trainQueue = [];

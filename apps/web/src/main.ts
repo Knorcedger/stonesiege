@@ -8,6 +8,7 @@ import '@fontsource/cinzel/latin-700.css';
 import { appOpenEvent } from '@bf/game/analytics/events';
 import { installNativeBridge, nativePlatform } from './native';
 import { createWebAnalytics, type WebAnalytics } from './analytics';
+import { renderBootError } from './bootError';
 
 const app = document.getElementById('app')!;
 app.innerHTML = '<div style="color:#c9b98a;font:16px monospace;padding:2rem">StoneSiege — bootstrapping…</div>';
@@ -43,5 +44,6 @@ async function boot() {
 }
 
 boot().catch((err) => {
-  app.innerHTML = `<pre style="color:#e66;padding:2rem">${String(err?.stack ?? err)}</pre>`;
+  console.error('StoneSiege failed during initial boot.', err);
+  renderBootError(app, err, { retry: () => window.location.reload() });
 });
