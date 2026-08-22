@@ -10,12 +10,14 @@
 *.zsh text eol=lf
 
 *.aab binary
+*.aiff binary
 *.apk binary
 *.gif binary
 *.ico binary
 *.jpeg binary
 *.jpg binary
 *.keystore binary
+*.m4a binary
 *.p12 binary
 *.png binary
 *.webp binary

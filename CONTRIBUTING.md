@@ -87,6 +87,12 @@ For generated or AI-assisted art, include provenance, source references, model/t
 
 Do not edit generated atlases in `apps/web/public/assets/hd/` by hand. Source renders, validated frames, generation steps, and licensing provenance belong under `art/hd/`; see [art/hd/README.md](art/hd/README.md). Source art and store screenshots use Git LFS and are intentionally excluded from ordinary clones. Install Git LFS and run `git lfs pull --include="art/**,store/screenshots/**" --exclude=""` before source-art or store-publishing work. Shipping runtime atlases remain regular Git files.
 
+Spoken campaign dialogue is rendered, not hand-edited: `npm run vo:render` writes the audio in
+`apps/web/public/assets/vo/` and its manifest. Re-run it after changing a dialogue line, or the
+recording of the old wording is deleted as stale and that beat falls back to the device's speech
+synthesizer. `npm run vo:render -- --list` reviews the lines on any platform; rendering needs
+macOS. Provenance and the licence status of the voice are recorded in [art/vo/README.md](art/vo/README.md).
+
 ## Commits and pull requests
 
 Write an imperative, specific commit subject, such as `Fix villagers losing queued drop-off orders`. The pull request should explain:

@@ -229,9 +229,11 @@ has its own concurrency budget, so a wall crew, a field battle, and an archer vo
 starve one another out of the mix.
 
 **Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as
-spoken story rather than silent text. There is no recorded voice-over: the lines go to the
-device's own speech synthesizer, which is steered by voice choice and phrasing rather than by
-pitch. The campaign is written for the English (UK) **Martha** voice and prefers her wherever
+spoken story rather than silent text. Lines that have been recorded play as voice-over from
+`assets/vo/`; every other line goes to the device's own speech synthesizer, steered by voice
+choice and phrasing rather than by pitch. The two are interchangeable beat by beat, so dialogue
+written after the last render is still read aloud, and an edited line stops playing the audio of
+its old wording. The campaign is written for the English (UK) **Martha** voice and prefers her wherever
 the device has her, falling back to the best-quality English voice installed; a line is spoken
 as a sequence of beats split at sentence ends, dashes, colons and semicolons, with silence held
 between them, and every voice stays within a whole tone of its own register — dragging the pitch
@@ -243,8 +245,10 @@ tap dismisses text and voice together. Narration stops with the match: pausing, 
 the app, or reaching the end screen silences it, and the closing lines are not read over the
 victory or defeat fanfare. **Narration** volume and a **Campaign narration** switch sit with
 the other audio settings; off sends nothing to the synthesizer at all.
-Devices without speech synthesis simply read nothing and play exactly as before. Recorded
-voice-over remains on the roadmap and can replace the synthesizer behind the same seam.
+Devices without speech synthesis read only the lines that have recordings, and play exactly as
+before otherwise. Voice-over is rendered by `npm run vo:render` into one file per spoken beat,
+named by a hash of speaker and wording so a text edit can never leave stale audio playing; see
+[../art/vo/README.md](../art/vo/README.md) for the source and its licence status.
 
 ## Victory / Defeat
 - Practice: conquest. A player is defeated the moment they have **no Town Center, no
