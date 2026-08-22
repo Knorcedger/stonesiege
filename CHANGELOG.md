@@ -32,6 +32,12 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   a ford — a gravel causeway lying under shin-deep water, with stepping stones standing out of
   it — so a player following a road to the water can see where the army wades across. Deep
   water is unchanged, and nothing about movement, pathing, or the minimap changes.
+- Every campaign road is laid on a curve. The Wallace chapters' roads — Lanark's two streets,
+  the Perth road to the Tay ford, the Tyne valley's bridge approaches and the Newcastle relief
+  road, the Falkirk approaches, the Forest roads to the Clyde — now wander to where they are
+  going instead of running in straight legs that meet at right angles. Bridges and causeways
+  keep their authored straight spans, roads still reach every place they reached before, and
+  no tile's passability changes.
 - The historical battlefield map (every generated legendary chapter) has a road that curves
   from the camp to the ford and on to the objective, instead of straight runs meeting at right
   angles — and it no longer runs down the middle of the river. The route through the channel is

@@ -33,6 +33,9 @@ const WET_TERRAIN = new Set(['water', 'shallows']);
 /** What a road ribbon may be drawn over — the ground the track was worn into. */
 const ROAD_GROUND = ['grass', 'dirt', 'sand', 'snow', 'farmland'];
 
+/** How far to look for that ground before calling a road tile a bridge deck. */
+const ROAD_GROUND_REACH = 4;
+
 /** How far along each axis a road's run direction is measured. */
 const ROAD_RUN_REACH = 3;
 
@@ -222,9 +225,12 @@ export function roadFrameName(
  * a snowfield lies on snow. Roads are ribbons on the ground, not tile-shaped
  * patches — that is what lets a road stepping between the tile axes read as one
  * diagonal instead of a staircase of tile-sized jogs.
+ *
+ * `null` out in open water: that is an authored bridge or causeway, and it gets a
+ * solid deck instead of a ribbon lying on ground that is not there.
  */
-export function roadGroundId(map: GameMap, x: number, y: number): string {
-  for (let radius = 1; radius <= 4; radius++) {
+export function roadGroundId(map: GameMap, x: number, y: number): string | null {
+  for (let radius = 1; radius <= ROAD_GROUND_REACH; radius++) {
     for (let dy = -radius; dy <= radius; dy++) {
       for (let dx = -radius; dx <= radius; dx++) {
         if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
@@ -233,7 +239,7 @@ export function roadGroundId(map: GameMap, x: number, y: number): string {
       }
     }
   }
-  return ROAD_GROUND[0];
+  return null;
 }
 
 interface Chunk {
@@ -383,12 +389,20 @@ export class TerrainLayer {
     return terrain;
   }
 
-  /** The ground tile a road ribbon is drawn over. */
+  /** The ground tile a road ribbon is drawn over, or null over open water. */
   private groundFrame(x: number, y: number) {
     const ground = roadGroundId(this.map, x, y);
+    if (ground === null) return null;
     const variants = this.variantCount(ground);
     const variant = variants > 0 ? ((Math.imul(x, 73856093) ^ Math.imul(y, 19349663)) >>> 0) % variants : 0;
     return this.assets.resolveFrame(`terr/${ground}/${variant}`);
+  }
+
+  /** One half-tile of bare road earth, toward `edge`. */
+  private fillFrame(x: number, y: number, edge: string) {
+    return this.assets.tryResolve(
+      `terr/road-fill/${edge}/${tileHash(x, y, edge.charCodeAt(1)) % ROAD_FILL_VARIANTS}`,
+    );
   }
 
   /**
@@ -415,7 +429,8 @@ export class TerrainLayer {
     const terrain = this.displayTerrainAt(x, y);
     if (terrain === 'ford') return 'shallows';
     // A road no longer transitions at all: it lies ON its ground, so the tile
-    // blends with its neighbours exactly as that ground does.
+    // blends with its neighbours exactly as that ground does. A bridge deck has
+    // no ground and blends with nothing — its edge over the water is the deck's.
     if (terrain !== null && terrain.startsWith('road')) return roadGroundId(this.map, x, y);
     return terrain;
   }
@@ -472,19 +487,21 @@ export class TerrainLayer {
         // band's outer edge keeps the ribbon's frayed silhouette.
         if (terr.startsWith('road')) {
           const ground = this.groundFrame(tx, ty);
-          const gspr = new Sprite(ground.texture);
-          gspr.anchor.set(ground.anchorX, ground.anchorY);
-          gspr.scale.set(ground.renderScale);
-          gspr.position.set(lx, ly);
-          temp.addChild(gspr);
-
+          if (ground) {
+            const gspr = new Sprite(ground.texture);
+            gspr.anchor.set(ground.anchorX, ground.anchorY);
+            gspr.scale.set(ground.renderScale);
+            gspr.position.set(lx, ly);
+            temp.addChild(gspr);
+          }
+          // Fill the half of the tile facing each road neighbour, so a road wider
+          // than one tile is one band. Out over open water there is no ground to
+          // lie on: fill every half instead, and the bridge gets a solid deck.
           for (const [nx, ny, edge] of [
             [0, -1, 'ne'], [1, 0, 'se'], [0, 1, 'sw'], [-1, 0, 'nw'],
           ] as Array<[number, number, string]>) {
-            if (this.terrainAt(tx + nx, ty + ny) !== 'road') continue;
-            const fill = this.assets.tryResolve(
-              `terr/road-fill/${edge}/${tileHash(tx, ty, edge.charCodeAt(1)) % ROAD_FILL_VARIANTS}`,
-            );
+            if (ground !== null && this.terrainAt(tx + nx, ty + ny) !== 'road') continue;
+            const fill = this.fillFrame(tx, ty, edge);
             if (!fill) continue;
             const fspr = new Sprite(fill.texture);
             fspr.anchor.set(fill.anchorX, fill.anchorY);

@@ -77,3 +77,102 @@ export function curveTiles(points: Array<[number, number]>): Array<[number, numb
   }
   return out;
 }
+
+export interface RoadCurveOptions {
+  /** Characters the road may be painted onto — plain terrain only, never objects. */
+  over: string;
+  /** Characters that mark water. Road tiles beside water are bridges and stay put. */
+  water?: string;
+  /** The legend character for road. */
+  road?: string;
+  /** Tiles across: 1 is a worn track, 2 a road two carts wide. Default 1. */
+  width?: number;
+  /** How close to water a road tile must be to count as a bridge. Default 2. */
+  bridgeReach?: number;
+}
+
+/** The commonest paintable ground character around a tile, for filling a cleared road. */
+function groundAround(
+  grid: string[][], x: number, y: number, over: Set<string>,
+): string {
+  const counts = new Map<string, number>();
+  for (let radius = 1; radius <= 3; radius++) {
+    for (let dy = -radius; dy <= radius; dy++) {
+      for (let dx = -radius; dx <= radius; dx++) {
+        const ny = y + dy;
+        const nx = x + dx;
+        if (ny < 0 || ny >= grid.length || nx < 0 || nx >= grid[ny].length) continue;
+        const char = grid[ny][nx];
+        if (!over.has(char)) continue;
+        counts.set(char, (counts.get(char) ?? 0) + 1);
+      }
+    }
+    if (counts.size > 0) break;
+  }
+  let best = [...over][0];
+  let bestCount = -1;
+  for (const [char, count] of counts) {
+    if (count > bestCount) { best = char; bestCount = count; }
+  }
+  return best;
+}
+
+/**
+ * Re-lay a map's roads on curves: clear the authored road back to the ground
+ * around it and paint `paths` through `curveTiles` instead.
+ *
+ * Road tiles touching water are left exactly where they are — those are authored
+ * bridges and their ramps, and a bridge is meant to be a straight span. Painting
+ * only ever covers the plain terrain characters in `over`, so gaia objects (trees,
+ * mines, berries, herds) are never overwritten, and terrain passability is
+ * unchanged: road, grass and dirt all carry the same traffic.
+ */
+export function layRoadCurves(
+  rows: string[], paths: Array<Array<[number, number]>>, options: RoadCurveOptions,
+): string[] {
+  const road = options.road ?? 'r';
+  const water = new Set((options.water ?? 'ws').split(''));
+  const over = new Set(options.over.split(''));
+  const grid = rows.map((row) => row.split(''));
+  const inside = (x: number, y: number): boolean =>
+    y >= 0 && y < grid.length && x >= 0 && x < grid[y].length;
+  // Two tiles, not one: the middle lane of a three-wide causeway touches only
+  // road, and clearing it would cut the span in half lengthwise.
+  const bridgeReach = options.bridgeReach ?? 2;
+  const bridging = (x: number, y: number): boolean => {
+    for (let dy = -bridgeReach; dy <= bridgeReach; dy++) {
+      for (let dx = -bridgeReach; dx <= bridgeReach; dx++) {
+        if (inside(x + dx, y + dy) && water.has(grid[y + dy][x + dx])) return true;
+      }
+    }
+    return false;
+  };
+
+  const cleared: Array<[number, number]> = [];
+  for (let y = 0; y < grid.length; y++) {
+    for (let x = 0; x < grid[y].length; x++) {
+      if (grid[y][x] === road && !bridging(x, y)) cleared.push([x, y]);
+    }
+  }
+  for (const [x, y] of cleared) grid[y][x] = groundAround(grid, x, y, over);
+
+  const paint = (x: number, y: number): void => {
+    if (inside(x, y) && over.has(grid[y][x])) grid[y][x] = road;
+  };
+  const width = options.width ?? 1;
+  for (const path of paths) {
+    const tiles = curveTiles(path);
+    tiles.forEach(([x, y], index) => {
+      paint(x, y);
+      if (width < 2) return;
+      // Widen to the same hand the whole way — the step into this tile is always
+      // along one axis, so its perpendicular is too and the second lane stays
+      // edge-adjacent. Alternating sides would bulge the band at every turn.
+      const [px, py] = tiles[Math.max(0, index - 1)];
+      const dx = Math.sign(x - px) || (index === 0 ? Math.sign(tiles[1]?.[0] - x) : 0);
+      const dy = Math.sign(y - py) || (index === 0 ? Math.sign(tiles[1]?.[1] - y) : 0);
+      paint(x - dy, y + dx);
+    });
+  }
+  return grid.map((row) => row.join(''));
+}

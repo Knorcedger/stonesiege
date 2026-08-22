@@ -269,4 +269,13 @@ describe('roadGroundId', () => {
     expect(bridge.terrainIds).toContain('water');
     expect(roadGroundId(bridge, 2, 1)).toBe('grass');
   });
+
+  it('has no ground far out over water: that is a bridge deck, not a track', () => {
+    const rows = ['..rr..'];
+    for (let i = 0; i < 12; i++) rows.push('wwrrww');
+    rows.push('..rr..');
+    const bridge = mapOf(rows);
+    expect(roadGroundId(bridge, 2, 6)).toBeNull();
+    expect(roadGroundId(bridge, 2, 1)).toBe('grass'); // the ramp still lies on the bank
+  });
 });

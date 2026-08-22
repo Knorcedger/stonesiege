@@ -261,8 +261,14 @@ Four families use it:
 | `road-fill` | `terr/road-fill/<edge>/<variant>`, 2 variants | The half of a tile facing a road tile beside it, in bare packed earth. A road wider than one tile is a row of ribbons with ground showing between them; filling the halves that face each other merges the lanes into one band while the band's outer edge keeps the frayed ribbon silhouette |
 | `road` (§3.1) | `terr/road/<variant>` | The junction patch: a crossroads, or a lone tile. Scuffed in both directions, reaching every edge midpoint so whatever meets it joins on |
 
-Maps should author roads as curves (`curveTiles` in `packages/scenarios`), not as
-axis-aligned runs meeting at right angles: no road worn by traffic turns 90° on the spot.
+Maps author roads as curves, not as axis-aligned runs meeting at right angles — no road worn
+by traffic turns 90° on the spot. `curveTiles` in `packages/scenarios/src/scenarios/authoring.ts`
+rasterizes a spline through waypoints into a 4-connected run; `layRoadCurves` re-lays a whole
+ASCII map's roads on such paths, clearing the authored road back to the ground around it while
+leaving bridge spans (any road tile within two tiles of water) exactly where they are.
+
+A road tile far enough from land that no ground can be found under it is a **bridge deck**: the
+renderer fills all four halves instead of laying a ribbon on ground that is not there.
 
 ---
 
