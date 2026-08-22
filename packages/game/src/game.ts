@@ -773,13 +773,17 @@ async function bootGame(
   // and dev-server reloads. Cleared the moment the match ends. When @bf/sim's
   // serialize() exists the blob rides along as a fast practice-resume path.
   let lastSavedTick = game.state.tick;
+  // Wall-clock stamp of the last save that reached storage — presentation only
+  // (the pause overlay's autosave line); never read by the sim.
+  let lastSavedAt: number | null = null;
   const saveMatch = (): void => {
     const st = getState();
     if (endShown || st.finished) return;
     const serialized = trySerialize(game);
     const withBlob = serialized !== undefined ? { serialized } : {};
+    let stored = false;
     if (plan.mode === 'scenario' && meta) {
-      saveSnapshot({
+      stored = saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'scenario', scenarioId: meta.id,
         // content stamp: the resume is only valid against identical authored
         // def + game data ('' can never match, degrading to "no resume")
@@ -788,12 +792,13 @@ async function bootGame(
         tallies: copyTallies(tallies), ...withBlob,
       });
     } else if (plan.setup) {
-      saveSnapshot({
+      stored = saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'practice', config, setup: plan.setup,
         tick: st.tick, log: commandLog, tallies: copyTallies(tallies), ...withBlob,
       });
     }
     lastSavedTick = st.tick;
+    if (stored) lastSavedAt = Date.now();
   };
   const onVisibility = (): void => {
     if (document.hidden) saveMatch();
@@ -1064,7 +1069,7 @@ async function bootGame(
     // commands post-finish, so Resign is swapped for this) — same full reboot
     // the end screen's Return to Title performs
     returnToTitle: () => reloadTo(meta ? { kind: 'scenarioList', campaignId: meta.campaign } : null),
-    saveGame: saveMatch,
+    getLastSaveTime: () => lastSavedAt,
     getIdleCounts,
     cycleIdle,
     focusBuilding,

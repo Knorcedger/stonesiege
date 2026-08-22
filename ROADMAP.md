@@ -25,8 +25,8 @@ and scenario-tool foundations below come first.
 - Deep water and shallows as terrain types; deep water is currently impassable
 - Scenario maps, objectives, dialogue, timed and event-driven triggers, allied teams, and AI
   profiles
-- One autosaved resumable match per campaign plus one for practice, with explicit “Save now”
-  and deterministic restoration
+- One autosaved resumable match per campaign plus one for practice, with the pause overlay
+  reporting the last autosave time and deterministic restoration
 - Touch-first controls, native mobile wrappers, HD runtime art, and automated quality gates
 
 ## Gap audit

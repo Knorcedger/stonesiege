@@ -416,8 +416,11 @@ function entryFor(slot: SaveSlot, snapshot: MatchSnapshot, seq: number): SaveEnt
  * rather than failing outright: first the practice fast-path blob, then the
  * least-recently-saved OTHER slot, one at a time. The save being written is
  * never the one evicted — the match in front of the player wins.
+ *
+ * Returns whether the snapshot actually reached storage, so the pause overlay
+ * only ever reports a save the device really kept.
  */
-export function saveSnapshot(snapshot: MatchSnapshot): void {
+export function saveSnapshot(snapshot: MatchSnapshot): boolean {
   const slot = slotForSnapshot(snapshot);
   // A scenario resume always log-replays, so its blob is unreadable weight.
   const stored: MatchSnapshot = snapshot.mode === 'scenario' && snapshot.serialized !== undefined
@@ -427,7 +430,7 @@ export function saveSnapshot(snapshot: MatchSnapshot): void {
   try {
     payload = encodeSnapshot(stored);
   } catch {
-    return; // unserializable state: losing one save beats crashing the match
+    return false; // unserializable state: losing one save beats crashing the match
   }
   let index = readIndex();
   if (!appStorage.trySet(slotKey(slot), payload)) {
@@ -438,7 +441,7 @@ export function saveSnapshot(snapshot: MatchSnapshot): void {
       const oldest = [...index.entries]
         .filter((e) => e.slot !== slot)
         .sort((a, b) => a.seq - b.seq)[0];
-      if (!oldest) return; // nothing left to give up
+      if (!oldest) return false; // nothing left to give up
       appStorage.remove(slotKey(oldest.slot));
       index = { ...index, entries: index.entries.filter((e) => e.slot !== oldest.slot) };
       writeIndex(index);
@@ -451,6 +454,7 @@ export function saveSnapshot(snapshot: MatchSnapshot): void {
       entryFor(slot, stored, index.next),
     ],
   });
+  return true;
 }
 
 export function loadSnapshot(slot: SaveSlot): MatchSnapshot | null {
