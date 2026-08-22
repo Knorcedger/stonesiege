@@ -1,5 +1,5 @@
 // Full-screen / edge DOM overlays that sit outside the command card:
-// - age-advance celebration banner (transient, Jacquard display face)
+// - age-advance celebration banner (transient, Cinzel display face)
 // - wonder countdown banner (persistent strip while a wonder stands)
 // - under-attack screen-edge red pulse
 // - victory / defeat end screen (ART_BIBLE dark wood + parchment + gold),
@@ -14,43 +14,44 @@ const OVERLAY_CSS = `
 .bf-agebanner { position:absolute; left:50%; top:22%; transform:translateX(-50%); text-align:center;
   pointer-events:none; opacity:0; transition:opacity 0.5s; z-index:${HUD_LAYER.ageBanner}; }
 .bf-agebanner.show { opacity:1; }
-.bf-agebanner h2 { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:52px; color:#E6C04A;
+.bf-agebanner h2 { font-family:"Cinzel","Georgia",serif; font-weight:700; font-size:42px; color:#E6C04A;
   text-shadow:2px 2px 0 #1A1208, 0 0 24px rgba(230,192,74,0.5); margin:0; letter-spacing:2px; }
-.bf-agebanner p { font-family:"Pixelify Sans",monospace; font-size:16px; color:#EFDDB5;
+.bf-agebanner p { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-size:16px; color:#EFDDB5;
   text-shadow:1px 1px 0 #1A1208; margin:4px 0 0; }
 /* Same measured anchor as the objectives panel: the top bar wraps to a second
    row on narrow viewports and grows with HUD scale, so a fixed 48px lands
    underneath it and the bar's opaque panel hides the countdown. */
 .bf-wonder { position:absolute; left:50%; top:var(${HUD_TOP_BAR_BOTTOM_VAR}, ${TOP_BAR_CLEAR_PX}px);
   transform:translateX(-50%); padding:4px 14px;
-  display:none; font-family:"Pixelify Sans",monospace; font-size:14px; color:#1A1208;
+  display:none; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-size:14px; color:#1A1208;
   background:linear-gradient(#F2E3B8,#DABE8D); border:1px solid #B99A6B; border-radius:3px;
   box-shadow:0 0 0 1px #8A6414; pointer-events:none; z-index:${HUD_LAYER.wonderBanner}; }
 .bf-wonder.show { display:block; }
-.bf-wonder .bf-num { font-family:"VT323",monospace; font-size:16px; }
+.bf-wonder .bf-num { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:15px; }
 .bf-attackpulse { position:absolute; inset:0; pointer-events:none; opacity:0; z-index:${HUD_LAYER.attackPulse};
   box-shadow:inset 0 0 0 3px rgba(179,38,30,0.9), inset 0 0 60px 18px rgba(179,38,30,0.45); }
 .bf-attackpulse.show { animation:bfAttackPulse 1.6s ease-out; }
 @keyframes bfAttackPulse { 0% {opacity:0;} 12% {opacity:1;} 55% {opacity:0.55;} 100% {opacity:0;} }
 .bf-end { position:absolute; inset:0; display:none; align-items:center; justify-content:center;
-  background:rgba(10,8,5,0.82); pointer-events:auto; z-index:${HUD_LAYER.endScreen}; font-family:"Pixelify Sans",monospace; }
+  background:rgba(10,8,5,0.82); pointer-events:auto; z-index:${HUD_LAYER.endScreen};
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; }
 .bf-end.show { display:flex; }
 .bf-end-panel { width:min(520px, 88%); max-height:92%; overflow-y:auto; padding:24px 26px 20px;
   box-sizing:border-box; text-align:center; color:#EFDDB5;
   background:linear-gradient(#3a2a18,#2C1F12); border:2px solid #1A1208; border-radius:6px;
   box-shadow:0 0 0 1px #8A6414 inset, 0 0 0 3px #64492B inset, 0 12px 40px rgba(0,0,0,0.65); }
-.bf-end-title { font-family:"Jacquard 12","Pixelify Sans",monospace; font-size:54px; line-height:1;
+.bf-end-title { font-family:"Cinzel","Georgia",serif; font-weight:700; font-size:44px; line-height:1.05;
   margin:0 0 4px; letter-spacing:2px; text-shadow:2px 2px 0 #1A1208; }
 .bf-end-title.victory { color:#E6C04A; }
 .bf-end-title.defeat { color:#C05B4E; }
 .bf-end-sub { font-size:14px; color:#B99A6B; margin:0 0 16px; }
-.bf-end-time { font-family:"VT323",monospace; font-size:26px; color:#EFDDB5; margin:0 0 14px; }
+.bf-end-time { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:24px; color:#EFDDB5; margin:0 0 14px; }
 .bf-end-stats { display:grid; grid-template-columns:1fr auto; gap:3px 24px; text-align:left;
   font-size:15px; margin:0 auto 18px; max-width:390px; }
 .bf-end-stats h3 { grid-column:1 / -1; margin:9px 0 2px; padding-bottom:3px; color:#DABE8D;
   border-bottom:1px solid #64492B; font-size:14px; font-weight:500; letter-spacing:1px; text-transform:uppercase; }
 .bf-end-stats h3:first-child { margin-top:0; }
-.bf-end-stats .bf-num { font-family:"VT323",monospace; font-size:18px; text-align:right; color:#E6C04A; }
+.bf-end-stats .bf-num { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:16px; text-align:right; color:#E6C04A; }
 .bf-end-btn { display:block; width:100%; margin:8px 0 0; padding:11px 0; font-family:inherit; font-size:18px;
   color:#1A1208; background:linear-gradient(#EFDDB5,#DABE8D); border:1px solid #B99A6B; border-radius:4px;
   box-shadow:0 2px 0 #8A6414; cursor:pointer; letter-spacing:1px; }

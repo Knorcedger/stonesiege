@@ -16,6 +16,7 @@ import { AGES } from '@bf/sim/types';
 import type { Command, Game, PlayerId, SimEvent } from '@bf/sim/types';
 import { createEconomy } from './economy';
 import { EnemyMemory } from './memory';
+import { GaiaResourceMemory } from './resourceMemory';
 import { createMilitary } from './military';
 import { buildSnapshot, makePlan } from './snapshot';
 import type { Ctx } from './snapshot';
@@ -42,6 +43,7 @@ export function createBot(
     rng: new SimRng(((o.seed ?? 0x5eed) ^ Math.imul(player + 1, 0x9e3779b9)) >>> 0),
     tuning: tuningFor(difficulty, profile),
     memory: new EnemyMemory(),
+    resourceMemory: new GaiaResourceMemory(),
     enemyAgeIdx: 0,
   };
   const economy = createEconomy(ctx);

@@ -7,6 +7,8 @@ import { AGES, GAIA } from '@bf/sim/types';
 import type { Entity, Game, PlayerId, PlayerState, Stockpile, Tick } from '@bf/sim/types';
 import type { SimRng } from '@bf/sim/rng';
 import type { EnemyMemory, Sighting } from './memory';
+import { createObservedMap, type ObservedMap } from './observedMap';
+import type { GaiaResourceMemory } from './resourceMemory';
 import type { Tuning } from './tuning';
 
 export interface Ctx {
@@ -16,6 +18,7 @@ export interface Ctx {
   /** Reassigned by setProfile — managers must read it fresh each pass. */
   tuning: Tuning;
   readonly memory: EnemyMemory;
+  readonly resourceMemory: GaiaResourceMemory;
   /**
    * Highest AGES index any HOSTILE player has publicly reached (createBot updates it
    * from ageAdvanced events — age-up horns are announced to the whole match, exactly
@@ -51,6 +54,8 @@ export interface Snapshot {
   /** Fog-honest enemy intel (from memory, refreshed this pass). */
   enemyUnits: Sighting[];
   enemyBuildings: Sighting[];
+  /** Terrain and occupancy filtered through this player's observations. */
+  observedMap: ObservedMap;
 }
 
 export interface AgePlan {
@@ -106,6 +111,7 @@ export function buildSnapshot(ctx: Ctx): Snapshot | null {
   if (!p || p.defeated) return null;
   const vis = p.visibility;
   const w = st.map.width;
+  ctx.resourceMemory.beginPass();
   // Diplomacy (mirrors sim isEnemy): players on the same non-zero team are ALLIES and
   // must never enter enemy memory. Fog is team-shared, so without this filter a bot
   // "sees" its ally's units as permanently-visible intruders, locks its whole army
@@ -134,12 +140,9 @@ export function buildSnapshot(ctx: Ctx): Snapshot | null {
 
   for (const e of st.entities.values()) {
     if (e.kind === 'resource') {
-      // resource nodes have no meaningful hp — classify purely by contents
-      if (e.player !== GAIA || (e.amountLeft ?? 0) <= 0 || e.stump) continue;
-      if (e.defId === 'tree') woodNodes.push(e);
-      else if (e.defId === 'goldMine') goldNodes.push(e);
-      else if (e.defId === 'stoneMine') stoneNodes.push(e);
-      else if (e.defId === 'berryBush') foodNodes.push(e);
+      // Only current LOS may update a static node. Hidden live depletion must not
+      // change the economy manager until the tile is observed again.
+      ctx.resourceMemory.note(e, vis, w, st.tick);
       continue;
     }
     if (e.hp <= 0 && !(e.kind === 'unit' && (e.amountLeft ?? 0) > 0)) continue;
@@ -169,7 +172,8 @@ export function buildSnapshot(ctx: Ctx): Snapshot | null {
     } else if (e.player === GAIA) {
       if (e.kind === 'unit' && gameData.units[e.defId]?.herdable) {
         // stray sheep: hunting one also walks a villager into capture range
-        if (e.hp > 0 || (e.amountLeft ?? 0) > 0) foodNodes.push(e);
+        if (vis[e.tileY * w + e.tileX] === 2
+          && (e.hp > 0 || (e.amountLeft ?? 0) > 0)) foodNodes.push(e);
       }
     } else if (e.hp > 0 && hostileTo(e.player)) {
       // hostile rival entity: goes through the fog filter — only recorded if visible
@@ -182,6 +186,13 @@ export function buildSnapshot(ctx: Ctx): Snapshot | null {
       }
     }
   }
+  ctx.resourceMemory.sweep(vis, w);
+  for (const resource of ctx.resourceMemory.entities()) {
+    if (resource.defId === 'tree') woodNodes.push(resource);
+    else if (resource.defId === 'goldMine') goldNodes.push(resource);
+    else if (resource.defId === 'stoneMine') stoneNodes.push(resource);
+    else if (resource.defId === 'berryBush') foodNodes.push(resource);
+  }
   if (scout !== null) military.push(scout);
   ctx.memory.sweep(st);
 
@@ -189,6 +200,8 @@ export function buildSnapshot(ctx: Ctx): Snapshot | null {
   const anchor = tc ?? foundations[0] ?? Object.values(own)[0]?.[0] ?? villagers[0] ?? military[0] ?? monks[0];
   if (!anchor) return null;
 
+  const enemyUnits = ctx.memory.units(st.tick, FRESH_SIGHTING_TICKS);
+  const enemyBuildings = ctx.memory.buildings();
   return {
     tick: st.tick, p, stock: p.stockpile,
     villagers, garrisonedVillagers, military, monks, rams, scout,
@@ -196,8 +209,15 @@ export function buildSnapshot(ctx: Ctx): Snapshot | null {
     foodNodes, woodNodes, goldNodes, stoneNodes,
     baseX: anchor.tileX, baseY: anchor.tileY, anchor,
     providedSum,
-    enemyUnits: ctx.memory.units(st.tick, FRESH_SIGHTING_TICKS),
-    enemyBuildings: ctx.memory.buildings(),
+    enemyUnits,
+    enemyBuildings,
+    observedMap: createObservedMap(
+      st,
+      ctx.player,
+      enemyBuildings,
+      enemyUnits,
+      ctx.resourceMemory.sightings(),
+    ),
   };
 }
 

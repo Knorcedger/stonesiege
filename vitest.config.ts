@@ -3,7 +3,7 @@ import path from 'node:path';
 
 export default defineConfig({
   test: {
-    include: ['packages/**/*.test.ts', 'tools/**/*.test.ts'],
+    include: ['apps/**/*.test.ts', 'packages/**/*.test.ts', 'tools/**/*.test.ts'],
     environment: 'node',
     testTimeout: 30000,
     // Cap parallelism below the core count (4P+6E on the dev machines): the multi-minute

@@ -117,6 +117,7 @@ export function handleResearch(state: SimState, cmd: ResearchCmd, events: SimEve
   building.trainQueue.push({
     defId: cmd.techId, techId: cmd.techId,
     ticksLeft: ticks, totalTicks: ticks, paid: cost, started: false,
+    ...(cmd.requestId === undefined ? {} : { requestId: cmd.requestId }),
   });
 }
 
@@ -125,7 +126,9 @@ export function handleCancelResearch(state: SimState, cmd: CancelResearchCmd): v
   const building = state.entities.get(cmd.buildingId);
   if (!building || building.kind !== 'building' || building.player !== cmd.player) return;
   if (!building.trainQueue) return;
-  const idx = building.trainQueue.findIndex((item) => item.techId !== undefined);
+  const idx = cmd.requestId === undefined
+    ? building.trainQueue.findIndex((item) => item.techId !== undefined)
+    : building.trainQueue.findIndex((item) => item.requestId === cmd.requestId);
   if (idx < 0) return;
   const [item] = building.trainQueue.splice(idx, 1);
   const p = state.players[cmd.player];

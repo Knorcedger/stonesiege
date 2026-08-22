@@ -10,6 +10,10 @@ export interface GameSettings {
   masterVolume: number;
   sfxVolume: number;
   ambientVolume: number;
+  /** Spoken campaign dialogue, scaled by masterVolume like the other buses. */
+  narrationVolume: number;
+  /** Read campaign dialogue banners aloud. */
+  narrationEnabled: boolean;
   /** Keyboard/edge camera pan multiplier, 0.5..2. */
   cameraSpeed: number;
   /** In-match HUD scale, 0.75..1.25. */
@@ -30,6 +34,8 @@ export const DEFAULT_SETTINGS: GameSettings = {
   masterVolume: 0.8,
   sfxVolume: 1,
   ambientVolume: 0.6,
+  narrationVolume: 1,
+  narrationEnabled: true,
   cameraSpeed: 1,
   hudScale: 1,
   productionSpeed: 2,
@@ -52,6 +58,10 @@ export function decodeSettings(raw: string | null): GameSettings {
       masterVolume: clamp01(s.masterVolume, DEFAULT_SETTINGS.masterVolume),
       sfxVolume: clamp01(s.sfxVolume, DEFAULT_SETTINGS.sfxVolume),
       ambientVolume: clamp01(s.ambientVolume, DEFAULT_SETTINGS.ambientVolume),
+      narrationVolume: clamp01(s.narrationVolume, DEFAULT_SETTINGS.narrationVolume),
+      narrationEnabled: typeof s.narrationEnabled === 'boolean'
+        ? s.narrationEnabled
+        : DEFAULT_SETTINGS.narrationEnabled,
       cameraSpeed: typeof s.cameraSpeed === 'number' && Number.isFinite(s.cameraSpeed)
         ? Math.min(2, Math.max(0.5, s.cameraSpeed))
         : DEFAULT_SETTINGS.cameraSpeed,

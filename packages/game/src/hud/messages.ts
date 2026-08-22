@@ -2,7 +2,12 @@
 // time below the resource bar. Auto-dismisses after a reading-time
 // duration or on tap. The queue model is pure (unit-tested); the DOM view
 // renders whatever the model says is current.
+//
+// When a narrator is attached the line is also read aloud, and the banner is
+// held past its reading time until the voice finishes (bounded by
+// MESSAGE_MAX_HOLD_MS) so spoken dialogue is never cut off mid-sentence.
 
+import type { Narrator } from '../audio/narration';
 import {
   belowTopBarPx, HUD_LAYER, HUD_NARROW_MAX_PX, HUD_TOP_BAR_BOTTOM_VAR,
 } from './layout';
@@ -18,15 +23,34 @@ export function messageDurationMs(msg: ScenarioMessage): number {
   return Math.min(9000, Math.max(3200, 1400 + chars * 55));
 }
 
+/**
+ * Hard ceiling on a held message, measured from the moment it appeared. A
+ * narrator that never reports finishing cannot stall the story queue.
+ */
+export const MESSAGE_MAX_HOLD_MS = 20000;
+
 interface ActiveMessage {
   msg: ScenarioMessage;
   shownAt: number;
+}
+
+export interface MessageQueueOptions {
+  /**
+   * Keeps the current message on screen past its reading time while it returns
+   * true — the narration seam, so the banner outlasts the spoken line.
+   */
+  hold?: (msg: ScenarioMessage, now: number) => boolean;
 }
 
 /** Pure banner queue: push, current(now) auto-advances, dismiss skips. */
 export class MessageQueue {
   private queue: ScenarioMessage[] = [];
   private active: ActiveMessage | null = null;
+  private readonly hold: MessageQueueOptions['hold'];
+
+  constructor(opts: MessageQueueOptions = {}) {
+    this.hold = opts.hold;
+  }
 
   push(msg: ScenarioMessage): void {
     this.queue.push(msg);
@@ -34,8 +58,10 @@ export class MessageQueue {
 
   /** The message that should be on screen at `now` (advances the queue). */
   current(now: number): ScenarioMessage | null {
-    if (this.active && now - this.active.shownAt >= messageDurationMs(this.active.msg)) {
-      this.active = null;
+    if (this.active) {
+      const elapsed = now - this.active.shownAt;
+      const held = elapsed < MESSAGE_MAX_HOLD_MS && (this.hold?.(this.active.msg, now) ?? false);
+      if (elapsed >= messageDurationMs(this.active.msg) && !held) this.active = null;
     }
     if (!this.active && this.queue.length > 0) {
       this.active = { msg: this.queue.shift()!, shownAt: now };
@@ -63,7 +89,7 @@ const MSG_CSS = `
   width:min(560px, 92%); padding:9px 14px 10px; z-index:${HUD_LAYER.messageBanner}; cursor:pointer; display:none;
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
   border:1px solid #64492B; border-radius:5px; box-shadow:0 0 0 1px #1A1208, 0 4px 16px rgba(0,0,0,0.5);
-  font-family:"Pixelify Sans",monospace; pointer-events:auto; }
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; pointer-events:auto; }
 /* Clear whichever is lower: the measured top bar, or the objective panel's
    published head clearance. The constants only cover the frames before the
    first measurement lands. */
@@ -80,13 +106,17 @@ const MSG_CSS = `
 `;
 
 export class MessageBanner {
-  readonly model = new MessageQueue();
+  readonly model: MessageQueue;
   private el: HTMLDivElement;
   private speakerEl: HTMLParagraphElement;
   private textEl: HTMLParagraphElement;
   private shownKey = '';
 
-  constructor(root: HTMLElement) {
+  /** `narrator` null (menus, tests, platforms without speech) keeps it silent. */
+  constructor(root: HTMLElement, private narrator: Narrator | null = null) {
+    this.model = new MessageQueue(
+      narrator ? { hold: (_msg, now) => narrator.isSpeaking(now) } : {},
+    );
     if (!document.getElementById('bf-msg-style')) {
       const style = document.createElement('style');
       style.id = 'bf-msg-style';
@@ -103,11 +133,15 @@ export class MessageBanner {
     hint.className = 'bf-msg-hint';
     hint.textContent = 'tap to dismiss';
     this.el.append(this.speakerEl, this.textEl, hint);
-    this.el.addEventListener('click', () => this.model.dismiss());
+    this.el.addEventListener('click', () => {
+      this.narrator?.cancel(); // tapping away the text takes the voice with it
+      this.model.dismiss();
+    });
     root.appendChild(this.el);
   }
 
   destroy(): void {
+    this.narrator?.cancel();
     this.el.remove();
   }
 
@@ -122,9 +156,13 @@ export class MessageBanner {
     if (key === this.shownKey) return;
     this.shownKey = key;
     if (!cur) {
+      // Reached only once the hold expired, so a still-running voice here is
+      // one that overran its ceiling: stop it with the banner.
+      this.narrator?.cancel();
       this.el.classList.remove('show');
       return;
     }
+    this.narrator?.speak(cur, now);
     this.speakerEl.textContent = cur.speaker ?? '';
     this.speakerEl.style.display = cur.speaker ? '' : 'none';
     this.textEl.textContent = cur.text;

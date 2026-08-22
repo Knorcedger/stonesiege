@@ -209,9 +209,12 @@ export function createMilitary(ctx: Ctx): MilitaryManager {
       const intruder = nearestSighting(near, snap.baseX, snap.baseY)!;
       if (defendTarget !== intruder.id) {
         defendTarget = intruder.id;
-        cmds.push(intruder.visibleNow
-          ? { kind: 'attack', player, units: guards.map((e) => e.id), targetId: intruder.id }
-          : { kind: 'attackMove', player, units: guards.map((e) => e.id), x: intruder.x, y: intruder.y });
+        const units = guards.map((e) => e.id);
+        cmds.push(ctx.tuning.neverAttack
+          ? { kind: 'move', player, units, x: intruder.x, y: intruder.y }
+          : intruder.visibleNow
+            ? { kind: 'attack', player, units, targetId: intruder.id }
+            : { kind: 'attackMove', player, units, x: intruder.x, y: intruder.y });
       }
       return guardIds;
     }
