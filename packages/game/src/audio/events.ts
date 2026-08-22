@@ -27,13 +27,14 @@ export class GameAudio {
   ) {}
 
   /** Volume for a world event at fixed-point sim coords; 0 = cull. */
-  private volumeAt(x: number, y: number, far?: number): number {
+  private volumeAt(x: number, y: number, far: number): number {
     const w = tileToWorld(x / FP, y / FP);
     return attenuation(Math.hypot(w.x - this.camera.x, w.y - this.camera.y), undefined, far);
   }
 
-  private playAt(name: SfxName, x: number, y: number, scale = 1, far?: number): void {
-    const v = this.volumeAt(x, y, far) * scale;
+  /** The voice's own horizon is applied here so no call site can forget it. */
+  private playAt(name: SfxName, x: number, y: number, scale = 1): void {
+    const v = this.volumeAt(x, y, voiceFalloff(name)) * scale;
     if (v > 0.01) this.engine.play(name, v);
   }
 
@@ -44,7 +45,7 @@ export class GameAudio {
         case 'projectileFired': {
           const shooter = state.entities.get(ev.fromId);
           const voice = releaseVoice(shooter?.defId ?? '');
-          this.playAt(voice, ev.x0, ev.y0, 0.9, voiceFalloff(voice));
+          this.playAt(voice, ev.x0, ev.y0, 0.9);
           break;
         }
         case 'attackImpact': {
@@ -56,7 +57,7 @@ export class GameAudio {
           if (!target) break;
           const attacker = state.entities.get(ev.attackerId);
           const voice = impactVoice(attacker?.defId, target.kind === 'building', ev.melee);
-          this.playAt(voice, target.x, target.y, 1, voiceFalloff(voice));
+          this.playAt(voice, target.x, target.y);
           break;
         }
         case 'entityDied':

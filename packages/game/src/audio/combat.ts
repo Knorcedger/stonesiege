@@ -11,6 +11,7 @@
 import { gameData } from '@bf/data';
 import { projectileKindFor } from '../projectiles';
 import type { SfxName } from './synth';
+import { SFX_FAR_DEFAULT } from './throttle';
 
 /** Weapon family an attacker's blows belong to. */
 export type AttackFamily =
@@ -89,7 +90,10 @@ export function releaseVoice(shooterDefId: string): SfxName {
  */
 const HEAVY_VOICES = new Set<SfxName>(['ramBoom', 'ramCrush', 'stoneShatter', 'stoneCrush', 'siegeRelease']);
 
+/** How far a heavy siege voice carries (world px), vs SFX_FAR_DEFAULT for the rest. */
+const HEAVY_FAR = 2400;
+
 /** Attenuation cutoff (world px) for a voice: heavy siege reaches further. */
 export function voiceFalloff(name: SfxName): number {
-  return HEAVY_VOICES.has(name) ? 2400 : 1500;
+  return HEAVY_VOICES.has(name) ? HEAVY_FAR : SFX_FAR_DEFAULT;
 }

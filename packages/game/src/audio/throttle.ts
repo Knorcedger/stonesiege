@@ -74,11 +74,18 @@ export class SfxThrottle {
 }
 
 /**
+ * Default attenuation horizon (world px): past this, an ordinary voice is
+ * culled. audio/combat.ts reaches for this so heavy siege voices can be
+ * described as "further than normal" without restating the number.
+ */
+export const SFX_FAR_DEFAULT = 1500;
+
+/**
  * Camera-distance attenuation (pure): full volume inside `near` world px,
  * linear falloff to zero at `far`. Returns 0 for anything past `far` so the
  * caller can skip synthesis entirely.
  */
-export function attenuation(distancePx: number, near = 380, far = 1500): number {
+export function attenuation(distancePx: number, near = 380, far = SFX_FAR_DEFAULT): number {
   if (distancePx <= near) return 1;
   if (distancePx >= far) return 0;
   return 1 - (distancePx - near) / (far - near);

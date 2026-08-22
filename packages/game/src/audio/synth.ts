@@ -191,12 +191,15 @@ export function playVoice(
     case 'ramBoom': {
       // the signature siege sound: a swung log slamming a gate. Deep boom under
       // a timber body, a hard impact crack on top, chain rattle and debris after.
-      tone(ctx, out, { when, dur: 0.5, gain: 0.6 * v, freq: rand(58, 70), freqTo: 30, type: 'sine' });
-      tone(ctx, out, { when, dur: 0.3, gain: 0.3 * v, freq: rand(105, 130), freqTo: 55, type: 'triangle', lowpass: 400 });
-      noiseHit(ctx, out, { when, dur: 0.16, gain: 0.45 * v, attack: 0.006, filter: { type: 'lowpass', from: 1200, to: 200 } });
-      noiseHit(ctx, out, { when: when + 0.1, dur: 0.3, gain: 0.13 * v, filter: { type: 'bandpass', from: 900, to: 350, q: 0.8 } });
+      // The three onset layers sum to ~0.9 on purpose: the buses feed the
+      // destination with no limiter, so a louder stack would clip into a crackle
+      // instead of a boom (collapse, the next loudest voice, peaks at 0.85).
+      tone(ctx, out, { when, dur: 0.5, gain: 0.4 * v, freq: rand(58, 70), freqTo: 30, type: 'sine' });
+      tone(ctx, out, { when, dur: 0.3, gain: 0.2 * v, freq: rand(105, 130), freqTo: 55, type: 'triangle', lowpass: 400 });
+      noiseHit(ctx, out, { when, dur: 0.16, gain: 0.3 * v, attack: 0.006, filter: { type: 'lowpass', from: 1200, to: 200 } });
+      noiseHit(ctx, out, { when: when + 0.1, dur: 0.3, gain: 0.09 * v, filter: { type: 'bandpass', from: 900, to: 350, q: 0.8 } });
       for (let i = 0; i < 3; i++) {
-        noiseHit(ctx, out, { when: when + 0.06 + i * rand(0.03, 0.06), dur: 0.03, gain: 0.07 * v, filter: { type: 'highpass', from: 3200 } });
+        noiseHit(ctx, out, { when: when + 0.06 + i * rand(0.03, 0.06), dur: 0.03, gain: 0.05 * v, filter: { type: 'highpass', from: 3200 } });
       }
       return 0.6;
     }
