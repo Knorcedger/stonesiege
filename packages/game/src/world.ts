@@ -32,6 +32,7 @@ const HP_RED = 0xb3261e;
 const HP_BG = 0x2c1f12;
 const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
+const GHOST_ALPHA = 0.8;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
@@ -75,22 +76,29 @@ const AGE_ART_SCALE: Readonly<Record<string, Readonly<Record<AgeId, number>>>> =
 };
 
 const AGE_VARIANT_FRAME = /^bld\/(\w+)\/(dark|feudal|castle|imperial)\/done$/;
+/** Construction stages and rubble: authored at footprint size, never rescaled. */
+const FOOTPRINT_SIZED_FRAME = /\/(construct\d+|rubble)$/;
 
 /**
  * Art-to-mechanics scale for the frame actually resolved for an entity — the one
  * rule shared by the live sprite, the fog ghost and the placement preview, which
  * each used to scale the same artwork differently (#116).
  *
+ * Both tables correct *finished* artwork only, which is the only artwork that
+ * was authored off-footprint. Every building authors its construction stages at
+ * exactly its footprint width and its rubble at 72-74% of it, so those frames
+ * take no scale at all: a keep's 2.95x tower factor turned its 64px foundation
+ * into a 189px sprawl across three tiles, and would have piled its debris two
+ * tiles wide the moment rubble was routed through here (#134).
+ *
  * Keyed on the resolved frame name, not on the owner's age, so a fallback frame
- * is never scaled by a variant's factor. Rubble is deliberately outside this
- * rule: those frames are authored at a consistent 72-74% of their own footprint,
- * fortifications included, so passing them through the table would blow a
- * destroyed keep's debris up to twice its tile.
+ * is never scaled by a variant's factor.
  */
 export function artScaleForFrame(defId: string, frameName: string): ArtScale {
+  if (FOOTPRINT_SIZED_FRAME.test(frameName)) return NO_ART_SCALE;
   const variant = AGE_VARIANT_FRAME.exec(frameName);
-  const byAge = variant && AGE_ART_SCALE[variant[1]]?.[variant[2] as AgeId];
-  if (byAge !== undefined && byAge !== null) return { x: byAge, y: byAge };
+  const byAge = variant ? AGE_ART_SCALE[variant[1]]?.[variant[2] as AgeId] : undefined;
+  if (byAge !== undefined) return { x: byAge, y: byAge };
   return FORTIFICATION_ART_SCALE[defId] ?? NO_ART_SCALE;
 }
 
@@ -154,14 +162,79 @@ export function advanceGateOpenProgress(current: number, open: boolean, elapsedT
   return Math.max(0, Math.min(1, current + direction * Math.max(0, elapsedTicks) / GATE_OPEN_TICKS));
 }
 
-interface EntityView {
-  root: Container;
-  ring: Graphics;
-  /** Perpendicular half-segment used only for a true L-shaped wall corner. */
+/**
+ * The four display objects a building's artwork needs: the sprite, plus the
+ * mirrored half and the two masks that turn an L-shaped stone-wall junction into
+ * a real corner. Both the live view and the fog ghost supply them, so both draw
+ * a remembered wall exactly the same way.
+ */
+interface WallJoinedArt {
+  sprite: Sprite;
   cornerSprite: Sprite;
   cornerPrimaryMask: Graphics;
   cornerSecondaryMask: Graphics;
-  sprite: Sprite;
+}
+
+/** Half-plane mask in root-local space: screenSide -1 keeps the left half. */
+function drawHalfMask(mask: Graphics, screenSide: -1 | 1): void {
+  mask.clear();
+  mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
+}
+
+/**
+ * Put one resolved building frame on a sprite pair at the drawn size the game
+ * uses for it, corner join included. The live sprite and the fog ghost both go
+ * through here: a remembered wall that skipped this drew one straight segment
+ * where the live wall draws two masked halves.
+ */
+function applyBuildingArt(
+  art: WallJoinedArt,
+  frame: ResolvedFrame,
+  artScale: ArtScale,
+  mirrorWall: boolean,
+  corner: WallCornerJoin | undefined,
+): void {
+  art.sprite.texture = frame.texture;
+  art.sprite.anchor.set(frame.anchorX, frame.anchorY);
+  const mirrorX = frame.mirrored !== mirrorWall;
+  art.sprite.scale.set(
+    mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
+    frame.renderScale * artScale.y,
+  );
+
+  if (!corner) {
+    art.cornerSprite.visible = false;
+    art.sprite.mask = null;
+    art.cornerSprite.mask = null;
+    art.cornerPrimaryMask.clear();
+    art.cornerSecondaryMask.clear();
+    return;
+  }
+  art.cornerSprite.texture = frame.texture;
+  art.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
+  art.cornerSprite.scale.set(-art.sprite.scale.x, art.sprite.scale.y);
+  art.cornerSprite.visible = true;
+  // +tileX projects down-right; +tileY projects down-left.
+  drawHalfMask(art.cornerPrimaryMask, corner.xDir);
+  drawHalfMask(art.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
+  art.sprite.mask = art.cornerPrimaryMask;
+  art.cornerSprite.mask = art.cornerSecondaryMask;
+}
+
+/** Cache key for the resolved artwork: anything here changes what is drawn. */
+export function buildingArtKey(
+  candidates: readonly string[],
+  colorIdx: number | undefined,
+  mirrorWall: boolean,
+  corner: WallCornerJoin | undefined,
+): string {
+  const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
+  return `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
+}
+
+interface EntityView extends WallJoinedArt {
+  root: Container;
+  ring: Graphics;
   /** Independent gate leaf/portcullis layer, drawn behind the permanent arch. */
   gateDoor: Sprite;
   gateOpenProgress: number;
@@ -252,10 +325,11 @@ interface GhostRecord {
   age: string;
   progress: number;
   mirrored: boolean;
+  corner: WallCornerJoin | undefined;
 }
 
-interface GhostView {
-  sprite: Sprite;
+interface GhostView extends WallJoinedArt {
+  root: Container;
   lastFrameKey: string;
 }
 
@@ -577,6 +651,22 @@ export class WorldLayer {
     return vis[ty * state.map.width + tx];
   }
 
+  /** Ghost art needs the same four objects as a live building, minus the overlays. */
+  private createGhostView(): GhostView {
+    const root = new Container();
+    const sprite = new Sprite();
+    const cornerSprite = new Sprite();
+    const cornerPrimaryMask = new Graphics();
+    const cornerSecondaryMask = new Graphics();
+    cornerSprite.visible = false;
+    sprite.tint = GHOST_TINT;
+    cornerSprite.tint = GHOST_TINT;
+    root.alpha = GHOST_ALPHA;
+    root.addChild(cornerSprite, sprite, cornerPrimaryMask, cornerSecondaryMask);
+    this.container.addChild(root);
+    return { root, sprite, cornerSprite, cornerPrimaryMask, cornerSecondaryMask, lastFrameKey: '' };
+  }
+
   private createView(): EntityView {
     const root = new Container();
     const ring = new Graphics();
@@ -683,41 +773,11 @@ export class WorldLayer {
     // former owner's palette until its next animation/facing transition.
     const mirrorWall = this.mirroredWalls.has(e.id);
     const corner = e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined;
-    const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
-    const key = `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
+    const key = buildingArtKey(candidates, colorIdx, mirrorWall, corner);
     if (key !== view.lastFrameKey) {
       const { frame, resolvedName } = this.resolveCandidates(candidates, colorIdx);
-      view.sprite.texture = frame.texture;
-      view.sprite.anchor.set(frame.anchorX, frame.anchorY);
       const artScale = artScaleForFrame(e.defId, resolvedName);
-      const mirrorX = frame.mirrored !== mirrorWall;
-      view.sprite.scale.set(
-        mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
-        frame.renderScale * artScale.y,
-      );
-
-      if (corner) {
-        view.cornerSprite.texture = frame.texture;
-        view.cornerSprite.anchor.set(frame.anchorX, frame.anchorY);
-        view.cornerSprite.scale.set(-view.sprite.scale.x, view.sprite.scale.y);
-        view.cornerSprite.visible = true;
-
-        const drawHalfMask = (mask: Graphics, screenSide: -1 | 1): void => {
-          mask.clear();
-          mask.rect(screenSide < 0 ? -256 : -8, -256, 264, 512).fill(0xffffff);
-        };
-        // +tileX projects down-right; +tileY projects down-left.
-        drawHalfMask(view.cornerPrimaryMask, corner.xDir);
-        drawHalfMask(view.cornerSecondaryMask, corner.yDir > 0 ? -1 : 1);
-        view.sprite.mask = view.cornerPrimaryMask;
-        view.cornerSprite.mask = view.cornerSecondaryMask;
-      } else {
-        view.cornerSprite.visible = false;
-        view.sprite.mask = null;
-        view.cornerSprite.mask = null;
-        view.cornerPrimaryMask.clear();
-        view.cornerSecondaryMask.clear();
-      }
+      applyBuildingArt(view, frame, artScale, mirrorWall, corner);
 
       const doorFrame = gateOperational && resolvedName === 'bld/gate/open'
         ? this.assets.tryResolve('bld/gate/door', colorIdx)
@@ -961,6 +1021,7 @@ export class WorldLayer {
       age: state.players[e.player]?.age ?? 'dark',
       progress: e.buildProgress ?? 1000,
       mirrored: this.mirroredWalls.has(e.id),
+      corner: e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined,
     });
   }
 
@@ -973,12 +1034,12 @@ export class WorldLayer {
           this.ghosts.delete(id);
           const stale = this.ghostViews.get(id);
           if (stale) {
-            stale.sprite.destroy();
+            stale.root.destroy({ children: true });
             this.ghostViews.delete(id);
           }
         } else {
           const live = this.ghostViews.get(id);
-          if (live) live.sprite.visible = false;
+          if (live) live.root.visible = false;
         }
         continue;
       }
@@ -988,10 +1049,7 @@ export class WorldLayer {
       let view = this.ghostViews.get(id);
       if (wantVisible) {
         if (!view) {
-          const sprite = new Sprite();
-          sprite.tint = GHOST_TINT;
-          this.container.addChild(sprite);
-          view = { sprite, lastFrameKey: '' };
+          view = this.createGhostView();
           this.ghostViews.set(id, view);
         }
         // A remembered building can change between sightings — a tower upgrades
@@ -1004,27 +1062,22 @@ export class WorldLayer {
         const choice = g.defId === 'farm'
           ? { candidates: [UNSEEN_FARM_FRAME], alpha: 1 }
           : buildingFrameCandidates(g.defId, g.age, g.progress);
-        const key = `${colorIdx ?? 'none'}|${g.mirrored ? 'wall-y|' : ''}${choice.candidates.join('|')}`;
+        const key = buildingArtKey(choice.candidates, colorIdx, g.mirrored, g.corner);
         if (key !== view.lastFrameKey) {
           view.lastFrameKey = key;
           const { frame, resolvedName } = this.resolveCandidates(choice.candidates, colorIdx);
-          const artScale = artScaleForFrame(g.defId, resolvedName);
-          view.sprite.texture = frame.texture;
-          view.sprite.anchor.set(frame.anchorX, frame.anchorY);
-          // Walls are authored along one isometric axis; a remembered run along
-          // the other one has to mirror exactly as the live sprite does.
-          const mirrorX = frame.mirrored !== g.mirrored;
-          view.sprite.scale.set(
-            mirrorX ? -frame.renderScale * artScale.x : frame.renderScale * artScale.x,
-            frame.renderScale * artScale.y,
+          // Same artwork, same drawn size, same wall join as the live sprite —
+          // a scouted building is remembered as the building that was scouted.
+          applyBuildingArt(
+            view, frame, artScaleForFrame(g.defId, resolvedName), g.mirrored, g.corner,
           );
-          view.sprite.alpha = 0.8 * choice.alpha;
+          view.root.alpha = GHOST_ALPHA * choice.alpha;
         }
-        view.sprite.position.set(Math.round(g.wx), Math.round(g.wy));
-        view.sprite.zIndex = artZIndex(g.defId, g.progress, g.wy);
-        view.sprite.visible = true;
+        view.root.position.set(Math.round(g.wx), Math.round(g.wy));
+        view.root.zIndex = artZIndex(g.defId, g.progress, g.wy);
+        view.root.visible = true;
       } else if (view) {
-        view.sprite.visible = false;
+        view.root.visible = false;
       }
     }
   }
