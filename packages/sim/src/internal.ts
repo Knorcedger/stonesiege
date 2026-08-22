@@ -101,6 +101,12 @@ export interface CombatInfo {
   auto: boolean;
   /** Joined through a nearby friendly's active fight; cannot relay awareness again. */
   supporting?: boolean;
+  /**
+   * Turned on the source of a blow that landed on this unit. The squad alarm relays a
+   * BUILDING target only from such a fight: being shot by a tower is forced on the
+   * unit, whereas acquiring a structure on an attack-move is an ordered assault.
+   */
+  retaliation?: boolean;
   /** Explicit building assault: continue into nearby hostile structures after a kill. */
   continueBuildings?: boolean;
   nextAttackTick: number;

@@ -436,8 +436,9 @@ function tryAcquire(
     // attack-moving formation turn its weapons on structures.
     if (targetId < 0 && mode === 'unitsAndBuildings') scanBuildings();
   }
-  // A soldier actively trading blows raises the alarm for nearby troops at
-  // twice their usual guard radius. Only the original fighter can relay the
+  // A soldier in a fight raises the alarm for nearby troops at twice their usual
+  // guard radius, so a squad standing together answers a tower or an ambush as one
+  // instead of feeding one man at a time. Only the original fighter can relay the
   // fight (`supporting` recruits cannot), preventing awareness from chaining
   // across an entire army or base one unit at a time.
   // Campaign missions author exact wave behavior and balance, so the broader
@@ -451,14 +452,25 @@ function tryAcquire(
       if (id === e.id) continue;
       const friend = state.entities.get(id);
       if (!friend || friend.kind !== 'unit' || friend.player !== e.player || friend.hp <= 0
-        || friend.garrisonedIn !== undefined || friend.activity !== 'attacking') continue;
+        || friend.garrisonedIn !== undefined) continue;
       const fight = state.combat.get(friend.id);
       if (!fight || fight.supporting) continue;
+      // An auto engagement (struck by someone, or acquired on sight) is local by
+      // construction — leashed to 12 tiles from where it started — so it alerts the
+      // squad the moment it begins, while the fighter is still closing in. Waiting
+      // for the first blow is what let a retaliating soldier walk off alone. An
+      // ordered attack may cross the map, so it only relays once blows land.
+      if (!fight.auto && friend.activity !== 'attacking') continue;
       const target = state.entities.get(fight.targetId);
       if (!target || target.hp <= 0 || target.kind === 'resource'
         || (target.kind === 'unit' && target.garrisonedIn !== undefined)
         || !isEnemy(state, e.player, target.player)) continue;
-      if (mode === 'units' && target.kind !== 'unit') continue;
+      // Idle troops never acquire structures themselves, so without this a soldier
+      // shot by a tower charges it alone while his squad watches. Only a blow that
+      // actually landed on the friendly relays a structure: an attack-mover that
+      // picked up a house on its route is carrying out an order, and an assault on a
+      // passive building must not drag parked defenders off post.
+      if (mode === 'units' && target.kind !== 'unit' && !fight.retaliation) continue;
       if (mode === 'buildings' && target.kind !== 'building') continue;
       if (minRangeFp > 0 && effDistFp(state, e, target) < minRangeFp) continue;
       const dx = friend.x - e.x, dy = friend.y - e.y;

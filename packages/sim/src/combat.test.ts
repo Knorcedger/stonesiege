@@ -156,6 +156,81 @@ describe('auto-engage defaults (GDD per-category behavior)', () => {
     expect(fight?.supporting).toBe(true);
   });
 
+  it('joins a squadmate that a tower dragged into a fight', () => {
+    const game = createGame(scenarioConfig(132, grassMap(40, 30), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'fighter' },
+      { defId: 'militia', player: P1, tileX: 5, tileY: 10, ref: 'buddy' },
+      { defId: 'watchTower', player: P2, tileX: 15, tileY: 10, ref: 'tower' },
+      { defId: 'villager', player: P1, tileX: 2, tileY: 2 },
+      { defId: 'villager', player: P2, tileX: 37, tileY: 27 },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const state = game.state as unknown as SimState;
+    state.conquest = true; // practice/skirmish behavior
+    const fighter = game.state.refs.get('fighter')!;
+    const buddy = game.state.refs.get('buddy')!;
+    const tower = game.state.refs.get('tower')!;
+
+    // The tower opens up on the nearest militia, who turns on it. His squadmate
+    // stands five tiles away — outside the tower's reach, and structures are never
+    // acquired on sight — so only the alarm can pull him into the same fight.
+    run(game, 60);
+    expect((game.state as unknown as SimState).combat.get(fighter)?.targetId).toBe(tower);
+    const support = (game.state as unknown as SimState).combat.get(buddy);
+    expect(support?.targetId).toBe(tower);
+    expect(support?.supporting).toBe(true);
+
+    run(game, 400);
+    expect(game.state.entities.get(buddy)!.activity).toBe('attacking');
+    expect(game.state.entities.get(tower)!.hp).toBeLessThan(850);
+  });
+
+  it('keeps a deliberate one-unit assault on a structure from dragging bystanders in', () => {
+    const game = createGame(scenarioConfig(133, grassMap(40, 30), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'raider' },
+      { defId: 'militia', player: P1, tileX: 7, tileY: 10, ref: 'bystander' },
+      { defId: 'house', player: P2, tileX: 13, tileY: 10, ref: 'house' },
+      { defId: 'villager', player: P1, tileX: 2, tileY: 2 },
+      { defId: 'villager', player: P2, tileX: 37, tileY: 27 },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const state = game.state as unknown as SimState;
+    state.conquest = true;
+    const raider = game.state.refs.get('raider')!;
+    const bystander = game.state.refs.get('bystander')!;
+    const house = game.state.refs.get('house')!;
+
+    game.advance([{ kind: 'attack', player: P1, units: [raider], targetId: house }]);
+    run(game, 200);
+    expect((game.state as unknown as SimState).combat.get(raider)?.targetId).toBe(house);
+    // A house never shoots back, so nothing forced this fight on anyone: the
+    // ordered raider razes it alone and the squadmate holds his ground.
+    expect((game.state as unknown as SimState).combat.has(bystander)).toBe(false);
+    expect(game.state.entities.get(bystander)!.tileX).toBe(7);
+  });
+
+  it('keeps a bystander out of a structure an attack-mover picked up on its route', () => {
+    const game = createGame(scenarioConfig(134, grassMap(40, 30), [
+      { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'mover' },
+      { defId: 'militia', player: P1, tileX: 7, tileY: 10, ref: 'bystander' },
+      { defId: 'house', player: P2, tileX: 13, tileY: 10, ref: 'house' },
+      { defId: 'villager', player: P1, tileX: 2, tileY: 2 },
+      { defId: 'villager', player: P2, tileX: 37, tileY: 27 },
+    ], [player({ isHuman: true }), player({ civ: 'english' })]));
+    const state = game.state as unknown as SimState;
+    state.conquest = true;
+    const mover = game.state.refs.get('mover')!;
+    const bystander = game.state.refs.get('bystander')!;
+    const house = game.state.refs.get('house')!;
+
+    // Attack-move clears structures once it arrives — that acquisition is auto, but it
+    // is still an order being carried out, not a blow forced on the unit. The idle
+    // squadmate was never sent anywhere and holds his post.
+    game.advance([{ kind: 'attackMove', player: P1, units: [mover], x: fp(11), y: fp(10) }]);
+    run(game, 200);
+    expect((game.state as unknown as SimState).combat.get(mover)?.targetId).toBe(house);
+    expect((game.state as unknown as SimState).combat.has(bystander)).toBe(false);
+    expect(game.state.entities.get(bystander)!.tileX).toBe(7);
+  });
+
   it('idle militia chases an enemy, leashes at ~12 tiles, and holds the battle endpoint', () => {
     const game = createGame(scenarioConfig(104, grassMap(40, 30), [
       { defId: 'militia', player: P1, tileX: 10, tileY: 10, ref: 'm' },

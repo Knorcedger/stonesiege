@@ -272,7 +272,8 @@ function retaliate(state: SimState, victim: Entity, attackerId: EntityId): void 
   if (!attacker || attacker.hp <= 0 || attacker.kind === 'resource') return;
   if (!isEnemy(state, victim.player, attacker.player)) return; // never turn on an ally (splash)
   state.combat.set(victim.id, {
-    targetId: attackerId, auto: true, nextAttackTick: 0, anchorX: victim.x, anchorY: victim.y,
+    targetId: attackerId, auto: true, retaliation: true,
+    nextAttackTick: 0, anchorX: victim.x, anchorY: victim.y,
   });
   victim.targetId = attackerId;
 }
