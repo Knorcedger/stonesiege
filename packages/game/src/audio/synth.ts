@@ -8,7 +8,13 @@
 
 export type SfxName =
   | 'chopWood' | 'pickMine' | 'farmScythe' | 'hammer'
-  | 'swordClash' | 'arrowShot' | 'collapse'
+  // combat impacts: weapon family x what it lands on (see audio/combat.ts)
+  | 'swordClash' | 'bladeChop' | 'sabreSlash' | 'spearThrust' | 'spearJab'
+  | 'toolStrike' | 'beastBite' | 'ramCrush' | 'ramBoom'
+  | 'arrowFlesh' | 'arrowThunk' | 'boltPunch' | 'stoneCrush' | 'stoneShatter'
+  // shot releases
+  | 'arrowShot' | 'boltShot' | 'siegeRelease'
+  | 'collapse'
   | 'hornAge' | 'hornAlert' | 'hornVictory' | 'hornDefeat'
   | 'monkChant' | 'townBellIn' | 'townBellOut' | 'uiTap';
 
@@ -136,11 +142,123 @@ export function playVoice(
       tone(ctx, out, { when: when + 0.004, dur: 0.12, gain: 0.1 * v, freq: rand(3700, 4300), type: 'square', lowpass: 6000 });
       return 0.16;
     }
+    case 'bladeChop': {
+      // steel edge biting timber/stone: metallic crack, low wood thunk, splinters
+      noiseHit(ctx, out, { when, dur: 0.09, gain: 0.45 * v, filter: { type: 'bandpass', from: rand(900, 1300), q: 1 } });
+      tone(ctx, out, { when, dur: 0.12, gain: 0.34 * v, freq: rand(120, 155), freqTo: 60, type: 'triangle' });
+      noiseHit(ctx, out, { when: when + 0.03, dur: 0.12, gain: 0.14 * v, filter: { type: 'highpass', from: 3000 } });
+      return 0.16;
+    }
+    case 'sabreSlash': {
+      // from horseback: a swing through air, a bright cut, and the weight behind it
+      noiseHit(ctx, out, { when, dur: 0.12, gain: 0.22 * v, attack: 0.03, filter: { type: 'bandpass', from: 2600, to: 1100, q: 1.6 } });
+      noiseHit(ctx, out, { when: when + 0.05, dur: 0.07, gain: 0.38 * v, filter: { type: 'highpass', from: 2200 } });
+      tone(ctx, out, { when: when + 0.05, dur: 0.12, gain: 0.12 * v, freq: rand(3000, 3600), type: 'square', lowpass: 6000 });
+      tone(ctx, out, { when: when + 0.05, dur: 0.09, gain: 0.2 * v, freq: rand(110, 140), freqTo: 58, type: 'sine' });
+      return 0.2;
+    }
+    case 'spearThrust': {
+      // shaft driven forward, narrow point bites: darker and drier than a sword
+      noiseHit(ctx, out, { when, dur: 0.07, gain: 0.2 * v, attack: 0.02, filter: { type: 'bandpass', from: 1400, to: 600, q: 2.4 } });
+      tone(ctx, out, { when: when + 0.02, dur: 0.09, gain: 0.26 * v, freq: rand(420, 520), freqTo: 260, type: 'triangle' });
+      noiseHit(ctx, out, { when: when + 0.02, dur: 0.05, gain: 0.18 * v, filter: { type: 'bandpass', from: 2200, q: 3 } });
+      return 0.13;
+    }
+    case 'spearJab': {
+      // a pike against a wall is a blunt knock, not a chop — no edge, no chips
+      tone(ctx, out, { when, dur: 0.11, gain: 0.34 * v, freq: rand(160, 200), freqTo: 85, type: 'sine' });
+      noiseHit(ctx, out, { when, dur: 0.045, gain: 0.18 * v, filter: { type: 'bandpass', from: 700, q: 1.4 } });
+      return 0.14;
+    }
+    case 'toolStrike': {
+      // villager hoe/axe swung in anger (also butchering): dull, wooden whack
+      tone(ctx, out, { when, dur: 0.1, gain: 0.3 * v, freq: rand(180, 230), freqTo: 95, type: 'triangle' });
+      noiseHit(ctx, out, { when, dur: 0.05, gain: 0.22 * v, filter: { type: 'bandpass', from: 1200, q: 0.9 } });
+      return 0.12;
+    }
+    case 'beastBite': {
+      // wolf: a wet snap over a short growl
+      noiseHit(ctx, out, { when, dur: 0.05, gain: 0.3 * v, filter: { type: 'bandpass', from: 1600, to: 700, q: 1.2 } });
+      tone(ctx, out, { when, dur: 0.18, gain: 0.16 * v, freq: rand(150, 190), freqTo: 110, type: 'sawtooth', lowpass: 600 });
+      return 0.2;
+    }
+    case 'ramCrush': {
+      // the log catching a body rather than a wall: heavy thud, brief crunch
+      tone(ctx, out, { when, dur: 0.22, gain: 0.5 * v, freq: rand(70, 90), freqTo: 38, type: 'sine' });
+      noiseHit(ctx, out, { when, dur: 0.1, gain: 0.3 * v, filter: { type: 'lowpass', from: 900, to: 300 } });
+      return 0.26;
+    }
+    case 'ramBoom': {
+      // the signature siege sound: a swung log slamming a gate. Deep boom under
+      // a timber body, a hard impact crack on top, chain rattle and debris after.
+      tone(ctx, out, { when, dur: 0.5, gain: 0.6 * v, freq: rand(58, 70), freqTo: 30, type: 'sine' });
+      tone(ctx, out, { when, dur: 0.3, gain: 0.3 * v, freq: rand(105, 130), freqTo: 55, type: 'triangle', lowpass: 400 });
+      noiseHit(ctx, out, { when, dur: 0.16, gain: 0.45 * v, attack: 0.006, filter: { type: 'lowpass', from: 1200, to: 200 } });
+      noiseHit(ctx, out, { when: when + 0.1, dur: 0.3, gain: 0.13 * v, filter: { type: 'bandpass', from: 900, to: 350, q: 0.8 } });
+      for (let i = 0; i < 3; i++) {
+        noiseHit(ctx, out, { when: when + 0.06 + i * rand(0.03, 0.06), dur: 0.03, gain: 0.07 * v, filter: { type: 'highpass', from: 3200 } });
+      }
+      return 0.6;
+    }
+    case 'arrowFlesh': {
+      // shaft into a body: soft thud, no ring off the armor, shaft still quivering
+      tone(ctx, out, { when, dur: 0.09, gain: 0.3 * v, freq: rand(190, 240), freqTo: 90, type: 'sine' });
+      noiseHit(ctx, out, { when, dur: 0.05, gain: 0.2 * v, filter: { type: 'lowpass', from: 1400, to: 500 } });
+      tone(ctx, out, { when: when + 0.02, dur: 0.1, gain: 0.05 * v, freq: rand(1400, 1800), type: 'triangle' });
+      return 0.13;
+    }
+    case 'arrowThunk': {
+      // shaft into timber: a sharp woody knock and a long shaft vibration
+      noiseHit(ctx, out, { when, dur: 0.04, gain: 0.3 * v, filter: { type: 'bandpass', from: 2200, q: 2 } });
+      tone(ctx, out, { when, dur: 0.11, gain: 0.28 * v, freq: rand(300, 380), freqTo: 150, type: 'triangle' });
+      tone(ctx, out, { when: when + 0.03, dur: 0.16, gain: 0.07 * v, freq: rand(1600, 2100), type: 'sine' });
+      return 0.18;
+    }
+    case 'boltPunch': {
+      // crossbow bolt: shorter, heavier, more punch and less ring than an arrow
+      noiseHit(ctx, out, { when, dur: 0.04, gain: 0.34 * v, filter: { type: 'highpass', from: 1800 } });
+      tone(ctx, out, { when, dur: 0.08, gain: 0.3 * v, freq: rand(240, 300), freqTo: 110, type: 'square', lowpass: 1200 });
+      return 0.11;
+    }
+    case 'stoneCrush': {
+      // boulder onto bodies and ground: heavy crunch trailing into dust
+      noiseHit(ctx, out, { when, dur: 0.18, gain: 0.5 * v, filter: { type: 'lowpass', from: 900, to: 180 } });
+      tone(ctx, out, { when, dur: 0.2, gain: 0.3 * v, freq: rand(80, 100), freqTo: 40, type: 'sawtooth', lowpass: 300 });
+      noiseHit(ctx, out, { when: when + 0.09, dur: 0.22, gain: 0.14 * v, filter: { type: 'bandpass', from: 600, to: 240, q: 0.7 } });
+      return 0.35;
+    }
+    case 'stoneShatter': {
+      // boulder into masonry: brighter crack than flesh, then rubble spraying off
+      noiseHit(ctx, out, { when, dur: 0.1, gain: 0.5 * v, filter: { type: 'bandpass', from: 1500, to: 500, q: 0.9 } });
+      tone(ctx, out, { when, dur: 0.26, gain: 0.3 * v, freq: rand(95, 120), freqTo: 44, type: 'sawtooth', lowpass: 400 });
+      for (let i = 0; i < 4; i++) {
+        noiseHit(ctx, out, {
+          when: when + 0.05 + i * rand(0.03, 0.07), dur: 0.05, gain: 0.1 * v,
+          filter: { type: 'bandpass', from: rand(1200, 2600), q: 1.5 },
+        });
+      }
+      return 0.45;
+    }
     case 'arrowShot': {
       // string release pluck + whoosh sweeping down
       tone(ctx, out, { when, dur: 0.05, gain: 0.3 * v, freq: 900, freqTo: 320, type: 'triangle' });
       noiseHit(ctx, out, { when: when + 0.02, dur: 0.28, gain: 0.22 * v, attack: 0.03, filter: { type: 'bandpass', from: 3800, to: 900, q: 2.2 } });
       return 0.3;
+    }
+    case 'boltShot': {
+      // crossbow: the lock clacks instead of a bowstring singing, flight is tighter
+      noiseHit(ctx, out, { when, dur: 0.03, gain: 0.3 * v, filter: { type: 'highpass', from: 2400 } });
+      tone(ctx, out, { when, dur: 0.05, gain: 0.22 * v, freq: 700, freqTo: 300, type: 'square', lowpass: 2000 });
+      noiseHit(ctx, out, { when: when + 0.015, dur: 0.2, gain: 0.18 * v, attack: 0.02, filter: { type: 'bandpass', from: 4200, to: 1400, q: 2.6 } });
+      return 0.22;
+    }
+    case 'siegeRelease': {
+      // mangonel/trebuchet loosing: timber groan, the arm slamming its stop, and
+      // the stone climbing away — nothing at all like a bowstring
+      noiseHit(ctx, out, { when, dur: 0.09, gain: 0.3 * v, filter: { type: 'bandpass', from: 500, to: 200, q: 1 } });
+      tone(ctx, out, { when, dur: 0.14, gain: 0.28 * v, freq: rand(90, 120), freqTo: 55, type: 'sawtooth', lowpass: 350 });
+      noiseHit(ctx, out, { when: when + 0.06, dur: 0.3, gain: 0.12 * v, attack: 0.04, filter: { type: 'bandpass', from: 900, to: 2600, q: 1.6 } });
+      return 0.36;
     }
     case 'collapse': {
       // building down: long low rumble, falling pitch, gravel tail

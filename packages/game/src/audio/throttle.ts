@@ -14,7 +14,14 @@ export const DEFAULT_POLICIES: Record<string, CategoryPolicy> = {
   gather: { maxConcurrent: 3, minGapMs: 90 },
   build: { maxConcurrent: 2, minGapMs: 120 },
   combat: { maxConcurrent: 4, minGapMs: 60 },
+  structure: { maxConcurrent: 3, minGapMs: 90 },
   bow: { maxConcurrent: 3, minGapMs: 70 },
+  arrowHit: { maxConcurrent: 3, minGapMs: 70 },
+  // siege voices are long and loud: a handful of rams or a mangonel splash must
+  // read as weight, not as a drum roll
+  ram: { maxConcurrent: 2, minGapMs: 200 },
+  siege: { maxConcurrent: 2, minGapMs: 160 },
+  siegeHit: { maxConcurrent: 2, minGapMs: 140 },
   collapse: { maxConcurrent: 2, minGapMs: 250 },
   monk: { maxConcurrent: 2, minGapMs: 300 },
   bell: { maxConcurrent: 1, minGapMs: 250 },

@@ -6,6 +6,7 @@
 import { FP, GAIA, type Entity, type GameState, type PlayerId, type SimEvent } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import { tileToWorld, type Camera } from '../camera';
+import { impactVoice, releaseVoice, voiceFalloff } from './combat';
 import type { AudioEngine } from './engine';
 import type { SfxName } from './synth';
 import { attenuation } from './throttle';
@@ -26,13 +27,13 @@ export class GameAudio {
   ) {}
 
   /** Volume for a world event at fixed-point sim coords; 0 = cull. */
-  private volumeAt(x: number, y: number): number {
+  private volumeAt(x: number, y: number, far?: number): number {
     const w = tileToWorld(x / FP, y / FP);
-    return attenuation(Math.hypot(w.x - this.camera.x, w.y - this.camera.y));
+    return attenuation(Math.hypot(w.x - this.camera.x, w.y - this.camera.y), undefined, far);
   }
 
-  private playAt(name: SfxName, x: number, y: number, scale = 1): void {
-    const v = this.volumeAt(x, y) * scale;
+  private playAt(name: SfxName, x: number, y: number, scale = 1, far?: number): void {
+    const v = this.volumeAt(x, y, far) * scale;
     if (v > 0.01) this.engine.play(name, v);
   }
 
@@ -40,13 +41,22 @@ export class GameAudio {
   onSimEvents(events: SimEvent[], state: GameState): void {
     for (const ev of events) {
       switch (ev.kind) {
-        case 'projectileFired':
-          this.playAt('arrowShot', ev.x0, ev.y0, 0.9);
+        case 'projectileFired': {
+          const shooter = state.entities.get(ev.fromId);
+          const voice = releaseVoice(shooter?.defId ?? '');
+          this.playAt(voice, ev.x0, ev.y0, 0.9, voiceFalloff(voice));
           break;
+        }
         case 'attackImpact': {
-          if (!ev.melee) break; // arrows already sounded at release
+          // The blow is heard where it lands, and it sounds like the weapon that
+          // threw it: a ram booming into a gate, a bolt punching a shield, an
+          // arrow thunking into a palisade. Ranged shots sound twice on purpose
+          // — once at the release, once where they arrive.
           const target = state.entities.get(ev.targetId);
-          if (target) this.playAt('swordClash', target.x, target.y);
+          if (!target) break;
+          const attacker = state.entities.get(ev.attackerId);
+          const voice = impactVoice(attacker?.defId, target.kind === 'building', ev.melee);
+          this.playAt(voice, target.x, target.y, 1, voiceFalloff(voice));
           break;
         }
         case 'entityDied':
