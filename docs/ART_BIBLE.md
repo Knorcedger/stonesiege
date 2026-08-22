@@ -585,13 +585,22 @@ Primitives assumed in `tools/assetgen` (all integer, all palette-indexed):
 
 ### 8.2 Fonts
 
-- **Display / headers / age banners**: **"Jacquard 12"** (Google Fonts, OFL) — pixel
-  blackletter, exactly the medieval-manuscript-meets-bitmap tone we want. Use at
-  native 12 px multiples only (12/24/36).
-- **Body / numbers / tooltips**: **"Pixelify Sans"** (Google Fonts, OFL) at 16/32 px.
-- **CSS stack**: `"Pixelify Sans", "VT323", monospace` (VT323 as the bitmap-flavored
-  fallback; both OFL). Disable smoothing on the DOM HUD
-  (`image-rendering: pixelated` for canvas text, no sub-pixel AA sizes).
+UI text is optimized for legibility first: the HUD carries dense, small,
+frequently-changing strings (stats, queue counts, timers) that a bitmap face
+renders ambiguously on high-DPI phone screens. The period tone is carried by the
+display face and by §8.1 panel art, not by pixelated body text.
+
+- **Display / headers / age banners**: **"Cinzel"** (Google Fonts, OFL) — an
+  inscriptional Roman capital serif that keeps the medieval register while staying
+  readable at banner sizes. Weights 600 (section titles) and 700 (banners).
+- **Body / numbers / tooltips**: **"Alegreya Sans"** (Google Fonts, OFL), a humanist
+  sans with a calligraphic root. Weights 400/500/700, typically 13–18 px.
+- **CSS stacks**: `"Alegreya Sans", "Trebuchet MS", sans-serif` for body and
+  `"Cinzel", "Georgia", serif` for display. Let the browser antialias normally — do
+  NOT apply `image-rendering: pixelated` to HUD text.
+- **Numerals**: every counter (`.bf-num`, resource/pop/HP/queue/timer readouts) sets
+  `font-variant-numeric: tabular-nums` so digits keep a fixed advance width and
+  values do not shift their neighbors as they tick.
 - Text colors: `parchLight` on wood, `outline` on parchment, `goldShine` for resource
   numbers when recently increased, `#B3261E` when insufficient.
 
@@ -660,7 +669,7 @@ These are drawn by the renderer, not assetgen, but must stay on-palette:
   Visible = untouched.
 - **Band-select box**: 1 px `highlight` rect while dragging (no fill).
 - **Control-group chips**: parchment mini-panels (§8.1 parchment inset, 20×20) with
-  the group numeral in Pixelify Sans `outline`-colored text.
+  the group numeral in Alegreya Sans `outline`-colored text.
 
 Score each sprite 0–2 per item (2 = pass, 1 = marginal, 0 = fail). Ship bar: no 0s,
 ≥ 90% of total points per atlas. Items marked ⚙ are automated in assetgen's post-pass;

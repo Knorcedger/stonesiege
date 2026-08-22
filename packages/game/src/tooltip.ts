@@ -14,7 +14,7 @@ const TOOLTIP_CSS = `
   white-space:pre-line; color:#1A1208; background:#DABE8D;
   border:1px solid #B99A6B; border-radius:3px;
   box-shadow:0 0 0 1px #8A6414 inset, 0 3px 10px rgba(10,8,5,.45);
-  font:15px/1.2 "VT323",monospace; letter-spacing:.15px;
+  font:14px/1.4 "Alegreya Sans","Trebuchet MS",sans-serif; letter-spacing:.15px;
 }
 `;
 

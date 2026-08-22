@@ -23,12 +23,14 @@ import {
   sameIdSet, type IdleCategory,
 } from './selectionTools';
 import { placementGhostFrames } from './frames';
+import { placementStatus, type PlacementStatus } from './placement';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
 import { WorldLayer } from './world';
 import { FxLayer } from './fx';
 import { FogLayer } from './fog';
 import { SimLoop, TICK_MS } from './simloop';
+import { CommandAdmission } from './admission';
 import { AudioEngine } from './audio/engine';
 import { Narrator, createBrowserSpeech, primeSpeechOnGesture } from './audio/narration';
 import { GameAudio } from './audio/events';
@@ -67,9 +69,11 @@ import {
 } from './persist';
 import { artworkLoadingStage, MatchLoadingScreen, withTimeout } from './loadingScreen';
 import { campaignLoadingArtwork } from './loadingContext';
+import { PlayerResourceMemory } from './resourceMemory';
 
 const PLACE_GREEN = 0x3e8c34;
 const PLACE_RED = 0xb3261e;
+const PLACE_NEEDS_VISIBILITY = 0xc29422;
 /** Autosave cadence while playing (ticks): 15 s — cheap next to hide/pagehide saves. */
 const AUTOSAVE_TICKS = 300;
 /** Trigger-driven camera pan duration (ms). */
@@ -288,17 +292,19 @@ async function bootGame(
   // chapter must leave a Wallace campaign in progress exactly where it was.
   if (!snapshot) clearSnapshot(plan.slot);
   assets.prepareMatchColors(config.players.map((p) => p.color));
-  // Practice fast-path resume: rebuild straight from the sim's serialized
-  // snapshot when one rode along (scenarios always log-replay instead — the
-  // TriggerRuntime's fired/objective state only reconstructs from the event
-  // stream). A rejected blob falls back to replay below.
+  // A controller-free practice match may rebuild straight from the sim's
+  // serialized snapshot. Matches with bots log-replay so their deterministic
+  // observation and manager state is reconstructed alongside the sim. Scenarios
+  // also replay because TriggerRuntime state reconstructs from the event stream.
   const humanPlayer: PlayerId = (config.players.findIndex((p) => p.isHuman) + 1) as PlayerId;
   // New snapshots carry renderer-owned match statistics. Legacy snapshots do
   // not, so deliberately log-replay those instead of taking the serialized
   // fast path; replay reconstructs their history without inventing totals.
   const tallies = snapshot?.tallies ? copyTallies(snapshot.tallies) : emptyTallies();
   const rebuildTalliesFromReplay = !!snapshot && !snapshot.tallies;
+  const hasComputerPlayers = config.players.some((player) => !player.isHuman);
   const restored = snapshot && snapshot.tallies && plan.mode === 'practice'
+    && !hasComputerPlayers
     ? gameFromSerialized(snapshot.serialized)
     : null;
   const game = restored ?? createGame(config);
@@ -419,6 +425,7 @@ async function bootGame(
   const commandLog: CommandLog = snapshot?.log ?? [[0, [{
     kind: 'setProductionSpeed', player: humanPlayer, multiplier: config.productionSpeed ?? 2,
   }]]];
+  let replayedPendingBotCommands: Command[] = [];
   if (snapshot && !restored) {
     const restoreTitle = 'Restoring saved match';
     let displayedRestorePercent = -1;
@@ -431,6 +438,11 @@ async function bootGame(
     replaying = true;
     await replaySnapshotIncrementally(game, snapshot, {
       onEvents: (events) => {
+        // Re-run controller decisions while the recorded commands rebuild the
+        // sim. Their output is already in the log except for the final tick;
+        // running them here restores deterministic fog memory and manager state.
+        replayedPendingBotCommands = [];
+        for (const bot of bots.values()) replayedPendingBotCommands.push(...bot.tick(events));
         if (rebuildTalliesFromReplay) {
           for (const ev of events) recordMatchEvent(tallies, ev, humanPlayer);
           recordPopulation(tallies, game.state.players[humanPlayer]?.pop ?? 0);
@@ -451,6 +463,13 @@ async function bootGame(
       },
     });
     replaying = false;
+  }
+
+  const resourceMemory = new PlayerResourceMemory(humanPlayer);
+  if (!snapshot?.resourceMemory || !resourceMemory.restore(snapshot.resourceMemory, game.state)) {
+    // A legacy save has no client observation record. Observe only current LOS;
+    // never seed explored fog from the authoritative resource collection.
+    resourceMemory.refresh(game.state);
   }
 
   loading.update({
@@ -487,6 +506,7 @@ async function bootGame(
     assets,
     humanPlayer,
     (defId) => unitDisplayStats(game, humanPlayer, defId)?.los ?? gameData.units[defId]?.los ?? 0,
+    resourceMemory,
   );
   const fx = new FxLayer(assets);
   const fog = new FogLayer(game.state.map);
@@ -563,7 +583,9 @@ async function bootGame(
     const out: Entity[] = [];
     for (const id of selection) {
       const e = st.entities.get(id);
-      if (e && e.activity !== 'dying') out.push(e);
+      if (!e || e.activity === 'dying') continue;
+      const visible = resourceMemory.entityFor(st, e);
+      if (visible) out.push(visible);
     }
     return out;
   };
@@ -780,6 +802,7 @@ async function bootGame(
       commandLog.push([tick, commands]);
     },
   });
+  for (const command of replayedPendingBotCommands) loop.issue(command);
   loop.attachAutoPause();
 
   // ------------------------------------------------------------- persistence
@@ -799,12 +822,13 @@ async function bootGame(
         // def + game data ('' can never match, degrading to "no resume")
         fingerprint: scenarioFingerprint(meta.id) ?? '',
         seed: config.seed, tick: st.tick, log: commandLog,
-        tallies: copyTallies(tallies), ...withBlob,
+        tallies: copyTallies(tallies), resourceMemory: resourceMemory.snapshot(), ...withBlob,
       });
     } else if (plan.setup) {
       saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'practice', config, setup: plan.setup,
-        tick: st.tick, log: commandLog, tallies: copyTallies(tallies), ...withBlob,
+        tick: st.tick, log: commandLog, tallies: copyTallies(tallies),
+        resourceMemory: resourceMemory.snapshot(), ...withBlob,
       });
     }
     lastSavedTick = st.tick;
@@ -828,7 +852,12 @@ async function bootGame(
   window.addEventListener(NATIVE_PAUSE_EVENT, onNativePause);
   window.addEventListener(NATIVE_BACK_EVENT, onNativeBack);
 
-  const issue = (cmd: Command): void => loop.issue(cmd);
+  const admission = new CommandAdmission(
+    game,
+    loop,
+    (label, undo) => hud.showUndoToast(label, undo),
+  );
+  const issue = (cmd: Command): boolean => admission.issue(cmd);
   // A setting changed from the title screen should also apply when resuming a
   // saved match. Queue it through the normal command path so the resumed log
   // remains deterministic; this also upgrades legacy 1× saves to the new 2× default.
@@ -838,10 +867,14 @@ async function bootGame(
       kind: 'setProductionSpeed', player: humanPlayer, multiplier: preferredProductionSpeed,
     });
   }
-  const issueWithUndo = (cmd: Command, label: string, undo: (() => void) | null): void => {
-    loop.issue(cmd);
-    if (cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
-    hud.showUndoToast(label, undo);
+  const issueWithUndo = (
+    cmd: Command,
+    label: string,
+    undo: (() => void) | null,
+  ): boolean => {
+    const accepted = admission.issueWithUndo(cmd, label, undo);
+    if (accepted && cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
+    return accepted;
   };
 
   // --------------------------------------------------------------- placement
@@ -859,13 +892,17 @@ async function bootGame(
     }
     const def = gameData.buildings[placement.defId];
     const size = def?.size ?? 1;
-    const valid = game.canPlace(humanPlayer, placement.defId, placement.tileX, placement.tileY);
+    const status = placementStatus(
+      getState(), humanPlayer, placement.tileX, placement.tileY, size,
+      () => game.canPlace(humanPlayer, placement!.defId, placement!.tileX, placement!.tileY),
+    );
     const center = tileToWorld(placement.tileX + size / 2, placement.tileY + size / 2);
     ghostLayer.position.set(center.x, center.y);
     ghostLayer.visible = true;
     const hw = size * 32;
     const hh = size * 16;
-    const color = valid ? PLACE_GREEN : PLACE_RED;
+    const color = status === 'valid' ? PLACE_GREEN
+      : status === 'needs-visibility' ? PLACE_NEEDS_VISIBILITY : PLACE_RED;
     ghostFoot.clear();
     ghostFoot
       .moveTo(0, -hh).lineTo(hw, 0).lineTo(0, hh).lineTo(-hw, 0).closePath()
@@ -909,7 +946,12 @@ async function bootGame(
       hud.showUndoToast('Construction arrives in wave 2', null);
       return;
     }
-    if (!game.canPlace(humanPlayer, placement.defId, placement.tileX, placement.tileY) || !canAfford(placement.defId)) return;
+    const size = gameData.buildings[placement.defId]?.size ?? 1;
+    const status = placementStatus(
+      getState(), humanPlayer, placement.tileX, placement.tileY, size,
+      () => game.canPlace(humanPlayer, placement!.defId, placement!.tileX, placement!.tileY),
+    );
+    if (status !== 'valid' || !canAfford(placement.defId)) return;
     const villagers = liveSelection().filter((e) => e.defId === 'villager').map((e) => e.id);
     if (villagers.length === 0) {
       hud.showUndoToast('Select a villager to build', null);
@@ -917,37 +959,24 @@ async function bootGame(
     }
     const def = gameData.buildings[placement.defId];
     const { defId, tileX, tileY } = placement;
-    issue({
+    const label = def?.wall
+      ? 'Wall placed — keep tapping to extend, Cancel to stop'
+      : keepActive
+        ? `${def?.name ?? defId} placed — Shift-click to keep building, Esc to stop`
+        : `Building ${def?.name ?? defId}`;
+    const accepted = issueWithUndo({
       kind: 'build', player: humanPlayer, units: villagers, defId, tileX, tileY,
       ...(keepActive ? { queue: true } : {}),
-    });
-    // Real undo: delete the foundation this confirm created (the sim spawns it at
-    // the next tick boundary, so the closure looks it up by footprint when tapped;
-    // deleteEntity refunds the unbuilt fraction via refundFoundation).
-    const undoBuild = (): void => {
-      for (const e of getState().entities.values()) {
-        if (e.kind === 'building' && e.player === humanPlayer && e.defId === defId
-          && e.tileX === tileX && e.tileY === tileY && (e.buildProgress ?? 1000) < 1000) {
-          issue({ kind: 'deleteEntity', player: humanPlayer, entityId: e.id });
-          return;
-        }
-      }
-    };
+    }, label, null);
+    if (!accepted) return;
     if (def?.wall || keepActive) {
       // v1 wall flow: single-tile walls placed repeatedly — placement mode stays
       // armed so a run of wall goes tap-confirm, tap-confirm. Holding Shift gives
       // every other building the same repeat-placement flow.
-      hud.showUndoToast(
-        def?.wall
-          ? 'Wall placed — keep tapping to extend, Cancel to stop'
-          : `${def?.name ?? defId} placed — Shift-click to keep building, Esc to stop`,
-        undoBuild,
-      );
       placementHeldByShift = keepActive && !def?.wall;
       refreshGhost();
       return;
     }
-    hud.showUndoToast(`Building ${def?.name ?? defId}`, undoBuild);
     placement = null;
     placementHeldByShift = false;
     refreshGhost();
@@ -962,19 +991,19 @@ async function bootGame(
     getUnitStats: (player, defId) => unitDisplayStats(game, player, defId),
     deselect,
     trainUnit: (buildingId, defId) => {
-      issue({ kind: 'train', player: humanPlayer, buildingId, defId });
-      hud.showUndoToast(`Training ${gameData.units[defId]?.name ?? defId}`, () => {
-        const b = getState().entities.get(buildingId);
-        const idx = (b?.trainQueue?.length ?? 0) - 1;
-        if (idx >= 0) issue({ kind: 'cancelTrain', player: humanPlayer, buildingId, index: idx });
-      });
+      issueWithUndo(
+        { kind: 'train', player: humanPlayer, buildingId, defId },
+        `Training ${gameData.units[defId]?.name ?? defId}`,
+        null,
+      );
     },
     cancelTrain: (buildingId, index) => issue({ kind: 'cancelTrain', player: humanPlayer, buildingId, index }),
     researchTech: (buildingId, techId) => {
-      issue({ kind: 'research', player: humanPlayer, buildingId, techId });
-      hud.showUndoToast(`Researching ${gameData.techs[techId]?.name ?? techId}`, () => {
-        issue({ kind: 'cancelResearch', player: humanPlayer, buildingId });
-      });
+      issueWithUndo(
+        { kind: 'research', player: humanPlayer, buildingId, techId },
+        `Researching ${gameData.techs[techId]?.name ?? techId}`,
+        null,
+      );
     },
     cancelResearch: (buildingId) => issue({ kind: 'cancelResearch', player: humanPlayer, buildingId }),
     ungarrisonAll: (buildingId) => {
@@ -1024,11 +1053,20 @@ async function bootGame(
     startPlacement,
     confirmPlacement,
     cancelPlacement,
-    getPlacement: () => (placement ? {
-      defId: placement.defId,
-      valid: game.canPlace(humanPlayer, placement.defId, placement.tileX, placement.tileY),
-      affordable: canAfford(placement.defId),
-    } : null),
+    getPlacement: () => {
+      if (!placement) return null;
+      const size = gameData.buildings[placement.defId]?.size ?? 1;
+      const status: PlacementStatus = placementStatus(
+        getState(), humanPlayer, placement.tileX, placement.tileY, size,
+        () => game.canPlace(humanPlayer, placement!.defId, placement!.tileX, placement!.tileY),
+      );
+      return {
+        defId: placement.defId,
+        valid: status === 'valid',
+        needsVisibility: status === 'needs-visibility',
+        affordable: canAfford(placement.defId),
+      };
+    },
     stopSelection: () => {
       const units = liveSelection().filter((e) => e.kind === 'unit').map((e) => e.id);
       if (units.length > 0) issue({ kind: 'stop', player: humanPlayer, units });
@@ -1120,7 +1158,7 @@ async function bootGame(
         .filter((e) => e.kind === 'unit' && e.player === humanPlayer)
         .map((e) => e.id);
       if (units.length === 0) return false;
-      const undo = (): void => issue({ kind: 'stop', player: humanPlayer, units });
+      const undo = (): void => { issue({ kind: 'stop', player: humanPlayer, units }); };
       issueWithUndo(
         { kind: 'move', player: humanPlayer, units, x: fp(tx), y: fp(ty) },
         'Move',
@@ -1128,6 +1166,7 @@ async function bootGame(
       );
       return true;
     },
+    resourceMemory,
   );
 
   let lastObjectiveProgressTick = -1;
@@ -1206,7 +1245,7 @@ async function bootGame(
     for (const s of [1, 4, 16]) {
       const b = document.createElement('button');
       b.textContent = `${s}×`;
-      b.style.cssText = 'font:12px "Pixelify Sans",monospace;padding:3px 8px;cursor:pointer;border-radius:3px;border:1px solid #64492B;background:#241809;color:#DABE8D;';
+      b.style.cssText = 'font:12px "Alegreya Sans","Trebuchet MS",sans-serif;padding:3px 8px;cursor:pointer;border-radius:3px;border:1px solid #64492B;background:#241809;color:#DABE8D;';
       b.addEventListener('click', () => {
         simSpeed = s;
         for (const x of btns) {
@@ -1260,7 +1299,7 @@ async function bootGame(
         for (let i = 0; i < ticks; i += 5) loop.update(TICK_MS * Math.min(5, ticks - i));
       },
       /** Queue a raw command like the HUD would (QA bulk re-tasking only). */
-      issue: (cmd: Command): void => issue(cmd),
+      issue: (cmd: Command): void => { issue(cmd); },
       setSpeed: (s: number): void => { simSpeed = Math.max(1, Math.min(64, Math.round(s))); },
       objectives: () => objectivesPanel?.model.items() ?? [],
       objectiveGuidance: () => ({

@@ -7,6 +7,7 @@ import type { GameAssets } from '../assets';
 import type { Camera } from '../camera';
 import { worldToTile } from '../camera';
 import { setGameTooltip } from '../tooltip';
+import { PlayerResourceMemory } from '../resourceMemory';
 
 const SIZE = 168;
 const TERRAIN_MINI_COLORS: Record<string, string> = {
@@ -38,6 +39,7 @@ export class Minimap {
     private fogCanvas: HTMLCanvasElement,
     private onJump: (tileX: number, tileY: number) => void,
     private onMove: (tileX: number, tileY: number) => boolean,
+    private resourceMemory: PlayerResourceMemory = new PlayerResourceMemory(humanPlayer),
   ) {
     this.canvas = document.createElement('canvas');
     this.canvas.className = 'bf-minimapcanvas';
@@ -142,8 +144,11 @@ export class Minimap {
     ctx.setTransform(1, 0, 0, 1, 0, 0);
 
     // entities
+    this.resourceMemory.refresh(state);
     const vis = state.players[this.humanPlayer]?.visibility;
-    for (const e of state.entities.values()) {
+    for (const live of state.entities.values()) {
+      const e = this.resourceMemory.entityFor(state, live);
+      if (!e) continue;
       const tv = vis ? vis[e.tileY * state.map.width + e.tileX] : 2;
       const px = m.a * (e.x / FP) + m.c * (e.y / FP) + m.e;
       const py = m.b * (e.x / FP) + m.d * (e.y / FP) + m.f;
@@ -167,6 +172,14 @@ export class Minimap {
         const s = e.kind === 'building' ? 3 : 2;
         ctx.fillRect(px - s / 2, py - s / 2, s, s);
       }
+    }
+    for (const e of this.resourceMemory.hiddenMissing(state)) {
+      const px = m.a * (e.x / FP) + m.c * (e.y / FP) + m.e;
+      const py = m.b * (e.x / FP) + m.d * (e.y / FP) + m.f;
+      ctx.fillStyle = '#1A1208';
+      ctx.fillRect(px - 1, py - 1, 3, 3);
+      ctx.fillStyle = RES_COLORS[e.defId] ?? '#C0C0C6';
+      ctx.fillRect(px, py, 1, 1);
     }
 
     // under-attack pings: expanding red rings, ~3 s

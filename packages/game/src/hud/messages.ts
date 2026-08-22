@@ -86,7 +86,7 @@ const MSG_CSS = `
   width:min(560px, 92%); padding:9px 14px 10px; z-index:28; cursor:pointer; display:none;
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
   border:1px solid #64492B; border-radius:5px; box-shadow:0 0 0 1px #1A1208, 0 4px 16px rgba(0,0,0,0.5);
-  font-family:"Pixelify Sans",monospace; pointer-events:auto; }
+  font-family:"Alegreya Sans","Trebuchet MS",sans-serif; pointer-events:auto; }
 /* The objective panel publishes its measured head clearance. The fallback
    covers the wrapped top bar before the first objective render. */
 @media (max-width: ${HUD_NARROW_MAX_PX}px) {
