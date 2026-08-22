@@ -81,6 +81,11 @@ export function hideGameTooltip(): void {
 
 /** Bind or update a StoneSiege tooltip. Safe to call repeatedly for dynamic labels. */
 export function setGameTooltip(el: HTMLElement, text: string): void {
+  // HUD panels re-assert their tooltips every frame. Once an element is bound and
+  // already carries this exact text, every write below would be a no-op that still
+  // costs three DOM attribute mutations — and attribute writes are what make a
+  // per-frame HUD refresh expensive on a phone.
+  if (el.dataset[BOUND] && el.dataset.bfTooltip === text) return;
   el.removeAttribute('title');
   el.dataset.bfTooltip = text;
   el.setAttribute('aria-label', text.split('\n')[0]);
