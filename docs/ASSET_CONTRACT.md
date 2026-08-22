@@ -38,9 +38,13 @@ The asset generator (`tools/assetgen`) emits Pixi spritesheet atlases into
 
 ## Frame naming (renderer resolves names mechanically — follow exactly)
 - Terrain: `terr/<terrainId>/<variant>` (2–4 variants each, e.g. `terr/grass/0`)
-  - Baked edge transitions: `terr/<hi>_<lo>/<edge>`, `edge` ∈ {`nw`, `ne`, `sw`, `se`}
-    (higher-priority terrain's fringe composited over the lower neighbor; packed into
-    `terrain.png` — recipe in ART_BIBLE §3.2).
+  - Baked edge transitions: `terr/<hi>_<lo>/<edge>/<variant>`, `edge` ∈ {`nw`, `ne`, `sw`,
+    `se`} (higher-priority terrain's fringe composited over the lower neighbor; packed into
+    `terrain.png` — recipe in ART_BIBLE §3.2). The renderer picks the variant per tile
+    coordinate, so one wobbling boundary is never repeated down a whole shoreline; it falls
+    back to an unnumbered `terr/<hi>_<lo>/<edge>` when an atlas ships without variants.
+  - Presentation-only tiles (no sim `TerrainId`): `terr/ford/<variant>` (ART_BIBLE §3.3),
+    drawn in place of a `shallows` tile that the renderer resolves as a river crossing.
 - Units: `unit/<defId>/<anim>/<dir>/<frame>`
   - anims: `idle`, `walk`, `attack`, `gather` (villager), `carry` (villager), `die`, `decay`
   - dir: 0..7, **0 = facing south (toward camera), clockwise** (1 = SW, 2 = W, 3 = NW, 4 = N…).

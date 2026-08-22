@@ -16,6 +16,23 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
+### Changed
+
+- Roads look their age. The road tile is now an uneven, rutted earth track — wandering wheel
+  ruts that fade in and out, potholes, loose stones, weeds on the verges — a step darker than
+  sand so a road running down to a river no longer merges into the bank. Every terrain border
+  wanders too: the baked edge fringes follow a noise-broken boundary with scattered outliers
+  instead of a straight three-band ramp, two variants are baked per pair and edge, and road
+  verges wear through to dirt tile by tile. No more ruler-straight, machine-cut terrain edges.
+- River crossings are visible as crossings. A shallows band that spans a channel now draws as
+  a ford — a gravel causeway lying under shin-deep water, with stepping stones standing out of
+  it — so a player following a road to the water can see where the army wades across. Deep
+  water is unchanged, and nothing about movement, pathing, or the minimap changes.
+- The historical battlefield map (every generated legendary chapter) no longer paints its road
+  down the middle of the river. The route through the channel is water the whole way, and the
+  road stops at one bank and resumes on the other. The tiles carry exactly the same traffic as
+  before.
+
 ## 0.1.2 — 2026-08-20
 
 ### Added

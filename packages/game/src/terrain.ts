@@ -1,7 +1,13 @@
 // Chunked terrain layer: 16x16-tile chunks baked to RenderTextures, with
 // per-tile variants and baked edge-transition frames per ASSET_CONTRACT §naming
-// (`terr/<hi>_<lo>/<edge>`). Only dirty chunks rebake; offscreen chunks are
-// LRU-evicted to bound GPU memory.
+// (`terr/<hi>_<lo>/<edge>/<variant>`). Only dirty chunks rebake; offscreen chunks
+// are LRU-evicted to bound GPU memory.
+//
+// Two presentation-only rules run on top of the sim terrain (the sim map, the
+// minimap and pathing never see them): road borders weather into dirt so a track
+// does not draw a ruler-straight line across the field, and a shallows band that
+// spans a channel draws as `ford` — the road bed under the water — so a player
+// following a road to a river can see where it is crossable.
 
 import { Container, RenderTexture, Sprite, type Renderer } from 'pixi.js';
 import type { GameMap } from '@bf/sim/types';
@@ -20,6 +26,106 @@ const TERRAIN_PRIORITY: Record<string, number> = {
   cliff: 9, road: 8, farmland: 7, forest: 6, snow: 5,
   grass: 4, dirt: 3, sand: 2, shallows: 1, water: 0,
 };
+
+/** Wet terrain: never weathered, and the material a crossing has to span. */
+const WET_TERRAIN = new Set(['water', 'shallows']);
+
+/** Share of road border tiles that render as worn-through dirt (out of 16). */
+const ROAD_WEAR_SHARE = 5;
+
+/** Stable per-tile hash — the same tile always weathers (or does not) the same way. */
+function tileHash(x: number, y: number, salt: number): number {
+  let h = (Math.imul(x + 1, 73856093) ^ Math.imul(y + 1, 19349663) ^ Math.imul(salt + 1, 83492791)) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x27d4eb2d) >>> 0;
+  return (h ^ (h >>> 15)) >>> 0;
+}
+
+/**
+ * Tiles of every `shallows` region that spans a water channel — a ford.
+ *
+ * A crossing is a shallows region with dry land reachable on both sides of one
+ * axis and water on both sides of the other: exactly the shape of a shallow bar
+ * carrying a route from bank to bank. A shallows fringe along a shore touches
+ * land on one side only and is left as ordinary shallow water.
+ *
+ * Pure function of the map, exported for tests; the renderer computes it once.
+ */
+export function fordTiles(map: GameMap): Set<number> {
+  const idOf = (x: number, y: number): string | null => (
+    x < 0 || y < 0 || x >= map.width || y >= map.height
+      ? null
+      : map.terrainIds[map.terrain[y * map.width + x]] ?? null
+  );
+  const fords = new Set<number>();
+  const seen = new Uint8Array(map.width * map.height);
+  for (let y0 = 0; y0 < map.height; y0++) {
+    for (let x0 = 0; x0 < map.width; x0++) {
+      const start = y0 * map.width + x0;
+      if (seen[start] || idOf(x0, y0) !== 'shallows') continue;
+      const region: number[] = [];
+      const queue = [start];
+      seen[start] = 1;
+      const land = { west: false, east: false, north: false, south: false };
+      const water = { west: false, east: false, north: false, south: false };
+      for (let i = 0; i < queue.length; i++) {
+        const tile = queue[i];
+        region.push(tile);
+        const x = tile % map.width;
+        const y = (tile / map.width) | 0;
+        for (const [dx, dy, side] of [
+          [-1, 0, 'west'], [1, 0, 'east'], [0, -1, 'north'], [0, 1, 'south'],
+        ] as Array<[number, number, 'west' | 'east' | 'north' | 'south']>) {
+          const neighbor = idOf(x + dx, y + dy);
+          if (neighbor === null) continue;
+          if (neighbor === 'shallows') {
+            const next = (y + dy) * map.width + (x + dx);
+            if (!seen[next]) { seen[next] = 1; queue.push(next); }
+          } else if (neighbor === 'water') water[side] = true;
+          else land[side] = true;
+        }
+      }
+      const spansX = land.west && land.east && water.north && water.south;
+      const spansY = land.north && land.south && water.west && water.east;
+      if (spansX || spansY) for (const tile of region) fords.add(tile);
+    }
+  }
+  return fords;
+}
+
+/**
+ * The terrain a tile is DRAWN as, given the map and its ford tiles.
+ *
+ * Two presentation-only rules, both pure functions of the map so every client
+ * draws the same field: a ford replaces the shallows it crosses, and a share of
+ * the road tiles that border open land wears through to dirt, so a verge is
+ * ragged at tile granularity instead of a straight line of full-strength road.
+ * A road tile within a tile of water is never weathered — those are the authored
+ * bridges and their ramps, and eating them would break the route the map draws.
+ */
+export function displayTerrainId(
+  map: GameMap, x: number, y: number, fords: ReadonlySet<number>,
+): string | null {
+  if (x < 0 || y < 0 || x >= map.width || y >= map.height) return null;
+  const at = (tx: number, ty: number): string | null => (
+    tx < 0 || ty < 0 || tx >= map.width || ty >= map.height
+      ? null
+      : map.terrainIds[map.terrain[ty * map.width + tx]] ?? null
+  );
+  const terrain = at(x, y);
+  if (terrain === 'shallows') return fords.has(y * map.width + x) ? 'ford' : terrain;
+  if (terrain !== 'road') return terrain;
+  let bordersLand = false;
+  for (let dy = -1; dy <= 1; dy++) {
+    for (let dx = -1; dx <= 1; dx++) {
+      const neighbor = at(x + dx, y + dy);
+      if (neighbor === null || (dx === 0 && dy === 0)) continue;
+      if (WET_TERRAIN.has(neighbor)) return terrain;
+      if (neighbor !== 'road' && (dx === 0 || dy === 0)) bordersLand = true;
+    }
+  }
+  return bordersLand && tileHash(x, y, 1) % 16 < ROAD_WEAR_SHARE ? 'dirt' : terrain;
+}
 
 interface Chunk {
   cx: number;
@@ -41,6 +147,7 @@ export class TerrainLayer {
   private variantCounts = new Map<string, number>();
   private chunksX: number;
   private chunksY: number;
+  private fords: Set<number>;
 
   constructor(
     private renderer: Renderer,
@@ -49,6 +156,7 @@ export class TerrainLayer {
   ) {
     this.chunksX = Math.ceil(map.width / CHUNK_TILES);
     this.chunksY = Math.ceil(map.height / CHUNK_TILES);
+    this.fords = fordTiles(map);
   }
 
   /** Mark a tile's chunk (and boundary neighbors) for rebake. */
@@ -155,6 +263,39 @@ export class TerrainLayer {
     return this.map.terrainIds[this.map.terrain[y * this.map.width + x]] ?? null;
   }
 
+  /**
+   * Display terrain for a tile, with an atlas fallback: an atlas without `ford`
+   * frames (the dev mock, an older build) simply keeps drawing shallow water.
+   */
+  private displayTerrainAt(x: number, y: number): string | null {
+    const terrain = displayTerrainId(this.map, x, y, this.fords);
+    if (terrain === 'ford' && this.variantCount('ford') === 0) return 'shallows';
+    return terrain;
+  }
+
+  /** Frame family used for edge transitions — `ford` bleeds exactly like the shallows it stands in for. */
+  private transitionTerrainAt(x: number, y: number): string | null {
+    const terrain = this.displayTerrainAt(x, y);
+    return terrain === 'ford' ? 'shallows' : terrain;
+  }
+
+  /**
+   * Baked fringe of `hi` over `lo` along one edge, picking a variant per tile so
+   * the same wobble never repeats down a whole shoreline. Atlases without
+   * variants (the dev mock, older builds) fall back to the unnumbered frame.
+   */
+  private transitionFrame(hi: string, lo: string, edge: string, tileX: number, tileY: number) {
+    const prefix = `terr/${hi}_${lo}/${edge}`;
+    let count = this.variantCounts.get(prefix);
+    if (count === undefined) {
+      count = 0;
+      while (count < 8 && this.assets.tryResolve(`${prefix}/${count}`)) count++;
+      this.variantCounts.set(prefix, count);
+    }
+    if (count === 0) return this.assets.tryResolve(prefix);
+    return this.assets.tryResolve(`${prefix}/${tileHash(tileX, tileY, edge.charCodeAt(0)) % count}`);
+  }
+
   private variantCount(terrainId: string): number {
     let n = this.variantCounts.get(terrainId);
     if (n === undefined) {
@@ -175,7 +316,7 @@ export class TerrainLayer {
 
     for (let ty = y0t; ty < y1t; ty++) {
       for (let tx = x0t; tx < x1t; tx++) {
-        const terr = this.terrainAt(tx, ty);
+        const terr = this.displayTerrainAt(tx, ty);
         if (!terr) continue;
         // tile diamond center in world coords, then chunk-local
         const cxw = (tx - ty) * HALF_W;
@@ -193,7 +334,8 @@ export class TerrainLayer {
         temp.addChild(spr);
 
         // Edge transitions: higher-priority neighbors bleed a fringe into this tile.
-        const myPrio = TERRAIN_PRIORITY[terr] ?? 1;
+        const myTerr = this.transitionTerrainAt(tx, ty) ?? terr;
+        const myPrio = TERRAIN_PRIORITY[myTerr] ?? 1;
         const neighbors: Array<[number, number, string]> = [
           [tx, ty - 1, 'ne'],
           [tx + 1, ty, 'se'],
@@ -201,10 +343,10 @@ export class TerrainLayer {
           [tx - 1, ty, 'nw'],
         ];
         for (const [nx, ny, edge] of neighbors) {
-          const nTerr = this.terrainAt(nx, ny);
-          if (!nTerr || nTerr === terr) continue;
+          const nTerr = this.transitionTerrainAt(nx, ny);
+          if (!nTerr || nTerr === myTerr) continue;
           if ((TERRAIN_PRIORITY[nTerr] ?? 1) <= myPrio) continue;
-          const trans = this.assets.tryResolve(`terr/${nTerr}_${terr}/${edge}`);
+          const trans = this.transitionFrame(nTerr, myTerr, edge, tx, ty);
           if (!trans) continue;
           const tspr = new Sprite(trans.texture);
           tspr.anchor.set(trans.anchorX, trans.anchorY);

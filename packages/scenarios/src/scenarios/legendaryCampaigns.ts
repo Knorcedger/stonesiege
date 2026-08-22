@@ -73,10 +73,16 @@ function historicalMap(climate: Climate): ScenarioMap {
     for (let y = y0; y <= y1; y++) for (let x = 33; x <= 37; x++) grid[y][x] = 's';
   }
 
-  // A continuous road from the player's camp, through the southern ford, to the goal.
-  for (let x = 12; x <= 35; x++) grid[54][x] = 'r';
-  for (let y = 25; y <= 54; y++) grid[y][35] = y >= 51 ? 's' : 'r';
-  for (let x = 35; x <= 58; x++) grid[25][x] = 'r';
+  // The road from the player's camp to the goal. It stops at the southern ford,
+  // and the route through the river is water the whole way: the crossing itself,
+  // a shallow lane up the middle of the channel, and the northern crossing back
+  // onto the east bank. Those tiles used to be painted as road, which put dry
+  // ground inside the river and hid where the map is actually crossable; they
+  // carry exactly the same traffic as shallows, and now they look like it.
+  for (let x = 12; x <= 32; x++) grid[54][x] = 'r';
+  for (let y = 25; y <= 54; y++) grid[y][35] = 's';
+  for (let x = 35; x <= 37; x++) grid[25][x] = 's';
+  for (let x = 38; x <= 58; x++) grid[25][x] = 'r';
   for (let y = 15; y <= 25; y++) grid[y][58] = 'r';
 
   // Gatherable pockets remain well away from the authored building footprints.

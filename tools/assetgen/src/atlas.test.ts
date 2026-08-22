@@ -11,7 +11,7 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gameData } from '@bf/data';
-import { TERRAINS, edgePairs, EDGES } from './gen-terrain.ts';
+import { EDGE_VARIANTS, EDGES, PRESENTATION_TILES, TERRAINS, edgePairs } from './gen-terrain.ts';
 import { CMD_VERBS } from './gen-icons.ts';
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '../../../apps/web/public/assets');
@@ -83,12 +83,24 @@ describe('terrain atlas', () => {
     expect(ids).toEqual(['cliff', 'dirt', 'farmland', 'grass', 'road', 'sand', 'shallows', 'snow', 'water']);
   });
 
-  it('has all 4 edge-transition frames for every priority pair', () => {
+  it('has every edge-transition variant for every priority pair', () => {
     const wanted: string[] = [];
     for (const [hi, lo] of edgePairs()) {
-      for (const edge of EDGES) wanted.push(`terr/${hi}_${lo}/${edge}`);
+      for (const edge of EDGES) {
+        for (let v = 0; v < EDGE_VARIANTS; v++) wanted.push(`terr/${hi}_${lo}/${edge}/${v}`);
+      }
     }
-    expect(wanted.length).toBe(36 * 4);
+    expect(EDGE_VARIANTS).toBeGreaterThanOrEqual(2); // one frame per edge repeats its wobble on every tile
+    expect(wanted.length).toBe(36 * 4 * EDGE_VARIANTS);
+    expectFrames(terrain, wanted);
+  });
+
+  it('has the presentation-only ford tile the renderer draws over a crossing', () => {
+    const wanted: string[] = [];
+    for (const spec of PRESENTATION_TILES) {
+      for (let v = 0; v < spec.variants; v++) wanted.push(`terr/${spec.id}/${v}`);
+    }
+    expect(PRESENTATION_TILES.map((t) => t.id)).toEqual(['ford']);
     expectFrames(terrain, wanted);
   });
 

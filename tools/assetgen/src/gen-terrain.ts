@@ -1,11 +1,13 @@
 // Terrain tiles (ART_BIBLE §3.1) + baked edge transitions (§3.2) for every
-// TerrainId in packages/sim (type-only import — safe under Node type stripping).
+// TerrainId in packages/sim (type-only import — safe under Node type stripping),
+// plus the presentation-only `ford` tile the renderer swaps in where a shallows
+// band crosses a river (§3.3) so a crossing reads as wadeable at a glance.
 
 import type { TerrainId } from '../../../packages/sim/src/types.ts';
 import { Raster, diamondRow, insideDiamond } from './raster.ts';
 import { PALETTE } from './palette.ts';
 import type { RGB } from './palette.ts';
-import { Rng } from './util.ts';
+import { Rng, hashString } from './util.ts';
 import type { FrameDef } from './atlas.ts';
 
 export const TILE_W = 64;
@@ -22,7 +24,9 @@ export interface TerrainSpec {
 /** Priority order: cliff > road > farmland > snow > grass > dirt > sand > shallows > water. */
 export const TERRAINS: readonly TerrainSpec[] = [
   { id: 'cliff', priority: 8, variants: 3, base: PALETTE.stoneDark },
-  { id: 'road', priority: 7, variants: 3, base: PALETTE.dirtPale },
+  // Roads are packed earth, a full ramp step darker than `sand` — a track worn
+  // into the ground must not read as the same material as a river bank.
+  { id: 'road', priority: 7, variants: 4, base: PALETTE.dirtLight },
   { id: 'farmland', priority: 6, variants: 2, base: PALETTE.dirtBase },
   { id: 'snow', priority: 5, variants: 3, base: PALETTE.highlight },
   { id: 'grass', priority: 4, variants: 4, base: PALETTE.grassBase },
@@ -32,7 +36,19 @@ export const TERRAINS: readonly TerrainSpec[] = [
   { id: 'water', priority: 0, variants: 4, base: PALETTE.waterBase },
 ];
 
-/** All (hi, lo) pairs needing baked `terr/<hi>_<lo>/<edge>` transition frames. */
+/**
+ * Presentation-only tiles: no sim TerrainId, drawn by the renderer in place of the
+ * sim terrain it decorates. `ford` replaces `shallows` on a crossing that spans a
+ * channel — the stony causeway under the water is what makes a ford readable.
+ */
+export const PRESENTATION_TILES = [
+  { id: 'ford', variants: 4 },
+] as const;
+
+/** Transition variants per (hi, lo, edge) — a single frame would repeat its wobble on every tile. */
+export const EDGE_VARIANTS = 2;
+
+/** All (hi, lo) pairs needing baked `terr/<hi>_<lo>/<edge>/<variant>` transition frames. */
 export function edgePairs(): Array<[TerrainId, TerrainId]> {
   const pairs: Array<[TerrainId, TerrainId]> = [];
   for (const hi of TERRAINS) {
@@ -166,24 +182,36 @@ function waterTile(r: Raster, rng: Rng, variant: number): void {
 
 function shallowsTile(r: Raster, rng: Rng, variant: number): void {
   baseDiamond(r, PALETTE.waterLight);
-  // sandy bottom showing through: dithered dirtPale patches
-  const patches = 2 + (variant % 2);
+  // Shin-deep water reads as wadeable only if the bed is plainly visible through
+  // it — broad sand and gravel patches, not a few flecks.
+  const patches = 3 + (variant % 2);
   for (let p = 0; p < patches; p++) {
     const [cx, cy] = samplePoint(rng);
+    const rx = rng.int(6, 11);
+    const ry = rng.int(2, 4);
     r.ditherWhere(
-      cx - 6,
-      cy - 2,
-      cx + 6,
-      cy + 2,
-      (x, y) => inTile(x, y) && Raster.inEllipse(x, y, cx, cy, 6, 2),
-      PALETTE.dirtPale,
-      50,
+      cx - rx,
+      cy - ry,
+      cx + rx,
+      cy + ry,
+      (x, y) => inTile(x, y) && Raster.inEllipse(x, y, cx, cy, rx, ry),
+      p % 2 === 0 ? PALETTE.dirtPale : PALETTE.dirtLight,
+      p % 2 === 0 ? 50 : 25,
     );
   }
   speckle(r, rng, 24, [
-    [PALETTE.waterBase, 70],
+    [PALETTE.waterBase, 55],
     [PALETTE.dirtPale, 30],
+    [PALETTE.stoneLight, 15],
   ]);
+  // A stone or two standing proud of the surface, with a ripple collar.
+  const stones = rng.int(1, 2);
+  for (let i = 0; i < stones; i++) {
+    const [x, y] = samplePoint(rng);
+    r.set(x, y, PALETTE.stoneLight);
+    if (inTile(x + 1, y)) r.set(x + 1, y, PALETTE.stoneBase);
+    if (inTile(x - 1, y)) r.set(x - 1, y, PALETTE.highlight);
+  }
   for (const bandY of [10, 22]) {
     const off = (variant * 3 + bandY) % 9;
     for (let x = 0; x < TILE_W; x++) {
@@ -192,19 +220,129 @@ function shallowsTile(r: Raster, rng: Rng, variant: number): void {
   }
 }
 
-function roadTile(r: Raster, rng: Rng, variant: number): void {
-  baseDiamond(r, PALETTE.dirtPale);
-  speckle(r, rng, 40, [
-    [PALETTE.dirtLight, 50],
-    [PALETTE.dirtBase, 30],
-    [PALETTE.stoneLight, 20],
-  ]);
-  // two wheel-rut lines corner-to-corner along the long (horizontal) axis
-  for (const dy of [-2, 3]) {
-    for (let x = 3; x < TILE_W - 3; x++) {
-      const y = TILE_H / 2 + dy + ((x + variant) % 8 === 0 ? 1 : 0);
-      if (inTile(x, y)) r.set(x, y, PALETTE.dirtBase);
+/**
+ * A ford (presentation-only, §3.3): the road bed carried on under shin-deep
+ * water. The water tone stays on top so the tile still reads as river, while the
+ * continuous gravel causeway and the stepping stones standing out of it say
+ * plainly that this is where a column crosses.
+ */
+function fordTile(r: Raster, rng: Rng, variant: number): void {
+  baseDiamond(r, PALETTE.waterLight);
+  const seed = hashString(`terr/ford/${variant}`);
+  // Gravel bars lying on the bed, placed on smooth noise and drawn in the road's
+  // own earth tones: the track reads as continuing under the water instead of
+  // stopping at the bank. Water still covers most of the tile, so the crossing
+  // never reads as dry ground in the middle of a river.
+  for (let y = 0; y < TILE_H; y++) {
+    const row = diamondRow(y, TILE_W, TILE_H);
+    if (!row) continue;
+    for (let x = row[0]; x < row[1]; x++) {
+      const stretch = 6 + variant; // each variant lays its bars at its own scale
+      const bar = valueNoise(seed, x / stretch + y / 3.5) * 0.62
+        + valueNoise(seed ^ 0x1f3d5b, x / 3 - y / 2.2) * 0.38;
+      const grain = pixelHash(seed, x, y);
+      if (bar > 0.16) r.set(x, y, grain > 0.4 ? PALETTE.dirtPale : PALETTE.dirtLight);
+      else if (bar > -0.08 && grain > 0.62) r.set(x, y, PALETTE.dirtLight);
     }
+  }
+  speckle(r, rng, 26, [
+    [PALETTE.waterBase, 45],
+    [PALETTE.dirtPale, 30],
+    [PALETTE.stoneLight, 25],
+  ]);
+  // Stepping stones: pale crown, wet shadow under, broken ripple upstream.
+  const stones = 4 + (variant % 2);
+  for (let i = 0; i < stones; i++) {
+    const [x, y] = samplePoint(rng);
+    r.set(x, y, PALETTE.stonePale);
+    if (inTile(x + 1, y)) r.set(x + 1, y, PALETTE.stoneLight);
+    if (inTile(x - 1, y)) r.set(x - 1, y, PALETTE.stoneBase);
+    if (inTile(x, y + 1)) r.set(x, y + 1, PALETTE.waterBase);
+    if (inTile(x - 2, y)) r.set(x - 2, y, PALETTE.highlight);
+  }
+  // Current breaking over the shallow bed.
+  for (const bandY of [7, 15, 23]) {
+    const off = (variant * 4 + bandY) % 7;
+    for (let x = 0; x < TILE_W; x++) {
+      if ((x + off) % 7 < 2 && inTile(x, bandY)) r.set(x, bandY, PALETTE.highlight);
+    }
+  }
+}
+
+/**
+ * An ancient track, not a paved lane: earth churned into uneven damp and dry
+ * patches, wheel ruts that wander and fade out, loose stones, shallow potholes,
+ * and weeds holding wherever the traffic thinned. Straight, evenly toned ruts on
+ * one flat fill are what made the old tile read as laid yesterday by machines.
+ */
+function roadTile(r: Raster, rng: Rng, variant: number): void {
+  baseDiamond(r, PALETTE.dirtLight);
+
+  const patches = 4 + (variant % 2);
+  for (let p = 0; p < patches; p++) {
+    const [cx, cy] = samplePoint(rng);
+    const rx = rng.int(7, 14);
+    const ry = rng.int(2, 5);
+    r.ditherWhere(
+      cx - rx,
+      cy - ry,
+      cx + rx,
+      cy + ry,
+      (x, y) => inTile(x, y) && Raster.inEllipse(x, y, cx, cy, rx, ry),
+      p % 2 === 0 ? PALETTE.dirtPale : PALETTE.dirtBase,
+      p % 2 === 0 ? 50 : 25,
+    );
+  }
+
+  speckle(r, rng, 46, [
+    [PALETTE.dirtBase, 40],
+    [PALETTE.dirtPale, 30],
+    [PALETTE.dirtDark, 20],
+    [PALETTE.stoneLight, 10],
+  ]);
+
+  // Two wheel ruts along the long axis that drift, thin, and break.
+  for (const lane of [-3, 2]) {
+    let drift = 0;
+    for (let x = 3; x < TILE_W - 3; x++) {
+      if ((x + variant) % 7 === 0) drift = Math.max(-2, Math.min(2, drift + rng.int(-1, 1)));
+      if (rng.chance(0.24)) continue;
+      const y = Math.round(TILE_H / 2 + lane + drift);
+      if (inTile(x, y)) r.set(x, y, PALETTE.dirtDark);
+      if (rng.chance(0.3) && inTile(x, y - 1)) r.set(x, y - 1, PALETTE.dirtBase);
+    }
+  }
+
+  const stones = rng.int(3, 5);
+  for (let i = 0; i < stones; i++) {
+    const [x, y] = samplePoint(rng);
+    r.set(x, y, PALETTE.stoneLight);
+    if (inTile(x + 1, y)) r.set(x + 1, y, PALETTE.stoneBase);
+    if (inTile(x, y + 1)) r.set(x, y + 1, PALETTE.dirtDark);
+  }
+
+  const holes = 1 + (variant % 2);
+  for (let i = 0; i < holes; i++) {
+    const [cx, cy] = samplePoint(rng);
+    const rx = rng.int(3, 5);
+    const ry = rng.int(1, 2);
+    for (let y = cy - ry; y <= cy + ry; y++) {
+      for (let x = cx - rx; x <= cx + rx; x++) {
+        if (!inTile(x, y) || !Raster.inEllipse(x, y, cx, cy, rx, ry)) continue;
+        const rim = !Raster.inEllipse(x, y, cx, cy, rx - 1, ry - 0.5);
+        if (rim && !Raster.ditherOn(x, y, 50)) continue;
+        r.set(x, y, rim ? PALETTE.dirtBase : PALETTE.dirtDark);
+      }
+    }
+  }
+
+  // Weeds take the crown and the verges wherever the wheels stopped running.
+  const weeds = rng.int(5, 8);
+  for (let i = 0; i < weeds; i++) {
+    const [x, y] = samplePoint(rng);
+    r.set(x, y, PALETTE.grassDark);
+    if (rng.chance(0.5) && inTile(x, y - 1)) r.set(x, y - 1, PALETTE.grassBase);
+    if (rng.chance(0.4) && inTile(x + 1, y)) r.set(x + 1, y, PALETTE.grassDark);
   }
 }
 
@@ -319,28 +457,91 @@ function edgeDepth(x: number, y: number, edge: Edge): number {
   return 16 - f;
 }
 
-function edgeFrame(hi: TerrainSpec, lo: TerrainSpec, edge: Edge): Raster {
+/**
+ * Coordinate running ALONG the named edge, roughly -16 at one tile corner to +16
+ * at the other. It is the half-plane ramp of the neighbouring edge, which is
+ * perpendicular in the isometric skew — the boundary wobble is a function of it.
+ */
+function edgeAlong(x: number, y: number, edge: Edge): number {
+  const dx = x - (TILE_W - 1) / 2;
+  const dy = y - (TILE_H - 1) / 2;
+  if (edge === 'nw') return dx / 2 - dy;
+  if (edge === 'ne') return -dx / 2 - dy;
+  if (edge === 'sw') return dx / 2 + dy;
+  return -dx / 2 + dy;
+}
+
+/** Smooth deterministic 1-D value noise in [-1, 1]. */
+function valueNoise(seed: number, u: number): number {
+  const at = (n: number): number => {
+    let h = (Math.imul(n | 0, 0x27d4eb2d) ^ seed) >>> 0;
+    h ^= h >>> 15;
+    h = Math.imul(h, 0x2c1b3c6d) >>> 0;
+    h ^= h >>> 12;
+    return (h >>> 0) / 0x7fffffff - 1;
+  };
+  const i = Math.floor(u);
+  const f = u - i;
+  const a = at(i);
+  const b = at(i + 1);
+  return a + (b - a) * f * f * (3 - 2 * f);
+}
+
+/** Per-pixel hash in [0, 1) — the fine grain that keeps a boundary from looking cut. */
+function pixelHash(seed: number, x: number, y: number): number {
+  let h = (Math.imul(x + 1, 0x85ebca6b) ^ Math.imul(y + 1, 0xc2b2ae35) ^ seed) >>> 0;
+  h ^= h >>> 13;
+  h = Math.imul(h, 0x27d4eb2d) >>> 0;
+  h ^= h >>> 15;
+  return (h >>> 0) / 4294967296;
+}
+
+/**
+ * One baked fringe of `hi` bleeding into a `lo` tile along one edge (§3.2).
+ *
+ * The boundary is not the straight three-band ramp it used to be: it wanders on
+ * smooth noise, is eaten into by per-pixel grain, and throws scattered outliers
+ * beyond the fringe, so a road or a shoreline never draws a ruler-straight line.
+ * The wobble tapers to zero at the two tile corners, so neighbouring tiles still
+ * meet exactly — the boundary wanders, it never tears.
+ */
+function edgeFrame(hi: TerrainSpec, lo: TerrainSpec, edge: Edge, variant: number): Raster {
   const r = new Raster(TILE_W, TILE_H);
   const waterSide = lo.id === 'water' || lo.id === 'shallows';
+  const seed = hashString(`terr/${hi.id}_${lo.id}/${edge}/${variant}`);
   for (let y = 0; y < TILE_H; y++) {
     for (let x = 0; x < TILE_W; x++) {
       if (!inTile(x, y)) continue;
       const t = edgeDepth(x, y, edge);
-      if (t < 2) {
-        r.set(x, y, hi.base); // band 0: solid fringe
-      } else if (t < 4) {
-        if (Raster.ditherOn(x, y, 50)) r.set(x, y, hi.base); // band 1: 50%
-      } else if (t < 6) {
-        if (Raster.ditherOn(x, y, 25)) r.set(x, y, hi.base); // band 2: 25%
+      const along = edgeAlong(x, y, edge);
+      const taper = Math.max(0, 1 - Math.abs(along) / 16);
+      const wobble = taper * (
+        valueNoise(seed, along / 5) * 2.6 + valueNoise(seed ^ 0x5bd1e995, along / 1.9) * 1.1
+      );
+      const grain = pixelHash(seed, x, y);
+      const solid = 2 + wobble + grain * 0.9; // band 0: solid fringe
+      const half = 4.2 + wobble * 1.2 + grain * 1.2; // band 1: 50%
+      const quarter = 6.4 + wobble * 1.4 + grain * 1.5; // band 2: 25%
+      if (t < solid) r.set(x, y, hi.base);
+      else if (t < half) {
+        if (Raster.ditherOn(x, y, 50)) r.set(x, y, hi.base);
+      } else if (t < quarter) {
+        if (Raster.ditherOn(x, y, 25)) r.set(x, y, hi.base);
+      } else if (t < quarter + 3.5 && grain > 0.94) {
+        r.set(x, y, hi.base); // stray earth/stone scattered past the fringe
       }
-      // shore foam: 1px waterLight just inside the water, dither-broken every 3rd px
-      if (waterSide && t >= 2 && t < 3 && (x + y) % 3 !== 0) {
+      // shore foam: 1px waterLight just inside the water, following the wobble
+      if (waterSide && t >= solid && t < solid + 1.3 && (x + y) % 3 !== 0) {
         r.set(x, y, PALETTE.waterLight);
       }
     }
   }
   return r;
 }
+
+const PRESENTATION_PAINTERS: Record<string, (r: Raster, rng: Rng, variant: number) => void> = {
+  ford: fordTile,
+};
 
 export function genTerrain(): FrameDef[] {
   const frames: FrameDef[] = [];
@@ -352,15 +553,24 @@ export function genTerrain(): FrameDef[] {
       frames.push({ name: `terr/${spec.id}/${v}`, raster: r, anchor });
     }
   }
+  for (const spec of PRESENTATION_TILES) {
+    for (let v = 0; v < spec.variants; v++) {
+      const r = new Raster(TILE_W, TILE_H);
+      PRESENTATION_PAINTERS[spec.id](r, new Rng(`terr/${spec.id}/${v}`), v);
+      frames.push({ name: `terr/${spec.id}/${v}`, raster: r, anchor });
+    }
+  }
   for (const [hiId, loId] of edgePairs()) {
     const hi = TERRAINS.find((t) => t.id === hiId)!;
     const lo = TERRAINS.find((t) => t.id === loId)!;
     for (const edge of EDGES) {
-      frames.push({
-        name: `terr/${hiId}_${loId}/${edge}`,
-        raster: edgeFrame(hi, lo, edge),
-        anchor,
-      });
+      for (let v = 0; v < EDGE_VARIANTS; v++) {
+        frames.push({
+          name: `terr/${hiId}_${loId}/${edge}/${v}`,
+          raster: edgeFrame(hi, lo, edge, v),
+          anchor,
+        });
+      }
     }
   }
   return frames;
