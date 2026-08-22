@@ -208,6 +208,17 @@ reference, then balanced by playtesting loops.
 Procedural/synthesized SFX v1 (villager chop, mining picks, swordplay, arrows, building
 placement, horn stings for age-up and attack warnings, UI clicks). Ambient loop. Music: roadmap.
 
+**Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as
+spoken story rather than silent text. There is no recorded voice-over: the lines go to the
+device's own speech synthesizer, steered into a slow, low, deliberate delivery. The `Narrator`
+and `Chronicle` lines get the deepest, slowest read, and every other speaker keeps a pitch
+derived from its name, so Wallace and Cressingham stay apart by ear across chapters. The banner
+holds until the voice finishes (capped at 20s) so a line is never cut off mid-sentence, and a
+tap dismisses text and voice together. **Narration** volume and a **Campaign narration**
+switch sit with the other audio settings; off sends nothing to the synthesizer at all.
+Devices without speech synthesis simply read nothing and play exactly as before. Recorded
+voice-over remains on the roadmap and can replace the synthesizer behind the same seam.
+
 ## Victory / Defeat
 - Practice: conquest. A player is defeated the moment they have **no Town Center, no
   villagers, and no production buildings** — deliberately including a player whose army is
