@@ -121,7 +121,7 @@ const SAVE_MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Se
  * game runs (and testable without pinning a timezone).
  */
 export function pauseSaveStatus(savedAt: Date | null): string {
-  if (savedAt === null) return 'Not autosaved yet — the first save lands within 15 seconds.';
+  if (savedAt === null) return 'No autosave stored on this device yet.';
   const day = savedAt.getDate();
   const month = SAVE_MONTHS[savedAt.getMonth()];
   const year = savedAt.getFullYear();
@@ -326,7 +326,7 @@ const HUD_CSS = `
 .bf-pausetitle { color:#E6C04A; font:15px/1 "Pixelify Sans",monospace; letter-spacing:1px; }
 .bf-pausehint { margin-top:5px; font:14px/1.25 "VT323",monospace; }
 .bf-pausesaveline { margin-top:8px; }
-.bf-pausestate { color:#E6C04A; font:15px/1 "VT323",monospace; }
+.bf-pausestate { color:#E6C04A; font:15px/1.25 "VT323",monospace; }
 .bf-pauseleave { display:flex; flex-direction:column; }
 .bf-pauseleave .bf-btn { width:100%; min-height:44px; margin-top:auto; }
 .bf-help { position:absolute; inset:0; background:rgba(10,8,5,.78); display:none; overflow-y:auto; pointer-events:auto; z-index:45; }

@@ -35,7 +35,7 @@ describe('pause presentation', () => {
   });
 
   it('says so plainly when nothing has been stored yet', () => {
-    expect(pauseSaveStatus(null)).toBe('Not autosaved yet — the first save lands within 15 seconds.');
+    expect(pauseSaveStatus(null)).toBe('No autosave stored on this device yet.');
   });
 
   it('runs the pause action on click instead of only changing the icon', () => {

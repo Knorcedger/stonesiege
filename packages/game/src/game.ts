@@ -776,9 +776,13 @@ async function bootGame(
   // Wall-clock stamp of the last save that reached storage — presentation only
   // (the pause overlay's autosave line); never read by the sim.
   let lastSavedAt: number | null = null;
+  let wasPausedLastFrame = false;
   const saveMatch = (): void => {
     const st = getState();
     if (endShown || st.finished) return;
+    // Every pause path asks for a save, and a paused sim cannot change: one
+    // stored snapshot per tick is all any of them can produce.
+    if (lastSavedAt !== null && st.tick === lastSavedTick) return;
     const serialized = trySerialize(game);
     const withBlob = serialized !== undefined ? { serialized } : {};
     let stored = false;
@@ -1274,6 +1278,14 @@ async function bootGame(
     // dev speed: each extra pass is a normal accumulator update — the catchup
     // clamp inside SimLoop still bounds each call to 5 ticks
     for (let i = 0; i < simSpeed; i++) loop.update(dt);
+    // Snapshot on every entry into pause, whatever caused it: the pause button,
+    // the P hotkey, or attachAutoPause on a hidden tab. A paused sim stops
+    // reaching the periodic save below, so this is the last chance to store the
+    // match — and it is what the pause overlay reports as the last autosave.
+    if (loop.paused !== wasPausedLastFrame) {
+      wasPausedLastFrame = loop.paused;
+      if (loop.paused) saveMatch();
+    }
     input.update(dt, now);
     camera.update(dt);
 
