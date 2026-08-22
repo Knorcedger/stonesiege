@@ -33,6 +33,8 @@ import { SimLoop, TICK_MS } from './simloop';
 import { CommandAdmission } from './admission';
 import { AudioEngine } from './audio/engine';
 import { Narrator, createBrowserSpeech, primeSpeechOnGesture } from './audio/narration';
+import { createRecordedSpeech, loadVoiceManifest } from './audio/recordedSpeech';
+import type { VoiceManifest } from './audio/voiceLines';
 import { GameAudio } from './audio/events';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
@@ -256,6 +258,14 @@ export async function runGame(
   }
 }
 
+/**
+ * The voice-over manifest is optional and unchanging, so it is fetched once per
+ * session and every later match reuses the result — including the empty one a
+ * build with no recordings produces.
+ */
+let voiceManifest: Promise<VoiceManifest> | null = null;
+const voiceOverManifest = (): Promise<VoiceManifest> => (voiceManifest ??= loadVoiceManifest());
+
 async function bootGame(
   root: HTMLElement,
   options: RunGameOptions,
@@ -321,10 +331,13 @@ async function bootGame(
   // ------------------------------------------------------------------ audio
   const audioEngine = new AudioEngine();
   audioEngine.ambientOn();
-  // Campaign dialogue is read aloud through the platform speech synthesizer.
-  // iOS wants a gesture before the first utterance, so one is spent silently on
-  // the first press rather than on the opening narrator line.
-  const speech = createBrowserSpeech();
+  // Campaign dialogue is read aloud: recorded voice-over where a beat has been
+  // captured, the platform speech synthesizer everywhere else. iOS wants a
+  // gesture before the first utterance and the first playback, so one is spent
+  // silently on the first press rather than on the opening narrator line.
+  const speech = createRecordedSpeech(await voiceOverManifest(), {
+    fallback: createBrowserSpeech(),
+  });
   const narrator = new Narrator(speech);
   primeSpeechOnGesture(speech);
   // every button press anywhere in the match UI clicks (capture: HUD buttons

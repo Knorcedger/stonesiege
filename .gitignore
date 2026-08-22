@@ -6,6 +6,9 @@ coverage/
 .DS_Store
 .vite/
 .qa/
+
+# Intermediate voice-over renders; the shipping .m4a files are committed.
+.vo-cache/
 .gstack/
 .vercel
 .secrets/

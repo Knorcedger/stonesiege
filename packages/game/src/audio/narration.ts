@@ -1,11 +1,15 @@
 // Campaign narration: reads the scenario dialogue banner aloud through the
 // platform speech synthesizer so chapters play as spoken story instead of
-// silent text. There are no voice-over assets, so the read is built out of two
-// things the platform can actually give: the best voice installed — the
-// English (UK) "Martha" the campaign is written for, where the device has her —
-// and phrasing. A line is spoken as a sequence of beats with real silence
-// between them, close to the voice's own register. Dragging the pitch down
-// instead, as this once did, is what makes a modern voice sound synthetic.
+// silent text. Lines the render tool has captured play as recorded audio (see
+// `recordedSpeech.ts`); everything else is synthesised here, and the two are
+// interchangeable beat by beat.
+//
+// The synthesised read is built out of the two things the platform can give:
+// the best voice installed — the English (UK) "Martha" the campaign is written
+// for, where the device has her — and phrasing. A line is spoken as a sequence
+// of beats with real silence between them, close to the voice's own register.
+// Dragging the pitch down instead, as this once did, is what makes a modern
+// voice sound synthetic.
 //
 // The browser API is reached only through the SpeechSeam below, so voice
 // choice, delivery and speaking-state logic are pure and unit-tested under the
@@ -13,11 +17,13 @@
 // failure must never reach gameplay.
 
 import { getSettings, onSettingsChanged, type GameSettings } from '../settings';
+import { speechBeats, speechText, voiceLineId, type NarrationLine } from './voiceLines';
 
-export interface NarrationLine {
-  text: string;
-  speaker?: string;
-}
+// The text helpers live in `voiceLines.ts` so the render tool can import them
+// without pulling in settings and the DOM; they are re-exported here because
+// narration is where callers expect to find them.
+export { speechBeats, speechText, voiceLineId };
+export type { NarrationLine };
 
 /** The subset of SpeechSynthesisVoice the picker ranks on. */
 export interface NarrationVoice {
@@ -37,61 +43,27 @@ export interface NarrationRequest {
   pitch: number;
   /** Final gain, 0..1. */
   volume: number;
+  /**
+   * Stable name for this beat, so a seam that has a recording of it can play
+   * that instead of synthesising. Undefined for the priming utterance.
+   */
+  id?: string;
   /** Fired when the utterance finishes, errors, or is cancelled. */
   onDone: () => void;
 }
 
-/** Platform seam. `createBrowserSpeech` is the only implementation shipped. */
+/**
+ * Platform seam. `createBrowserSpeech` synthesises; `createRecordedSpeech`
+ * wraps it so beats with a recording play the file instead.
+ */
 export interface SpeechSeam {
   getVoices(): NarrationVoice[];
   speak(req: NarrationRequest): void;
   cancel(): void;
   /** Subscribe to late voice-list population; returns an unsubscribe. */
   onVoicesChanged(cb: () => void): () => void;
-}
-
-// ------------------------------------------------------------- spoken text
-
-/**
- * Prepare banner text for the synthesizer: ellipses become the dots engines
- * actually pause on, and whitespace is collapsed so wrapped scenario strings do
- * not read with gaps. Dashes are left standing — `speechBeats` turns them into
- * silence, which is a longer pause than any punctuation buys.
- */
-export function speechText(line: NarrationLine): string {
-  return line.text
-    .replace(/…/g, '...')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-/**
- * Split a prepared line into the beats spoken one after another, with the
- * delivery's silence held between them. Phrasing is what reads as gravity, so
- * the line breaks where a storyteller would draw breath: sentence ends, dashes,
- * colons and semicolons. A line with nothing to say yields no beats.
- */
-export function speechBeats(text: string): string[] {
-  const beats: string[] = [];
-  let buf = '';
-  const flush = (): void => {
-    const beat = buf.trim();
-    if (beat !== '') beats.push(beat);
-    buf = '';
-  };
-  for (let i = 0; i < text.length; i++) {
-    const ch = text.charAt(i);
-    if (ch === '—' || ch === '–') {
-      flush(); // the dash is the silence; it is never spoken
-      continue;
-    }
-    buf += ch;
-    // "May 1297. The English" ends a sentence; a decimal point does not.
-    if ((ch === '.' || ch === '!' || ch === '?') && !/[0-9]/.test(text.charAt(i + 1))) flush();
-    else if (ch === ';' || ch === ':') flush();
-  }
-  flush();
-  return beats;
+  /** Spend the first user gesture on whatever this seam needs unlocked. */
+  prime?(): void;
 }
 
 // --------------------------------------------------------------- delivery
@@ -389,7 +361,7 @@ export class Narrator {
         timeoutMs: estimateLineMs(beats, delivery) * SPEECH_TIMEOUT_FACTOR,
       };
       this.queue = beats.slice(1);
-      this.sayBeat(beats[0], delivery, volume, this.generation);
+      this.sayBeat(beats[0], line.speaker, delivery, volume, this.generation);
     } catch {
       this.active = null; // narration must never break the banner
       this.queue = [];
@@ -403,12 +375,14 @@ export class Narrator {
    */
   private sayBeat(
     text: string,
+    speaker: string | undefined,
     delivery: NarrationDelivery,
     volume: number,
     generation: number,
   ): void {
     this.seam?.speak({
       text,
+      id: voiceLineId(speaker, text),
       voice: this.resolveVoice(),
       rate: delivery.rate,
       pitch: delivery.pitch,
@@ -424,7 +398,7 @@ export class Narrator {
           this.beatTimer = null;
           if (generation !== this.generation) return;
           try {
-            this.sayBeat(next, delivery, volume, generation);
+            this.sayBeat(next, speaker, delivery, volume, generation);
           } catch {
             this.active = null;
             this.queue = [];
@@ -521,9 +495,9 @@ export function createBrowserSpeech(): SpeechSeam | null {
 }
 
 /**
- * iOS refuses the first utterance unless it follows a user gesture. Speaking a
- * silent one on the first pointer/key press spends that gesture up front so the
- * opening narrator line is not the one that gets swallowed.
+ * iOS refuses the first utterance, and the first audio playback, unless it
+ * follows a user gesture. Spending the first pointer/key press on a silent one
+ * of each means the opening narrator line is not the one that gets swallowed.
  */
 export function primeSpeechOnGesture(seam: SpeechSeam | null): () => void {
   if (!seam || typeof document === 'undefined') return () => undefined;
@@ -532,6 +506,7 @@ export function primeSpeechOnGesture(seam: SpeechSeam | null): () => void {
     if (primed) return;
     primed = true;
     try {
+      seam.prime?.();
       seam.speak({ text: ' ', voice: null, rate: 1, pitch: 1, volume: 0, onDone: () => undefined });
     } catch {
       /* non-fatal */
