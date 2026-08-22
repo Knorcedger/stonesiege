@@ -141,7 +141,16 @@ interface Skel {
 // One walk cycle: contacts on frames 0 and 3, passings between them.
 // `WALK_STRIDE` is the near leg's dx; the far leg mirrors it, so the pair is
 // never closer than 2 px and never has to be nudged apart.
-const WALK_STRIDE = [3, 1, -1, -3, -1, 1];
+//
+// Signs are relative to the authored side views, which all face screen-left
+// (`FACE[1..3][0] === -1`). A planted foot has to travel *against* the facing
+// direction — the ground holds it while the body walks over it — so the near
+// leg starts a contact behind the hip at -3 and sweeps forward to +3 through
+// its stance (frames 0-3, where `WALK_LIFT_NEAR` keeps it down), then swings
+// back under the body while lifted. The far leg reads the same series negated,
+// which puts it half a cycle away. Running these the other way round is a
+// moonwalk: the feet drive the unit backwards while it advances.
+const WALK_STRIDE = [-3, -1, 1, 3, 1, -1];
 // The horizontal swing alone is a palindrome (frames 1/5 and 2/4 share a stride
 // magnitude). The lifts are in quadrature with it — each leg leaves the ground
 // only while it is swinging through — which is what makes all six poses
@@ -166,6 +175,51 @@ const WALK_SWAY = [1, 1, 0, -1, -1, 0];
  */
 const WALK_FRONT_DROP_L = [0, 1, 2, 3, 4, 1];
 const WALK_FRONT_DROP_R = [3, 4, 1, 0, 1, 2];
+/**
+ * Walking away, screen depth runs the other way: the foot planted ahead is the
+ * one further from the camera, so it sits HIGH and descends through its stance
+ * instead of rising, and the swinging foot — forward and lifted at once — is
+ * higher than either contact. Sharing one table with the front view played the
+ * rear-facing walk backwards. `R` is `L` half a cycle later, as in the front
+ * view, and no entry repeats inside a table so all six poses stay distinct.
+ */
+const WALK_REAR_DROP_L = [4, 3, 2, 1, 6, 5];
+const WALK_REAR_DROP_R = [1, 6, 5, 4, 3, 2];
+
+/**
+ * Near/far leg offsets for one side-view walk frame: `dx` px from the hip,
+ * `lift` px clear of the ground. Exported so the gait's direction of travel can
+ * be asserted directly instead of inferred from rendered pixels.
+ */
+export function walkSideLegs(frame: number): {
+  near: { dx: number; lift: number };
+  far: { dx: number; lift: number };
+} {
+  return {
+    near: { dx: WALK_STRIDE[frame], lift: WALK_LIFT_NEAR[frame] },
+    far: { dx: -WALK_STRIDE[frame], lift: WALK_LIFT_FAR[frame] },
+  };
+}
+
+/** Front/rear foot heights for one walk frame, as (left, right) px off the ground. */
+export function walkFootDrop(dir: Dir, frame: number): readonly [number, number] {
+  return awayView(dir)
+    ? [WALK_REAR_DROP_L[frame], WALK_REAR_DROP_R[frame]]
+    : [WALK_FRONT_DROP_L[frame], WALK_FRONT_DROP_R[frame]];
+}
+
+/**
+ * The same walk, flattened into the 0-2 px the robe hem has to work with.
+ * Rebase on the table's own floor first: the rear table's stance bottoms out at
+ * 1, so clamping it raw collapsed four of the monk's six rear-facing hems onto
+ * the same two values and the cycle played as five poses.
+ */
+export function walkHemLift(dir: Dir, frame: number): readonly [number, number] {
+  const table = awayView(dir) ? WALK_REAR_DROP_L : WALK_FRONT_DROP_L;
+  const floor = Math.min(...table);
+  const [left, right] = walkFootDrop(dir, frame);
+  return [Math.min(2, left - floor), Math.min(2, right - floor)];
+}
 /** Body sits lowest at each contact and rises over the straight stance leg. */
 const WALK_BOB = [0, -1, -1, 0, -1, -1];
 
@@ -355,11 +409,11 @@ function paintLegs(r: Raster, s: Skel, spec: HumanSpec, dir: Dir, anim: HumanAni
     // Mirrored about the hip so the pair is always >=2 px apart: the old rig
     // offset the near leg by a fixed -2, which collided at the passing frames
     // and had to teleport the far leg to the wrong side of the body.
-    const stride = walkish ? WALK_STRIDE[frame] : 0;
-    const nearX = s.cx + s.lean - 1 + stride;
-    const farX = s.cx + s.lean - 1 - stride;
-    const nearLift = walkish ? WALK_LIFT_NEAR[frame] : 0;
-    const farLift = walkish ? WALK_LIFT_FAR[frame] : 0;
+    const legs = walkSideLegs(frame);
+    const nearX = s.cx + s.lean - 1 + (walkish ? legs.near.dx : 0);
+    const farX = s.cx + s.lean - 1 + (walkish ? legs.far.dx : 0);
+    const nearLift = walkish ? legs.near.lift : 0;
+    const farLift = walkish ? legs.far.lift : 0;
     const lo = Math.min(nearX, farX);
     const hi = Math.max(nearX, farX);
     r.fillRect(lo, s.hipY, hi - lo + 2, h - 1, far); // hull filler (feet row stays split)
@@ -372,8 +426,7 @@ function paintLegs(r: Raster, s: Skel, spec: HumanSpec, dir: Dir, anim: HumanAni
     // front-facing cycle was two poses strobing at 10 fps.
     const spread = walkish ? WALK_SPREAD[frame] : 0;
     const sway = walkish ? WALK_SWAY[frame] : 0;
-    const dropL = walkish ? WALK_FRONT_DROP_L[frame] : 0;
-    const dropR = walkish ? WALK_FRONT_DROP_R[frame] : 0;
+    const [dropL, dropR] = walkish ? walkFootDrop(dir, frame) : [0, 0];
     const cx = s.cx + s.lean + sway;
     // Filler spans the hip, so a scissored leg never becomes an isolated 2 px
     // column (the §7.2 outline pass eats those down to a black post). Both legs
@@ -722,8 +775,8 @@ export function drawHuman(spec: HumanSpec, anim: HumanAnim, dir: Dir, frame: num
     paintRobe(
       r, s, spec,
       walkish ? WALK_SWAY[frame] : 0,
-      walkish ? Math.min(2, WALK_FRONT_DROP_L[frame]) : 0,
-      walkish ? Math.min(2, WALK_FRONT_DROP_R[frame]) : 0,
+      walkish ? walkHemLift(dir, frame)[0] : 0,
+      walkish ? walkHemLift(dir, frame)[1] : 0,
     );
   } else {
     paintLegs(r, s, spec, dir, anim, frame);
