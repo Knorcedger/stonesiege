@@ -11,7 +11,10 @@ import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gameData } from '@bf/data';
-import { TERRAINS, edgePairs, EDGES } from './gen-terrain.ts';
+import {
+  EDGE_VARIANTS, EDGES, PRESENTATION_TILES, ROAD_AXES, ROAD_BENDS, ROAD_BEND_ARMS,
+  ROAD_BEND_VARIANTS, ROAD_JOINT_VARIANTS, ROAD_OFFSETS, TERRAINS, edgePairs,
+} from './gen-terrain.ts';
 import { CMD_VERBS } from './gen-icons.ts';
 
 const ASSETS = join(dirname(fileURLToPath(import.meta.url)), '../../../apps/web/public/assets');
@@ -83,12 +86,57 @@ describe('terrain atlas', () => {
     expect(ids).toEqual(['cliff', 'dirt', 'farmland', 'grass', 'road', 'sand', 'shallows', 'snow', 'water']);
   });
 
-  it('has all 4 edge-transition frames for every priority pair', () => {
+  it('has every edge-transition variant for every priority pair', () => {
     const wanted: string[] = [];
     for (const [hi, lo] of edgePairs()) {
-      for (const edge of EDGES) wanted.push(`terr/${hi}_${lo}/${edge}`);
+      for (const edge of EDGES) {
+        for (let v = 0; v < EDGE_VARIANTS; v++) wanted.push(`terr/${hi}_${lo}/${edge}/${v}`);
+      }
     }
-    expect(wanted.length).toBe(36 * 4);
+    expect(EDGE_VARIANTS).toBeGreaterThanOrEqual(2); // one frame per edge repeats its wobble on every tile
+    // `road` is drawn over its ground rather than transitioned into, so it is not
+    // one of the 8 terrains that pair up here.
+    expect(edgePairs().some(([hi, lo]) => hi === 'road' || lo === 'road')).toBe(false);
+    expect(wanted.length).toBe(28 * 4 * EDGE_VARIANTS);
+    expectFrames(terrain, wanted);
+  });
+
+  it('has the presentation-only ford tile the renderer draws over a crossing', () => {
+    const wanted: string[] = [];
+    for (const spec of PRESENTATION_TILES) {
+      for (let v = 0; v < spec.variants; v++) wanted.push(`terr/${spec.id}/${v}`);
+    }
+    expect(PRESENTATION_TILES.map((t) => t.id)).toEqual(['ford']);
+    expectFrames(terrain, wanted);
+  });
+
+  it('has every road joint: run direction x entry x exit x variant', () => {
+    const wanted: string[] = [];
+    for (const axis of ROAD_AXES) {
+      for (let entry = 0; entry < ROAD_OFFSETS.length; entry++) {
+        for (let exit = 0; exit < ROAD_OFFSETS.length; exit++) {
+          for (let v = 0; v < ROAD_JOINT_VARIANTS; v++) {
+            wanted.push(`terr/road-${axis}/${entry}${exit}/${v}`);
+          }
+        }
+      }
+    }
+    // Every entry offset must pair with every exit offset, or a road's track
+    // would break where two tiles meet.
+    expect(wanted.length).toBe(2 * ROAD_OFFSETS.length * ROAD_OFFSETS.length * ROAD_JOINT_VARIANTS);
+    expectFrames(terrain, wanted);
+  });
+
+  it('has every bend: corner x what each arm hands over x variant', () => {
+    const wanted: string[] = [];
+    for (const bend of ROAD_BENDS) {
+      for (const arms of ROAD_BEND_ARMS) {
+        for (let v = 0; v < ROAD_BEND_VARIANTS; v++) wanted.push(`terr/road-bend/${bend}/${arms}/${v}`);
+      }
+    }
+    // Every corner must exist for both arm kinds, or a road stepping between the
+    // axes would fall back to the junction tile and read as a staircase.
+    expect(ROAD_BEND_ARMS).toEqual(['ss', 'sb', 'bs', 'bb']);
     expectFrames(terrain, wanted);
   });
 

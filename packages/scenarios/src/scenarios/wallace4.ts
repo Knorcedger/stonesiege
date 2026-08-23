@@ -14,7 +14,7 @@
 // enters the E edge at (127,70) and runs W along the south bank.
 
 import type { ScenarioDef } from '../schema';
-import { unitGroup, wallRing } from './authoring';
+import { layRoadCurves, unitGroup, wallRing } from './authoring';
 
 const legend: ScenarioDef['map']['legend'] = {
   n: { terrain: 'snow' },
@@ -26,6 +26,22 @@ const legend: ScenarioDef['map']['legend'] = {
   S: { terrain: 'snow', object: 'stone' },
   D: { terrain: 'snow', object: 'deer' },
 };
+
+/**
+ * The Tyne valley roads, re-laid as curves: the two bridge approaches on either
+ * bank, the Newcastle relief road running the width of the south bank, and the
+ * spur to Corbridge's west gate. The bridges themselves stay straight spans —
+ * `layRoadCurves` never moves a road tile that touches water.
+ */
+const ROAD_PATHS: Array<Array<[number, number]>> = [
+  [[34, 34], [36, 40], [33, 46], [35, 52], [34, 59]],
+  [[34, 67], [36, 72], [33, 78], [35, 83], [34, 87]],
+  [[84, 30], [82, 36], [85, 43], [83, 50], [84, 59]],
+  [[84, 67], [85, 69], [84, 71]],
+  [[20, 71], [28, 69], [34, 70], [42, 72], [52, 69], [62, 71], [72, 69], [84, 70],
+    [94, 72], [104, 69], [114, 71], [127, 70]],
+  [[34, 81], [40, 79], [46, 82], [51, 81]],
+];
 
 export const wallace4: ScenarioDef = {
   id: 'wallace-4',
@@ -83,7 +99,7 @@ export const wallace4: ScenarioDef = {
     width: 128,
     height: 128,
     legend,
-    rows: [
+    rows: layRoadCurves([
       'NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN',
       'NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN',
       'NNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNNN',
@@ -212,7 +228,7 @@ export const wallace4: ScenarioDef = {
       'NNNNNNNnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn',
       'NNNNNNNnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn',
       'NNNNNNNnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnnn',
-    ],
+    ], ROAD_PATHS, { over: 'nd', width: 2 }),
   },
   entities: [
     // ---- Player 1: the raiding column on the NW plateau ----

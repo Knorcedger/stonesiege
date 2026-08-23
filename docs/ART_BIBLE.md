@@ -172,39 +172,106 @@ picking variants per-coordinate hash at runtime.
 | `dirt` | `dirtBase` | ~50 px: 50% `dirtDark`, 30% `dirtLight`, 20% `dirtPale`; 3–5 pebbles (2×1 `dirtDark` with 1 px `dirtLight` top) | 3 — v2 adds a dry crack: 6–10 px meandering 1 px `dirtDark` polyline |
 | `forest` (floor under trees) | `grassShadow` | ~80 px litter: 50% `leafShadow`, 30% `grassDark`, 20% `dirtDark`; 2–3 root knuckles (2×2 `woodDark`) | 3 |
 | `water` | `waterBase` | 3 horizontal shimmer bands: rows y=8/16/24 dashed `waterLight` (dash 4 px, gap 6 px, x-offset differs per variant); ~10 px `waterDeep` speckle below center; 1–2 single `highlight` sparkle px | 4 (band offsets shift +2 px per variant — tiling water looks alive without animation) |
-| `shallows` | `waterLight` | sandy-bottom patches, sparse `waterBase` speckle, and broken `highlight` ripple bands | 3 |
+| `shallows` | `waterLight` | broad dithered sand/gravel bed patches (`dirtPale`/`dirtLight`) so the bottom is plainly visible, sparse `waterBase`/`stoneLight` speckle, 1–2 stones breaking the surface, broken `highlight` ripple bands | 3 |
 | `sand` | `dirtPale` | sparse earth/thatch flecks and short wind-ripple dashes | 3 |
-| `road` | `dirtPale` | ~40 px: 50% `dirtLight`, 30% `dirtBase`, 20% `stoneLight` fleck; two 1 px wheel-rut lines of `dirtBase` running corner-to-corner of the diamond long axis | 3 |
+| `road` | `dirtLight` | packed earth, never one flat tone: dithered damp/dry patches (`dirtBase`/`dirtPale`), grit fleck, 1–3 loose stones, 1–2 potholes (`dirtDark` core, dithered `dirtBase` rim), weed tufts. Unlike every other terrain this frame does NOT fill its diamond: roads are ribbons laid over the ground (§3.3), and this one is the junction patch — a crossroads or a lone tile | 4 |
 | `farmland` (under farm objects, optional) | `dirtBase` | plow rows: 1 px `dirtDark` lines parallel to the NW edge every 4 px, `dirtLight` line adjacent (furrow highlight) | 2 |
 | `snow` | `highlight` | cool stone/parchment speckle with short pale drift lines | 3 |
 | `cliff` (blocked) | `stoneDark` | raised `stoneBase`/`stoneLight` shelf over dark layered strata, broken seams, cracks, and stone flecks | 3 |
+
+`road` sits a full ramp step below `sand`: a worn track and a river bank must not read as
+the same material where a road runs down to the water.
 
 Noise placement: rejection-sample points inside the diamond via
 `insideDiamond(x, y) = abs(x-32)/32 + abs(y-16)/16 <= 1` (minus a 1 px margin).
 
 ### 3.2 Edge transitions
 
-Terrain priority (high paints over low): `cliff > road > farmland > forest > snow >
-grass > dirt > sand > shallows > water`.
+Terrain priority (high paints over low): `cliff > farmland > forest > snow > grass >
+dirt > sand > shallows > water`. `road` takes no part — it is drawn as a ribbon over the
+ground it was worn into (§3.3), so a road tile blends with its neighbours as that ground
+does, and `terr/road_*` / `terr/*_road` transition frames are not baked at all.
 
-Algorithm (implemented as an overlay pass when the renderer composes, or as baked
-transition frames `terr/<hi>_<lo>/<edge>` if we prefer baking — assetgen picks baked;
-a tile diamond's four edges run diagonally on screen, so edges are named `nw`, `ne`,
-`sw`, `se`. These frames are packed into `terrain.png` and are registered in
-ASSET_CONTRACT — see §10.7):
+Algorithm (baked transition frames `terr/<hi>_<lo>/<edge>/<variant>`; a tile diamond's
+four edges run diagonally on screen, so edges are named `nw`, `ne`, `sw`, `se`. These
+frames are packed into `terrain.png` and are registered in ASSET_CONTRACT — see §10.7):
 
 1. For each tile edge where the neighbor's terrain differs and has **lower** priority,
    the higher terrain bleeds a fringe **into the neighbor tile** along the shared edge.
 2. Fringe = 3 bands parallel to the edge, in the neighbor's frame:
-   band 0 (touching edge): 100% higher-terrain base fill, 2 px deep;
-   band 1: 50% checker dither of higher base over lower base, 2 px;
-   band 2: 25% dither, 2 px.
-3. **Water shores** additionally draw a 1 px `waterLight` foam line on the water side
-   of the edge, with a 50% dither break every 3rd px (no solid banding).
-4. `forest` floor never transitions to `water` directly (map gen guarantees a grass or
+   band 0 (touching edge): 100% higher-terrain base fill, ~2 px deep;
+   band 1: 50% checker dither of higher base over lower base, ~2 px;
+   band 2: 25% dither, ~2 px.
+3. The band depths are **not constant**. They are displaced by smooth 1-D value noise of
+   the coordinate running along the edge (two octaves, ~±3.7 px) plus a per-pixel grain
+   term, and stray single pixels of the higher base are scattered up to ~3.5 px past
+   band 2. A straight, evenly repeating fringe is what made roads and shorelines read as
+   machine-cut. The wobble is tapered to zero at both tile corners, so neighbouring tiles
+   still meet exactly — the boundary wanders, it never tears.
+4. Two variants are baked per (hi, lo, edge); the renderer picks one per tile coordinate,
+   so a long shoreline never repeats the same wobble tile after tile.
+5. **Water shores** additionally draw a 1 px `waterLight` foam line just inside the water
+   along the (wobbling) boundary, with a dither break every 3rd px (no solid banding).
+6. `forest` floor never transitions to `water` directly (map gen guarantees a grass or
    dirt ring); farmland only ever borders grass/dirt.
 
-This reads as soft, hand-blended edges at 1× while being ~30 lines of code.
+This reads as soft, hand-blended, organic edges at 1×.
+
+### 3.3 Presentation-only tiles
+
+These families have no sim `TerrainId`. The renderer resolves them from the map and draws
+them in place of the terrain they stand for (`packages/game/src/terrain.ts`), so the sim,
+pathing, the minimap and replays never see them.
+
+**`ford`** (`terr/ford/<variant>`, 4 variants) replaces a `shallows` tile carrying a route
+across a water channel. Decided per tile: across the crossing the first thing that is not
+shallows must be water on BOTH sides (a channel, not a shore — which is what rejects the rim
+of a lake or an island), and along it one side must reach dry land through shallows (the bank
+being waded to). A shallow lane running down the middle of a channel reaches neither bank and
+stays ordinary shallow water.
+
+Recipe: `waterLight` base; gravel bars laid on smooth value noise in the road's own earth
+tones (`dirtLight`/`dirtPale`, ~45% of the diamond) so the track reads as continuing under
+the water; ~26 px `waterBase`/`stoneLight` speckle; 4–5 stepping stones (`stonePale` crown,
+`stoneBase` shoulder, `waterBase` wet shadow, broken `highlight` ripple); three broken
+`highlight` current lines. Water still covers most of the tile: a crossing must never read
+as dry ground standing in the middle of a river.
+
+#### Roads are ribbons, not tiles
+
+Every road frame is **transparent past the track's own edge**, and the renderer paints the
+surrounding ground (`grass`/`dirt`/`sand`/`snow`/`farmland`, whichever is nearest) under it.
+This is the whole reason a road can look like a road:
+
+- a tile-shaped road patch jogs a full tile wherever the route steps between the map axes,
+  so any road that is not perfectly axis-aligned reads as a staircase;
+- a ribbon crosses its tile corner to corner, so the same route reads as one continuous
+  track, and its silhouette is the track rather than the diamond.
+
+`roadBand` lays the ribbon: every pixel within a noisy half-width (12.5 px ±3.5, two octaves
+of value noise) of the track centre, with a 2.6 px dithered frayed rim and nothing outside
+it. On top of that: a crown ~11 px wide polished pale (`dirtPale`), damp shoulders
+(`dirtBase`, `dirtDark` past 12 px), two cart ruts (`dirtDark`) at −6 and +4.5 px wandering
+±2.6 px and breaking (~30% of pixels missing, ~62% on the abandoned variant), grit, stones,
+potholes and weeds thickening outward from the crown.
+
+Four families use it:
+
+| Family | Frames | What it draws |
+|---|---|---|
+| `road-x`, `road-y` | `terr/road-<axis>/<entry><exit>/<variant>`, 3 variants per joint | A road running along one map axis. `entry`/`exit` index `ROAD_OFFSETS` (−4.5, 0, +4.5 px): where the track crosses into the neighbouring tile. The renderer derives both from tile coordinates, so one tile's exit offset IS its neighbour's entry offset and the whole road meanders as one continuous line. The last variant is a stretch the traffic has nearly abandoned |
+| `road-bend` | `terr/road-bend/<corner>/<arms>/<variant>`, 2 variants | A road turning between the two edges `corner` names (`nw` west, `se` east, `ne` north, `sw` south), on a cubic Bezier between their midpoints. `arms` says what lies beyond each edge — `s` a straight run, `b` another bend — and sets the end tangents: a lone corner (`ss`) turns on a quarter arc tangent to both runs, while a bend between two bends (`bb`) draws the straight chord, so the staircase a curved route makes is one straight diagonal on screen instead of a sawtooth |
+| `road-fill` | `terr/road-fill/<edge>/<variant>`, 2 variants | The half of a tile facing a road tile beside it, in bare packed earth. A road wider than one tile is a row of ribbons with ground showing between them; filling the halves that face each other merges the lanes into one band while the band's outer edge keeps the frayed ribbon silhouette |
+| `road` (§3.1) | `terr/road/<variant>` | The junction patch: a crossroads, or a lone tile. Scuffed in both directions, reaching every edge midpoint so whatever meets it joins on |
+
+Maps author roads as curves, not as axis-aligned runs meeting at right angles — no road worn
+by traffic turns 90° on the spot. `curveTiles` in `packages/scenarios/src/scenarios/authoring.ts`
+rasterizes a spline through waypoints into a 4-connected run; `layRoadCurves` re-lays a whole
+ASCII map's roads on such paths, clearing the authored road back to the ground around it while
+leaving bridge spans (any road tile within two tiles of water) exactly where they are.
+
+A road tile far enough from land that no ground can be found under it is a **bridge deck**: the
+renderer fills all four halves instead of laying a ribbon on ground that is not there.
 
 ---
 
@@ -741,8 +808,9 @@ mirrored into ASSET_CONTRACT.md; the rest still need sign-off.
    budget; if male/female variants are wanted later, they're a rig re-dress.
 6. **Impact frame metadata** [in contract]: `meta.bannerfall.impactFrame` per attack
    anim, alongside `playerColorStrategy`.
-7. **Baked terrain transitions** [in contract]: `terr/<hi>_<lo>/<edge>` with `edge`
-   ∈ {`nw`, `ne`, `sw`, `se`} (§3.2), packed into `terrain.png`.
+7. **Baked terrain transitions** [in contract]: `terr/<hi>_<lo>/<edge>/<variant>` with
+   `edge` ∈ {`nw`, `ne`, `sw`, `se`} (§3.2), packed into `terrain.png`, alongside the
+   presentation-only crossing tile and road ribbon families (§3.3).
 8. **Grayscale icon companions** [in contract]: `icon/<id>/gray` (§8.1 disabled
    buttons), packed into `icons.png`; luma-mapped onto the stone ramp, never masked.
 9. **`@p<idx>` scope & token** [in contract]: the variant token is the numeric player

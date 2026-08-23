@@ -17,7 +17,7 @@
 // deliberate invention; every other beat follows the record.
 
 import type { ScenarioDef } from '../schema';
-import { unitGroup, wallRing } from './authoring';
+import { layRoadCurves, unitGroup, wallRing } from './authoring';
 
 const legend: ScenarioDef['map']['legend'] = {
   '.': { terrain: 'grass' },
@@ -34,6 +34,22 @@ const legend: ScenarioDef['map']['legend'] = {
   H: { terrain: 'grass', object: 'sheep' },
   W: { terrain: 'grass', object: 'wolf' },
 };
+
+/**
+ * The Forest roads, re-laid as curves: the west road down to the Earnside
+ * causeway, and the Clyde roads on the east side. The causeway itself and every
+ * other span over the water keep their authored line — `layRoadCurves` never
+ * moves a road tile that touches water.
+ */
+const ROAD_PATHS: Array<Array<[number, number]>> = [
+  [[22, 31], [30, 29], [37, 31], [43, 34]],
+  [[43, 34], [45, 41], [42, 48], [44, 54]],
+  [[90, 32], [88, 40], [91, 48], [89, 55], [90, 61]],
+  [[90, 61], [99, 59], [106, 62], [112, 64], [113, 71], [112, 77]],
+  // Below y100 the road is the only gap in the Ettrick treeline: it holds that
+  // corridor exactly, and only wanders where the Forest lets it.
+  [[90, 61], [92, 72], [89, 84], [91, 94], [90, 101], [90, 110], [80, 111]],
+];
 
 export const wallace6: ScenarioDef = {
   id: 'wallace-6',
@@ -89,7 +105,7 @@ export const wallace6: ScenarioDef = {
     width: 144,
     height: 144,
     legend,
-    rows: [
+    rows: layRoadCurves([
       '................................................wwwwwwwww.......................................................................................',
       '................................................wwwwwwwww.......................................................................................',
       '................................................wwwwwwwww.......................................................................................',
@@ -234,7 +250,7 @@ export const wallace6: ScenarioDef = {
       '.................................................TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       '................................................TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       '...............................................TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-    ],
+    ], ROAD_PATHS, { over: '.d', width: 2 }),
   },
   entities: [
     // ---- Player 1: the hidden war-camp in the clearing ----

@@ -12,6 +12,7 @@
 // docs/CAMPAIGN_WALLACE.md Appendix A, canonical in @bf/data (units.ts hero section).
 
 import type { ScenarioDef } from '../schema';
+import { layRoadCurves } from './authoring';
 
 const legend: ScenarioDef['map']['legend'] = {
   '.': { terrain: 'grass' },
@@ -25,6 +26,16 @@ const legend: ScenarioDef['map']['legend'] = {
   D: { terrain: 'grass', object: 'deer' },
   W: { terrain: 'grass', object: 'wolf' },
 };
+
+/**
+ * Lanark's two streets, re-laid as curves. The south road still runs through the
+ * gallows cross at (65, 43) where Heselrig holds his court — the camera pans
+ * there and the briefing names it, so the curve is authored through that tile.
+ */
+const ROAD_PATHS: Array<Array<[number, number]>> = [
+  [[65, 28], [67, 32], [64, 37], [65, 43], [66, 45]],
+  [[56, 38], [61, 37], [66, 38], [70, 37], [73, 38]],
+];
 
 export const wallace1: ScenarioDef = {
   id: 'wallace-1',
@@ -77,7 +88,7 @@ export const wallace1: ScenarioDef = {
     width: 96,
     height: 96,
     legend,
-    rows: [
+    rows: layRoadCurves([
       'TTTTTTT.......................................................................wwwwwwwwwwwwwwwwww',
       'TTTTTTT.......................................................................wwwwwwwwwwwwwwwwww',
       'TTTTTTT.......................................................................wwwwwwwwwwwwwwwwww',
@@ -174,7 +185,7 @@ export const wallace1: ScenarioDef = {
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTwwwwwwwwwwwwwwwwww',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTwwwwwwwwwwwwwwwwww',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTwwwwwwwwwwwwwwwwww',
-    ],
+    ], ROAD_PATHS, { over: '.d', width: 2 }),
   },
   entities: [
     // ---- Player 1: Wallace's band in the glen ----

@@ -42,9 +42,33 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
   is off, the volume is zero, the game is paused or in the background, or the device has no
   speech support.
 
-
 ### Changed
 
+- Roads look their age, and behave like roads. A road is now a ribbon of worn earth laid
+  over the ground rather than a row of tile-shaped patches: it has a crown polished pale by
+  traffic, two cart ruts that wander and break, damp shoulders, weeds, and a frayed edge that
+  narrows and widens along its length. Its centre line meanders from tile to tile, turns are
+  drawn as curves, and a road authored as a curve reads as one continuous diagonal instead of
+  a staircase — no more right-angle corners. Roads wider than one tile merge into a single
+  band. Road earth is a step darker than sand, so a road running down to a river no longer
+  merges into the bank. Every other terrain border wanders too: the baked edge fringes follow
+  a noise-broken boundary with scattered outliers instead of a straight three-band ramp, with
+  two variants per pair and edge picked by tile. No more machine-cut terrain edges.
+- River crossings are visible as crossings. A shallows band that spans a channel now draws as
+  a ford — a gravel causeway lying under shin-deep water, with stepping stones standing out of
+  it — so a player following a road to the water can see where the army wades across. Deep
+  water is unchanged, and nothing about movement, pathing, or the minimap changes.
+- Every campaign road is laid on a curve. The Wallace chapters' roads — Lanark's two streets,
+  the Perth road to the Tay ford, the Tyne valley's bridge approaches and the Newcastle relief
+  road, the Falkirk approaches, the Forest roads to the Clyde — now wander to where they are
+  going instead of running in straight legs that meet at right angles. Bridges and causeways
+  keep their authored straight spans, roads still reach every place they reached before, and
+  no tile's passability changes.
+- The historical battlefield map (every generated legendary chapter) has a road that curves
+  from the camp to the ford and on to the objective, instead of straight runs meeting at right
+  angles — and it no longer runs down the middle of the river. The route through the channel is
+  water the whole way, and the road stops at one bank and resumes on the other. Every tile
+  carries exactly the same traffic as before.
 - Every chapter in every campaign now carries story while it is being played, not only an opening
   and a closing line. The twelve William Wallace chapters gained 57 new spoken beats; the six
   legendary campaigns gained 72, and their missions are no longer narrated end to end by a single

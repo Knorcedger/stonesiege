@@ -17,6 +17,7 @@
 // canonical in @bf/data — load with campaignGameData from ../heroes.
 
 import type { ScenarioDef } from '../schema';
+import { layRoadCurves } from './authoring';
 
 const legend: ScenarioDef['map']['legend'] = {
   '.': { terrain: 'grass' },
@@ -31,6 +32,17 @@ const legend: ScenarioDef['map']['legend'] = {
   D: { terrain: 'grass', object: 'deer' },
   H: { terrain: 'grass', object: 'sheep' },
 };
+
+/**
+ * The Perth road, re-laid as a curve: down from Scone to the Tay ford on the north
+ * bank, and from the ford south-west to the player's meadow camp. The straight
+ * legs meeting at right angles this replaces were the one thing on the map that
+ * looked surveyed rather than worn.
+ */
+const ROAD_PATHS: Array<Array<[number, number]>> = [
+  [[75, 19], [68, 20], [62, 21], [58, 25], [57, 32]],
+  [[57, 43], [56, 47], [55, 50], [50, 51], [46, 52], [44, 56], [42, 60], [36, 61]],
+];
 
 export const wallace2: ScenarioDef = {
   id: 'wallace-2',
@@ -80,7 +92,7 @@ export const wallace2: ScenarioDef = {
     width: 112,
     height: 112,
     legend,
-    rows: [
+    rows: layRoadCurves([
       'TTTTTTTTT...............................wwwwwwwwwwwww...........................................................',
       'TTTTTTTTT...............................wwwwwwwwwwwww...........................................................',
       'TTTTTTTTT...............................wwwwwwwwwwwww...........................................................',
@@ -193,7 +205,7 @@ export const wallace2: ScenarioDef = {
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
-    ],
+    ], ROAD_PATHS, { over: '.d', width: 2 }),
   },
   entities: [
     // ---- Player 1: the camp on the Tay ----

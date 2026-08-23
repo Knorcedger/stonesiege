@@ -16,7 +16,7 @@
 // this is a battle, not an economy build.
 
 import type { ScenarioDef } from '../schema';
-import { unitGroup, wallRing } from './authoring';
+import { layRoadCurves, unitGroup, wallRing } from './authoring';
 
 const legend: ScenarioDef['map']['legend'] = {
   '.': { terrain: 'grass' },
@@ -27,6 +27,17 @@ const legend: ScenarioDef['map']['legend'] = {
   G: { terrain: 'dirt', object: 'gold' }, // inside the war-camp (dirt floor)
   S: { terrain: 'dirt', object: 'stone' },
 };
+
+/**
+ * The two approach roads onto the moss and the Linlithgow road running east along
+ * it, re-laid as curves. Dead-straight legs meeting at right angles read as
+ * surveyed, and nothing on a 1298 battlefield was surveyed.
+ */
+const ROAD_PATHS: Array<Array<[number, number]>> = [
+  [[52, 78], [54, 83], [51, 87], [53, 92]],
+  [[77, 78], [75, 83], [78, 88], [76, 92]],
+  [[52, 93], [62, 91], [74, 93], [86, 91], [96, 93], [107, 92]],
+];
 
 export const wallace5: ScenarioDef = {
   id: 'wallace-5',
@@ -78,7 +89,7 @@ export const wallace5: ScenarioDef = {
     width: 132,
     height: 132,
     legend,
-    rows: [
+    rows: layRoadCurves([
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
       'TTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTTT',
@@ -211,7 +222,7 @@ export const wallace5: ScenarioDef = {
       '....................................................................................................................................',
       '....................................................................................................................................',
       '....................................................................................................................................',
-    ],
+    ], ROAD_PATHS, { over: '.d', width: 2 }),
   },
   entities: [
     // ---- Player 1: the fortified war-camp ----
