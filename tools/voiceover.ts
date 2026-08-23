@@ -30,13 +30,20 @@ const OUT_DIR = join(ROOT, 'apps/web/public/assets/vo');
 const CACHE_DIR = join(ROOT, '.vo-cache');
 const MANIFEST = join(OUT_DIR, 'manifest.json');
 
-/** The voice every speaker is read by unless the cast says otherwise. */
-export const DEFAULT_VOICE = 'Martha';
+/**
+ * The voice every speaker is read by unless the cast says otherwise. This is
+ * the voice the committed recordings were rendered with, so a re-render
+ * without `--voice` reproduces them rather than silently revoicing the
+ * campaign. It is deliberately not the runtime fallback ranking in
+ * `packages/game/src/audio/narration.ts`, which still prefers Martha for
+ * devices that have to synthesise a line live.
+ */
+export const DEFAULT_VOICE = 'Daniel';
 
 /**
  * `say -r` counts words per minute where the browser counts multiples of the
- * voice's natural rate. Martha reads at roughly this pace at rate 1, so the
- * recordings land at the same speed the synthesised fallback would.
+ * voice's natural rate, so the two have to be reconciled by hand. Daniel's
+ * own rate-1 pace measures about 146 wpm, a little under this figure.
  */
 const BASE_WPM = 175;
 
@@ -189,7 +196,7 @@ export function runVoiceOverCli(argv: readonly string[]): number {
     opts = parseArgs(argv);
   } catch (error) {
     process.stderr.write(`${(error as Error).message}\n`);
-    process.stderr.write('Usage: npm run vo:render -- [--list] [--force] [--voice Martha] [--cast Wallace=Daniel]\n');
+    process.stderr.write('Usage: npm run vo:render -- [--list] [--force] [--voice Daniel] [--cast Wallace=Daniel]\n');
     return 2;
   }
 
