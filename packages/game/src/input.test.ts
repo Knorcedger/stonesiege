@@ -80,6 +80,7 @@ describe('InputController touch command dispatch', () => {
     picks: Entity[] = [],
   ) {
     const issued: Command[] = [];
+    const undoLabels: string[] = [];
     const selectionChanges: EntityId[][] = [];
     const toasts: string[] = [];
     let deselects = 0;
@@ -96,7 +97,10 @@ describe('InputController touch command dispatch', () => {
       setSelection: (ids: EntityId[]) => selectionChanges.push(ids),
       deselect: () => { deselects += 1; },
       issue: (cmd: Command) => issued.push(cmd),
-      issueWithUndo: (cmd: Command) => issued.push(cmd),
+      issueWithUndo: (cmd: Command, label: string) => {
+        issued.push(cmd);
+        undoLabels.push(label);
+      },
       isPlacing: () => false,
       getArmedVerb: () => armedVerb,
       clearArmedVerb: () => { armedVerb = null; },
@@ -111,6 +115,7 @@ describe('InputController touch command dispatch', () => {
     }).handleDesktopPrimaryTap(20, 20);
     return {
       issued,
+      undoLabels,
       tap,
       desktopTap,
       armedVerb: () => armedVerb,
@@ -119,6 +124,36 @@ describe('InputController touch command dispatch', () => {
       toasts,
     };
   }
+
+  it('names the building in the toast when villagers are sent to a foundation', () => {
+    const foundation = ent({
+      kind: 'building', defId: 'house', player: HUMAN,
+      tileX: 19, tileY: 19, x: 20 * 256, y: 20 * 256,
+      hp: 40, maxHp: 750, buildProgress: 200,
+    });
+    const villager = ent({ defId: 'villager', player: HUMAN });
+    const { issued, undoLabels, tap } = controllerHarness([villager], null, [foundation]);
+
+    tap();
+
+    expect(issued).toHaveLength(1);
+    expect(issued[0]).toMatchObject({ kind: 'repair', targetId: foundation.id });
+    expect(undoLabels).toEqual(['Building House']);
+  });
+
+  it('names the building when villagers are sent to repair a damaged one', () => {
+    const barracks = ent({
+      kind: 'building', defId: 'barracks', player: HUMAN,
+      tileX: 19, tileY: 19, x: 20 * 256, y: 20 * 256,
+      hp: 100, maxHp: 1200, buildProgress: 1000,
+    });
+    const villager = ent({ defId: 'villager', player: HUMAN });
+    const { undoLabels, tap } = controllerHarness([villager], null, [barracks]);
+
+    tap();
+
+    expect(undoLabels).toEqual(['Repairing Barracks']);
+  });
 
   it('consumes an armed Rally tap and sets the selected production building rally', () => {
     const barracks = ent({ kind: 'building', defId: 'barracks', player: HUMAN, x: 10, y: 10 });

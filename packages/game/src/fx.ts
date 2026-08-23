@@ -10,6 +10,9 @@
 //   ASSET_CONTRACT
 // - conversion beam + sparkles while a monk's activity is 'converting'
 // - a short descending ground arrow confirming move-order destinations
+// - a two-pulse outline on the target of an aimed order (build/repair, gather,
+//   attack, garrison, convert, heal), so an order lands visibly on the thing it
+//   was aimed at instead of only in the corner toast
 //
 // Three containers: `ground` sorts under the entity layer (corpses/rubble),
 // `air` above it (projectiles, flashes, beams), and `overlay` above fog for
@@ -27,7 +30,8 @@ import {
   ANIM_FPS, animFrameIndex, heroAccentFor, heroDrawScale, heroTintFor, unitRig,
 } from './frames';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
-import { tileToWorld } from './camera';
+import { HALF_H, HALF_W, tileToWorld } from './camera';
+import { tileVisibility } from './fog';
 import { projectileKindFor, type ProjectileKind } from './projectiles';
 
 interface Projectile {
@@ -52,6 +56,16 @@ interface MoveMarker {
   gfx: Graphics;
   startTick: number;
   baseY: number;
+}
+
+/** Order confirmation drawn on the commanded target itself. */
+interface TargetPing {
+  gfx: Graphics;
+  startTick: number;
+  targetId: EntityId;
+  /** Last known screen point — kept so a target that dies mid-ping stays put. */
+  wx: number;
+  wy: number;
 }
 
 interface Corpse {
@@ -86,6 +100,11 @@ const FADE_TICKS = 2 * TICKS_PER_SECOND;
 const RUBBLE_TICKS = 12 * TICKS_PER_SECOND;
 const ARROW_LINGER_TICKS = 30;
 const MOVE_MARKER_TICKS = 14;
+const TARGET_PING_TICKS = 24;
+const TARGET_PING_PULSES = 2;
+/** Amber for work orders, red for attack — the two answers a player needs at a glance. */
+const PING_WORK_COLOR = 0xe6c04a;
+const PING_ATTACK_COLOR = 0xd6503c;
 
 export class FxLayer {
   readonly ground = new Container();
@@ -95,11 +114,12 @@ export class FxLayer {
   private projectiles: Projectile[] = [];
   private flashes: Flash[] = [];
   private moveMarkers: MoveMarker[] = [];
+  private targetPings: TargetPing[] = [];
   private corpses: Corpse[] = [];
   private deferred = new Map<EntityId, DeferredDeath>();
   private beamGfx = new Graphics();
 
-  constructor(private assets: GameAssets) {
+  constructor(private assets: GameAssets, private humanPlayer: PlayerId) {
     this.ground.sortableChildren = true;
     this.air.addChild(this.beamGfx);
   }
@@ -161,12 +181,39 @@ export class FxLayer {
     this.moveMarkers.push({ gfx, startTick: tick, baseY: p.y });
   }
 
+  /**
+   * Confirm a target-aimed order by pulsing the target's own outline twice —
+   * the player is looking at the target, not at the corner toast. Lives in
+   * `overlay` beside the move markers so an order onto a fogged target still
+   * reads without revealing what is under the fog.
+   */
+  showTargetPing(target: Entity, tick: number, tone: 'work' | 'attack'): void {
+    const color = tone === 'attack' ? PING_ATTACK_COLOR : PING_WORK_COLOR;
+    const gfx = new Graphics();
+    if (target.kind === 'building') {
+      // Footprint diamond, matching the selection/worksite rings in the world layer.
+      const size = gameData.buildings[target.defId]?.size ?? 1;
+      const hw = size * HALF_W;
+      const hh = size * HALF_H;
+      gfx.moveTo(0, -hh).lineTo(hw, 0).lineTo(0, hh).lineTo(-hw, 0).closePath();
+    } else {
+      const rx = target.kind === 'resource' ? 16 : 12;
+      gfx.ellipse(0, 0, rx, rx / 2);
+    }
+    gfx.stroke({ width: 2, color, alpha: 0.95 });
+    const p = tileToWorld(target.x / FP, target.y / FP);
+    gfx.position.set(p.x, p.y);
+    this.overlay.addChild(gfx);
+    this.targetPings.push({ gfx, startTick: tick, targetId: target.id, wx: p.x, wy: p.y });
+  }
+
   /** Per-frame. tickFloat = state.tick + alpha. */
   update(state: GameState, tickFloat: number): void {
     this.flushDeferred(state, tickFloat);
     this.updateProjectiles(tickFloat);
     this.updateFlashes(tickFloat);
     this.updateMoveMarkers(tickFloat);
+    this.updateTargetPings(state, tickFloat);
     this.updateCorpses(tickFloat);
     this.drawConversionBeams(state, tickFloat);
   }
@@ -283,6 +330,42 @@ export class FxLayer {
       const pulse = 0.9 + Math.sin(t * Math.PI) * 0.18;
       marker.gfx.scale.set(pulse);
     }
+  }
+
+  private updateTargetPings(state: GameState, tickFloat: number): void {
+    const vis = state.players[this.humanPlayer]?.visibility ?? null;
+    for (let i = this.targetPings.length - 1; i >= 0; i--) {
+      const ping = this.targetPings[i];
+      const t = Math.max(0, (tickFloat - ping.startTick) / TARGET_PING_TICKS);
+      if (t >= 1) {
+        ping.gfx.destroy();
+        this.targetPings.splice(i, 1);
+        continue;
+      }
+      // Track a target that walks off (attack/convert/heal) only while the
+      // player can still see it. `overlay` draws above the fog, so a ping that
+      // followed a fleeing scout would trace its hidden path — and its death
+      // spot — in the clear. A target that dies or slips into fog keeps its
+      // last seen point, so the pulse finishes where the player aimed it.
+      const target = state.entities.get(ping.targetId);
+      if (target && this.targetVisible(state, vis, target)) {
+        const p = tileToWorld(target.x / FP, target.y / FP);
+        ping.wx = p.x;
+        ping.wy = p.y;
+      }
+      ping.gfx.position.set(ping.wx, ping.wy);
+      // Each pulse expands out of the outline and fades; the second is dimmer
+      // so the effect reads as a confirmation, not as a persistent state.
+      const pulse = (t * TARGET_PING_PULSES) % 1;
+      ping.gfx.alpha = (1 - pulse) * (1 - t * 0.4);
+      ping.gfx.scale.set(1 + pulse * 0.3);
+    }
+  }
+
+  /** Same rule the world layer uses to decide whether a sprite is drawn at all. */
+  private targetVisible(state: GameState, vis: Uint8Array | null, target: Entity): boolean {
+    if (target.player === this.humanPlayer || target.kind === 'resource') return true;
+    return tileVisibility(vis, state.map, target.tileX, target.tileY) === 2;
   }
 
   // ---------------------------------------------------------------- corpses

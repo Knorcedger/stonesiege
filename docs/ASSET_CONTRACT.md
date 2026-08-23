@@ -38,9 +38,25 @@ The asset generator (`tools/assetgen`) emits Pixi spritesheet atlases into
 
 ## Frame naming (renderer resolves names mechanically — follow exactly)
 - Terrain: `terr/<terrainId>/<variant>` (2–4 variants each, e.g. `terr/grass/0`)
-  - Baked edge transitions: `terr/<hi>_<lo>/<edge>`, `edge` ∈ {`nw`, `ne`, `sw`, `se`}
-    (higher-priority terrain's fringe composited over the lower neighbor; packed into
-    `terrain.png` — recipe in ART_BIBLE §3.2).
+  - Baked edge transitions: `terr/<hi>_<lo>/<edge>/<variant>`, `edge` ∈ {`nw`, `ne`, `sw`,
+    `se`} (higher-priority terrain's fringe composited over the lower neighbor; packed into
+    `terrain.png` — recipe in ART_BIBLE §3.2). The renderer picks the variant per tile
+    coordinate, so one wobbling boundary is never repeated down a whole shoreline; it falls
+    back to an unnumbered `terr/<hi>_<lo>/<edge>` when an atlas ships without variants.
+  - Presentation-only families (no sim `TerrainId`), all resolved from the map by the
+    renderer — ART_BIBLE §3.3:
+    - `terr/ford/<variant>`, drawn in place of a `shallows` tile that resolves as a river
+      crossing;
+    - road ribbons, drawn OVER the ground the renderer paints under them (their frames are
+      transparent past the track's edge): `terr/road-<axis>/<entry><exit>/<variant>` for a
+      run along one map axis (`axis` ∈ {`x`, `y`}, `entry`/`exit` ∈ {0, 1, 2} — where the
+      track crosses each tile edge, one tile's exit being its neighbour's entry),
+      `terr/road-bend/<corner>/<arms>/<variant>` for a turn (`corner` ∈ {`nwne`, `nwsw`,
+      `sene`, `sesw`}, `arms` ∈ {`ss`, `sb`, `bs`, `bb`}), `terr/road-fill/<edge>/<variant>`
+      for the half-tile that merges the lanes of a road wider than one tile, and
+      `terr/road/<variant>` for a crossroads or a lone tile.
+    - No `terr/road_*` or `terr/*_road` transition frames exist: a road blends with its
+      neighbours as the ground it lies on.
 - Units: `unit/<defId>/<anim>/<dir>/<frame>`
   - anims: `idle`, `walk`, `attack`, `gather` (villager), `carry` (villager), `die`, `decay`
   - dir: 0..7, **0 = facing south (toward camera), clockwise** (1 = SW, 2 = W, 3 = NW, 4 = N…).

@@ -72,7 +72,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_dirt/ne": {
+  "terr/cliff_dirt/ne/0": {
    "frame": {
     "x": 196,
     "y": 1,
@@ -96,7 +96,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_dirt/nw": {
+  "terr/cliff_dirt/ne/1": {
    "frame": {
     "x": 261,
     "y": 1,
@@ -120,7 +120,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_dirt/se": {
+  "terr/cliff_dirt/nw/0": {
    "frame": {
     "x": 326,
     "y": 1,
@@ -144,7 +144,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_dirt/sw": {
+  "terr/cliff_dirt/nw/1": {
    "frame": {
     "x": 391,
     "y": 1,
@@ -168,7 +168,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_farmland/ne": {
+  "terr/cliff_dirt/se/0": {
    "frame": {
     "x": 456,
     "y": 1,
@@ -192,7 +192,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_farmland/nw": {
+  "terr/cliff_dirt/se/1": {
    "frame": {
     "x": 521,
     "y": 1,
@@ -216,7 +216,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_farmland/se": {
+  "terr/cliff_dirt/sw/0": {
    "frame": {
     "x": 586,
     "y": 1,
@@ -240,7 +240,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_farmland/sw": {
+  "terr/cliff_dirt/sw/1": {
    "frame": {
     "x": 651,
     "y": 1,
@@ -264,7 +264,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_grass/ne": {
+  "terr/cliff_farmland/ne/0": {
    "frame": {
     "x": 716,
     "y": 1,
@@ -288,7 +288,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_grass/nw": {
+  "terr/cliff_farmland/ne/1": {
    "frame": {
     "x": 781,
     "y": 1,
@@ -312,7 +312,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_grass/se": {
+  "terr/cliff_farmland/nw/0": {
    "frame": {
     "x": 846,
     "y": 1,
@@ -336,7 +336,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_grass/sw": {
+  "terr/cliff_farmland/nw/1": {
    "frame": {
     "x": 911,
     "y": 1,
@@ -360,7 +360,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_road/ne": {
+  "terr/cliff_farmland/se/0": {
    "frame": {
     "x": 1,
     "y": 34,
@@ -384,7 +384,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_road/nw": {
+  "terr/cliff_farmland/se/1": {
    "frame": {
     "x": 66,
     "y": 34,
@@ -408,7 +408,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_road/se": {
+  "terr/cliff_farmland/sw/0": {
    "frame": {
     "x": 131,
     "y": 34,
@@ -432,7 +432,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_road/sw": {
+  "terr/cliff_farmland/sw/1": {
    "frame": {
     "x": 196,
     "y": 34,
@@ -456,7 +456,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_sand/ne": {
+  "terr/cliff_grass/ne/0": {
    "frame": {
     "x": 261,
     "y": 34,
@@ -480,7 +480,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_sand/nw": {
+  "terr/cliff_grass/ne/1": {
    "frame": {
     "x": 326,
     "y": 34,
@@ -504,7 +504,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_sand/se": {
+  "terr/cliff_grass/nw/0": {
    "frame": {
     "x": 391,
     "y": 34,
@@ -528,7 +528,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_sand/sw": {
+  "terr/cliff_grass/nw/1": {
    "frame": {
     "x": 456,
     "y": 34,
@@ -552,7 +552,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_shallows/ne": {
+  "terr/cliff_grass/se/0": {
    "frame": {
     "x": 521,
     "y": 34,
@@ -576,7 +576,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_shallows/nw": {
+  "terr/cliff_grass/se/1": {
    "frame": {
     "x": 586,
     "y": 34,
@@ -600,7 +600,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_shallows/se": {
+  "terr/cliff_grass/sw/0": {
    "frame": {
     "x": 651,
     "y": 34,
@@ -624,7 +624,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_shallows/sw": {
+  "terr/cliff_grass/sw/1": {
    "frame": {
     "x": 716,
     "y": 34,
@@ -648,7 +648,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_snow/ne": {
+  "terr/cliff_sand/ne/0": {
    "frame": {
     "x": 781,
     "y": 34,
@@ -672,7 +672,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_snow/nw": {
+  "terr/cliff_sand/ne/1": {
    "frame": {
     "x": 846,
     "y": 34,
@@ -696,7 +696,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_snow/se": {
+  "terr/cliff_sand/nw/0": {
    "frame": {
     "x": 911,
     "y": 34,
@@ -720,7 +720,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_snow/sw": {
+  "terr/cliff_sand/nw/1": {
    "frame": {
     "x": 1,
     "y": 67,
@@ -744,7 +744,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_water/ne": {
+  "terr/cliff_sand/se/0": {
    "frame": {
     "x": 66,
     "y": 67,
@@ -768,7 +768,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_water/nw": {
+  "terr/cliff_sand/se/1": {
    "frame": {
     "x": 131,
     "y": 67,
@@ -792,7 +792,7 @@
     "y": 0.5
    }
   },
-  "terr/cliff_water/se": {
+  "terr/cliff_sand/sw/0": {
    "frame": {
     "x": 196,
     "y": 67,
@@ -816,10 +816,586 @@
     "y": 0.5
    }
   },
-  "terr/cliff_water/sw": {
+  "terr/cliff_sand/sw/1": {
    "frame": {
     "x": 261,
     "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/ne/0": {
+   "frame": {
+    "x": 326,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/ne/1": {
+   "frame": {
+    "x": 391,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/nw/0": {
+   "frame": {
+    "x": 456,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/nw/1": {
+   "frame": {
+    "x": 521,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/se/0": {
+   "frame": {
+    "x": 586,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/se/1": {
+   "frame": {
+    "x": 651,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/sw/0": {
+   "frame": {
+    "x": 716,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_shallows/sw/1": {
+   "frame": {
+    "x": 781,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/ne/0": {
+   "frame": {
+    "x": 846,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/ne/1": {
+   "frame": {
+    "x": 911,
+    "y": 67,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/nw/0": {
+   "frame": {
+    "x": 1,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/nw/1": {
+   "frame": {
+    "x": 66,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/se/0": {
+   "frame": {
+    "x": 131,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/se/1": {
+   "frame": {
+    "x": 196,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/sw/0": {
+   "frame": {
+    "x": 261,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_snow/sw/1": {
+   "frame": {
+    "x": 326,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/ne/0": {
+   "frame": {
+    "x": 391,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/ne/1": {
+   "frame": {
+    "x": 456,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/nw/0": {
+   "frame": {
+    "x": 521,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/nw/1": {
+   "frame": {
+    "x": 586,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/se/0": {
+   "frame": {
+    "x": 651,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/se/1": {
+   "frame": {
+    "x": 716,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/sw/0": {
+   "frame": {
+    "x": 781,
+    "y": 100,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/cliff_water/sw/1": {
+   "frame": {
+    "x": 846,
+    "y": 100,
     "w": 64,
     "h": 32
    },
@@ -842,8 +1418,8 @@
   },
   "terr/dirt/0": {
    "frame": {
-    "x": 326,
-    "y": 67,
+    "x": 911,
+    "y": 100,
     "w": 64,
     "h": 32
    },
@@ -866,8 +1442,8 @@
   },
   "terr/dirt/1": {
    "frame": {
-    "x": 391,
-    "y": 67,
+    "x": 1,
+    "y": 133,
     "w": 64,
     "h": 32
    },
@@ -890,224 +1466,8 @@
   },
   "terr/dirt/2": {
    "frame": {
-    "x": 456,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_sand/ne": {
-   "frame": {
-    "x": 521,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_sand/nw": {
-   "frame": {
-    "x": 586,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_sand/se": {
-   "frame": {
-    "x": 651,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_sand/sw": {
-   "frame": {
-    "x": 716,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_shallows/ne": {
-   "frame": {
-    "x": 781,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_shallows/nw": {
-   "frame": {
-    "x": 846,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_shallows/se": {
-   "frame": {
-    "x": 911,
-    "y": 67,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_shallows/sw": {
-   "frame": {
-    "x": 1,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/dirt_water/ne": {
-   "frame": {
     "x": 66,
-    "y": 100,
+    "y": 133,
     "w": 64,
     "h": 32
    },
@@ -1128,10 +1488,10 @@
     "y": 0.5
    }
   },
-  "terr/dirt_water/nw": {
+  "terr/dirt_sand/ne/0": {
    "frame": {
     "x": 131,
-    "y": 100,
+    "y": 133,
     "w": 64,
     "h": 32
    },
@@ -1152,10 +1512,10 @@
     "y": 0.5
    }
   },
-  "terr/dirt_water/se": {
+  "terr/dirt_sand/ne/1": {
    "frame": {
     "x": 196,
-    "y": 100,
+    "y": 133,
     "w": 64,
     "h": 32
    },
@@ -1176,10 +1536,514 @@
     "y": 0.5
    }
   },
-  "terr/dirt_water/sw": {
+  "terr/dirt_sand/nw/0": {
    "frame": {
     "x": 261,
-    "y": 100,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_sand/nw/1": {
+   "frame": {
+    "x": 326,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_sand/se/0": {
+   "frame": {
+    "x": 391,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_sand/se/1": {
+   "frame": {
+    "x": 456,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_sand/sw/0": {
+   "frame": {
+    "x": 521,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_sand/sw/1": {
+   "frame": {
+    "x": 586,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/ne/0": {
+   "frame": {
+    "x": 651,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/ne/1": {
+   "frame": {
+    "x": 716,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/nw/0": {
+   "frame": {
+    "x": 781,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/nw/1": {
+   "frame": {
+    "x": 846,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/se/0": {
+   "frame": {
+    "x": 911,
+    "y": 133,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/se/1": {
+   "frame": {
+    "x": 1,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/sw/0": {
+   "frame": {
+    "x": 66,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_shallows/sw/1": {
+   "frame": {
+    "x": 131,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/ne/0": {
+   "frame": {
+    "x": 196,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/ne/1": {
+   "frame": {
+    "x": 261,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/nw/0": {
+   "frame": {
+    "x": 326,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/nw/1": {
+   "frame": {
+    "x": 391,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/se/0": {
+   "frame": {
+    "x": 456,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/se/1": {
+   "frame": {
+    "x": 521,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/sw/0": {
+   "frame": {
+    "x": 586,
+    "y": 166,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/dirt_water/sw/1": {
+   "frame": {
+    "x": 651,
+    "y": 166,
     "w": 64,
     "h": 32
    },
@@ -1202,8 +2066,8 @@
   },
   "terr/farmland/0": {
    "frame": {
-    "x": 326,
-    "y": 100,
+    "x": 716,
+    "y": 166,
     "w": 64,
     "h": 32
    },
@@ -1226,152 +2090,8 @@
   },
   "terr/farmland/1": {
    "frame": {
-    "x": 391,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/farmland_dirt/ne": {
-   "frame": {
-    "x": 456,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/farmland_dirt/nw": {
-   "frame": {
-    "x": 521,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/farmland_dirt/se": {
-   "frame": {
-    "x": 586,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/farmland_dirt/sw": {
-   "frame": {
-    "x": 651,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/farmland_grass/ne": {
-   "frame": {
-    "x": 716,
-    "y": 100,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/farmland_grass/nw": {
-   "frame": {
     "x": 781,
-    "y": 100,
+    "y": 166,
     "w": 64,
     "h": 32
    },
@@ -1392,10 +2112,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_grass/se": {
+  "terr/farmland_dirt/ne/0": {
    "frame": {
     "x": 846,
-    "y": 100,
+    "y": 166,
     "w": 64,
     "h": 32
    },
@@ -1416,10 +2136,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_grass/sw": {
+  "terr/farmland_dirt/ne/1": {
    "frame": {
     "x": 911,
-    "y": 100,
+    "y": 166,
     "w": 64,
     "h": 32
    },
@@ -1440,10 +2160,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_sand/ne": {
+  "terr/farmland_dirt/nw/0": {
    "frame": {
     "x": 1,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1464,10 +2184,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_sand/nw": {
+  "terr/farmland_dirt/nw/1": {
    "frame": {
     "x": 66,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1488,10 +2208,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_sand/se": {
+  "terr/farmland_dirt/se/0": {
    "frame": {
     "x": 131,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1512,10 +2232,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_sand/sw": {
+  "terr/farmland_dirt/se/1": {
    "frame": {
     "x": 196,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1536,10 +2256,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_shallows/ne": {
+  "terr/farmland_dirt/sw/0": {
    "frame": {
     "x": 261,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1560,10 +2280,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_shallows/nw": {
+  "terr/farmland_dirt/sw/1": {
    "frame": {
     "x": 326,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1584,10 +2304,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_shallows/se": {
+  "terr/farmland_grass/ne/0": {
    "frame": {
     "x": 391,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1608,10 +2328,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_shallows/sw": {
+  "terr/farmland_grass/ne/1": {
    "frame": {
     "x": 456,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1632,10 +2352,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_snow/ne": {
+  "terr/farmland_grass/nw/0": {
    "frame": {
     "x": 521,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1656,10 +2376,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_snow/nw": {
+  "terr/farmland_grass/nw/1": {
    "frame": {
     "x": 586,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1680,10 +2400,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_snow/se": {
+  "terr/farmland_grass/se/0": {
    "frame": {
     "x": 651,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1704,10 +2424,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_snow/sw": {
+  "terr/farmland_grass/se/1": {
    "frame": {
     "x": 716,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1728,10 +2448,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_water/ne": {
+  "terr/farmland_grass/sw/0": {
    "frame": {
     "x": 781,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1752,10 +2472,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_water/nw": {
+  "terr/farmland_grass/sw/1": {
    "frame": {
     "x": 846,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1776,10 +2496,10 @@
     "y": 0.5
    }
   },
-  "terr/farmland_water/se": {
+  "terr/farmland_sand/ne/0": {
    "frame": {
     "x": 911,
-    "y": 133,
+    "y": 199,
     "w": 64,
     "h": 32
    },
@@ -1800,10 +2520,826 @@
     "y": 0.5
    }
   },
-  "terr/farmland_water/sw": {
+  "terr/farmland_sand/ne/1": {
    "frame": {
     "x": 1,
-    "y": 166,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_sand/nw/0": {
+   "frame": {
+    "x": 66,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_sand/nw/1": {
+   "frame": {
+    "x": 131,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_sand/se/0": {
+   "frame": {
+    "x": 196,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_sand/se/1": {
+   "frame": {
+    "x": 261,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_sand/sw/0": {
+   "frame": {
+    "x": 326,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_sand/sw/1": {
+   "frame": {
+    "x": 391,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/ne/0": {
+   "frame": {
+    "x": 456,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/ne/1": {
+   "frame": {
+    "x": 521,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/nw/0": {
+   "frame": {
+    "x": 586,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/nw/1": {
+   "frame": {
+    "x": 651,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/se/0": {
+   "frame": {
+    "x": 716,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/se/1": {
+   "frame": {
+    "x": 781,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/sw/0": {
+   "frame": {
+    "x": 846,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_shallows/sw/1": {
+   "frame": {
+    "x": 911,
+    "y": 232,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/ne/0": {
+   "frame": {
+    "x": 1,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/ne/1": {
+   "frame": {
+    "x": 66,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/nw/0": {
+   "frame": {
+    "x": 131,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/nw/1": {
+   "frame": {
+    "x": 196,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/se/0": {
+   "frame": {
+    "x": 261,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/se/1": {
+   "frame": {
+    "x": 326,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/sw/0": {
+   "frame": {
+    "x": 391,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_snow/sw/1": {
+   "frame": {
+    "x": 456,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/ne/0": {
+   "frame": {
+    "x": 521,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/ne/1": {
+   "frame": {
+    "x": 586,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/nw/0": {
+   "frame": {
+    "x": 651,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/nw/1": {
+   "frame": {
+    "x": 716,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/se/0": {
+   "frame": {
+    "x": 781,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/se/1": {
+   "frame": {
+    "x": 846,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/sw/0": {
+   "frame": {
+    "x": 911,
+    "y": 265,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/farmland_water/sw/1": {
+   "frame": {
+    "x": 1,
+    "y": 298,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/ford/0": {
+   "frame": {
+    "x": 66,
+    "y": 298,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/ford/1": {
+   "frame": {
+    "x": 131,
+    "y": 298,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/ford/2": {
+   "frame": {
+    "x": 196,
+    "y": 298,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/ford/3": {
+   "frame": {
+    "x": 261,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -1826,8 +3362,8 @@
   },
   "terr/grass/0": {
    "frame": {
-    "x": 66,
-    "y": 166,
+    "x": 326,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -1850,8 +3386,8 @@
   },
   "terr/grass/1": {
    "frame": {
-    "x": 131,
-    "y": 166,
+    "x": 391,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -1874,8 +3410,8 @@
   },
   "terr/grass/2": {
    "frame": {
-    "x": 196,
-    "y": 166,
+    "x": 456,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -1898,104 +3434,8 @@
   },
   "terr/grass/3": {
    "frame": {
-    "x": 261,
-    "y": 166,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/grass_dirt/ne": {
-   "frame": {
-    "x": 326,
-    "y": 166,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/grass_dirt/nw": {
-   "frame": {
-    "x": 391,
-    "y": 166,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/grass_dirt/se": {
-   "frame": {
-    "x": 456,
-    "y": 166,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/grass_dirt/sw": {
-   "frame": {
     "x": 521,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2016,10 +3456,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_sand/ne": {
+  "terr/grass_dirt/ne/0": {
    "frame": {
     "x": 586,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2040,10 +3480,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_sand/nw": {
+  "terr/grass_dirt/ne/1": {
    "frame": {
     "x": 651,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2064,10 +3504,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_sand/se": {
+  "terr/grass_dirt/nw/0": {
    "frame": {
     "x": 716,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2088,10 +3528,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_sand/sw": {
+  "terr/grass_dirt/nw/1": {
    "frame": {
     "x": 781,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2112,10 +3552,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_shallows/ne": {
+  "terr/grass_dirt/se/0": {
    "frame": {
     "x": 846,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2136,10 +3576,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_shallows/nw": {
+  "terr/grass_dirt/se/1": {
    "frame": {
     "x": 911,
-    "y": 166,
+    "y": 298,
     "w": 64,
     "h": 32
    },
@@ -2160,10 +3600,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_shallows/se": {
+  "terr/grass_dirt/sw/0": {
    "frame": {
     "x": 1,
-    "y": 199,
+    "y": 331,
     "w": 64,
     "h": 32
    },
@@ -2184,10 +3624,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_shallows/sw": {
+  "terr/grass_dirt/sw/1": {
    "frame": {
     "x": 66,
-    "y": 199,
+    "y": 331,
     "w": 64,
     "h": 32
    },
@@ -2208,10 +3648,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_water/ne": {
+  "terr/grass_sand/ne/0": {
    "frame": {
     "x": 131,
-    "y": 199,
+    "y": 331,
     "w": 64,
     "h": 32
    },
@@ -2232,10 +3672,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_water/nw": {
+  "terr/grass_sand/ne/1": {
    "frame": {
     "x": 196,
-    "y": 199,
+    "y": 331,
     "w": 64,
     "h": 32
    },
@@ -2256,10 +3696,10 @@
     "y": 0.5
    }
   },
-  "terr/grass_water/se": {
+  "terr/grass_sand/nw/0": {
    "frame": {
     "x": 261,
-    "y": 199,
+    "y": 331,
     "w": 64,
     "h": 32
    },
@@ -2280,10 +3720,2746 @@
     "y": 0.5
    }
   },
-  "terr/grass_water/sw": {
+  "terr/grass_sand/nw/1": {
    "frame": {
     "x": 326,
-    "y": 199,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_sand/se/0": {
+   "frame": {
+    "x": 391,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_sand/se/1": {
+   "frame": {
+    "x": 456,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_sand/sw/0": {
+   "frame": {
+    "x": 521,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_sand/sw/1": {
+   "frame": {
+    "x": 586,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/ne/0": {
+   "frame": {
+    "x": 651,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/ne/1": {
+   "frame": {
+    "x": 716,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/nw/0": {
+   "frame": {
+    "x": 781,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/nw/1": {
+   "frame": {
+    "x": 846,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/se/0": {
+   "frame": {
+    "x": 911,
+    "y": 331,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/se/1": {
+   "frame": {
+    "x": 1,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/sw/0": {
+   "frame": {
+    "x": 66,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_shallows/sw/1": {
+   "frame": {
+    "x": 131,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/ne/0": {
+   "frame": {
+    "x": 196,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/ne/1": {
+   "frame": {
+    "x": 261,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/nw/0": {
+   "frame": {
+    "x": 326,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/nw/1": {
+   "frame": {
+    "x": 391,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/se/0": {
+   "frame": {
+    "x": 456,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/se/1": {
+   "frame": {
+    "x": 521,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/sw/0": {
+   "frame": {
+    "x": 586,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/grass_water/sw/1": {
+   "frame": {
+    "x": 651,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/bb/0": {
+   "frame": {
+    "x": 716,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/bb/1": {
+   "frame": {
+    "x": 781,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/bs/0": {
+   "frame": {
+    "x": 846,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/bs/1": {
+   "frame": {
+    "x": 911,
+    "y": 364,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/sb/0": {
+   "frame": {
+    "x": 1,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/sb/1": {
+   "frame": {
+    "x": 66,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/ss/0": {
+   "frame": {
+    "x": 131,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwne/ss/1": {
+   "frame": {
+    "x": 196,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/bb/0": {
+   "frame": {
+    "x": 261,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/bb/1": {
+   "frame": {
+    "x": 326,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/bs/0": {
+   "frame": {
+    "x": 391,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/bs/1": {
+   "frame": {
+    "x": 456,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/sb/0": {
+   "frame": {
+    "x": 521,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/sb/1": {
+   "frame": {
+    "x": 586,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/ss/0": {
+   "frame": {
+    "x": 651,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/nwsw/ss/1": {
+   "frame": {
+    "x": 716,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/bb/0": {
+   "frame": {
+    "x": 781,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/bb/1": {
+   "frame": {
+    "x": 846,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/bs/0": {
+   "frame": {
+    "x": 911,
+    "y": 397,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/bs/1": {
+   "frame": {
+    "x": 1,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/sb/0": {
+   "frame": {
+    "x": 66,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/sb/1": {
+   "frame": {
+    "x": 131,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/ss/0": {
+   "frame": {
+    "x": 196,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sene/ss/1": {
+   "frame": {
+    "x": 261,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/bb/0": {
+   "frame": {
+    "x": 326,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/bb/1": {
+   "frame": {
+    "x": 391,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/bs/0": {
+   "frame": {
+    "x": 456,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/bs/1": {
+   "frame": {
+    "x": 521,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/sb/0": {
+   "frame": {
+    "x": 586,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/sb/1": {
+   "frame": {
+    "x": 651,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/ss/0": {
+   "frame": {
+    "x": 716,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-bend/sesw/ss/1": {
+   "frame": {
+    "x": 781,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/ne/0": {
+   "frame": {
+    "x": 846,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/ne/1": {
+   "frame": {
+    "x": 911,
+    "y": 430,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/nw/0": {
+   "frame": {
+    "x": 1,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/nw/1": {
+   "frame": {
+    "x": 66,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/se/0": {
+   "frame": {
+    "x": 131,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/se/1": {
+   "frame": {
+    "x": 196,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/sw/0": {
+   "frame": {
+    "x": 261,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-fill/sw/1": {
+   "frame": {
+    "x": 326,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/00/0": {
+   "frame": {
+    "x": 391,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/00/1": {
+   "frame": {
+    "x": 456,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/00/2": {
+   "frame": {
+    "x": 521,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/01/0": {
+   "frame": {
+    "x": 586,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/01/1": {
+   "frame": {
+    "x": 651,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/01/2": {
+   "frame": {
+    "x": 716,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/02/0": {
+   "frame": {
+    "x": 781,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/02/1": {
+   "frame": {
+    "x": 846,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/02/2": {
+   "frame": {
+    "x": 911,
+    "y": 463,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/10/0": {
+   "frame": {
+    "x": 1,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/10/1": {
+   "frame": {
+    "x": 66,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/10/2": {
+   "frame": {
+    "x": 131,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/11/0": {
+   "frame": {
+    "x": 196,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/11/1": {
+   "frame": {
+    "x": 261,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/11/2": {
+   "frame": {
+    "x": 326,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/12/0": {
+   "frame": {
+    "x": 391,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/12/1": {
+   "frame": {
+    "x": 456,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/12/2": {
+   "frame": {
+    "x": 521,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/20/0": {
+   "frame": {
+    "x": 586,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/20/1": {
+   "frame": {
+    "x": 651,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/20/2": {
+   "frame": {
+    "x": 716,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/21/0": {
+   "frame": {
+    "x": 781,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/21/1": {
+   "frame": {
+    "x": 846,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/21/2": {
+   "frame": {
+    "x": 911,
+    "y": 496,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/22/0": {
+   "frame": {
+    "x": 1,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/22/1": {
+   "frame": {
+    "x": 66,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-x/22/2": {
+   "frame": {
+    "x": 131,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/00/0": {
+   "frame": {
+    "x": 196,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/00/1": {
+   "frame": {
+    "x": 261,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/00/2": {
+   "frame": {
+    "x": 326,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/01/0": {
+   "frame": {
+    "x": 391,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/01/1": {
+   "frame": {
+    "x": 456,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/01/2": {
+   "frame": {
+    "x": 521,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/02/0": {
+   "frame": {
+    "x": 586,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/02/1": {
+   "frame": {
+    "x": 651,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/02/2": {
+   "frame": {
+    "x": 716,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/10/0": {
+   "frame": {
+    "x": 781,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/10/1": {
+   "frame": {
+    "x": 846,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/10/2": {
+   "frame": {
+    "x": 911,
+    "y": 529,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/11/0": {
+   "frame": {
+    "x": 1,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/11/1": {
+   "frame": {
+    "x": 66,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/11/2": {
+   "frame": {
+    "x": 131,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/12/0": {
+   "frame": {
+    "x": 196,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/12/1": {
+   "frame": {
+    "x": 261,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/12/2": {
+   "frame": {
+    "x": 326,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/20/0": {
+   "frame": {
+    "x": 391,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/20/1": {
+   "frame": {
+    "x": 456,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/20/2": {
+   "frame": {
+    "x": 521,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/21/0": {
+   "frame": {
+    "x": 586,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/21/1": {
+   "frame": {
+    "x": 651,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/21/2": {
+   "frame": {
+    "x": 716,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/22/0": {
+   "frame": {
+    "x": 781,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/22/1": {
+   "frame": {
+    "x": 846,
+    "y": 562,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/road-y/22/2": {
+   "frame": {
+    "x": 911,
+    "y": 562,
     "w": 64,
     "h": 32
    },
@@ -2306,8 +6482,8 @@
   },
   "terr/road/0": {
    "frame": {
-    "x": 391,
-    "y": 199,
+    "x": 1,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -2330,8 +6506,8 @@
   },
   "terr/road/1": {
    "frame": {
-    "x": 456,
-    "y": 199,
+    "x": 66,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -2354,224 +6530,8 @@
   },
   "terr/road/2": {
    "frame": {
-    "x": 521,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_dirt/ne": {
-   "frame": {
-    "x": 586,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_dirt/nw": {
-   "frame": {
-    "x": 651,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_dirt/se": {
-   "frame": {
-    "x": 716,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_dirt/sw": {
-   "frame": {
-    "x": 781,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_farmland/ne": {
-   "frame": {
-    "x": 846,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_farmland/nw": {
-   "frame": {
-    "x": 911,
-    "y": 199,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_farmland/se": {
-   "frame": {
-    "x": 1,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_farmland/sw": {
-   "frame": {
-    "x": 66,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_grass/ne": {
-   "frame": {
     "x": 131,
-    "y": 232,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -2592,442 +6552,10 @@
     "y": 0.5
    }
   },
-  "terr/road_grass/nw": {
+  "terr/road/3": {
    "frame": {
     "x": 196,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_grass/se": {
-   "frame": {
-    "x": 261,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_grass/sw": {
-   "frame": {
-    "x": 326,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_sand/ne": {
-   "frame": {
-    "x": 391,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_sand/nw": {
-   "frame": {
-    "x": 456,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_sand/se": {
-   "frame": {
-    "x": 521,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_sand/sw": {
-   "frame": {
-    "x": 586,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_shallows/ne": {
-   "frame": {
-    "x": 651,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_shallows/nw": {
-   "frame": {
-    "x": 716,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_shallows/se": {
-   "frame": {
-    "x": 781,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_shallows/sw": {
-   "frame": {
-    "x": 846,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_snow/ne": {
-   "frame": {
-    "x": 911,
-    "y": 232,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_snow/nw": {
-   "frame": {
-    "x": 1,
-    "y": 265,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_snow/se": {
-   "frame": {
-    "x": 66,
-    "y": 265,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_snow/sw": {
-   "frame": {
-    "x": 131,
-    "y": 265,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_water/ne": {
-   "frame": {
-    "x": 196,
-    "y": 265,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_water/nw": {
-   "frame": {
-    "x": 261,
-    "y": 265,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_water/se": {
-   "frame": {
-    "x": 326,
-    "y": 265,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/road_water/sw": {
-   "frame": {
-    "x": 391,
-    "y": 265,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3050,8 +6578,8 @@
   },
   "terr/sand/0": {
    "frame": {
-    "x": 456,
-    "y": 265,
+    "x": 261,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3074,8 +6602,8 @@
   },
   "terr/sand/1": {
    "frame": {
-    "x": 521,
-    "y": 265,
+    "x": 326,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3098,8 +6626,8 @@
   },
   "terr/sand/2": {
    "frame": {
-    "x": 586,
-    "y": 265,
+    "x": 391,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3120,10 +6648,82 @@
     "y": 0.5
    }
   },
-  "terr/sand_shallows/ne": {
+  "terr/sand_shallows/ne/0": {
+   "frame": {
+    "x": 456,
+    "y": 595,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_shallows/ne/1": {
+   "frame": {
+    "x": 521,
+    "y": 595,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_shallows/nw/0": {
+   "frame": {
+    "x": 586,
+    "y": 595,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_shallows/nw/1": {
    "frame": {
     "x": 651,
-    "y": 265,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3144,10 +6744,10 @@
     "y": 0.5
    }
   },
-  "terr/sand_shallows/nw": {
+  "terr/sand_shallows/se/0": {
    "frame": {
     "x": 716,
-    "y": 265,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3168,10 +6768,10 @@
     "y": 0.5
    }
   },
-  "terr/sand_shallows/se": {
+  "terr/sand_shallows/se/1": {
    "frame": {
     "x": 781,
-    "y": 265,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3192,10 +6792,10 @@
     "y": 0.5
    }
   },
-  "terr/sand_shallows/sw": {
+  "terr/sand_shallows/sw/0": {
    "frame": {
     "x": 846,
-    "y": 265,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3216,10 +6816,10 @@
     "y": 0.5
    }
   },
-  "terr/sand_water/ne": {
+  "terr/sand_shallows/sw/1": {
    "frame": {
     "x": 911,
-    "y": 265,
+    "y": 595,
     "w": 64,
     "h": 32
    },
@@ -3240,10 +6840,10 @@
     "y": 0.5
    }
   },
-  "terr/sand_water/nw": {
+  "terr/sand_water/ne/0": {
    "frame": {
     "x": 1,
-    "y": 298,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3264,10 +6864,10 @@
     "y": 0.5
    }
   },
-  "terr/sand_water/se": {
+  "terr/sand_water/ne/1": {
    "frame": {
     "x": 66,
-    "y": 298,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3288,10 +6888,130 @@
     "y": 0.5
    }
   },
-  "terr/sand_water/sw": {
+  "terr/sand_water/nw/0": {
    "frame": {
     "x": 131,
-    "y": 298,
+    "y": 628,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_water/nw/1": {
+   "frame": {
+    "x": 196,
+    "y": 628,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_water/se/0": {
+   "frame": {
+    "x": 261,
+    "y": 628,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_water/se/1": {
+   "frame": {
+    "x": 326,
+    "y": 628,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_water/sw/0": {
+   "frame": {
+    "x": 391,
+    "y": 628,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/sand_water/sw/1": {
+   "frame": {
+    "x": 456,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3314,8 +7034,8 @@
   },
   "terr/shallows/0": {
    "frame": {
-    "x": 196,
-    "y": 298,
+    "x": 521,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3338,8 +7058,8 @@
   },
   "terr/shallows/1": {
    "frame": {
-    "x": 261,
-    "y": 298,
+    "x": 586,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3362,8 +7082,8 @@
   },
   "terr/shallows/2": {
    "frame": {
-    "x": 326,
-    "y": 298,
+    "x": 651,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3384,10 +7104,10 @@
     "y": 0.5
    }
   },
-  "terr/shallows_water/ne": {
+  "terr/shallows_water/ne/0": {
    "frame": {
-    "x": 391,
-    "y": 298,
+    "x": 716,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3408,10 +7128,10 @@
     "y": 0.5
    }
   },
-  "terr/shallows_water/nw": {
+  "terr/shallows_water/ne/1": {
    "frame": {
-    "x": 456,
-    "y": 298,
+    "x": 781,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3432,10 +7152,10 @@
     "y": 0.5
    }
   },
-  "terr/shallows_water/se": {
+  "terr/shallows_water/nw/0": {
    "frame": {
-    "x": 521,
-    "y": 298,
+    "x": 846,
+    "y": 628,
     "w": 64,
     "h": 32
    },
@@ -3456,10 +7176,106 @@
     "y": 0.5
    }
   },
-  "terr/shallows_water/sw": {
+  "terr/shallows_water/nw/1": {
    "frame": {
-    "x": 586,
-    "y": 298,
+    "x": 911,
+    "y": 628,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/shallows_water/se/0": {
+   "frame": {
+    "x": 1,
+    "y": 661,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/shallows_water/se/1": {
+   "frame": {
+    "x": 66,
+    "y": 661,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/shallows_water/sw/0": {
+   "frame": {
+    "x": 131,
+    "y": 661,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/shallows_water/sw/1": {
+   "frame": {
+    "x": 196,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3482,8 +7298,8 @@
   },
   "terr/snow/0": {
    "frame": {
-    "x": 651,
-    "y": 298,
+    "x": 261,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3506,8 +7322,8 @@
   },
   "terr/snow/1": {
    "frame": {
-    "x": 716,
-    "y": 298,
+    "x": 326,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3530,224 +7346,8 @@
   },
   "terr/snow/2": {
    "frame": {
-    "x": 781,
-    "y": 298,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_dirt/ne": {
-   "frame": {
-    "x": 846,
-    "y": 298,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_dirt/nw": {
-   "frame": {
-    "x": 911,
-    "y": 298,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_dirt/se": {
-   "frame": {
-    "x": 1,
-    "y": 331,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_dirt/sw": {
-   "frame": {
-    "x": 66,
-    "y": 331,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_grass/ne": {
-   "frame": {
-    "x": 131,
-    "y": 331,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_grass/nw": {
-   "frame": {
-    "x": 196,
-    "y": 331,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_grass/se": {
-   "frame": {
-    "x": 261,
-    "y": 331,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_grass/sw": {
-   "frame": {
-    "x": 326,
-    "y": 331,
-    "w": 64,
-    "h": 32
-   },
-   "rotated": false,
-   "trimmed": false,
-   "spriteSourceSize": {
-    "x": 0,
-    "y": 0,
-    "w": 64,
-    "h": 32
-   },
-   "sourceSize": {
-    "w": 64,
-    "h": 32
-   },
-   "anchor": {
-    "x": 0.5,
-    "y": 0.5
-   }
-  },
-  "terr/snow_sand/ne": {
-   "frame": {
     "x": 391,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3768,10 +7368,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_sand/nw": {
+  "terr/snow_dirt/ne/0": {
    "frame": {
     "x": 456,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3792,10 +7392,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_sand/se": {
+  "terr/snow_dirt/ne/1": {
    "frame": {
     "x": 521,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3816,10 +7416,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_sand/sw": {
+  "terr/snow_dirt/nw/0": {
    "frame": {
     "x": 586,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3840,10 +7440,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_shallows/ne": {
+  "terr/snow_dirt/nw/1": {
    "frame": {
     "x": 651,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3864,10 +7464,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_shallows/nw": {
+  "terr/snow_dirt/se/0": {
    "frame": {
     "x": 716,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3888,10 +7488,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_shallows/se": {
+  "terr/snow_dirt/se/1": {
    "frame": {
     "x": 781,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3912,10 +7512,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_shallows/sw": {
+  "terr/snow_dirt/sw/0": {
    "frame": {
     "x": 846,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3936,10 +7536,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_water/ne": {
+  "terr/snow_dirt/sw/1": {
    "frame": {
     "x": 911,
-    "y": 331,
+    "y": 661,
     "w": 64,
     "h": 32
    },
@@ -3960,10 +7560,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_water/nw": {
+  "terr/snow_grass/ne/0": {
    "frame": {
     "x": 1,
-    "y": 364,
+    "y": 694,
     "w": 64,
     "h": 32
    },
@@ -3984,10 +7584,10 @@
     "y": 0.5
    }
   },
-  "terr/snow_water/se": {
+  "terr/snow_grass/ne/1": {
    "frame": {
     "x": 66,
-    "y": 364,
+    "y": 694,
     "w": 64,
     "h": 32
    },
@@ -4008,10 +7608,706 @@
     "y": 0.5
    }
   },
-  "terr/snow_water/sw": {
+  "terr/snow_grass/nw/0": {
    "frame": {
     "x": 131,
-    "y": 364,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_grass/nw/1": {
+   "frame": {
+    "x": 196,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_grass/se/0": {
+   "frame": {
+    "x": 261,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_grass/se/1": {
+   "frame": {
+    "x": 326,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_grass/sw/0": {
+   "frame": {
+    "x": 391,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_grass/sw/1": {
+   "frame": {
+    "x": 456,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/ne/0": {
+   "frame": {
+    "x": 521,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/ne/1": {
+   "frame": {
+    "x": 586,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/nw/0": {
+   "frame": {
+    "x": 651,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/nw/1": {
+   "frame": {
+    "x": 716,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/se/0": {
+   "frame": {
+    "x": 781,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/se/1": {
+   "frame": {
+    "x": 846,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/sw/0": {
+   "frame": {
+    "x": 911,
+    "y": 694,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_sand/sw/1": {
+   "frame": {
+    "x": 1,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/ne/0": {
+   "frame": {
+    "x": 66,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/ne/1": {
+   "frame": {
+    "x": 131,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/nw/0": {
+   "frame": {
+    "x": 196,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/nw/1": {
+   "frame": {
+    "x": 261,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/se/0": {
+   "frame": {
+    "x": 326,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/se/1": {
+   "frame": {
+    "x": 391,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/sw/0": {
+   "frame": {
+    "x": 456,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_shallows/sw/1": {
+   "frame": {
+    "x": 521,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/ne/0": {
+   "frame": {
+    "x": 586,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/ne/1": {
+   "frame": {
+    "x": 651,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/nw/0": {
+   "frame": {
+    "x": 716,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/nw/1": {
+   "frame": {
+    "x": 781,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/se/0": {
+   "frame": {
+    "x": 846,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/se/1": {
+   "frame": {
+    "x": 911,
+    "y": 727,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/sw/0": {
+   "frame": {
+    "x": 1,
+    "y": 760,
+    "w": 64,
+    "h": 32
+   },
+   "rotated": false,
+   "trimmed": false,
+   "spriteSourceSize": {
+    "x": 0,
+    "y": 0,
+    "w": 64,
+    "h": 32
+   },
+   "sourceSize": {
+    "w": 64,
+    "h": 32
+   },
+   "anchor": {
+    "x": 0.5,
+    "y": 0.5
+   }
+  },
+  "terr/snow_water/sw/1": {
+   "frame": {
+    "x": 66,
+    "y": 760,
     "w": 64,
     "h": 32
    },
@@ -4034,8 +8330,8 @@
   },
   "terr/water/0": {
    "frame": {
-    "x": 196,
-    "y": 364,
+    "x": 131,
+    "y": 760,
     "w": 64,
     "h": 32
    },
@@ -4058,8 +8354,8 @@
   },
   "terr/water/1": {
    "frame": {
-    "x": 261,
-    "y": 364,
+    "x": 196,
+    "y": 760,
     "w": 64,
     "h": 32
    },
@@ -4082,8 +8378,8 @@
   },
   "terr/water/2": {
    "frame": {
-    "x": 326,
-    "y": 364,
+    "x": 261,
+    "y": 760,
     "w": 64,
     "h": 32
    },
@@ -4106,8 +8402,8 @@
   },
   "terr/water/3": {
    "frame": {
-    "x": 391,
-    "y": 364,
+    "x": 326,
+    "y": 760,
     "w": 64,
     "h": 32
    },
@@ -4136,7 +8432,7 @@
   "format": "RGBA8888",
   "size": {
    "w": 1024,
-   "h": 397
+   "h": 793
   },
   "scale": 1,
   "bannerfall": {

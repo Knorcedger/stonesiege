@@ -3,7 +3,7 @@
 // (screens/nav.ts hints steer the next boot back to the right menu screen).
 
 import { showMenu, type GameRequest } from './screens/menu';
-import { flowAtScenarioList, type FlowState } from './screens/flow';
+import { flowAtEpilogue, flowAtScenarioList, type FlowState } from './screens/flow';
 import { takeNavHint } from './screens/nav';
 import { flowFromHash, hashFor, matchPath, type MatchRoute } from './screens/route';
 import { NATIVE_BACK_EVENT } from './nativeEvents';
@@ -81,7 +81,9 @@ export async function startApp(root: HTMLElement, options: StartAppOptions = {})
   } else {
     const flow: FlowState | null = hint?.kind === 'scenarioList'
       ? flowAtScenarioList(hint.campaignId)
-      : flowFromHash(window.location.hash);
+      : hint?.kind === 'campaignEpilogue'
+        ? flowAtEpilogue(hint.campaignId)
+        : flowFromHash(window.location.hash);
     request = await showMenu(root, { analytics, ...(flow ? { flow } : {}) });
   }
   enterMatchRoute(request);

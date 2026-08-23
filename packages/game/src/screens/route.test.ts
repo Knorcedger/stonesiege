@@ -12,6 +12,8 @@ const SCREENS: MenuScreen[] = [
   { id: 'practiceSetup' },
   { id: 'campaigns' },
   { id: 'scenarioList', campaignId: 'wallace' },
+  { id: 'prologue', campaignId: 'wallace' },
+  { id: 'epilogue', campaignId: 'wallace' },
   { id: 'briefing', campaignId: 'joan', scenarioId: 'joan-02-orleans' },
   { id: 'settings' },
 ];
@@ -21,7 +23,8 @@ describe('screen addresses', () => {
     const paths = SCREENS.map(screenPath);
     expect(paths).toEqual([
       '/', '/play', '/practice', '/campaigns',
-      '/campaigns/wallace', '/campaigns/joan/joan-02-orleans', '/settings',
+      '/campaigns/wallace', '/campaigns/wallace/prologue', '/campaigns/wallace/epilogue',
+      '/campaigns/joan/joan-02-orleans', '/settings',
     ]);
     expect(new Set(paths).size).toBe(paths.length);
   });

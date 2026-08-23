@@ -1,0 +1,2190 @@
+{
+  "version": 1,
+  "voices": {
+    "Wallace": "Daniel",
+    "A tenant of Elderslie": "Daniel",
+    "Narrator": "Daniel",
+    "A kinsman": "Daniel",
+    "Douglas": "Daniel",
+    "Moray": "Daniel",
+    "Cressingham": "Daniel",
+    "Warenne": "Daniel",
+    "Graham": "Daniel",
+    "A raider": "Daniel",
+    "Fraser": "Daniel"
+  },
+  "lines": {
+    "19116996": {
+      "file": "wallace-19116996.m4a",
+      "ms": 1340,
+      "text": "I want eyes on the ford.",
+      "speaker": "Wallace"
+    },
+    "19885822": {
+      "file": "graham-19885822.m4a",
+      "ms": 1059,
+      "text": "look at the field.",
+      "speaker": "Graham"
+    },
+    "34043998": {
+      "file": "wallace-34043998.m4a",
+      "ms": 479,
+      "text": "John!",
+      "speaker": "Wallace"
+    },
+    "37237966": {
+      "file": "narrator-37237966.m4a",
+      "ms": 2022,
+      "text": "A grievance becomes a rebellion.",
+      "speaker": "Narrator"
+    },
+    "53319595": {
+      "file": "wallace-53319595.m4a",
+      "ms": 1719,
+      "text": "kin are coming in from the hills.",
+      "speaker": "Wallace"
+    },
+    "67680367": {
+      "file": "moray-67680367.m4a",
+      "ms": 2430,
+      "text": "A blade in the water drowns same as a coward.",
+      "speaker": "Moray"
+    },
+    "77449753": {
+      "file": "douglas-77449753.m4a",
+      "ms": 2859,
+      "text": "before the justiciar finds a faster horse.",
+      "speaker": "Douglas"
+    },
+    "78717792": {
+      "file": "narrator-78717792.m4a",
+      "ms": 4402,
+      "text": "After Earnside, the military record of William Wallace falls silent.",
+      "speaker": "Narrator"
+    },
+    "84885228": {
+      "file": "wallace-84885228.m4a",
+      "ms": 2496,
+      "text": "Then tomorrow the sheriff answers his own ledger.",
+      "speaker": "Wallace"
+    },
+    "96505958": {
+      "file": "wallace-96505958.m4a",
+      "ms": 1025,
+      "text": "It nearly worked.",
+      "speaker": "Wallace"
+    },
+    "00670982": {
+      "file": "graham-00670982.m4a",
+      "ms": 697,
+      "text": "SCHILTRON!",
+      "speaker": "Graham"
+    },
+    "01de7ad1": {
+      "file": "fraser-01de7ad1.m4a",
+      "ms": 3347,
+      "text": "and the terms are on the table for every man here except you.",
+      "speaker": "Fraser"
+    },
+    "0340b209": {
+      "file": "moray-0340b209.m4a",
+      "ms": 2116,
+      "text": "not one of them recrosses that bridge!",
+      "speaker": "Moray"
+    },
+    "03f66c4f": {
+      "file": "douglas-03f66c4f.m4a",
+      "ms": 2722,
+      "text": "Half of Scotland wants this over before harvest.",
+      "speaker": "Douglas"
+    },
+    "058ecd41": {
+      "file": "narrator-058ecd41.m4a",
+      "ms": 2776,
+      "text": "But Andrew Moray took his wounds on the causeway.",
+      "speaker": "Narrator"
+    },
+    "0680e14a": {
+      "file": "moray-0680e14a.m4a",
+      "ms": 711,
+      "text": "not yet.",
+      "speaker": "Moray"
+    },
+    "07a3e2b9": {
+      "file": "narrator-07a3e2b9.m4a",
+      "ms": 1488,
+      "text": "Ormesby flees south.",
+      "speaker": "Narrator"
+    },
+    "0858c14a": {
+      "file": "narrator-0858c14a.m4a",
+      "ms": 2629,
+      "text": "Keep them behind the line, never in it.",
+      "speaker": "Narrator"
+    },
+    "085a9021": {
+      "file": "douglas-085a9021.m4a",
+      "ms": 1756,
+      "text": "Ormesby is packing his silver.",
+      "speaker": "Douglas"
+    },
+    "086eedaf": {
+      "file": "narrator-086eedaf.m4a",
+      "ms": 1251,
+      "text": "Heselrig is dead.",
+      "speaker": "Narrator"
+    },
+    "09bfba3b": {
+      "file": "douglas-09bfba3b.m4a",
+      "ms": 967,
+      "text": "Across the ford",
+      "speaker": "Douglas"
+    },
+    "0a891863": {
+      "file": "moray-0a891863.m4a",
+      "ms": 3822,
+      "text": "When enough of them are on this bank to be worth killing and too many to go back.",
+      "speaker": "Moray"
+    },
+    "0abbb025": {
+      "file": "narrator-0abbb025.m4a",
+      "ms": 2460,
+      "text": "The men remember every fine he levied",
+      "speaker": "Narrator"
+    },
+    "0b1fbae7": {
+      "file": "graham-0b1fbae7.m4a",
+      "ms": 2601,
+      "text": "Scotland was eaten bare before we ever won it.",
+      "speaker": "Graham"
+    },
+    "0be69e83": {
+      "file": "narrator-0be69e83.m4a",
+      "ms": 1796,
+      "text": "The crowning-place of kings",
+      "speaker": "Narrator"
+    },
+    "0bf62de0": {
+      "file": "narrator-0bf62de0.m4a",
+      "ms": 4727,
+      "text": "Below them, Warenne has offered terms twice and sent friars to negotiate.",
+      "speaker": "Narrator"
+    },
+    "0cb99b5a": {
+      "file": "douglas-0cb99b5a.m4a",
+      "ms": 1501,
+      "text": "A camp worth defending.",
+      "speaker": "Douglas"
+    },
+    "0d0c71f5": {
+      "file": "narrator-0d0c71f5.m4a",
+      "ms": 5076,
+      "text": "In the north, Andrew Moray’s separate rising is sweeping English garrisons away.",
+      "speaker": "Narrator"
+    },
+    "0d10b171": {
+      "file": "wallace-0d10b171.m4a",
+      "ms": 2253,
+      "text": "Spear hafts, roof beams",
+      "speaker": "Wallace"
+    },
+    "0d88da02": {
+      "file": "graham-0d88da02.m4a",
+      "ms": 2856,
+      "text": "They are riding away, and they are not coming back.",
+      "speaker": "Graham"
+    },
+    "0e0391e9": {
+      "file": "wallace-0e0391e9.m4a",
+      "ms": 685,
+      "text": "They have it.",
+      "speaker": "Wallace"
+    },
+    "0e4f98d1": {
+      "file": "narrator-0e4f98d1.m4a",
+      "ms": 2196,
+      "text": "is remembered by English chroniclers.",
+      "speaker": "Narrator"
+    },
+    "0e7d94e4": {
+      "file": "wallace-0e7d94e4.m4a",
+      "ms": 4810,
+      "text": "Every man who crosses that bridge puts a deep river between himself and his friends.",
+      "speaker": "Wallace"
+    },
+    "0f5b4c07": {
+      "file": "a-kinsman-0f5b4c07.m4a",
+      "ms": 2824,
+      "text": "If the garrison forms up in the square we are finished.",
+      "speaker": "A kinsman"
+    },
+    "0f79f7ad": {
+      "file": "wallace-0f79f7ad.m4a",
+      "ms": 2835,
+      "text": "What is left of the host is being whipped up the causeway",
+      "speaker": "Wallace"
+    },
+    "10544bbc": {
+      "file": "a-tenant-of-elderslie-10544bbc.m4a",
+      "ms": 2000,
+      "text": "My brother swore to Edward in August.",
+      "speaker": "A tenant of Elderslie"
+    },
+    "10d3ddbe": {
+      "file": "narrator-10d3ddbe.m4a",
+      "ms": 3043,
+      "text": "Monks heal the hurt and turn the enemy's own steel.",
+      "speaker": "Narrator"
+    },
+    "10ef0292": {
+      "file": "wallace-10ef0292.m4a",
+      "ms": 4603,
+      "text": "I have seen what a Scottish parliament looks like when Edward writes the invitations.",
+      "speaker": "Wallace"
+    },
+    "10f93e2b": {
+      "file": "narrator-10f93e2b.m4a",
+      "ms": 2518,
+      "text": "The west road belongs to the Forest now.",
+      "speaker": "Narrator"
+    },
+    "11296be2": {
+      "file": "fraser-11296be2.m4a",
+      "ms": 5015,
+      "text": "Segrave’s riders are sweeping the Forest again, and they are taking whole households now",
+      "speaker": "Fraser"
+    },
+    "1243bc6c": {
+      "file": "wallace-1243bc6c.m4a",
+      "ms": 1836,
+      "text": "Call the kin down from the hills.",
+      "speaker": "Wallace"
+    },
+    "12aaf912": {
+      "file": "graham-12aaf912.m4a",
+      "ms": 1948,
+      "text": "The rings will hold against horse.",
+      "speaker": "Graham"
+    },
+    "12ada22c": {
+      "file": "wallace-12ada22c.m4a",
+      "ms": 2292,
+      "text": "I will not sign it away in an afternoon.",
+      "speaker": "Wallace"
+    },
+    "12ed509c": {
+      "file": "douglas-12ed509c.m4a",
+      "ms": 558,
+      "text": "Scone.",
+      "speaker": "Douglas"
+    },
+    "12f3597a": {
+      "file": "douglas-12f3597a.m4a",
+      "ms": 629,
+      "text": "Wallace!",
+      "speaker": "Douglas"
+    },
+    "1341f97b": {
+      "file": "douglas-1341f97b.m4a",
+      "ms": 1419,
+      "text": "Douglas rides with you.",
+      "speaker": "Douglas"
+    },
+    "13a69f03": {
+      "file": "wallace-13a69f03.m4a",
+      "ms": 908,
+      "text": "Now roofs",
+      "speaker": "Wallace"
+    },
+    "16d6c17f": {
+      "file": "fraser-16d6c17f.m4a",
+      "ms": 2053,
+      "text": "The pen at Happrew holds only the dead.",
+      "speaker": "Fraser"
+    },
+    "1779cceb": {
+      "file": "wallace-1779cceb.m4a",
+      "ms": 2403,
+      "text": "Then the war feeds itself south of the border.",
+      "speaker": "Wallace"
+    },
+    "19e8f51c": {
+      "file": "wallace-19e8f51c.m4a",
+      "ms": 2819,
+      "text": "Take it back for an afternoon and let people see it.",
+      "speaker": "Wallace"
+    },
+    "1a3d5e59": {
+      "file": "wallace-1a3d5e59.m4a",
+      "ms": 1280,
+      "text": "you're Scotland's again.",
+      "speaker": "Wallace"
+    },
+    "1a9ad617": {
+      "file": "narrator-1a9ad617.m4a",
+      "ms": 3028,
+      "text": "Heselrig sits in judgement at Lanark tomorrow.",
+      "speaker": "Narrator"
+    },
+    "1adc229b": {
+      "file": "douglas-1adc229b.m4a",
+      "ms": 1372,
+      "text": "Where our kings were made",
+      "speaker": "Douglas"
+    },
+    "1b0cd374": {
+      "file": "fraser-1b0cd374.m4a",
+      "ms": 2227,
+      "text": "Earnside's tower holds the only bridge.",
+      "speaker": "Fraser"
+    },
+    "1e10a25d": {
+      "file": "wallace-1e10a25d.m4a",
+      "ms": 1254,
+      "text": "Then we take them back.",
+      "speaker": "Wallace"
+    },
+    "1f6f6de9": {
+      "file": "wallace-1f6f6de9.m4a",
+      "ms": 3669,
+      "text": "The stone is gone to Westminster, the crown is gone with Balliol.",
+      "speaker": "Wallace"
+    },
+    "1fa47851": {
+      "file": "narrator-1fa47851.m4a",
+      "ms": 2307,
+      "text": "Farms under frost still feed men",
+      "speaker": "Narrator"
+    },
+    "208d8a64": {
+      "file": "cressingham-208d8a64.m4a",
+      "ms": 2731,
+      "text": "Riders, cross, in the king's name",
+      "speaker": "Cressingham"
+    },
+    "20f54518": {
+      "file": "narrator-20f54518.m4a",
+      "ms": 2219,
+      "text": "war is a guest that eats everything.",
+      "speaker": "Narrator"
+    },
+    "210e005c": {
+      "file": "narrator-210e005c.m4a",
+      "ms": 2077,
+      "text": "Then the knights ride into the gaps.",
+      "speaker": "Narrator"
+    },
+    "211fc2cc": {
+      "file": "douglas-211fc2cc.m4a",
+      "ms": 1814,
+      "text": "You have farmers, Wallace.",
+      "speaker": "Douglas"
+    },
+    "219774ad": {
+      "file": "wallace-219774ad.m4a",
+      "ms": 862,
+      "text": "Moray is hit",
+      "speaker": "Wallace"
+    },
+    "21dee030": {
+      "file": "narrator-21dee030.m4a",
+      "ms": 4895,
+      "text": "that they have come to free the kingdom, and the English may come and prove otherwise",
+      "speaker": "Narrator"
+    },
+    "21ec4981": {
+      "file": "narrator-21ec4981.m4a",
+      "ms": 2472,
+      "text": "The full weight of England leans on the line.",
+      "speaker": "Narrator"
+    },
+    "2243ea5a": {
+      "file": "wallace-2243ea5a.m4a",
+      "ms": 2427,
+      "text": "Stores and soldiers, nothing else.",
+      "speaker": "Wallace"
+    },
+    "2396c4cc": {
+      "file": "narrator-2396c4cc.m4a",
+      "ms": 4949,
+      "text": "how many men, how much grain, how long before someone informs.",
+      "speaker": "Narrator"
+    },
+    "249678d3": {
+      "file": "wallace-249678d3.m4a",
+      "ms": 2636,
+      "text": "hold the bridgehead and let the Forth take the rest.",
+      "speaker": "Wallace"
+    },
+    "2691a061": {
+      "file": "narrator-2691a061.m4a",
+      "ms": 2939,
+      "text": "Lanark, May 1297.",
+      "speaker": "Narrator"
+    },
+    "27e7bc49": {
+      "file": "moray-27e7bc49.m4a",
+      "ms": 2116,
+      "text": "My men came out of Avoch and Inverness.",
+      "speaker": "Moray"
+    },
+    "2801273a": {
+      "file": "wallace-2801273a.m4a",
+      "ms": 1045,
+      "text": "The stores burn.",
+      "speaker": "Wallace"
+    },
+    "28fbcbfb": {
+      "file": "wallace-28fbcbfb.m4a",
+      "ms": 1662,
+      "text": "We are not here to be enriched",
+      "speaker": "Wallace"
+    },
+    "291934ea": {
+      "file": "narrator-291934ea.m4a",
+      "ms": 4237,
+      "text": "The wagons roll north, heavy with the Tyne valley's winter stores.",
+      "speaker": "Narrator"
+    },
+    "298d08d6": {
+      "file": "fraser-298d08d6.m4a",
+      "ms": 1988,
+      "text": "Break the wall and they're ours again.",
+      "speaker": "Fraser"
+    },
+    "2a944013": {
+      "file": "wallace-2a944013.m4a",
+      "ms": 897,
+      "text": "Let them come.",
+      "speaker": "Wallace"
+    },
+    "2c353394": {
+      "file": "wallace-2c353394.m4a",
+      "ms": 4293,
+      "text": "The moment we chase them onto the causeway we give back the only advantage we have.",
+      "speaker": "Wallace"
+    },
+    "2dd06d8f": {
+      "file": "wallace-2dd06d8f.m4a",
+      "ms": 1693,
+      "text": "This kingdom still has a king.",
+      "speaker": "Wallace"
+    },
+    "2dea8bc2": {
+      "file": "a-kinsman-2dea8bc2.m4a",
+      "ms": 1788,
+      "text": "There are more of them than we counted.",
+      "speaker": "A kinsman"
+    },
+    "2e59523c": {
+      "file": "graham-2e59523c.m4a",
+      "ms": 1359,
+      "text": "The castle is breached",
+      "speaker": "Graham"
+    },
+    "30c7f206": {
+      "file": "narrator-30c7f206.m4a",
+      "ms": 1648,
+      "text": "The watch-fort burns.",
+      "speaker": "Narrator"
+    },
+    "325f5c8d": {
+      "file": "narrator-325f5c8d.m4a",
+      "ms": 1023,
+      "text": "Word comes:",
+      "speaker": "Narrator"
+    },
+    "32ae46e8": {
+      "file": "narrator-32ae46e8.m4a",
+      "ms": 2092,
+      "text": "Knights round the western flank!",
+      "speaker": "Narrator"
+    },
+    "32d15dbe": {
+      "file": "narrator-32d15dbe.m4a",
+      "ms": 6642,
+      "text": "Wallace had gone to Paris and argued Scotland’s case at the French court, and probably carried it to Rome.",
+      "speaker": "Narrator"
+    },
+    "332e8faa": {
+      "file": "douglas-332e8faa.m4a",
+      "ms": 4089,
+      "text": "What is written in those ledgers is the only thing holding a man to Edward’s oath.",
+      "speaker": "Douglas"
+    },
+    "36a40de7": {
+      "file": "wallace-36a40de7.m4a",
+      "ms": 814,
+      "text": "Keep building.",
+      "speaker": "Wallace"
+    },
+    "36e3a032": {
+      "file": "wallace-36e3a032.m4a",
+      "ms": 3809,
+      "text": "Strike fast, and leave before the garrison closes its fist.",
+      "speaker": "Wallace"
+    },
+    "36fede04": {
+      "file": "narrator-36fede04.m4a",
+      "ms": 1369,
+      "text": "The warning fails.",
+      "speaker": "Narrator"
+    },
+    "371aa895": {
+      "file": "warenne-371aa895.m4a",
+      "ms": 1047,
+      "text": "We are done here.",
+      "speaker": "Warenne"
+    },
+    "37f19f77": {
+      "file": "wallace-37f19f77.m4a",
+      "ms": 2555,
+      "text": "Smoke rises where I say it rises now.",
+      "speaker": "Wallace"
+    },
+    "39aa817e": {
+      "file": "narrator-39aa817e.m4a",
+      "ms": 1294,
+      "text": "Cressingham is down.",
+      "speaker": "Narrator"
+    },
+    "3af11f3c": {
+      "file": "wallace-3af11f3c.m4a",
+      "ms": 4020,
+      "text": "A man who swears to Edward admits that Edward had the right to be sworn to.",
+      "speaker": "Wallace"
+    },
+    "3bc5fe40": {
+      "file": "narrator-3bc5fe40.m4a",
+      "ms": 1424,
+      "text": "Falkirk is lost.",
+      "speaker": "Narrator"
+    },
+    "3ca13b44": {
+      "file": "moray-3ca13b44.m4a",
+      "ms": 2507,
+      "text": "He will force the crossing before the week is out.",
+      "speaker": "Moray"
+    },
+    "3ce972d1": {
+      "file": "wallace-3ce972d1.m4a",
+      "ms": 665,
+      "text": "Settled.",
+      "speaker": "Wallace"
+    },
+    "3cf4bfa1": {
+      "file": "graham-3cf4bfa1.m4a",
+      "ms": 525,
+      "text": "Bowmen",
+      "speaker": "Graham"
+    },
+    "3dcd1818": {
+      "file": "graham-3dcd1818.m4a",
+      "ms": 2998,
+      "text": "Now we discover who keeps faith when the arrows fall.",
+      "speaker": "Graham"
+    },
+    "4000124e": {
+      "file": "wallace-4000124e.m4a",
+      "ms": 1202,
+      "text": "I gave them my word.",
+      "speaker": "Wallace"
+    },
+    "404af76b": {
+      "file": "wallace-404af76b.m4a",
+      "ms": 711,
+      "text": "Not yet",
+      "speaker": "Wallace"
+    },
+    "416ec4b5": {
+      "file": "moray-416ec4b5.m4a",
+      "ms": 1260,
+      "text": "NOW, Wallace!",
+      "speaker": "Moray"
+    },
+    "41bd2cfb": {
+      "file": "narrator-41bd2cfb.m4a",
+      "ms": 1592,
+      "text": "Night falls over the glen.",
+      "speaker": "Narrator"
+    },
+    "420ce850": {
+      "file": "graham-420ce850.m4a",
+      "ms": 584,
+      "text": "Ours.",
+      "speaker": "Graham"
+    },
+    "42b11a14": {
+      "file": "wallace-42b11a14.m4a",
+      "ms": 3590,
+      "text": "When every pardoned sword in Scotland was sheathed, his was out",
+      "speaker": "Wallace"
+    },
+    "432184dc": {
+      "file": "wallace-432184dc.m4a",
+      "ms": 1162,
+      "text": "Heselrig's tower.",
+      "speaker": "Wallace"
+    },
+    "434ef57d": {
+      "file": "douglas-434ef57d.m4a",
+      "ms": 2503,
+      "text": "I have riders and a name Edward already hates.",
+      "speaker": "Douglas"
+    },
+    "44665de7": {
+      "file": "wallace-44665de7.m4a",
+      "ms": 1063,
+      "text": "I know what they did.",
+      "speaker": "Wallace"
+    },
+    "4479e0cb": {
+      "file": "fraser-4479e0cb.m4a",
+      "ms": 1942,
+      "text": "not fighters, families.",
+      "speaker": "Fraser"
+    },
+    "46b0ee53": {
+      "file": "narrator-46b0ee53.m4a",
+      "ms": 4925,
+      "text": "Across Scotland, men look at their own garrisons and begin to count spears.",
+      "speaker": "Narrator"
+    },
+    "4764f9fd": {
+      "file": "a-tenant-of-elderslie-4764f9fd.m4a",
+      "ms": 1799,
+      "text": "He says there was no refusing it.",
+      "speaker": "A tenant of Elderslie"
+    },
+    "47bdf303": {
+      "file": "douglas-47bdf303.m4a",
+      "ms": 1010,
+      "text": "The road is open.",
+      "speaker": "Douglas"
+    },
+    "489105c9": {
+      "file": "narrator-489105c9.m4a",
+      "ms": 4710,
+      "text": "Farther south, Corbridge and Hexham still provision English garrisons.",
+      "speaker": "Narrator"
+    },
+    "4908939d": {
+      "file": "narrator-4908939d.m4a",
+      "ms": 6050,
+      "text": "Within weeks, Wallace resigns the Guardianship into the hands of the nobles who watched from the treeline.",
+      "speaker": "Narrator"
+    },
+    "4a08096e": {
+      "file": "fraser-4a08096e.m4a",
+      "ms": 2894,
+      "text": "Every unpardoned man in the south is here, Will.",
+      "speaker": "Fraser"
+    },
+    "4a1e0c04": {
+      "file": "graham-4a1e0c04.m4a",
+      "ms": 1359,
+      "text": "the camp cannot hold!",
+      "speaker": "Graham"
+    },
+    "4a6bb800": {
+      "file": "moray-4a6bb800.m4a",
+      "ms": 711,
+      "text": "Not yet",
+      "speaker": "Moray"
+    },
+    "4b4751d2": {
+      "file": "graham-4b4751d2.m4a",
+      "ms": 863,
+      "text": "THOUSANDS.",
+      "speaker": "Graham"
+    },
+    "4b836532": {
+      "file": "wallace-4b836532.m4a",
+      "ms": 2799,
+      "text": "Scotland needs living men more than dead heroes.",
+      "speaker": "Wallace"
+    },
+    "4b864763": {
+      "file": "narrator-4b864763.m4a",
+      "ms": 3806,
+      "text": "The men waiting for them are farmers with eight feet of ash and an iron head.",
+      "speaker": "Narrator"
+    },
+    "4b94dcf7": {
+      "file": "wallace-4b94dcf7.m4a",
+      "ms": 1594,
+      "text": "Nobody stops for plunder.",
+      "speaker": "Wallace"
+    },
+    "4bd1fb2c": {
+      "file": "narrator-4bd1fb2c.m4a",
+      "ms": 4274,
+      "text": "Before the first snow, the best soldier of the rising will be gone",
+      "speaker": "Narrator"
+    },
+    "4c32b47c": {
+      "file": "narrator-4c32b47c.m4a",
+      "ms": 1619,
+      "text": "Corbridge's keep is rubble.",
+      "speaker": "Narrator"
+    },
+    "4c9de570": {
+      "file": "narrator-4c9de570.m4a",
+      "ms": 1627,
+      "text": "What comes afterwards",
+      "speaker": "Narrator"
+    },
+    "4ce4f1c0": {
+      "file": "wallace-4ce4f1c0.m4a",
+      "ms": 1381,
+      "text": "He is simply not here.",
+      "speaker": "Wallace"
+    },
+    "4d8888ac": {
+      "file": "wallace-4d8888ac.m4a",
+      "ms": 2395,
+      "text": "Just hold, and make it cost him.",
+      "speaker": "Wallace"
+    },
+    "4eba7a7b": {
+      "file": "narrator-4eba7a7b.m4a",
+      "ms": 3876,
+      "text": "The first English charge breaks on the spears exactly as it should.",
+      "speaker": "Narrator"
+    },
+    "4f2af80e": {
+      "file": "moray-4f2af80e.m4a",
+      "ms": 5378,
+      "text": "Cressingham is counting the daily cost of the army out loud, where his own soldiers can hear him.",
+      "speaker": "Moray"
+    },
+    "503489a4": {
+      "file": "wallace-503489a4.m4a",
+      "ms": 1082,
+      "text": "Work quietly.",
+      "speaker": "Wallace"
+    },
+    "5129aed4": {
+      "file": "narrator-5129aed4.m4a",
+      "ms": 3969,
+      "text": "The parchment does not mention the men still under arms in the Forest.",
+      "speaker": "Narrator"
+    },
+    "51c56240": {
+      "file": "graham-51c56240.m4a",
+      "ms": 2220,
+      "text": "Dig in, my lord Guardian-to-be.",
+      "speaker": "Graham"
+    },
+    "53af8553": {
+      "file": "narrator-53af8553.m4a",
+      "ms": 4585,
+      "text": "Stirling Bridge, 11 September 1297.",
+      "speaker": "Narrator"
+    },
+    "54e52a43": {
+      "file": "wallace-54e52a43.m4a",
+      "ms": 1419,
+      "text": "we are here to be understood.",
+      "speaker": "Wallace"
+    },
+    "556f4399": {
+      "file": "cressingham-556f4399.m4a",
+      "ms": 3358,
+      "text": "wages are owed for VICTORIES, not for standing about.",
+      "speaker": "Cressingham"
+    },
+    "55a0e00d": {
+      "file": "wallace-55a0e00d.m4a",
+      "ms": 328,
+      "text": "Good.",
+      "speaker": "Wallace"
+    },
+    "564990cd": {
+      "file": "cressingham-564990cd.m4a",
+      "ms": 909,
+      "text": "Enough delay!",
+      "speaker": "Cressingham"
+    },
+    "5775b746": {
+      "file": "wallace-5775b746.m4a",
+      "ms": 3242,
+      "text": "and then two Scots earls sold him our position for a pardon.",
+      "speaker": "Wallace"
+    },
+    "57fb48ed": {
+      "file": "wallace-57fb48ed.m4a",
+      "ms": 2703,
+      "text": "Terms with Edward are just a slower way of losing.",
+      "speaker": "Wallace"
+    },
+    "59059c42": {
+      "file": "douglas-59059c42.m4a",
+      "ms": 1825,
+      "text": "But my men eat like horses",
+      "speaker": "Douglas"
+    },
+    "59339a84": {
+      "file": "narrator-59339a84.m4a",
+      "ms": 3659,
+      "text": "Robroyston, Westminster Hall, Smithfield",
+      "speaker": "Narrator"
+    },
+    "5a9b84cf": {
+      "file": "graham-5a9b84cf.m4a",
+      "ms": 1905,
+      "text": "Snow hides our tracks and theirs.",
+      "speaker": "Graham"
+    },
+    "5ab56384": {
+      "file": "wallace-5ab56384.m4a",
+      "ms": 1872,
+      "text": "Lanark, beyond the river bend.",
+      "speaker": "Wallace"
+    },
+    "5ad9f0f8": {
+      "file": "wallace-5ad9f0f8.m4a",
+      "ms": 1263,
+      "text": "The priory does NOT.",
+      "speaker": "Wallace"
+    },
+    "5ae5b97a": {
+      "file": "narrator-5ae5b97a.m4a",
+      "ms": 2185,
+      "text": "New soldiers, new tools",
+      "speaker": "Narrator"
+    },
+    "5b6a4880": {
+      "file": "narrator-5b6a4880.m4a",
+      "ms": 4809,
+      "text": "On the wing where the lords' cavalry should stand, there is only wind in the trees.",
+      "speaker": "Narrator"
+    },
+    "5b7bd30c": {
+      "file": "fraser-5b7bd30c.m4a",
+      "ms": 2533,
+      "text": "While they stand, Bothwell sleeps easy.",
+      "speaker": "Fraser"
+    },
+    "5bb12960": {
+      "file": "narrator-5bb12960.m4a",
+      "ms": 2225,
+      "text": "The English think Scotland is settled.",
+      "speaker": "Narrator"
+    },
+    "5bd05a9c": {
+      "file": "graham-5bd05a9c.m4a",
+      "ms": 4496,
+      "text": "Edward is come himself, with more men than have ever crossed the border at once.",
+      "speaker": "Graham"
+    },
+    "5c9bbd7e": {
+      "file": "narrator-5c9bbd7e.m4a",
+      "ms": 3252,
+      "text": "Warenne’s knights are the finest heavy cavalry in Europe.",
+      "speaker": "Narrator"
+    },
+    "5d2f7b49": {
+      "file": "wallace-5d2f7b49.m4a",
+      "ms": 1491,
+      "text": "I have brought you to the ring.",
+      "speaker": "Wallace"
+    },
+    "5d69ae9f": {
+      "file": "narrator-5d69ae9f.m4a",
+      "ms": 3166,
+      "text": "This is the last action the record can place him in.",
+      "speaker": "Narrator"
+    },
+    "5d9fb2a0": {
+      "file": "narrator-5d9fb2a0.m4a",
+      "ms": 2533,
+      "text": "Edward of England has crossed his last river.",
+      "speaker": "Narrator"
+    },
+    "5e24d801": {
+      "file": "narrator-5e24d801.m4a",
+      "ms": 4457,
+      "text": "Their complaints are also evidence of how completely the border had reversed.",
+      "speaker": "Narrator"
+    },
+    "5f07750c": {
+      "file": "fraser-5f07750c.m4a",
+      "ms": 3962,
+      "text": "Edward is offering lands back, offices back, everything back",
+      "speaker": "Fraser"
+    },
+    "60b2fd03": {
+      "file": "wallace-60b2fd03.m4a",
+      "ms": 1080,
+      "text": "Sound the retreat",
+      "speaker": "Wallace"
+    },
+    "61acb3de": {
+      "file": "narrator-61acb3de.m4a",
+      "ms": 5157,
+      "text": "at Bannockburn in 1314, the road from Lanark reaches a free Scotland.",
+      "speaker": "Narrator"
+    },
+    "62444b5d": {
+      "file": "narrator-62444b5d.m4a",
+      "ms": 3856,
+      "text": "Build a Lumber Camp beside the western wood so the walk is short.",
+      "speaker": "Narrator"
+    },
+    "62f03aff": {
+      "file": "wallace-62f03aff.m4a",
+      "ms": 443,
+      "text": "No.",
+      "speaker": "Wallace"
+    },
+    "63fe5fd8": {
+      "file": "graham-63fe5fd8.m4a",
+      "ms": 2656,
+      "text": "The merchants want to know who guarantees their goods.",
+      "speaker": "Graham"
+    },
+    "64c3f5e5": {
+      "file": "wallace-64c3f5e5.m4a",
+      "ms": 1571,
+      "text": "Everything else is supply.",
+      "speaker": "Wallace"
+    },
+    "664eb498": {
+      "file": "wallace-664eb498.m4a",
+      "ms": 3929,
+      "text": "Any man who forgets that answers to me, and I have had a long winter.",
+      "speaker": "Wallace"
+    },
+    "670ba0a3": {
+      "file": "narrator-670ba0a3.m4a",
+      "ms": 2127,
+      "text": "a small mercy of the game of war.",
+      "speaker": "Narrator"
+    },
+    "689d76af": {
+      "file": "narrator-689d76af.m4a",
+      "ms": 6585,
+      "text": "and Wallace’s blunt admission that he could protect them while he stood there, and not a moment after he rode away.",
+      "speaker": "Narrator"
+    },
+    "68f2a928": {
+      "file": "wallace-68f2a928.m4a",
+      "ms": 1960,
+      "text": "That is precisely why we will not.",
+      "speaker": "Wallace"
+    },
+    "693cd0cb": {
+      "file": "wallace-693cd0cb.m4a",
+      "ms": 3158,
+      "text": "Then teach the farmers to stand when the riders come at them.",
+      "speaker": "Wallace"
+    },
+    "6aef5022": {
+      "file": "graham-6aef5022.m4a",
+      "ms": 3959,
+      "text": "Stirling made you the government, and the government has nothing in its stores.",
+      "speaker": "Graham"
+    },
+    "6c36b6b5": {
+      "file": "wallace-6c36b6b5.m4a",
+      "ms": 3964,
+      "text": "Any man who touches the priory answers to me before he answers to God.",
+      "speaker": "Wallace"
+    },
+    "6eb5dbd0": {
+      "file": "narrator-6eb5dbd0.m4a",
+      "ms": 1454,
+      "text": "and one promise to keep.",
+      "speaker": "Narrator"
+    },
+    "6f726d17": {
+      "file": "wallace-6f726d17.m4a",
+      "ms": 4344,
+      "text": "whatever peace they write for him after, the Forest remembers whose side he held.",
+      "speaker": "Wallace"
+    },
+    "721d2f64": {
+      "file": "wallace-721d2f64.m4a",
+      "ms": 2137,
+      "text": "Scotland, what a price you ask.",
+      "speaker": "Wallace"
+    },
+    "72eb26ea": {
+      "file": "wallace-72eb26ea.m4a",
+      "ms": 514,
+      "text": "Enough.",
+      "speaker": "Wallace"
+    },
+    "7437ac3c": {
+      "file": "graham-7437ac3c.m4a",
+      "ms": 1161,
+      "text": "Their engines burn!",
+      "speaker": "Graham"
+    },
+    "74d22072": {
+      "file": "wallace-74d22072.m4a",
+      "ms": 4517,
+      "text": "Smoke carries down the glen, and Heselrig pays men to watch for smoke.",
+      "speaker": "Wallace"
+    },
+    "750d0c56": {
+      "file": "narrator-750d0c56.m4a",
+      "ms": 1570,
+      "text": "It goes into the hills",
+      "speaker": "Narrator"
+    },
+    "7598c232": {
+      "file": "narrator-7598c232.m4a",
+      "ms": 1346,
+      "text": "The man could be killed.",
+      "speaker": "Narrator"
+    },
+    "75a992b8": {
+      "file": "graham-75a992b8.m4a",
+      "ms": 4284,
+      "text": "He has been eating his own supplies for a week because you left him nothing to take.",
+      "speaker": "Graham"
+    },
+    "77b98644": {
+      "file": "fraser-77b98644.m4a",
+      "ms": 2223,
+      "text": "Happrew's fort watches the west road;",
+      "speaker": "Fraser"
+    },
+    "784aa553": {
+      "file": "wallace-784aa553.m4a",
+      "ms": 5413,
+      "text": "If the only thing left to defend is the people, that is still something worth being in the field for.",
+      "speaker": "Wallace"
+    },
+    "7865c3e2": {
+      "file": "narrator-7865c3e2.m4a",
+      "ms": 5563,
+      "text": "Edward brings his bowmen forward and has them shoot into the stationary rings until gaps open.",
+      "speaker": "Narrator"
+    },
+    "792f79b0": {
+      "file": "wallace-792f79b0.m4a",
+      "ms": 1347,
+      "text": "Then they get my seal",
+      "speaker": "Wallace"
+    },
+    "7a133551": {
+      "file": "narrator-7a133551.m4a",
+      "ms": 7305,
+      "text": "On the south bank, an English army still greater than the Scottish one is watching its own vanguard die and cannot reach it.",
+      "speaker": "Narrator"
+    },
+    "7ac8eb4e": {
+      "file": "wallace-7ac8eb4e.m4a",
+      "ms": 1823,
+      "text": "the way a boot settles on a neck.",
+      "speaker": "Wallace"
+    },
+    "7b0d0ee9": {
+      "file": "fraser-7b0d0ee9.m4a",
+      "ms": 1244,
+      "text": "Comyn has submitted.",
+      "speaker": "Fraser"
+    },
+    "7b5b8bda": {
+      "file": "graham-7b5b8bda.m4a",
+      "ms": 1210,
+      "text": "Get the Guardian OUT!",
+      "speaker": "Graham"
+    },
+    "7e2e679f": {
+      "file": "wallace-7e2e679f.m4a",
+      "ms": 1182,
+      "text": "There was refusing it.",
+      "speaker": "Wallace"
+    },
+    "7fa24507": {
+      "file": "moray-7fa24507.m4a",
+      "ms": 2159,
+      "text": "they mean to take your camp from behind!",
+      "speaker": "Moray"
+    },
+    "811cdb49": {
+      "file": "narrator-811cdb49.m4a",
+      "ms": 3504,
+      "text": "Here the record catches Wallace in arms for the last time.",
+      "speaker": "Narrator"
+    },
+    "81569b18": {
+      "file": "narrator-81569b18.m4a",
+      "ms": 3005,
+      "text": "The priory’s own chronicle preserves the episode",
+      "speaker": "Narrator"
+    },
+    "82193be4": {
+      "file": "graham-82193be4.m4a",
+      "ms": 1977,
+      "text": "You know what they will not hold against.",
+      "speaker": "Graham"
+    },
+    "82fd56b7": {
+      "file": "narrator-82fd56b7.m4a",
+      "ms": 1264,
+      "text": "The rising could not.",
+      "speaker": "Narrator"
+    },
+    "866373d4": {
+      "file": "fraser-866373d4.m4a",
+      "ms": 1379,
+      "text": "Feed them, arm them",
+      "speaker": "Fraser"
+    },
+    "87d4a5a7": {
+      "file": "narrator-87d4a5a7.m4a",
+      "ms": 2983,
+      "text": "Segrave's riders sweep the Forest roads again.",
+      "speaker": "Narrator"
+    },
+    "87d635a2": {
+      "file": "narrator-87d635a2.m4a",
+      "ms": 7522,
+      "text": "The first army of knights ever broken by common footmen streams south, and Scotland north of the Forth is free ground.",
+      "speaker": "Narrator"
+    },
+    "87f5814c": {
+      "file": "wallace-87f5814c.m4a",
+      "ms": 1382,
+      "text": "Carry Sir Simon back.",
+      "speaker": "Wallace"
+    },
+    "88b4e101": {
+      "file": "graham-88b4e101.m4a",
+      "ms": 2186,
+      "text": "and the lords who swore us THEIR horses.",
+      "speaker": "Graham"
+    },
+    "8a5b339a": {
+      "file": "narrator-8a5b339a.m4a",
+      "ms": 1930,
+      "text": "and new attention from the enemy.",
+      "speaker": "Narrator"
+    },
+    "8afeaec4": {
+      "file": "narrator-8afeaec4.m4a",
+      "ms": 2533,
+      "text": "Official ink says Scotland is at peace.",
+      "speaker": "Narrator"
+    },
+    "8c015883": {
+      "file": "moray-8c015883.m4a",
+      "ms": 511,
+      "text": "Steady.",
+      "speaker": "Moray"
+    },
+    "8c1efb9e": {
+      "file": "wallace-8c1efb9e.m4a",
+      "ms": 2145,
+      "text": "There was just no surviving the refusal.",
+      "speaker": "Wallace"
+    },
+    "8c559479": {
+      "file": "wallace-8c559479.m4a",
+      "ms": 2584,
+      "text": "north, through the wood, and DO NOT STOP.",
+      "speaker": "Wallace"
+    },
+    "8d804fd7": {
+      "file": "wallace-8d804fd7.m4a",
+      "ms": 965,
+      "text": "carry him back!",
+      "speaker": "Wallace"
+    },
+    "8f9fd32b": {
+      "file": "narrator-8f9fd32b.m4a",
+      "ms": 4658,
+      "text": "it records in far more detail, because Edward wanted it written down.",
+      "speaker": "Narrator"
+    },
+    "8fb48454": {
+      "file": "narrator-8fb48454.m4a",
+      "ms": 3195,
+      "text": "In Westminster Hall he rejects the charge of treason:",
+      "speaker": "Narrator"
+    },
+    "9006ed30": {
+      "file": "narrator-9006ed30.m4a",
+      "ms": 2314,
+      "text": "Houses raise your population room.",
+      "speaker": "Narrator"
+    },
+    "90536af9": {
+      "file": "narrator-90536af9.m4a",
+      "ms": 1230,
+      "text": "The camp will hold.",
+      "speaker": "Narrator"
+    },
+    "9183625e": {
+      "file": "narrator-9183625e.m4a",
+      "ms": 3137,
+      "text": "Knights on the causeway, footmen at their heels.",
+      "speaker": "Narrator"
+    },
+    "925a4930": {
+      "file": "wallace-925a4930.m4a",
+      "ms": 2343,
+      "text": "Front rank kneel, spears grounded.",
+      "speaker": "Wallace"
+    },
+    "92620ca9": {
+      "file": "wallace-92620ca9.m4a",
+      "ms": 2482,
+      "text": "The flock's scattered since the soldiers came.",
+      "speaker": "Wallace"
+    },
+    "92e52082": {
+      "file": "wallace-92e52082.m4a",
+      "ms": 2595,
+      "text": "I have spent eight years arguing that he never did.",
+      "speaker": "Wallace"
+    },
+    "93e3daa1": {
+      "file": "warenne-93e3daa1.m4a",
+      "ms": 560,
+      "text": "BURN IT.",
+      "speaker": "Warenne"
+    },
+    "94ad2bb0": {
+      "file": "wallace-94ad2bb0.m4a",
+      "ms": 758,
+      "text": "On your feet",
+      "speaker": "Wallace"
+    },
+    "95bf3410": {
+      "file": "narrator-95bf3410.m4a",
+      "ms": 9255,
+      "text": "On 23 August he is executed at Smithfield and his quartered body sent to Newcastle, Berwick, Stirling, and Perth as a warning.",
+      "speaker": "Narrator"
+    },
+    "95f118e5": {
+      "file": "narrator-95f118e5.m4a",
+      "ms": 1134,
+      "text": "form your line.",
+      "speaker": "Narrator"
+    },
+    "9675f96d": {
+      "file": "graham-9675f96d.m4a",
+      "ms": 1615,
+      "text": "Sell what we cannot carry",
+      "speaker": "Graham"
+    },
+    "96f29800": {
+      "file": "narrator-96f29800.m4a",
+      "ms": 1770,
+      "text": "Cressingham orders the crossing.",
+      "speaker": "Narrator"
+    },
+    "9709e544": {
+      "file": "narrator-9709e544.m4a",
+      "ms": 5238,
+      "text": "English chroniclers of that winter describe the raids in terms usually saved for scripture.",
+      "speaker": "Narrator"
+    },
+    "97391e5f": {
+      "file": "narrator-97391e5f.m4a",
+      "ms": 4668,
+      "text": "Wallace burns Stirling and Perth behind him so that Edward may govern ashes.",
+      "speaker": "Narrator"
+    },
+    "986371b6": {
+      "file": "narrator-986371b6.m4a",
+      "ms": 3358,
+      "text": "An army that cannot be fed at home must be fed abroad.",
+      "speaker": "Narrator"
+    },
+    "9871e374": {
+      "file": "wallace-9871e374.m4a",
+      "ms": 2204,
+      "text": "Take him up if you can and get to the trees",
+      "speaker": "Wallace"
+    },
+    "98c5af74": {
+      "file": "narrator-98c5af74.m4a",
+      "ms": 4831,
+      "text": "Behind them, Northumberland learns what Scotland has known for two years:",
+      "speaker": "Narrator"
+    },
+    "994d4a3a": {
+      "file": "wallace-994d4a3a.m4a",
+      "ms": 3878,
+      "text": "Spears close, and no man breaks the ring to chase a fallen knight.",
+      "speaker": "Wallace"
+    },
+    "9a718674": {
+      "file": "narrator-9a718674.m4a",
+      "ms": 2806,
+      "text": "The Earl of Surrey did not stay to test the ford.",
+      "speaker": "Narrator"
+    },
+    "9b4c8f19": {
+      "file": "wallace-9b4c8f19.m4a",
+      "ms": 961,
+      "text": "Full bellies.",
+      "speaker": "Wallace"
+    },
+    "9c2a1fac": {
+      "file": "douglas-9c2a1fac.m4a",
+      "ms": 1767,
+      "text": "build us a camp worth the name.",
+      "speaker": "Douglas"
+    },
+    "9d2ba4f8": {
+      "file": "narrator-9d2ba4f8.m4a",
+      "ms": 1404,
+      "text": "The war does not end.",
+      "speaker": "Narrator"
+    },
+    "9ee5ab13": {
+      "file": "narrator-9ee5ab13.m4a",
+      "ms": 1743,
+      "text": "Neither leader has met the other.",
+      "speaker": "Narrator"
+    },
+    "9f0950d4": {
+      "file": "wallace-9f0950d4.m4a",
+      "ms": 3475,
+      "text": "in the name of King John, whether he is in a cell in England or not.",
+      "speaker": "Wallace"
+    },
+    "9fabad50": {
+      "file": "graham-9fabad50.m4a",
+      "ms": 3132,
+      "text": "The canons at Hexham came out to meet us rather than wait.",
+      "speaker": "Graham"
+    },
+    "a101d6a8": {
+      "file": "narrator-a101d6a8.m4a",
+      "ms": 1848,
+      "text": "Reseed them when they exhaust.",
+      "speaker": "Narrator"
+    },
+    "a1608adc": {
+      "file": "fraser-a1608adc.m4a",
+      "ms": 2255,
+      "text": "You would not even have to swear it loudly.",
+      "speaker": "Fraser"
+    },
+    "a250c40b": {
+      "file": "cressingham-a250c40b.m4a",
+      "ms": 3326,
+      "text": "I shall recover the cost of this war from their hides personally.",
+      "speaker": "Cressingham"
+    },
+    "a260b967": {
+      "file": "graham-a260b967.m4a",
+      "ms": 2290,
+      "text": "and the priory stands on Wallace’s word.",
+      "speaker": "Graham"
+    },
+    "a55e0f7f": {
+      "file": "narrator-a55e0f7f.m4a",
+      "ms": 2231,
+      "text": "and Wallace will carry the war alone.",
+      "speaker": "Narrator"
+    },
+    "a6a870e0": {
+      "file": "narrator-a6a870e0.m4a",
+      "ms": 3772,
+      "text": "Scone, summer 1297.",
+      "speaker": "Narrator"
+    },
+    "a8814818": {
+      "file": "narrator-a8814818.m4a",
+      "ms": 3066,
+      "text": "Bothwell on the Clyde, seat of Edward's Warden.",
+      "speaker": "Narrator"
+    },
+    "a8e7a335": {
+      "file": "wallace-a8e7a335.m4a",
+      "ms": 2278,
+      "text": "Let the Warden's clerks write THAT down.",
+      "speaker": "Wallace"
+    },
+    "a999e31f": {
+      "file": "narrator-a999e31f.m4a",
+      "ms": 1102,
+      "text": "The Feudal Age.",
+      "speaker": "Narrator"
+    },
+    "aabe48f0": {
+      "file": "wallace-aabe48f0.m4a",
+      "ms": 1120,
+      "text": "Hold the bridge end.",
+      "speaker": "Wallace"
+    },
+    "ab0d1253": {
+      "file": "narrator-ab0d1253.m4a",
+      "ms": 7618,
+      "text": "In the north, Andrew Moray is taking castles Wallace has never seen, in a rising that started for its own reasons.",
+      "speaker": "Narrator"
+    },
+    "ab820fd1": {
+      "file": "moray-ab820fd1.m4a",
+      "ms": 1582,
+      "text": "Riders at the western ford",
+      "speaker": "Moray"
+    },
+    "abd2fd6e": {
+      "file": "a-raider-abd2fd6e.m4a",
+      "ms": 3132,
+      "text": "They burned our churches at Berwick with the people inside them.",
+      "speaker": "A raider"
+    },
+    "acfa2bb8": {
+      "file": "graham-acfa2bb8.m4a",
+      "ms": 2775,
+      "text": "They are asking for your seal, not the king’s.",
+      "speaker": "Graham"
+    },
+    "acfea737": {
+      "file": "narrator-acfea737.m4a",
+      "ms": 2785,
+      "text": "The camp is fed, roofed, and hidden.",
+      "speaker": "Narrator"
+    },
+    "ad7eb62f": {
+      "file": "narrator-ad7eb62f.m4a",
+      "ms": 2324,
+      "text": "now the counting-house of the justiciar.",
+      "speaker": "Narrator"
+    },
+    "ad885160": {
+      "file": "wallace-ad885160.m4a",
+      "ms": 1013,
+      "text": "Graham is down.",
+      "speaker": "Wallace"
+    },
+    "add20fe3": {
+      "file": "wallace-add20fe3.m4a",
+      "ms": 1741,
+      "text": "Heselrig, not the town.",
+      "speaker": "Wallace"
+    },
+    "b01730a4": {
+      "file": "graham-b01730a4.m4a",
+      "ms": 2459,
+      "text": "This valley will provision Scotland for a year.",
+      "speaker": "Graham"
+    },
+    "b069cf9b": {
+      "file": "fraser-b069cf9b.m4a",
+      "ms": 1166,
+      "text": "Happrew burns.",
+      "speaker": "Fraser"
+    },
+    "b1133f13": {
+      "file": "wallace-b1133f13.m4a",
+      "ms": 6754,
+      "text": "That is what the cavalry on our wing is for, and the cavalry is commanded by men who would rather I had never been knighted.",
+      "speaker": "Wallace"
+    },
+    "b1a562bd": {
+      "file": "douglas-b1a562bd.m4a",
+      "ms": 4357,
+      "text": "and Edward has his clerk sitting in it, fining men for not swearing to him.",
+      "speaker": "Douglas"
+    },
+    "b2183405": {
+      "file": "narrator-b2183405.m4a",
+      "ms": 1395,
+      "text": "and so does Wallace.",
+      "speaker": "Narrator"
+    },
+    "b2722d3e": {
+      "file": "wallace-b2722d3e.m4a",
+      "ms": 3658,
+      "text": "Scotland needs men who lived through this more than it needs another grave.",
+      "speaker": "Wallace"
+    },
+    "b27c7dd8": {
+      "file": "graham-b27c7dd8.m4a",
+      "ms": 641,
+      "text": "But Will",
+      "speaker": "Graham"
+    },
+    "b293cc61": {
+      "file": "fraser-b293cc61.m4a",
+      "ms": 2125,
+      "text": "They keep our people penned in that fort",
+      "speaker": "Fraser"
+    },
+    "b2aaf242": {
+      "file": "narrator-b2aaf242.m4a",
+      "ms": 1752,
+      "text": "Soon the two armies will meet.",
+      "speaker": "Narrator"
+    },
+    "b2dd94ff": {
+      "file": "narrator-b2dd94ff.m4a",
+      "ms": 1939,
+      "text": "Plunder is heavy and gold is not.",
+      "speaker": "Narrator"
+    },
+    "b455abc8": {
+      "file": "narrator-b455abc8.m4a",
+      "ms": 2864,
+      "text": "Farms are slower than berries but never run out.",
+      "speaker": "Narrator"
+    },
+    "b4bdbb1d": {
+      "file": "wallace-b4bdbb1d.m4a",
+      "ms": 943,
+      "text": "Let them talk.",
+      "speaker": "Wallace"
+    },
+    "b5764f98": {
+      "file": "narrator-b5764f98.m4a",
+      "ms": 2318,
+      "text": "Food is dropped off at the Town Center.",
+      "speaker": "Narrator"
+    },
+    "b592bc09": {
+      "file": "narrator-b592bc09.m4a",
+      "ms": 7351,
+      "text": "In the spring, at the Forest Kirk, the community of the realm names William Wallace knight and sole Guardian of Scotland",
+      "speaker": "Narrator"
+    },
+    "b6023855": {
+      "file": "wallace-b6023855.m4a",
+      "ms": 4076,
+      "text": "Straight for the court, and take the sheriff before the horn is done sounding.",
+      "speaker": "Wallace"
+    },
+    "b650e658": {
+      "file": "wallace-b650e658.m4a",
+      "ms": 499,
+      "text": "So.",
+      "speaker": "Wallace"
+    },
+    "b6cd04df": {
+      "file": "wallace-b6cd04df.m4a",
+      "ms": 825,
+      "text": "The archers.",
+      "speaker": "Wallace"
+    },
+    "b70495e0": {
+      "file": "fraser-b70495e0.m4a",
+      "ms": 2091,
+      "text": "Submit, and you keep your life.",
+      "speaker": "Fraser"
+    },
+    "b8ed0d64": {
+      "file": "narrator-b8ed0d64.m4a",
+      "ms": 1912,
+      "text": "The camp will hold through the snow.",
+      "speaker": "Narrator"
+    },
+    "b9bb0f91": {
+      "file": "fraser-b9bb0f91.m4a",
+      "ms": 1732,
+      "text": "Bruce submitted a year ago.",
+      "speaker": "Fraser"
+    },
+    "ba03a7e2": {
+      "file": "fraser-ba03a7e2.m4a",
+      "ms": 1605,
+      "text": "and give them somewhere to point.",
+      "speaker": "Fraser"
+    },
+    "bb9b3910": {
+      "file": "graham-bb9b3910.m4a",
+      "ms": 3225,
+      "text": "They are asking for your protection in front of the whole column.",
+      "speaker": "Graham"
+    },
+    "bc1e04b7": {
+      "file": "wallace-bc1e04b7.m4a",
+      "ms": 1574,
+      "text": "No, not you as well.",
+      "speaker": "Wallace"
+    },
+    "bc2ea464": {
+      "file": "graham-bc2ea464.m4a",
+      "ms": 3940,
+      "text": "For every one we cut down, Edward has five more fed and rested.",
+      "speaker": "Graham"
+    },
+    "bd2d4269": {
+      "file": "moray-bd2d4269.m4a",
+      "ms": 4054,
+      "text": "Today they learn to stand in one line, or the Forth will not save us.",
+      "speaker": "Moray"
+    },
+    "c0346d80": {
+      "file": "narrator-c0346d80.m4a",
+      "ms": 6269,
+      "text": "Scotland is, on parchment, a settled province with a governing ordinance and a new administration.",
+      "speaker": "Narrator"
+    },
+    "c0f957ff": {
+      "file": "wallace-c0f957ff.m4a",
+      "ms": 694,
+      "text": "Finish it!",
+      "speaker": "Wallace"
+    },
+    "c227318d": {
+      "file": "wallace-c227318d.m4a",
+      "ms": 518,
+      "text": "Hold.",
+      "speaker": "Wallace"
+    },
+    "c312f903": {
+      "file": "narrator-c312f903.m4a",
+      "ms": 1942,
+      "text": "Horses die on spearpoints",
+      "speaker": "Narrator"
+    },
+    "c4bb86cb": {
+      "file": "douglas-c4bb86cb.m4a",
+      "ms": 3423,
+      "text": "the nobles are talking terms with the English rather than fighting.",
+      "speaker": "Douglas"
+    },
+    "c4bfefad": {
+      "file": "wallace-c4bfefad.m4a",
+      "ms": 1619,
+      "text": "Hop gracefully if you can.",
+      "speaker": "Wallace"
+    },
+    "c50913d3": {
+      "file": "moray-c50913d3.m4a",
+      "ms": 2949,
+      "text": "Spears for their horses, javelins for their bowmen.",
+      "speaker": "Moray"
+    },
+    "c5176c7a": {
+      "file": "narrator-c5176c7a.m4a",
+      "ms": 3055,
+      "text": "Lanarkshire, May 1297.",
+      "speaker": "Narrator"
+    },
+    "c5810312": {
+      "file": "narrator-c5810312.m4a",
+      "ms": 3056,
+      "text": "A Market turns spare grain and timber into coin.",
+      "speaker": "Narrator"
+    },
+    "c63be55d": {
+      "file": "wallace-c63be55d.m4a",
+      "ms": 1790,
+      "text": "We are not fighting to become them.",
+      "speaker": "Wallace"
+    },
+    "c6cf6961": {
+      "file": "graham-c6cf6961.m4a",
+      "ms": 1727,
+      "text": "The men eat English bread tonight.",
+      "speaker": "Graham"
+    },
+    "c6ea7f18": {
+      "file": "wallace-c6ea7f18.m4a",
+      "ms": 1625,
+      "text": "The ring is the reason he fell.",
+      "speaker": "Wallace"
+    },
+    "c73c0b96": {
+      "file": "graham-c73c0b96.m4a",
+      "ms": 3156,
+      "text": "First the pride of England breaks itself on our spears.",
+      "speaker": "Graham"
+    },
+    "c7ae8e4f": {
+      "file": "graham-c7ae8e4f.m4a",
+      "ms": 2069,
+      "text": "wagons want gold more than grain.",
+      "speaker": "Graham"
+    },
+    "c84e3a1b": {
+      "file": "narrator-c84e3a1b.m4a",
+      "ms": 3409,
+      "text": "Tap a villager, then tap berries or a sheep to gather.",
+      "speaker": "Narrator"
+    },
+    "c86b1cda": {
+      "file": "narrator-c86b1cda.m4a",
+      "ms": 4484,
+      "text": "Edward's engineers bring up rams and stone-throwers against the camp walls.",
+      "speaker": "Narrator"
+    },
+    "c8fe7e67": {
+      "file": "wallace-c8fe7e67.m4a",
+      "ms": 1892,
+      "text": "Scotland is not finished with you!",
+      "speaker": "Wallace"
+    },
+    "c9910b42": {
+      "file": "narrator-c9910b42.m4a",
+      "ms": 2912,
+      "text": "Earnside, September 1304.",
+      "speaker": "Narrator"
+    },
+    "c9be2ae1": {
+      "file": "narrator-c9be2ae1.m4a",
+      "ms": 6341,
+      "text": "In England, Edward puts aside his French war and turns north with the greatest army he has ever raised.",
+      "speaker": "Narrator"
+    },
+    "cb51f1b0": {
+      "file": "douglas-cb51f1b0.m4a",
+      "ms": 1222,
+      "text": "Simple arithmetic.",
+      "speaker": "Douglas"
+    },
+    "cb54ffe3": {
+      "file": "douglas-cb54ffe3.m4a",
+      "ms": 2371,
+      "text": "Now let us give Ormesby reason to fear it.",
+      "speaker": "Douglas"
+    },
+    "cba05c82": {
+      "file": "wallace-cba05c82.m4a",
+      "ms": 769,
+      "text": "Good timber.",
+      "speaker": "Wallace"
+    },
+    "cbb16f59": {
+      "file": "wallace-cbb16f59.m4a",
+      "ms": 1472,
+      "text": "The place is still ours.",
+      "speaker": "Wallace"
+    },
+    "cc6c8b05": {
+      "file": "graham-cc6c8b05.m4a",
+      "ms": 999,
+      "text": "The line is ready.",
+      "speaker": "Graham"
+    },
+    "ce1e095b": {
+      "file": "wallace-ce1e095b.m4a",
+      "ms": 606,
+      "text": "Yes.",
+      "speaker": "Wallace"
+    },
+    "ce28c449": {
+      "file": "wallace-ce28c449.m4a",
+      "ms": 2047,
+      "text": "and more hands to swing the axes.",
+      "speaker": "Wallace"
+    },
+    "cf3ca005": {
+      "file": "narrator-cf3ca005.m4a",
+      "ms": 3160,
+      "text": "Robert Bruce takes the crown in 1306;",
+      "speaker": "Narrator"
+    },
+    "d0613367": {
+      "file": "graham-d0613367.m4a",
+      "ms": 2542,
+      "text": "The schiltrons will hold the horses, Will.",
+      "speaker": "Graham"
+    },
+    "d0dcbed1": {
+      "file": "wallace-d0dcbed1.m4a",
+      "ms": 862,
+      "text": "Up the path",
+      "speaker": "Wallace"
+    },
+    "d1aeacc3": {
+      "file": "wallace-d1aeacc3.m4a",
+      "ms": 4428,
+      "text": "I would rather answer for burnt Northumbrian barns than bury Scots who starved.",
+      "speaker": "Wallace"
+    },
+    "d2012006": {
+      "file": "wallace-d2012006.m4a",
+      "ms": 1472,
+      "text": "first we feed our own.",
+      "speaker": "Wallace"
+    },
+    "d208da90": {
+      "file": "narrator-d208da90.m4a",
+      "ms": 1808,
+      "text": "The English position breaks.",
+      "speaker": "Narrator"
+    },
+    "d328c242": {
+      "file": "graham-d328c242.m4a",
+      "ms": 1269,
+      "text": "It's the bowmen I fear",
+      "speaker": "Graham"
+    },
+    "d340d09f": {
+      "file": "wallace-d340d09f.m4a",
+      "ms": 2877,
+      "text": "Two more days of hunger and he would have turned for home",
+      "speaker": "Wallace"
+    },
+    "d379bb4e": {
+      "file": "narrator-d379bb4e.m4a",
+      "ms": 4323,
+      "text": "Falkirk, 22 July 1298.",
+      "speaker": "Narrator"
+    },
+    "d3fd659b": {
+      "file": "graham-d3fd659b.m4a",
+      "ms": 4136,
+      "text": "Mangonels forward, and every rider we have on their flanks, NOW!",
+      "speaker": "Graham"
+    },
+    "d419416f": {
+      "file": "graham-d419416f.m4a",
+      "ms": 836,
+      "text": "Then Hexham",
+      "speaker": "Graham"
+    },
+    "d51c0105": {
+      "file": "wallace-d51c0105.m4a",
+      "ms": 3288,
+      "text": "Grain first, roofs second, blades last.",
+      "speaker": "Wallace"
+    },
+    "d58ed84c": {
+      "file": "moray-d58ed84c.m4a",
+      "ms": 1790,
+      "text": "Yours came out of Clydesdale.",
+      "speaker": "Moray"
+    },
+    "d629bbb1": {
+      "file": "narrator-d629bbb1.m4a",
+      "ms": 4565,
+      "text": "Every man in this street knows what happens to the families of failed rebels.",
+      "speaker": "Narrator"
+    },
+    "d656a043": {
+      "file": "graham-d656a043.m4a",
+      "ms": 1838,
+      "text": "A counting-house in a war camp.",
+      "speaker": "Graham"
+    },
+    "d6aab0ca": {
+      "file": "fraser-d6aab0ca.m4a",
+      "ms": 1252,
+      "text": "taken in the sweeps.",
+      "speaker": "Fraser"
+    },
+    "d78a96aa": {
+      "file": "graham-d78a96aa.m4a",
+      "ms": 1035,
+      "text": "Corbridge first.",
+      "speaker": "Graham"
+    },
+    "d8167d79": {
+      "file": "fraser-d8167d79.m4a",
+      "ms": 1159,
+      "text": "They have offered again.",
+      "speaker": "Fraser"
+    },
+    "d87e459d": {
+      "file": "wallace-d87e459d.m4a",
+      "ms": 282,
+      "text": "Aye",
+      "speaker": "Wallace"
+    },
+    "d9dedf07": {
+      "file": "narrator-d9dedf07.m4a",
+      "ms": 5446,
+      "text": "But Edward's great host, starving and mutinous, cannot hold what it has won.",
+      "speaker": "Narrator"
+    },
+    "db8ed3ff": {
+      "file": "wallace-db8ed3ff.m4a",
+      "ms": 1756,
+      "text": "Remember this hour, lads",
+      "speaker": "Wallace"
+    },
+    "dc76ccf2": {
+      "file": "graham-dc76ccf2.m4a",
+      "ms": 1753,
+      "text": "The horse are pulling off the field.",
+      "speaker": "Graham"
+    },
+    "dcb3e2b4": {
+      "file": "narrator-dcb3e2b4.m4a",
+      "ms": 1877,
+      "text": "The Forest says otherwise.",
+      "speaker": "Narrator"
+    },
+    "dcb8d087": {
+      "file": "a-tenant-of-elderslie-dcb8d087.m4a",
+      "ms": 3784,
+      "text": "His name is on the roll at Berwick with every other landholder in Scotland.",
+      "speaker": "A tenant of Elderslie"
+    },
+    "ddb5794b": {
+      "file": "graham-ddb5794b.m4a",
+      "ms": 2278,
+      "text": "Ryton's granary, in our wagons.",
+      "speaker": "Graham"
+    },
+    "ddde43f5": {
+      "file": "douglas-ddde43f5.m4a",
+      "ms": 1964,
+      "text": "Burn the rolls, not the abbey.",
+      "speaker": "Douglas"
+    },
+    "de553f98": {
+      "file": "wallace-de553f98.m4a",
+      "ms": 999,
+      "text": "The line is ready.",
+      "speaker": "Wallace"
+    },
+    "dffb6dc6": {
+      "file": "warenne-dffb6dc6.m4a",
+      "ms": 908,
+      "text": "Burn the bridge.",
+      "speaker": "Warenne"
+    },
+    "e072b98f": {
+      "file": "wallace-e072b98f.m4a",
+      "ms": 1278,
+      "text": "Scotland's nobles.",
+      "speaker": "Wallace"
+    },
+    "e0a5fab6": {
+      "file": "moray-e0a5fab6.m4a",
+      "ms": 1082,
+      "text": "Let them cross.",
+      "speaker": "Moray"
+    },
+    "e1a33339": {
+      "file": "douglas-e1a33339.m4a",
+      "ms": 1661,
+      "text": "Steel buys back Scotland.",
+      "speaker": "Douglas"
+    },
+    "e1fdf644": {
+      "file": "wallace-e1fdf644.m4a",
+      "ms": 1547,
+      "text": "You hear me, Andrew",
+      "speaker": "Wallace"
+    },
+    "e3cfb0ef": {
+      "file": "wallace-e3cfb0ef.m4a",
+      "ms": 1730,
+      "text": "Then we do not let them form up.",
+      "speaker": "Wallace"
+    },
+    "e557e857": {
+      "file": "wallace-e557e857.m4a",
+      "ms": 1942,
+      "text": "Now we let the river do the counting.",
+      "speaker": "Wallace"
+    },
+    "e7a2720a": {
+      "file": "narrator-e7a2720a.m4a",
+      "ms": 6910,
+      "text": "Ormesby has a strongbox, a fast horse, and no intention of testing whether his patrol holds.",
+      "speaker": "Narrator"
+    },
+    "e7a2fa96": {
+      "file": "wallace-e7a2fa96.m4a",
+      "ms": 987,
+      "text": "Close the rings.",
+      "speaker": "Wallace"
+    },
+    "e800c3cc": {
+      "file": "moray-e800c3cc.m4a",
+      "ms": 3102,
+      "text": "We need ten and eight before Cressingham loses patience.",
+      "speaker": "Moray"
+    },
+    "e91a0a11": {
+      "file": "narrator-e91a0a11.m4a",
+      "ms": 2725,
+      "text": "he could not betray a king who was never his.",
+      "speaker": "Narrator"
+    },
+    "e9be2c8a": {
+      "file": "narrator-e9be2c8a.m4a",
+      "ms": 5412,
+      "text": "Across Scotland this spring, small bands like this one are doing the same arithmetic:",
+      "speaker": "Narrator"
+    },
+    "ea08dcce": {
+      "file": "douglas-ea08dcce.m4a",
+      "ms": 1117,
+      "text": "Gold buys steel.",
+      "speaker": "Douglas"
+    },
+    "ed49b4a5": {
+      "file": "narrator-ed49b4a5.m4a",
+      "ms": 3666,
+      "text": "He came back with letters, sympathy, and no army.",
+      "speaker": "Narrator"
+    },
+    "ed86934e": {
+      "file": "narrator-ed86934e.m4a",
+      "ms": 3104,
+      "text": "Comyn's banners are already small on the northern road.",
+      "speaker": "Narrator"
+    },
+    "ee2276a2": {
+      "file": "narrator-ee2276a2.m4a",
+      "ms": 2574,
+      "text": "the treasurer pays his own arrears at last.",
+      "speaker": "Narrator"
+    },
+    "ee371db9": {
+      "file": "narrator-ee371db9.m4a",
+      "ms": 2744,
+      "text": "For a few minutes it looks like Stirling again.",
+      "speaker": "Narrator"
+    },
+    "ee756cfc": {
+      "file": "narrator-ee756cfc.m4a",
+      "ms": 4019,
+      "text": "A third of the army lies on the moor, and Sir John de Graham with them.",
+      "speaker": "Narrator"
+    },
+    "efcdbd94": {
+      "file": "fraser-efcdbd94.m4a",
+      "ms": 4166,
+      "text": "Earnside’s bridge and Bothwell’s walls are all that stand between us and the Warden.",
+      "speaker": "Fraser"
+    },
+    "f0dafc05": {
+      "file": "narrator-f0dafc05.m4a",
+      "ms": 1113,
+      "text": "They came anyway.",
+      "speaker": "Narrator"
+    },
+    "f182877a": {
+      "file": "wallace-f182877a.m4a",
+      "ms": 3901,
+      "text": "Then the archers do as they please, and we can neither reach them nor move.",
+      "speaker": "Wallace"
+    },
+    "f1d293a7": {
+      "file": "douglas-f1d293a7.m4a",
+      "ms": 1094,
+      "text": "Word from Irvine",
+      "speaker": "Douglas"
+    },
+    "f305b6a9": {
+      "file": "wallace-f305b6a9.m4a",
+      "ms": 801,
+      "text": "There's work.",
+      "speaker": "Wallace"
+    },
+    "f30b6704": {
+      "file": "narrator-f30b6704.m4a",
+      "ms": 1938,
+      "text": "There is no more room to be clever.",
+      "speaker": "Narrator"
+    },
+    "f4c05c18": {
+      "file": "moray-f4c05c18.m4a",
+      "ms": 973,
+      "text": "Take the bridgehead",
+      "speaker": "Moray"
+    },
+    "f553e6a5": {
+      "file": "narrator-f553e6a5.m4a",
+      "ms": 4019,
+      "text": "Northumberland, winter 1297.",
+      "speaker": "Narrator"
+    },
+    "f6131cc6": {
+      "file": "narrator-f6131cc6.m4a",
+      "ms": 2344,
+      "text": "the commoner now first man of the kingdom.",
+      "speaker": "Narrator"
+    },
+    "f74509f3": {
+      "file": "graham-f74509f3.m4a",
+      "ms": 920,
+      "text": "Lock and hold!",
+      "speaker": "Graham"
+    },
+    "f93656b0": {
+      "file": "wallace-f93656b0.m4a",
+      "ms": 1565,
+      "text": "That is what we are changing.",
+      "speaker": "Wallace"
+    },
+    "f976b0fb": {
+      "file": "narrator-f976b0fb.m4a",
+      "ms": 1174,
+      "text": "Wallace’s answer",
+      "speaker": "Narrator"
+    },
+    "fab98f3e": {
+      "file": "fraser-fab98f3e.m4a",
+      "ms": 1617,
+      "text": "Add it to the Warden's account.",
+      "speaker": "Fraser"
+    },
+    "fbc3eb97": {
+      "file": "narrator-fbc3eb97.m4a",
+      "ms": 2359,
+      "text": "Edward’s drums answer across the moor.",
+      "speaker": "Narrator"
+    },
+    "fbc97f74": {
+      "file": "douglas-fbc97f74.m4a",
+      "ms": 1857,
+      "text": "His patrol is already on the road.",
+      "speaker": "Douglas"
+    },
+    "fc91e0cc": {
+      "file": "wallace-fc91e0cc.m4a",
+      "ms": 1491,
+      "text": "I know what is on the table.",
+      "speaker": "Wallace"
+    },
+    "fcfbb2df": {
+      "file": "wallace-fcfbb2df.m4a",
+      "ms": 3353,
+      "text": "This day is ash in my mouth, whatever else it brings.",
+      "speaker": "Wallace"
+    },
+    "fd2ea65f": {
+      "file": "douglas-fd2ea65f.m4a",
+      "ms": 3753,
+      "text": "Between us we might make something an English earl has to take seriously.",
+      "speaker": "Douglas"
+    },
+    "fdd9f984": {
+      "file": "wallace-fdd9f984.m4a",
+      "ms": 2453,
+      "text": "A hungry man cannot hold a spear for an hour.",
+      "speaker": "Wallace"
+    },
+    "fe3416ce": {
+      "file": "narrator-fe3416ce.m4a",
+      "ms": 1975,
+      "text": "One garrison left on the Tyne",
+      "speaker": "Narrator"
+    },
+    "fe525f1e": {
+      "file": "narrator-fe525f1e.m4a",
+      "ms": 9975,
+      "text": "On 5 August 1305, at Robroyston near Glasgow, Wallace is captured by men serving Sir John Menteith and carried south in chains.",
+      "speaker": "Narrator"
+    },
+    "ff2e9da9": {
+      "file": "wallace-ff2e9da9.m4a",
+      "ms": 1117,
+      "text": "remember who stayed.",
+      "speaker": "Wallace"
+    },
+    "ff661fe2": {
+      "file": "wallace-ff661fe2.m4a",
+      "ms": 2893,
+      "text": "Whatever comes at you, the ground does not move.",
+      "speaker": "Wallace"
+    },
+    "ff9c4795": {
+      "file": "wallace-ff9c4795.m4a",
+      "ms": 1089,
+      "text": "That is the whole of it.",
+      "speaker": "Wallace"
+    }
+  }
+}

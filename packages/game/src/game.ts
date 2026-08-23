@@ -13,7 +13,7 @@ import {
 import { gameData } from '@bf/data';
 import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import {
-  deriveObjectiveGuides, evaluateObjectiveGuide, scenariosById, TriggerRuntime,
+  campaigns, deriveObjectiveGuides, evaluateObjectiveGuide, scenariosById, TriggerRuntime,
   type AiProfile, type Rect, type ScenarioMeta,
 } from '@bf/scenarios';
 import { applyAiProfile, attackNow, createBot, type Bot } from '@bf/ai';
@@ -26,13 +26,15 @@ import { placementGhostFrames } from './frames';
 import { placementStatus, type PlacementStatus } from './placement';
 import { Camera, tileToWorld, worldToTile } from './camera';
 import { TerrainLayer } from './terrain';
-import { WorldLayer } from './world';
+import { artScaleForFrame, WorldLayer } from './world';
 import { FxLayer } from './fx';
 import { FogLayer } from './fog';
 import { SimLoop, TICK_MS } from './simloop';
 import { CommandAdmission } from './admission';
 import { AudioEngine } from './audio/engine';
 import { Narrator, createBrowserSpeech, primeSpeechOnGesture } from './audio/narration';
+import { createRecordedSpeech, loadVoiceManifest } from './audio/recordedSpeech';
+import type { VoiceManifest } from './audio/voiceLines';
 import { GameAudio } from './audio/events';
 import { InputController, type InputHost } from './input';
 import { Hud, type HudHost } from './hud/hud';
@@ -57,7 +59,10 @@ import {
   type MatchContext,
 } from './analytics/events';
 import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
-import { completeScenario, loadProgress, saveProgress } from './campaign/progress';
+import {
+  campaignEpilogueDue, completeScenario, loadProgress, saveProgress,
+} from './campaign/progress';
+import { chapterAftermathPage } from './campaign/aftermath';
 import { setNavHint } from './screens/nav';
 import { getSettings } from './settings';
 import { activeArtworkMode } from './developerTools';
@@ -256,6 +261,14 @@ export async function runGame(
   }
 }
 
+/**
+ * The voice-over manifest is optional and unchanging, so it is fetched once per
+ * session and every later match reuses the result — including the empty one a
+ * build with no recordings produces.
+ */
+let voiceManifest: Promise<VoiceManifest> | null = null;
+const voiceOverManifest = (): Promise<VoiceManifest> => (voiceManifest ??= loadVoiceManifest());
+
 async function bootGame(
   root: HTMLElement,
   options: RunGameOptions,
@@ -321,10 +334,13 @@ async function bootGame(
   // ------------------------------------------------------------------ audio
   const audioEngine = new AudioEngine();
   audioEngine.ambientOn();
-  // Campaign dialogue is read aloud through the platform speech synthesizer.
-  // iOS wants a gesture before the first utterance, so one is spent silently on
-  // the first press rather than on the opening narrator line.
-  const speech = createBrowserSpeech();
+  // Campaign dialogue is read aloud: recorded voice-over where a beat has been
+  // captured, the platform speech synthesizer everywhere else. iOS wants a
+  // gesture before the first utterance and the first playback, so one is spent
+  // silently on the first press rather than on the opening narrator line.
+  const speech = createRecordedSpeech(await voiceOverManifest(), {
+    fallback: createBrowserSpeech(),
+  });
   const narrator = new Narrator(speech);
   primeSpeechOnGesture(speech);
   // every button press anywhere in the match UI clicks (capture: HUD buttons
@@ -508,7 +524,7 @@ async function bootGame(
     (defId) => unitDisplayStats(game, humanPlayer, defId)?.los ?? gameData.units[defId]?.los ?? 0,
     resourceMemory,
   );
-  const fx = new FxLayer(assets);
+  const fx = new FxLayer(assets, humanPlayer);
   const fog = new FogLayer(game.state.map);
   const ghostLayer = new Container();
   const ghostFoot = new Graphics();
@@ -598,10 +614,21 @@ async function bootGame(
 
   // Idle-unit cycling (GDD: top-bar idle-villager/-military badges = touch `.` hotkey).
   const idleCursor: Record<IdleCategory, number> = { villager: 0, military: 0 };
-  const getIdleCounts = (): Record<IdleCategory, number> => ({
-    villager: idleUnits(getState(), humanPlayer, 'villager').length,
-    military: idleUnits(getState(), humanPlayer, 'military').length,
-  });
+  // Both idle scans walk every entity on the map, and the HUD asks for them on
+  // every frame while the answer can only change when the sim advances.
+  let idleCountsTick = -1;
+  let idleCountsCache: Record<IdleCategory, number> = { villager: 0, military: 0 };
+  const getIdleCounts = (): Record<IdleCategory, number> => {
+    const st = getState();
+    if (st.tick !== idleCountsTick) {
+      idleCountsTick = st.tick;
+      idleCountsCache = {
+        villager: idleUnits(st, humanPlayer, 'villager').length,
+        military: idleUnits(st, humanPlayer, 'military').length,
+      };
+    }
+    return idleCountsCache;
+  };
   const cycleIdle = (cat: IdleCategory): void => {
     const list = idleUnits(getState(), humanPlayer, cat);
     if (list.length === 0) return;
@@ -682,24 +709,43 @@ async function bootGame(
       // campaign flow: victory unlocks the next scenario; defeat offers retry
       const scenarioId = meta.id;
       const campaignId = meta.campaign;
+      let campaignFinished = false;
       if (victory) {
-        saveProgress(completeScenario(loadProgress(), scenarioId));
+        const progress = completeScenario(loadProgress(), scenarioId);
+        saveProgress(progress);
+        campaignFinished = campaignEpilogueDue(campaigns[campaignId], progress, scenarioId);
         analytics.track(campaignChapterCompleteEvent(matchContext, summary.durationSeconds));
       }
-      overlays.showEndScreen(victory, summary, {
-        sub: victory ? `${meta.title} — complete` : meta.title,
-        buttons: victory
-          ? [
-            { label: 'Continue', onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
-            { label: 'Replay scenario', ghost: true, onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
-            { label: 'Continue watching', ghost: true, dismiss: true },
-          ]
-          : [
-            { label: 'Retry', onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
-            { label: 'Return to scenarios', ghost: true, onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
-            { label: 'Continue watching', ghost: true, dismiss: true },
-          ],
-      });
+      // Winning the last chapter continues into the campaign's closing page
+      // rather than a list of chapters that are all finished.
+      const onwards = campaignFinished
+        ? { kind: 'campaignEpilogue' as const, campaignId }
+        : { kind: 'scenarioList' as const, campaignId };
+      const showStats = (): void => {
+        overlays.showEndScreen(victory, summary, {
+          sub: victory ? `${meta.title} — complete` : meta.title,
+          buttons: victory
+            ? [
+              {
+                label: campaignFinished ? 'Read the ending' : 'Continue',
+                onClick: () => reloadTo(onwards),
+              },
+              { label: 'Replay scenario', ghost: true, onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
+              { label: 'Continue watching', ghost: true, dismiss: true },
+            ]
+            : [
+              { label: 'Retry', onClick: () => reloadTo({ kind: 'startScenario', scenarioId }) },
+              { label: 'Return to scenarios', ghost: true, onClick: () => reloadTo({ kind: 'scenarioList', campaignId }) },
+              { label: 'Continue watching', ghost: true, dismiss: true },
+            ],
+        });
+      };
+      // The story payoff comes before the arithmetic: what the chapter changed,
+      // then how many sheep it took. Only on a win, and only where the chapter
+      // has an authored aftermath.
+      const aftermath = victory ? chapterAftermathPage(scenarioDef) : null;
+      if (aftermath) overlays.showAftermath(aftermath, showStats);
+      else showStats();
     } else {
       overlays.showEndScreen(victory, summary, {
         buttons: [
@@ -876,13 +922,31 @@ async function bootGame(
       kind: 'setProductionSpeed', player: humanPlayer, multiplier: preferredProductionSpeed,
     });
   }
+  /**
+   * World-space confirmation for an accepted player order: ground orders drop a
+   * destination arrow, target-aimed ones pulse the target itself. Without this
+   * a build/gather/attack order only ever showed up in the corner toast, which
+   * reads as a dropped command while the unit is still walking over.
+   */
+  const showOrderFeedback = (cmd: Command): void => {
+    const st = getState();
+    if (cmd.kind === 'move') {
+      fx.showMoveMarker(cmd.x, cmd.y, st.tick);
+      return;
+    }
+    if (cmd.kind === 'attack' || cmd.kind === 'gather' || cmd.kind === 'repair'
+      || cmd.kind === 'garrison' || cmd.kind === 'convert' || cmd.kind === 'heal') {
+      const target = st.entities.get(cmd.targetId);
+      if (target) fx.showTargetPing(target, st.tick, cmd.kind === 'attack' ? 'attack' : 'work');
+    }
+  };
   const issueWithUndo = (
     cmd: Command,
     label: string,
     undo: (() => void) | null,
   ): boolean => {
     const accepted = admission.issueWithUndo(cmd, label, undo);
-    if (accepted && cmd.kind === 'move') fx.showMoveMarker(cmd.x, cmd.y, getState().tick);
+    if (accepted) showOrderFeedback(cmd);
     return accepted;
   };
 
@@ -923,13 +987,19 @@ async function bootGame(
     const colorIdx = getState().players[humanPlayer]?.setup.color;
     const candidates = placementGhostFrames(placement.defId, getState().players[humanPlayer]?.age ?? 'dark');
     let frame = null;
+    let resolvedName = candidates[candidates.length - 1];
     for (let i = 0; i < candidates.length - 1 && !frame; i++) {
       frame = assets.tryResolve(candidates[i], colorIdx);
+      if (frame) resolvedName = candidates[i];
     }
-    frame ??= assets.resolveFrame(candidates[candidates.length - 1], colorIdx);
+    frame ??= assets.resolveFrame(resolvedName, colorIdx);
     ghostSprite.texture = frame.texture;
     ghostSprite.anchor.set(frame.anchorX, frame.anchorY);
-    ghostSprite.scale.set(frame.renderScale);
+    // Same art scale the live building will be drawn at, so the preview is the
+    // size of what actually gets built (#116): without it a keep previewed at
+    // roughly a third of the tower the player ends up with.
+    const artScale = artScaleForFrame(placement.defId, resolvedName);
+    ghostSprite.scale.set(frame.renderScale * artScale.x, frame.renderScale * artScale.y);
   };
 
   const startPlacement = (defId: string): void => {
@@ -1360,8 +1430,9 @@ async function bootGame(
 
     const st = getState();
     const alpha = loop.alpha;
-    terrain.update(camera.getWorldView());
-    world.update(st, alpha, st.tick + alpha);
+    const worldView = camera.getWorldView();
+    terrain.update(worldView);
+    world.update(st, alpha, st.tick + alpha, worldView);
     fx.update(st, st.tick + alpha);
     if (placement) refreshGhost();
     hud.update();

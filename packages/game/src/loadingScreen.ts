@@ -16,6 +16,8 @@ export interface LoadingArtwork {
   campaign: string;
   chapter: string;
   setting?: string;
+  /** What is at stake this chapter — the last thing read before play starts. */
+  stakes?: string;
 }
 
 export interface ArtworkLoadProgress {
@@ -133,6 +135,9 @@ const LOADING_CSS = `
 .bf-loading-chapter { margin:0; color:#F3DE9C; font:600 24px/1.15 "Cinzel","Georgia",serif;
   letter-spacing:.7px; text-shadow:0 2px 8px #0b0703; }
 .bf-loading-setting { margin:5px 0 0; color:#C9AE7E; font-size:13px; line-height:1.3; letter-spacing:.5px; }
+/* The chapter's stakes, held on screen while the atlases download: the last
+   quiet moment before the map appears is the one place a player will read it. */
+.bf-loading-stakes { margin:8px 0 0; max-width:52ch; color:#EFDDB5; font-size:14px; line-height:1.45; }
 .bf-loading-mark { width:46px; height:46px; margin:0 auto 18px; transform:rotate(45deg);
   border:2px solid #8A6414; box-shadow:0 0 0 2px #2C1F12 inset,0 0 20px rgba(230,192,74,.12); }
 .bf-loading.has-art .bf-loading-mark { width:28px; height:28px; margin:0 0 14px; }
@@ -178,6 +183,7 @@ const LOADING_CSS = `
   .bf-loading-story { margin-bottom:10px; padding-bottom:9px; }
   .bf-loading-chapter { font-size:19px; }
   .bf-loading-setting { margin-top:3px; font-size:11.5px; }
+  .bf-loading-stakes { margin-top:5px; font-size:12px; }
   .bf-loading.has-art .bf-loading-mark { display:none; }
   .bf-loading.has-art h1 { margin-bottom:5px; font-size:19px; }
   .bf-loading-status { min-height:20px; margin-bottom:9px; font-size:16px; }
@@ -289,6 +295,12 @@ export class MatchLoadingScreen {
       setting.className = 'bf-loading-setting';
       setting.textContent = artwork.setting;
       story.appendChild(setting);
+    }
+    if (artwork.stakes) {
+      const stakes = document.createElement('p');
+      stakes.className = 'bf-loading-stakes';
+      stakes.textContent = artwork.stakes;
+      story.appendChild(stakes);
     }
 
     this.artworkImage = image;

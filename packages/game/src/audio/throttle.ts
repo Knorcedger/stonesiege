@@ -14,7 +14,14 @@ export const DEFAULT_POLICIES: Record<string, CategoryPolicy> = {
   gather: { maxConcurrent: 3, minGapMs: 90 },
   build: { maxConcurrent: 2, minGapMs: 120 },
   combat: { maxConcurrent: 4, minGapMs: 60 },
+  structure: { maxConcurrent: 3, minGapMs: 90 },
   bow: { maxConcurrent: 3, minGapMs: 70 },
+  arrowHit: { maxConcurrent: 3, minGapMs: 70 },
+  // siege voices are long and loud: a handful of rams or a mangonel splash must
+  // read as weight, not as a drum roll
+  ram: { maxConcurrent: 2, minGapMs: 200 },
+  siege: { maxConcurrent: 2, minGapMs: 160 },
+  siegeHit: { maxConcurrent: 2, minGapMs: 140 },
   collapse: { maxConcurrent: 2, minGapMs: 250 },
   monk: { maxConcurrent: 2, minGapMs: 300 },
   bell: { maxConcurrent: 1, minGapMs: 250 },
@@ -67,11 +74,18 @@ export class SfxThrottle {
 }
 
 /**
+ * Default attenuation horizon (world px): past this, an ordinary voice is
+ * culled. audio/combat.ts reaches for this so heavy siege voices can be
+ * described as "further than normal" without restating the number.
+ */
+export const SFX_FAR_DEFAULT = 1500;
+
+/**
  * Camera-distance attenuation (pure): full volume inside `near` world px,
  * linear falloff to zero at `far`. Returns 0 for anything past `far` so the
  * caller can skip synthesis entirely.
  */
-export function attenuation(distancePx: number, near = 380, far = 1500): number {
+export function attenuation(distancePx: number, near = 380, far = SFX_FAR_DEFAULT): number {
   if (distancePx <= near) return 1;
   if (distancePx >= far) return 0;
   return 1 - (distancePx - near) / (far - near);

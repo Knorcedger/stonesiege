@@ -119,6 +119,14 @@ against Paladins), 2-tier scout line, 2-tier skirmisher line matching AoE2's two
   - Standard military units auto-engage hostiles within their visible guard radius. Selected
     units show that radius as a faint ground circle: infantry guard 4 tiles, cavalry 6, and
     other military classes use their LOS. Plain move orders still take priority.
+  - **Squad alarm** (skirmish/practice, human army): a soldier dragged into a fight — struck
+    by an enemy, or acquiring one on sight — alerts friendly troops within twice their guard
+    radius, and they join the same target as soon as the fight starts rather than after the
+    first blow lands. A structure joins the alarm only when it actually struck him, so a squad
+    answers a tower together instead of feeding it one man at a time. Only the original fighter
+    raises the alarm, so awareness never chains across a whole army, and an assault on a
+    passive building — ordered, or picked up along an attack-move route — still sends exactly
+    the units you sent.
   - Same-player moving units do not shove one another into slow feedback chains. They may pass
     through a friendly queue while idle units still spread apart locally after movement ends.
   - **Villagers never auto-engage.** Attacked villagers flee toward the nearest TC/tower and
@@ -208,18 +216,39 @@ reference, then balanced by playtesting loops.
 Procedural/synthesized SFX v1 (villager chop, mining picks, swordplay, arrows, building
 placement, horn stings for age-up and attack warnings, UI clicks). Ambient loop. Music: roadmap.
 
-**Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as
-spoken story rather than silent text. There is no recorded voice-over: the lines go to the
-device's own speech synthesizer, steered into a slow, low, deliberate delivery. The `Narrator`
-and `Chronicle` lines get the deepest, slowest read, and every other speaker keeps a pitch
-derived from its name, so Wallace and Cressingham stay apart by ear across chapters. The banner
-holds until the voice finishes (capped at 20s) so a line is never cut off mid-sentence, and a
-tap dismisses text and voice together. Narration stops with the match: pausing, backgrounding
-the app, or reaching the end screen silences it, and the closing lines are not read over the
-victory or defeat fanfare. **Narration** volume and a **Campaign narration** switch sit with
-the other audio settings; off sends nothing to the synthesizer at all.
-Devices without speech synthesis simply read nothing and play exactly as before. Recorded
-voice-over remains on the roadmap and can replace the synthesizer behind the same seam.
+**Combat impacts.** A blow is voiced by the weapon that lands it and the material it lands on,
+so the battle can be read by ear. Swords clash on armor but chop into timber; pikes thrust at
+troops and knock dully against walls; cavalry sabres carry the swing and the weight of the
+horse; villagers strike with tools; wolves bite. A battering ram booms — a swung log against a
+gate, nothing else in the game sounds like it — and crushes rather than booms when it catches a
+body. Ranged attacks sound twice: the release (bowstring, crossbow lock, or a siege arm slamming
+its stop) and the arrival, where an arrow thuds into flesh, thunks into wood, a crossbow bolt
+punches, and a mangonel or trebuchet boulder crushes bodies or shatters masonry. Ram and boulder
+impacts carry further than hand weapons, so an off-screen siege is still audible. Every family
+has its own concurrency budget, so a wall crew, a field battle, and an archer volley never
+starve one another out of the mix.
+
+**Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as spoken
+story rather than silent text. Lines that have been recorded play as voice-over from `assets/vo/`,
+read by the English (UK) **Daniel** voice; every other line goes to the device's own speech
+synthesizer, steered by voice choice and phrasing rather than by pitch. The two are
+interchangeable beat by beat, so dialogue written after the last render is still read aloud, and
+an edited line stops playing the audio of its old wording. That synthesizer prefers the English
+(UK) **Martha** voice wherever the device has her, falling back to the best-quality English voice
+installed; a line is spoken as a sequence of beats split at sentence ends, dashes, colons and
+semicolons, with silence held between them, and every voice stays within a whole tone of its own
+register — dragging the pitch down instead is what makes a modern voice sound synthetic. The
+`Narrator` and `Chronicle` lines get the slowest read and the longest silences, and every other
+speaker keeps a slight pitch offset derived from its name, so Wallace and Cressingham stay apart
+by ear across chapters. The banner holds until the voice finishes (capped at 20s) so a line is
+never cut off mid-sentence, and a tap dismisses text and voice together. Narration stops with the
+match: pausing, backgrounding the app, or reaching the end screen silences it, and the closing
+lines are not read over the victory or defeat fanfare. **Narration** volume and a **Campaign
+narration** switch sit with the other audio settings; off sends nothing to the synthesizer at all.
+Devices without speech synthesis read only the lines that have recordings, and play exactly as
+before otherwise. Voice-over is rendered by `npm run vo:render` into one file per spoken beat,
+named by a hash of speaker and wording so a text edit can never leave stale audio playing; see
+[../art/vo/README.md](../art/vo/README.md) for the source and its licence status.
 
 ## Victory / Defeat
 - Practice: conquest. A player is defeated the moment they have **no Town Center, no

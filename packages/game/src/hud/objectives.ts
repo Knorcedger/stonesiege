@@ -4,7 +4,8 @@
 
 import type { ObjectiveGuideReadout, ObjectiveTargetTile } from '@bf/scenarios';
 import {
-  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_TOP_BAR_BOTTOM_VAR, TOP_BAR_CLEAR_PX,
+  cssVarPx, HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
+  OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_GAP_PX, OBJECTIVES_MESSAGE_TOP_VAR, TOP_BAR_CLEAR_PX,
 } from './layout';
 
 export type ObjectiveUiState = 'open' | 'complete' | 'failed';
@@ -117,6 +118,152 @@ export function objectiveSequencePosition(
   };
 }
 
+/**
+ * A run of resolved objectives, folded into one row. Completed goals are
+ * history: they carry the same full row — text, progress chips and all — as the
+ * goal the player is actually working on, so a campaign mission's list grew
+ * past the screen and over the command card by its fourth objective.
+ */
+export type ObjectiveRow =
+  /** `folded`: revealed history, indented under the summary row that owns it. */
+  | { kind: 'objective'; objective: ObjectiveItem; display: ObjectiveDisplayState; folded: boolean }
+  /**
+   * `runId` identifies THIS run (its first objective) so each summary expands on
+   * its own — a mission with two history blocks must not open both at one tap.
+   * `ids` are the objectives it stands for: a completion inside a folded run has
+   * no row of its own to flash, so the summary flashes for it.
+   */
+  | {
+    kind: 'resolved'; runId: string; ids: readonly string[];
+    completed: number; failed: number; expanded: boolean;
+  };
+
+/**
+ * Runs shorter than this stay expanded: folding a single completed objective
+ * into a "1 completed" row costs exactly the row it saves, and hides the text.
+ */
+export const RESOLVED_COLLAPSE_MIN = 2;
+
+/**
+ * Rows to render, folding each *consecutive* run of resolved objectives into
+ * one summary. Grouping by runs rather than by state keeps the authored
+ * sequence intact — a failed optional goal in the middle of the list does not
+ * teleport to the top — and matches how a campaign actually reads: a block of
+ * history, then the live goals.
+ */
+export function objectiveRows(
+  items: readonly ObjectiveItem[],
+  currentId: string | undefined,
+  expandedRuns: ReadonlySet<string>,
+): ObjectiveRow[] {
+  const rows: ObjectiveRow[] = [];
+  const push = (objective: ObjectiveItem, folded: boolean): void => {
+    rows.push({
+      kind: 'objective',
+      objective,
+      display: objectiveDisplayState(objective, currentId),
+      folded,
+    });
+  };
+  let run: ObjectiveItem[] = [];
+  const flush = (): void => {
+    if (run.length === 0) return;
+    if (run.length >= RESOLVED_COLLAPSE_MIN) {
+      const expanded = expandedRuns.has(run[0].id);
+      rows.push({
+        kind: 'resolved',
+        runId: run[0].id,
+        ids: run.map((objective) => objective.id),
+        completed: run.filter((objective) => objective.state === 'complete').length,
+        failed: run.filter((objective) => objective.state === 'failed').length,
+        expanded,
+      });
+      // The summary row is also the control that folds them back up, so it
+      // stays in place above the rows it reveals.
+      if (expanded) for (const objective of run) push(objective, true);
+    } else {
+      for (const objective of run) push(objective, false);
+    }
+    run = [];
+  };
+  for (const objective of items) {
+    if (objective.state === 'open') {
+      flush();
+      push(objective, false);
+    } else {
+      run.push(objective);
+    }
+  }
+  flush();
+  return rows;
+}
+
+export function resolvedSummaryLabel(completed: number, failed: number): string {
+  const parts: string[] = [];
+  if (completed > 0) parts.push(`${completed} completed`);
+  if (failed > 0) parts.push(`${failed} failed`);
+  return parts.join(' · ');
+}
+
+export function resolvedSummaryMark(completed: number, failed: number): string {
+  return failed > 0 && completed === 0 ? '✖' : '✔';
+}
+
+/** Breathing room (px) between the objectives list and the cluster below it. */
+export const OBJECTIVE_LIST_GAP_PX = 8;
+/** Below this the open list is more overlap than information — head only. */
+export const OBJECTIVE_LIST_MIN_PX = 88;
+/** Cap on a list that has room to spare: the battlefield still has to be visible. */
+export const OBJECTIVE_LIST_MAX_FRACTION = 0.44;
+
+/**
+ * How tall the expanded list may be (px) before it reaches the bottom-right
+ * command cluster. Everything is root-relative, so this is pure arithmetic on
+ * measurements the HUD already publishes.
+ *
+ * The panel and the cluster share the right edge of the screen, so a list sized
+ * against the viewport (the old flat 44vh) overlapped the command card by
+ * construction whenever the card was tall — which on a landscape phone is most
+ * of a match.
+ */
+export function objectiveListMaxHeightPx(
+  headBottom: number,
+  clusterTop: number,
+  rootHeight: number,
+): number {
+  const free = Math.floor(clusterTop - headBottom - OBJECTIVE_LIST_GAP_PX);
+  const cap = Math.floor(rootHeight * OBJECTIVE_LIST_MAX_FRACTION);
+  return Math.max(0, Math.min(free, cap));
+}
+
+/**
+ * Whether the space left over is worth a list at all. Below the floor the panel
+ * shows its head only — which already carries the current goal and its live
+ * progress — instead of a two-line scroller wedged against the card.
+ */
+export function objectiveListFits(maxHeightPx: number): boolean {
+  return maxHeightPx >= OBJECTIVE_LIST_MIN_PX;
+}
+
+/**
+ * Hit testing for the panel itself, on the same rule as the battlefield beacon
+ * (see objectiveMarkerPointerEvents): an overlay that cannot get out of the
+ * way must not take the taps meant for the control underneath it.
+ *
+ * The head is anchored under the top bar and cannot move, so a cluster whose
+ * top rises past the head's bottom — a town centre card on a landscape phone —
+ * is a column with no free space at all. The head keeps painting there (it
+ * carries the current goal and its progress, the one thing worth the pixels),
+ * but its taps belong to the card: the list it would toggle is hidden in that
+ * state anyway, so nothing is lost by letting them through.
+ */
+export function objectivePanelPointerEvents(
+  headBottom: number,
+  clusterTop: number,
+): 'auto' | 'none' {
+  return headBottom > clusterTop ? 'none' : 'auto';
+}
+
 export type ObjectiveMarkerPlacement =
   | { kind: 'beacon'; x: number; y: number; angle: number }
   | { kind: 'edge'; x: number; y: number; angle: number };
@@ -189,10 +336,21 @@ const OBJ_CSS = `
   background:#241809; border-left:1px solid #8A6414; border-radius:0 3px 3px 0;
   color:#E6C04A; font-size:18px; }
 .bf-obj-focus.show { display:block; }
-.bf-obj-list { margin:2px 0 0; padding:5px 7px; list-style:none; display:none; max-height:44vh; overflow:auto;
+/* max-height is set inline from measurement (see objectiveListMaxHeightPx); the
+   44vh here is only the pre-layout fallback, and a viewport-relative cap knows
+   nothing about the command card directly below this panel. border-box, so that
+   measured cap bounds the whole box — as content-box, the 5px padding and 1px
+   border rode 12px past it and back onto the card. */
+.bf-obj-list { box-sizing:border-box; margin:2px 0 0; padding:5px 7px; list-style:none; display:none;
+  max-height:44vh; overflow:auto; overscroll-behavior:contain;
   background:linear-gradient(rgba(44,31,18,0.94), rgba(26,18,8,0.94));
   border:1px solid #64492B; border-radius:4px; box-shadow:0 0 0 1px #1A1208; }
 .bf-objectives.open .bf-obj-list { display:block; }
+/* Open, but with less clear space than one readable list: the head already
+   carries the current goal and its progress, so drop the list rather than
+   stack it on the command card. Room returning re-opens it — the player's
+   intent is kept in the panel's open flag, not in the DOM. */
+.bf-objectives.open.cramped .bf-obj-list { display:none; }
 .bf-obj-item { display:grid; grid-template-columns:15px minmax(0,1fr) auto; gap:5px; align-items:start;
   padding:5px 3px; font-size:12px; line-height:1.25; color:#EFDDB5; border-left:2px solid transparent; }
 .bf-obj-item + .bf-obj-item { border-top:1px solid rgba(100,73,43,0.45); }
@@ -210,6 +368,18 @@ const OBJ_CSS = `
   background:#1A1208; font-size:10px; white-space:nowrap; text-decoration:none; }
 .bf-obj-chip.done { color:#9BCB70; border-color:#527033; }
 .bf-obj-item.complete .bf-obj-chip { color:#8f8268; border-color:#46331F; }
+.bf-obj-fold { padding:0; list-style:none; }
+.bf-obj-fold.flash { animation:bfObjFlash 0.9s ease-out; }
+.bf-obj-fold + .bf-obj-item, .bf-obj-item + .bf-obj-fold { border-top:1px solid rgba(100,73,43,0.45); }
+/* 44px like every other tappable in the HUD: this is a thumb target, not a label. */
+.bf-obj-resolved { box-sizing:border-box; display:grid; grid-template-columns:15px minmax(0,1fr) 14px;
+  gap:5px; align-items:center; width:100%; min-height:44px; padding:6px 3px; border:0;
+  background:transparent; color:#B99A6B; font:12px/1.25 "Alegreya Sans","Trebuchet MS",sans-serif;
+  text-align:left; cursor:pointer; }
+.bf-obj-resolved .bf-obj-mark { color:#E6C04A; }
+.bf-obj-chevron { color:#B99A6B; font-size:10px; text-align:center; }
+/* Revealed history is indented under the summary that owns it. */
+.bf-obj-item.folded { padding-left:16px; }
 .bf-obj-row-focus { box-sizing:border-box; width:44px; height:44px; padding:0; border:1px solid #8A6414; border-radius:3px;
   background:#241809; color:#E6C04A; font:16px "Alegreya Sans","Trebuchet MS",sans-serif; cursor:pointer; }
 .bf-obj-item.flash { animation:bfObjFlash 0.9s ease-out; }
@@ -253,11 +423,21 @@ export class ObjectivesPanel {
   private listEl: HTMLUListElement;
   private markerEl: HTMLButtonElement;
   private open: boolean;
+  /** Runs of history the player has unfolded, keyed by first objective id. */
+  private expandedRuns = new Set<string>();
+  /**
+   * Re-render on the next update() even though nothing the key covers changed.
+   * A boolean, NOT a sentinel key: '' is the real key of an empty objective
+   * list, so a sentinel would be swallowed exactly when the panel is empty.
+   */
+  private forceRender = false;
   private wideViewport: boolean;
   private viewportKey: string;
   private lastKey = '';
   /** Last top-bar clearance this panel rendered against (see update()). */
   private lastBarClear = '';
+  /** Last command-cluster edge this panel sized its list against (see update()). */
+  private lastClusterTop = '';
   private flashIds = new Set<string>();
 
   constructor(
@@ -293,6 +473,7 @@ export class ObjectivesPanel {
       this.open = !this.open;
       this.el.classList.toggle('open', this.open);
       this.summaryEl.setAttribute('aria-expanded', String(this.open));
+      this.forceRender = true; // re-measure: aria and the cramped state follow `open`
     });
     this.headFocusEl = document.createElement('button');
     this.headFocusEl.type = 'button';
@@ -315,7 +496,8 @@ export class ObjectivesPanel {
   }
 
   destroy(): void {
-    this.root.style.removeProperty('--bf-objectives-message-top');
+    this.root.style.removeProperty(OBJECTIVES_MESSAGE_TOP_VAR);
+    this.root.style.removeProperty(OBJECTIVES_LEFT_VAR);
     this.el.remove();
     this.markerEl.remove();
   }
@@ -403,9 +585,28 @@ export class ObjectivesPanel {
     // lands back on top of the objective head.
     const barClear = this.root.style.getPropertyValue(HUD_TOP_BAR_BOTTOM_VAR);
     const barMoved = barClear !== this.lastBarClear;
-    if (key === this.lastKey && this.flashIds.size === 0 && !viewportChanged && !barMoved) return;
+    // Same reasoning for the command cluster below: selecting a town centre
+    // raises its top edge ~500px, and the list has to shrink to match even
+    // though not one objective changed.
+    const clusterTop = this.root.style.getPropertyValue(HUD_RIGHT_CLUSTER_TOP_VAR);
+    const clusterMoved = clusterTop !== this.lastClusterTop;
+    // Geometry and content are separated deliberately. The cluster is
+    // bottom-anchored, so its edge moves on every selection, every queued unit
+    // and every garrison change — rebuilding the rows for that would reset the
+    // list's scroll position, drop focus to <body>, and swallow a tap that
+    // straddled the rebuild, several times a minute. Moving edges re-measure;
+    // only real objective changes rebuild rows.
+    const rowsChanged = key !== this.lastKey || this.flashIds.size > 0
+      || this.forceRender || viewportChanged;
+    if (!rowsChanged && !barMoved && !clusterMoved) return;
     this.lastKey = key;
     this.lastBarClear = barClear;
+    this.lastClusterTop = clusterTop;
+    this.forceRender = false;
+    if (!rowsChanged) {
+      this.applyClearance();
+      return;
+    }
 
     const current = this.model.current;
     if (current) {
@@ -422,48 +623,137 @@ export class ObjectivesPanel {
     this.headFocusEl.classList.toggle('show', this.currentTarget !== undefined);
 
     this.listEl.replaceChildren();
-    for (const objective of items) {
-      const displayState = objectiveDisplayState(objective, current?.id);
-      const li = document.createElement('li');
-      li.className = `bf-obj-item ${displayState}${this.flashIds.has(objective.id) ? ' flash' : ''}`;
-      const mark = document.createElement('span');
-      mark.className = 'bf-obj-mark';
-      mark.textContent = MARK[displayState];
-      const body = document.createElement('div');
-      const text = document.createElement('span');
-      text.textContent = objective.text;
-      body.appendChild(text);
-      if ((objective.readout?.goals.length ?? 0) > 0) {
-        const progress = document.createElement('div');
-        progress.className = 'bf-obj-progress';
-        for (const goal of objective.readout!.goals) {
-          const chip = document.createElement('span');
-          chip.className = `bf-obj-chip${goal.done ? ' done' : ''}`;
-          chip.textContent = `${goal.label} ${goal.have}/${goal.need}`;
-          progress.appendChild(chip);
-        }
-        body.appendChild(progress);
-      }
-      li.append(mark, body);
-      if (objective.readout?.target && objective.state === 'open') {
-        const focus = document.createElement('button');
-        focus.type = 'button';
-        focus.className = 'bf-obj-row-focus';
-        focus.textContent = '◎';
-        focus.setAttribute('aria-label', `Show objective on map: ${objective.text}`);
-        focus.addEventListener('click', () => this.onFocusTarget(objective.readout!.target!));
-        li.appendChild(focus);
-      }
-      this.listEl.appendChild(li);
+    for (const row of objectiveRows(items, current?.id, this.expandedRuns)) {
+      this.listEl.appendChild(row.kind === 'resolved'
+        ? this.buildResolvedRow(row)
+        : this.buildObjectiveRow(row.objective, row.display, row.folded));
     }
     this.flashIds.clear();
-    if (this.wideViewport) {
-      this.root.style.removeProperty('--bf-objectives-message-top');
-    } else {
-      const rootRect = this.root.getBoundingClientRect();
-      const headRect = this.headEl.getBoundingClientRect();
-      const messageTop = Math.ceil(headRect.bottom - rootRect.top + 14);
-      this.root.style.setProperty('--bf-objectives-message-top', `${messageTop}px`);
+    this.applyClearance();
+  }
+
+  private buildResolvedRow(row: Extract<ObjectiveRow, { kind: 'resolved' }>): HTMLLIElement {
+    const { completed, failed, expanded } = row;
+    const li = document.createElement('li');
+    // A goal that completes inside a folded run has no row of its own to flash;
+    // without this the 2nd completion onward lands with no feedback at all,
+    // since notify() also skips the head flash while the panel is open.
+    const flash = !expanded && row.ids.some((id) => this.flashIds.has(id));
+    li.className = flash ? 'bf-obj-fold flash' : 'bf-obj-fold';
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'bf-obj-resolved';
+    button.setAttribute('aria-expanded', String(expanded));
+    const mark = document.createElement('span');
+    mark.className = 'bf-obj-mark';
+    mark.textContent = resolvedSummaryMark(completed, failed);
+    const label = document.createElement('span');
+    label.textContent = resolvedSummaryLabel(completed, failed);
+    const chevron = document.createElement('span');
+    chevron.className = 'bf-obj-chevron';
+    chevron.textContent = expanded ? '▲' : '▼';
+    button.append(mark, label, chevron);
+    button.addEventListener('click', () => {
+      if (!this.expandedRuns.delete(row.runId)) this.expandedRuns.add(row.runId);
+      // The row set changes without any objective changing, so the key-based
+      // early return in update() would otherwise swallow the tap.
+      this.forceRender = true;
+    });
+    li.appendChild(button);
+    return li;
+  }
+
+  private buildObjectiveRow(
+    objective: ObjectiveItem,
+    displayState: ObjectiveDisplayState,
+    folded: boolean,
+  ): HTMLLIElement {
+    const li = document.createElement('li');
+    li.className = `bf-obj-item ${displayState}${folded ? ' folded' : ''}`
+      + `${this.flashIds.has(objective.id) ? ' flash' : ''}`;
+    const mark = document.createElement('span');
+    mark.className = 'bf-obj-mark';
+    mark.textContent = MARK[displayState];
+    const body = document.createElement('div');
+    const text = document.createElement('span');
+    text.textContent = objective.text;
+    body.appendChild(text);
+    if ((objective.readout?.goals.length ?? 0) > 0) {
+      const progress = document.createElement('div');
+      progress.className = 'bf-obj-progress';
+      for (const goal of objective.readout!.goals) {
+        const chip = document.createElement('span');
+        chip.className = `bf-obj-chip${goal.done ? ' done' : ''}`;
+        chip.textContent = `${goal.label} ${goal.have}/${goal.need}`;
+        progress.appendChild(chip);
+      }
+      body.appendChild(progress);
     }
+    li.append(mark, body);
+    if (objective.readout?.target && objective.state === 'open') {
+      const focus = document.createElement('button');
+      focus.type = 'button';
+      focus.className = 'bf-obj-row-focus';
+      focus.textContent = '◎';
+      focus.setAttribute('aria-label', `Show objective on map: ${objective.text}`);
+      focus.addEventListener('click', () => this.onFocusTarget(objective.readout!.target!));
+      li.appendChild(focus);
+    }
+    return li;
+  }
+
+  /**
+   * Size the list against what is actually below it, then publish this panel's
+   * own footprint for the overlays that have to work around it. Everything is
+   * measured after the rows are in the DOM, so the heights reflect the text
+   * just rendered.
+   */
+  private applyClearance(): void {
+    const rootRect = this.root.getBoundingClientRect();
+    const headBottom = this.headEl.getBoundingClientRect().bottom - rootRect.top;
+    // No published edge yet (the frames before the HUD's first measurement)
+    // means no known obstacle: the column is free to the bottom of the root.
+    const clusterTop = cssVarPx(
+      this.root.style.getPropertyValue(HUD_RIGHT_CLUSTER_TOP_VAR),
+      rootRect.height,
+    );
+    const maxHeight = objectiveListMaxHeightPx(headBottom, clusterTop, rootRect.height);
+    const fits = objectiveListFits(maxHeight);
+    this.listEl.style.maxHeight = `${maxHeight}px`;
+    this.el.classList.toggle('cramped', !fits);
+    this.el.style.pointerEvents = objectivePanelPointerEvents(headBottom, clusterTop);
+    // aria-expanded must describe what is actually revealed, not what the
+    // player asked for, or a screen reader announces a list that is not there.
+    this.summaryEl.setAttribute('aria-expanded', String(this.open && fits));
+    this.publishFootprint(rootRect, headBottom, this.open && fits);
+  }
+
+  /**
+   * Publish what this panel occupies, for overlays that have to work around it
+   * — today the scenario message banner.
+   *
+   * Both edges, unconditionally: the banner is centred and the panel is
+   * right-anchored, so whether they collide is a question about two rectangles,
+   * not about a breakpoint. The clearance used to be published only below the
+   * narrow breakpoint, which left the banner sitting on the objective head at
+   * every width from there up to ~1172px — landscape phones, small tablets and
+   * a windowed desktop browser alike.
+   *
+   * The bottom is the panel's real bottom — the list's when it is open, the
+   * head's when it is not — so dropping the banner clear of the head does not
+   * simply move it onto the list instead.
+   */
+  private publishFootprint(rootRect: DOMRect, headBottom: number, listVisible: boolean): void {
+    const bottom = listVisible
+      ? this.listEl.getBoundingClientRect().bottom - rootRect.top
+      : headBottom;
+    this.root.style.setProperty(
+      OBJECTIVES_MESSAGE_TOP_VAR,
+      `${Math.ceil(bottom + OBJECTIVES_MESSAGE_GAP_PX)}px`,
+    );
+    this.root.style.setProperty(
+      OBJECTIVES_LEFT_VAR,
+      `${Math.floor(this.el.getBoundingClientRect().left - rootRect.left)}px`,
+    );
   }
 }

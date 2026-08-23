@@ -96,6 +96,63 @@ export interface TriggerDef {
   effects: TriggerEffect[];
 }
 
+/**
+ * How hard a chapter plays, 1 (gentle) to 5 (brutal). Authored per chapter;
+ * a campaign's rating is derived from its chapters so the two cannot drift.
+ * `difficulty.ts` turns a rating into the label and pip count the menu draws.
+ */
+export type DifficultyRating = 1 | 2 | 3 | 4 | 5;
+
+export interface ChapterDifficulty {
+  rating: DifficultyRating;
+  /** One line naming what actually makes this chapter hard. */
+  note: string;
+}
+
+/** A sourced line of period voice, set apart from the narration around it. */
+export interface StoryQuote {
+  text: string;
+  source: string;
+}
+
+/** One named person the player meets this chapter, so dialogue has faces. */
+export interface CastMember {
+  name: string;
+  /** Their standing in one short phrase ("Sheriff of Lanark"). */
+  role: string;
+  /** Why they matter to this chapter. */
+  note: string;
+}
+
+/** A full-bleed story page: campaign prologue, campaign epilogue. */
+export interface StoryPage {
+  /** Small line above the title ("Scotland, 1296"). */
+  kicker: string;
+  title: string;
+  /** 16:9 artwork under apps/web/public, like campaign covers. */
+  image: string;
+  imageAlt: string;
+  paragraphs: string[];
+  quote?: StoryQuote;
+  /** Label for the button that leaves the page ("Begin the rising"). */
+  cta: string;
+}
+
+/** Narrative framing around a chapter: before it, and after it is won. */
+export interface ChapterStory {
+  /** What is lost if this chapter fails. Shown large on the briefing. */
+  stakes: string;
+  cast: CastMember[];
+  /** Shown on victory, before the statistics panel: what this changed. */
+  aftermath: {
+    title: string;
+    paragraphs: string[];
+    quote?: StoryQuote;
+  };
+  /** Where the mission dramatizes, compresses, or guesses past the record. */
+  historyNote?: string;
+}
+
 export interface ScenarioDef {
   id: string;
   campaign: string;
@@ -110,7 +167,13 @@ export interface ScenarioDef {
     estimatedMinutes: string;
     image: string;
     imageAlt: string;
+    difficulty: ChapterDifficulty;
   };
+  /**
+   * Story framing. Optional for the same reason as `chapter` — dev and legacy
+   * scenarios carry neither — but required of every chapter a campaign lists.
+   */
+  story?: ChapterStory;
   briefing: {
     history: string; // pre-mission story text (shown on briefing screen)
     objectives: string[]; // initial objective list
@@ -136,6 +199,14 @@ export interface CampaignDef {
    */
   cover: string;
   coverAlt: string;
+  /**
+   * Opening story page, shown the first time the campaign is opened and
+   * re-readable from the chapter list. Required: a campaign must be able to
+   * explain itself before it asks anyone to move troops.
+   */
+  prologue: StoryPage;
+  /** Closing story page, shown once the final chapter is complete. */
+  epilogue: StoryPage;
   scenarioIds: string[]; // in order; completing one unlocks the next
   acts?: Array<{
     id: string;

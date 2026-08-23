@@ -15,11 +15,12 @@ import type { UnitDef } from '@bf/data';
 import { FP, GAIA, TICKS_PER_SECOND } from './types';
 import type { Command, Entity, EntityId, Fixed, SimEvent } from './types';
 import {
-  adjacentToFootprint, effDistFp, facingFromDelta, isTileWalkableForPlayer,
+  adjacentToFootprint, effDistFp, facingFromDelta, isqrt, isTileWalkableForPlayer,
 } from './internal';
 import type { CombatInfo, SimState } from './internal';
 import { resolveBuildingStats, resolveUnitStats } from './stats';
 import { orderMove } from './path';
+import { stepToward } from './movement';
 import { applyHit, isEnemy, tickCorpses, unitAttackDamage } from './damage';
 import { fireProjectile } from './projectiles';
 import { cancelQueuedBuilds } from './construction';
@@ -36,6 +37,10 @@ const BATTLE_SUPPORT_RADIUS_MULTIPLIER = 2;
 const ARROW_JITTER_FP = 32;
 /** Explicit building assaults chain through structures within the same local base. */
 const ASSAULT_CHAIN_RADIUS_FP = 12 * FP;
+/** Ticks between target-motion samples used to aim the chase ahead of a runner. */
+const VELOCITY_SAMPLE_TICKS = 4;
+/** A chase never aims further ahead of a moving target than this many ticks of its travel. */
+const MAX_LEAD_TICKS = 10;
 
 const queryBuf: EntityId[] = [];
 
@@ -199,6 +204,62 @@ function alternateAssaultBuilding(
   return null;
 }
 
+/** Forget a target's sampled motion (engagement retargeted — the old velocity is stale). */
+function clearTargetMotion(info: CombatInfo): void {
+  info.velX = undefined;
+  info.velY = undefined;
+  info.trackTick = undefined;
+  info.trackX = undefined;
+  info.trackY = undefined;
+}
+
+/**
+ * Sample how fast the target is travelling (fixed units per tick), measured over a few
+ * ticks so one separation shove does not read as a sprint. Called every tick an
+ * engagement is alive, so the reading survives walks that span many ticks.
+ */
+function trackTargetMotion(state: SimState, info: CombatInfo, target: Entity): void {
+  const elapsed = info.trackTick === undefined ? -1 : state.tick - info.trackTick;
+  if (elapsed < 0 || elapsed >= VELOCITY_SAMPLE_TICKS) {
+    if (elapsed >= VELOCITY_SAMPLE_TICKS) {
+      info.velX = Math.trunc((target.x - info.trackX!) / elapsed);
+      info.velY = Math.trunc((target.y - info.trackY!) / elapsed);
+    }
+    info.trackTick = state.tick;
+    info.trackX = target.x;
+    info.trackY = target.y;
+  }
+}
+
+/**
+ * Where to walk to meet a moving target. Walking at where it stands is a tail chase:
+ * against anything faster the attacker converges to a fixed gap behind it and — if that
+ * gap lands even slightly outside its reach — never swings once, however close it looks.
+ * Aiming at where the target will be by the time we arrive turns a fly-by into an
+ * interception, without letting a slower unit run down a faster one in a straight line
+ * (there the lead point is collinear with the target, so the walk is unchanged).
+ */
+function chasePoint(state: SimState, e: Entity, info: CombatInfo, target: Entity): { x: Fixed; y: Fixed } {
+  const vx = info.velX ?? 0, vy = info.velY ?? 0;
+  const stats = resolveUnitStats(state, e.player, e.defId);
+  const speedFp = Math.max(1, stats.speedFp);
+  // Only a melee unit has to physically arrive, and only a target it cannot out-walk is
+  // worth cutting off. Shooters keep walking straight at their target (they need firing
+  // distance, not contact), as does anything chasing something it can run down — the
+  // ordinary case in a field battle, left byte-for-byte unchanged.
+  if (stats.projectileSpeedFpPerTick > 0 || !state.motion.has(target.id)
+    || isqrt(vx * vx + vy * vy) <= speedFp) {
+    return { x: target.x, y: target.y };
+  }
+  const lead = Math.min(Math.floor(effDistFp(state, e, target) / speedFp), MAX_LEAD_TICKS);
+  if (lead <= 0) return { x: target.x, y: target.y };
+  const maxX = state.map.width * FP - 1, maxY = state.map.height * FP - 1;
+  return {
+    x: Math.max(0, Math.min(maxX, target.x + vx * lead)),
+    y: Math.max(0, Math.min(maxY, target.y + vy * lead)),
+  };
+}
+
 /**
  * (Re)aim the chase walk. Re-path when the target drifted > 1 tile from where the walk
  * was ordered, or when the walk ended while still out of range (with a short backoff so
@@ -229,6 +290,7 @@ function chase(state: SimState, e: Entity, info: CombatInfo, target: Entity): vo
       info.chaseX = alternate.target.x;
       info.chaseY = alternate.target.y;
       info.chaseFails = 0;
+      clearTargetMotion(info);
       e.intent = { kind: 'attackTarget', targetId: alternate.target.id };
       e.targetId = alternate.target.id;
       goal = alternate.goal;
@@ -236,7 +298,9 @@ function chase(state: SimState, e: Entity, info: CombatInfo, target: Entity): vo
       return;
     }
   }
-  orderMove(state, [e.id], goal?.x ?? target.x, goal?.y ?? target.y);
+  if (goal) { orderMove(state, [e.id], goal.x, goal.y); return; }
+  const lead = chasePoint(state, e, info, target);
+  orderMove(state, [e.id], lead.x, lead.y);
 }
 
 /** Drop the engagement: resume attack-move, otherwise hold the battle endpoint. */
@@ -277,9 +341,25 @@ function continueBuildingAssault(state: SimState, e: Entity, info: CombatInfo): 
   info.chaseFails = undefined;
   info.slotX = undefined;
   info.slotY = undefined;
+  clearTargetMotion(info);
   e.intent = { kind: 'attackTarget', targetId: next.id };
   e.targetId = next.id;
   return true;
+}
+
+/**
+ * Roll a melee attacker the last stretch onto the building it is striking, so the blow
+ * lands on the wall instead of on the dirt in front of it. `gap` is the current
+ * edge-to-edge distance, so the step stops exactly where the soft body meets the
+ * footprint; terrain keeps the unit out of the structure itself.
+ */
+function closeToContact(state: SimState, e: Entity, target: Entity, speedFp: number, gap: number): void {
+  const size = gameData.buildings[target.defId]?.size ?? 1;
+  const x0 = target.tileX * FP, y0 = target.tileY * FP;
+  const x1 = (target.tileX + size) * FP, y1 = (target.tileY + size) * FP;
+  const px = Math.max(x0, Math.min(x1, e.x));
+  const py = Math.max(y0, Math.min(y1, e.y));
+  stepToward(state, e, px, py, Math.min(speedFp, gap));
 }
 
 /** Any friendly (own/allied) unit inside the blast a shot at `target` would make? */
@@ -309,6 +389,7 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
     if (dx * dx + dy * dy > LEASH_FP * LEASH_FP) { disengage(state, e); return; }
   }
   e.targetId = target.id;
+  trackTargetMotion(state, info, target);
 
   const stats = resolveUnitStats(state, e.player, e.defId);
   const ranged = stats.projectileSpeedFpPerTick > 0;
@@ -318,9 +399,15 @@ function stepCombat(state: SimState, e: Entity, def: UnitDef, info: CombatInfo, 
   // Melee vs a building: standing anywhere on the footprint ring IS in reach.
   // Separation shoves can push effDist past MELEE_REACH_FP for a unit wedged on a
   // ring corner, leaving it 'idle' with a live engagement, never striking (deadlock).
-  if (!ranged && target.kind === 'building' && dist > rangeFp
+  if (!ranged && target.kind === 'building' && dist > 0
     && adjacentToFootprint(e, target.tileX, target.tileY, gameData.buildings[target.defId]?.size ?? 1)) {
-    dist = rangeFp;
+    // ...but reach is not contact. The chase walk ends within ARRIVE_DIST of its ring
+    // slot (sooner on a crowded ring), so an attacker can settle a full tile of open
+    // ground short of the wall and hammer at nothing — glaring on a ram. Creep the
+    // remainder onto the footprint; the reach rule above stays as the deadlock
+    // fallback for an attacker that is wedged and cannot close.
+    closeToContact(state, e, target, stats.speedFp, dist);
+    dist = Math.min(effDistFp(state, e, target), rangeFp);
   }
 
   // trebuchet: mobile only while packed; deploys automatically once in position
@@ -436,8 +523,9 @@ function tryAcquire(
     // attack-moving formation turn its weapons on structures.
     if (targetId < 0 && mode === 'unitsAndBuildings') scanBuildings();
   }
-  // A soldier actively trading blows raises the alarm for nearby troops at
-  // twice their usual guard radius. Only the original fighter can relay the
+  // A soldier in a fight raises the alarm for nearby troops at twice their usual
+  // guard radius, so a squad standing together answers a tower or an ambush as one
+  // instead of feeding one man at a time. Only the original fighter can relay the
   // fight (`supporting` recruits cannot), preventing awareness from chaining
   // across an entire army or base one unit at a time.
   // Campaign missions author exact wave behavior and balance, so the broader
@@ -451,14 +539,25 @@ function tryAcquire(
       if (id === e.id) continue;
       const friend = state.entities.get(id);
       if (!friend || friend.kind !== 'unit' || friend.player !== e.player || friend.hp <= 0
-        || friend.garrisonedIn !== undefined || friend.activity !== 'attacking') continue;
+        || friend.garrisonedIn !== undefined) continue;
       const fight = state.combat.get(friend.id);
       if (!fight || fight.supporting) continue;
+      // An auto engagement (struck by someone, or acquired on sight) is local by
+      // construction — leashed to 12 tiles from where it started — so it alerts the
+      // squad the moment it begins, while the fighter is still closing in. Waiting
+      // for the first blow is what let a retaliating soldier walk off alone. An
+      // ordered attack may cross the map, so it only relays once blows land.
+      if (!fight.auto && friend.activity !== 'attacking') continue;
       const target = state.entities.get(fight.targetId);
       if (!target || target.hp <= 0 || target.kind === 'resource'
         || (target.kind === 'unit' && target.garrisonedIn !== undefined)
         || !isEnemy(state, e.player, target.player)) continue;
-      if (mode === 'units' && target.kind !== 'unit') continue;
+      // Idle troops never acquire structures themselves, so without this a soldier
+      // shot by a tower charges it alone while his squad watches. Only a blow that
+      // actually landed on the friendly relays a structure: an attack-mover that
+      // picked up a house on its route is carrying out an order, and an assault on a
+      // passive building must not drag parked defenders off post.
+      if (mode === 'units' && target.kind !== 'unit' && !fight.retaliation) continue;
       if (mode === 'buildings' && target.kind !== 'building') continue;
       if (minRangeFp > 0 && effDistFp(state, e, target) < minRangeFp) continue;
       const dx = friend.x - e.x, dy = friend.y - e.y;

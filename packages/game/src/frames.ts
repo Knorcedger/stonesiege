@@ -34,18 +34,59 @@ export function resolveFrameName(name: string): FrameRef {
   return { name, mirrored: false };
 }
 
+export interface BuildingArtChoice {
+  /** Frame names, most specific first: callers tryResolve all but the last, then
+   *  resolveFrame the last so a truly missing frame surfaces the diagnosable
+   *  placeholder instead of nothing. */
+  candidates: string[];
+  alpha: number;
+}
+
 /**
- * Candidate frame names for the building-placement ghost, most specific first
- * (callers tryResolve all but the last, then resolveFrame the last so a truly
- * missing frame still surfaces the diagnosable placeholder). Farms — any def
- * with providesFood — have NO bld/ frames (ASSET_CONTRACT: the renderer draws
- * obj/farm/<stage>), so their ghost previews the mature field, matching the
- * fog-remembered farm ghost in world.ts; resolving bld/farm/done rendered the
- * magenta missing-frame box on every farm placement.
+ * The one building frame-candidate rule, shared by the live renderer, the
+ * fog-remembered ghost and the placement preview. Those three drew the same
+ * buildings from three private copies of this logic, which is how they drifted
+ * (#116): the ghost forgot construction stages, the preview forgot everything
+ * but `done`.
+ *
+ * Farms — any def with providesFood — have NO bld/ frames (ASSET_CONTRACT: the
+ * renderer draws obj/farm/<stage>), and resolving bld/farm/done rendered the
+ * magenta missing-frame box. TC/house are the per-age variants
+ * (`bld/<defId>/<age>/done`); everything else is authored once as
+ * `bld/<defId>/done`, hence the fallback.
+ */
+export function buildingFrameCandidates(
+  defId: string,
+  age: string,
+  progress = 1000,
+  farmAmountLeft?: number,
+): BuildingArtChoice {
+  if (gameData.buildings[defId]?.providesFood !== undefined) {
+    // ART_BIBLE §4.4: farms have no construct/rubble frames — obj/farm/<stage>,
+    // with a build-progress dropout (approximated here with an alpha ramp).
+    if (progress < 1000) return { candidates: ['obj/farm/0'], alpha: 0.35 + (progress / 1000) * 0.65 };
+    return { candidates: [`obj/farm/${(farmAmountLeft ?? 1) <= 0 ? 4 : 3}`], alpha: 1 };
+  }
+  if (progress < 1000) {
+    const stage = progress < 334 ? 0 : progress < 667 ? 1 : 2;
+    return { candidates: [`bld/${defId}/construct${stage}`], alpha: 1 };
+  }
+  return { candidates: [`bld/${defId}/${age}/done`, `bld/${defId}/done`], alpha: 1 };
+}
+
+/**
+ * The stage a farm is drawn at when it is previewed or remembered rather than
+ * seen: a mid-growth field commits to neither a fresh sowing nor a spent one.
+ */
+export const UNSEEN_FARM_FRAME = 'obj/farm/2';
+
+/**
+ * Candidate frames for the building-placement ghost: the finished building, as
+ * the player is previewing what they will get, not the foundation they place.
  */
 export function placementGhostFrames(defId: string, age: string): string[] {
-  if (gameData.buildings[defId]?.providesFood !== undefined) return ['obj/farm/2'];
-  return [`bld/${defId}/${age}/done`, `bld/${defId}/done`];
+  if (gameData.buildings[defId]?.providesFood !== undefined) return [UNSEEN_FARM_FRAME];
+  return buildingFrameCandidates(defId, age).candidates;
 }
 
 /**
@@ -229,6 +270,18 @@ const WORK_FRAME_SEQUENCE: Partial<Readonly<Record<AnimName, readonly number[]>>
   mine: [0, 1, 2, 2, 3, 0],
   build: [0, 1, 2, 2, 3, 0],
 };
+
+/**
+ * Frame index for ONE combat swing, `ageSeconds` after the blow it belongs to.
+ * The attack sheet is a 0.5 s cycle but rate of fire is 2 s for a militia and 5 s
+ * for a ram, so looping it freely makes a siege engine flail ten times per hit and
+ * read as ineffectual. Play the sheet once per attack, then hold the ready pose.
+ */
+export function attackSwingFrameIndex(ageSeconds: number, frameCount: number): number {
+  if (frameCount <= 1) return 0;
+  const raw = Math.max(0, Math.floor(ageSeconds * ANIM_FPS.attack));
+  return raw >= frameCount ? 0 : raw;
+}
 
 /** Frame index for an anim at a given sim-time (seconds). die/decay clamp; others loop. */
 export function animFrameIndex(anim: AnimName, animAgeSeconds: number, frameCount: number): number {

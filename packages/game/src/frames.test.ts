@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { gameData } from '@bf/data';
 import {
-  ANIM_FPS, animForActivity, animFrameIndex, bakedColorName, facingFromDelta, villagerWorkAnim,
-  placementGhostFrames, resolveFrameName, unitRig,
+  ANIM_FPS, animForActivity, animFrameIndex, attackSwingFrameIndex, bakedColorName,
+  facingFromDelta, villagerWorkAnim, buildingFrameCandidates, placementGhostFrames,
+  resolveFrameName, unitRig,
   heroAccentFor, heroDrawScale, heroTintFor, isHeroUnit, HERO_DRAW_SCALE,
 } from './frames';
 import { hexToRgb, UNIT_CLOTH_RAMP, UNIT_METAL_RAMP } from './recolor';
@@ -119,6 +120,16 @@ describe('anim helpers', () => {
     expect(animFrameIndex('idle', 5, 1)).toBe(0);
   });
 
+  it('plays one swing per attack and then holds the ready pose', () => {
+    // A ram's rate of fire is 5 s against a 0.5 s attack sheet: looping it made the
+    // engine flail ten times per blow and read as if it barely scratched the wall.
+    const swing = [0, 0.1, 0.2, 0.3, 0.4, 0.5, 1, 3, 4.9]
+      .map((seconds) => attackSwingFrameIndex(seconds, 5));
+    expect(swing).toEqual([0, 1, 2, 3, 4, 0, 0, 0, 0]);
+    expect(attackSwingFrameIndex(-1, 5)).toBe(0);
+    expect(attackSwingFrameIndex(0.3, 1)).toBe(0); // single-frame rigs have no cycle
+  });
+
   it('never returns a negative frame for a negative animation age', () => {
     // Regression: with the sim tick frozen at game end, the interpolated clock
     // could run slightly backward — frame index must clamp to 0, not -1.
@@ -206,5 +217,33 @@ describe('hero art (campaign protagonists share a rank-and-file rig)', () => {
     expect(HERO_DRAW_SCALE).toBeGreaterThan(1);
     expect(HERO_DRAW_SCALE).toBeLessThanOrEqual(1.35); // must still sit on its tile
     expect(heroDrawScale('militia')).toBe(1);
+  });
+});
+
+describe('buildingFrameCandidates (one rule for live art, fog ghosts and previews)', () => {
+  it('walks the construction stages before the finished building', () => {
+    expect(buildingFrameCandidates('barracks', 'dark', 0).candidates).toEqual(['bld/barracks/construct0']);
+    expect(buildingFrameCandidates('barracks', 'dark', 500).candidates).toEqual(['bld/barracks/construct1']);
+    expect(buildingFrameCandidates('barracks', 'dark', 800).candidates).toEqual(['bld/barracks/construct2']);
+    expect(buildingFrameCandidates('barracks', 'dark', 1000).candidates)
+      .toEqual(['bld/barracks/dark/done', 'bld/barracks/done']);
+  });
+
+  it('defaults to the finished building, which is what a placement preview wants', () => {
+    expect(buildingFrameCandidates('keep', 'castle').candidates)
+      .toEqual(['bld/keep/castle/done', 'bld/keep/done']);
+  });
+
+  it('keeps the farm exception: no bld/ frames, and a fade-in while it is sown', () => {
+    const sowing = buildingFrameCandidates('farm', 'dark', 500);
+    expect(sowing.candidates).toEqual(['obj/farm/0']);
+    expect(sowing.alpha).toBeGreaterThan(0.35);
+    expect(sowing.alpha).toBeLessThan(1);
+    expect(buildingFrameCandidates('farm', 'dark', 1000, 100).candidates).toEqual(['obj/farm/3']);
+    expect(buildingFrameCandidates('farm', 'dark', 1000, 0).candidates).toEqual(['obj/farm/4']);
+  });
+
+  it('gives a finished building full opacity', () => {
+    expect(buildingFrameCandidates('house', 'imperial').alpha).toBe(1);
   });
 });

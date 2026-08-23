@@ -14,8 +14,29 @@ export const SFX_CATEGORY: Record<SfxName, string> = {
   pickMine: 'gather',
   farmScythe: 'gather',
   hammer: 'build',
+  // melee onto flesh
   swordClash: 'combat',
+  sabreSlash: 'combat',
+  spearThrust: 'combat',
+  toolStrike: 'combat',
+  beastBite: 'combat',
+  // melee onto structures: its own budget so a wall crew never starves the
+  // field battle behind it (and vice versa)
+  bladeChop: 'structure',
+  spearJab: 'structure',
+  // siege is loud and slow — a very small budget keeps it from smothering the mix
+  ramCrush: 'ram',
+  ramBoom: 'ram',
+  stoneCrush: 'siegeHit',
+  stoneShatter: 'siegeHit',
+  siegeRelease: 'siege',
+  // ranged: releases and landings are throttled apart, so a volley's arrivals
+  // are never swallowed by the volley that follows it
   arrowShot: 'bow',
+  boltShot: 'bow',
+  arrowFlesh: 'arrowHit',
+  arrowThunk: 'arrowHit',
+  boltPunch: 'arrowHit',
   collapse: 'collapse',
   hornAge: 'sting',
   hornAlert: 'sting',
