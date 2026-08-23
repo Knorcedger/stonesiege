@@ -4,8 +4,8 @@
 
 import type { ObjectiveGuideReadout, ObjectiveTargetTile } from '@bf/scenarios';
 import {
-  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
-  TOP_BAR_CLEAR_PX,
+  cssVarPx, HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
+  OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_GAP_PX, OBJECTIVES_MESSAGE_TOP_VAR, TOP_BAR_CLEAR_PX,
 } from './layout';
 
 export type ObjectiveUiState = 'open' | 'complete' | 'failed';
@@ -264,12 +264,6 @@ export function objectivePanelPointerEvents(
   return headBottom > clusterTop ? 'none' : 'auto';
 }
 
-/** Root height (px) fallback for a cluster edge the HUD has not published yet. */
-export function parseClusterTopPx(value: string, rootHeight: number): number {
-  const parsed = Number.parseFloat(value);
-  return Number.isFinite(parsed) ? parsed : rootHeight;
-}
-
 export type ObjectiveMarkerPlacement =
   | { kind: 'beacon'; x: number; y: number; angle: number }
   | { kind: 'edge'; x: number; y: number; angle: number };
@@ -502,7 +496,8 @@ export class ObjectivesPanel {
   }
 
   destroy(): void {
-    this.root.style.removeProperty('--bf-objectives-message-top');
+    this.root.style.removeProperty(OBJECTIVES_MESSAGE_TOP_VAR);
+    this.root.style.removeProperty(OBJECTIVES_LEFT_VAR);
     this.el.remove();
     this.markerEl.remove();
   }
@@ -708,14 +703,17 @@ export class ObjectivesPanel {
   }
 
   /**
-   * Size the list against what is actually below it, and publish the head's own
-   * bottom edge for the scenario message banner. Both are measured after the
-   * rows are in the DOM, so the head's height reflects the text just rendered.
+   * Size the list against what is actually below it, then publish this panel's
+   * own footprint for the overlays that have to work around it. Everything is
+   * measured after the rows are in the DOM, so the heights reflect the text
+   * just rendered.
    */
   private applyClearance(): void {
     const rootRect = this.root.getBoundingClientRect();
     const headBottom = this.headEl.getBoundingClientRect().bottom - rootRect.top;
-    const clusterTop = parseClusterTopPx(
+    // No published edge yet (the frames before the HUD's first measurement)
+    // means no known obstacle: the column is free to the bottom of the root.
+    const clusterTop = cssVarPx(
       this.root.style.getPropertyValue(HUD_RIGHT_CLUSTER_TOP_VAR),
       rootRect.height,
     );
@@ -727,12 +725,35 @@ export class ObjectivesPanel {
     // aria-expanded must describe what is actually revealed, not what the
     // player asked for, or a screen reader announces a list that is not there.
     this.summaryEl.setAttribute('aria-expanded', String(this.open && fits));
+    this.publishFootprint(rootRect, headBottom, this.open && fits);
+  }
 
-    if (this.wideViewport) {
-      this.root.style.removeProperty('--bf-objectives-message-top');
-    } else {
-      const messageTop = Math.ceil(headBottom + 14);
-      this.root.style.setProperty('--bf-objectives-message-top', `${messageTop}px`);
-    }
+  /**
+   * Publish what this panel occupies, for overlays that have to work around it
+   * — today the scenario message banner.
+   *
+   * Both edges, unconditionally: the banner is centred and the panel is
+   * right-anchored, so whether they collide is a question about two rectangles,
+   * not about a breakpoint. The clearance used to be published only below the
+   * narrow breakpoint, which left the banner sitting on the objective head at
+   * every width from there up to ~1172px — landscape phones, small tablets and
+   * a windowed desktop browser alike.
+   *
+   * The bottom is the panel's real bottom — the list's when it is open, the
+   * head's when it is not — so dropping the banner clear of the head does not
+   * simply move it onto the list instead.
+   */
+  private publishFootprint(rootRect: DOMRect, headBottom: number, listVisible: boolean): void {
+    const bottom = listVisible
+      ? this.listEl.getBoundingClientRect().bottom - rootRect.top
+      : headBottom;
+    this.root.style.setProperty(
+      OBJECTIVES_MESSAGE_TOP_VAR,
+      `${Math.ceil(bottom + OBJECTIVES_MESSAGE_GAP_PX)}px`,
+    );
+    this.root.style.setProperty(
+      OBJECTIVES_LEFT_VAR,
+      `${Math.floor(this.el.getBoundingClientRect().left - rootRect.left)}px`,
+    );
   }
 }
