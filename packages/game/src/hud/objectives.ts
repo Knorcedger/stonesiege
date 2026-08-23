@@ -5,7 +5,8 @@
 import type { ObjectiveGuideReadout, ObjectiveTargetTile } from '@bf/scenarios';
 import {
   cssVarPx, HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
-  OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_GAP_PX, OBJECTIVES_MESSAGE_TOP_VAR, TOP_BAR_CLEAR_PX,
+  OBJECTIVES_HEAD_BOTTOM_VAR, OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_GAP_PX,
+  OBJECTIVES_MESSAGE_TOP_VAR, TOP_BAR_CLEAR_PX,
 } from './layout';
 
 export type ObjectiveUiState = 'open' | 'complete' | 'failed';
@@ -498,6 +499,7 @@ export class ObjectivesPanel {
   destroy(): void {
     this.root.style.removeProperty(OBJECTIVES_MESSAGE_TOP_VAR);
     this.root.style.removeProperty(OBJECTIVES_LEFT_VAR);
+    this.root.style.removeProperty(OBJECTIVES_HEAD_BOTTOM_VAR);
     this.el.remove();
     this.markerEl.remove();
   }
@@ -755,5 +757,10 @@ export class ObjectivesPanel {
       OBJECTIVES_LEFT_VAR,
       `${Math.floor(this.el.getBoundingClientRect().left - rootRect.left)}px`,
     );
+    // The head alone, separate from the bottom above: the command cluster sizes
+    // itself against this, and the head's height depends only on the objective
+    // text — never on the cluster — so there is no loop. Publishing the panel's
+    // full bottom here would make one: the list is measured against the cluster.
+    this.root.style.setProperty(OBJECTIVES_HEAD_BOTTOM_VAR, `${Math.ceil(headBottom)}px`);
   }
 }
