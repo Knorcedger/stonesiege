@@ -36,13 +36,25 @@ export function speechBeats(text: string): string[] {
   let buf = '';
   const flush = (): void => {
     const beat = buf.trim();
-    if (beat !== '') beats.push(beat);
+    // Punctuation on its own is not a beat. Whatever route the split took, a
+    // beat with no letter or digit in it would be read aloud as a click and
+    // recorded as a file of one.
+    if (/[\p{L}\p{N}]/u.test(beat)) beats.push(beat);
     buf = '';
   };
   for (let i = 0; i < text.length; i++) {
     const ch = text.charAt(i);
     if (ch === '—' || ch === '–') {
       flush(); // the dash is the silence; it is never spoken
+      continue;
+    }
+    // A run of dots is an ellipsis, and an ellipsis is a breath like the dash:
+    // it breaks the line and is never spoken. Splitting on each dot instead
+    // would emit beats whose whole text is "." — read aloud as a click, and
+    // recorded as a file of one. A lone dot still ends its beat as a sentence.
+    if (ch === '.' && text.charAt(i + 1) === '.') {
+      flush();
+      while (text.charAt(i + 1) === '.') i++;
       continue;
     }
     buf += ch;

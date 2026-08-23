@@ -25,6 +25,31 @@ describe('voiceLineId', () => {
   });
 });
 
+describe('speechBeats', () => {
+  const beats = (text: string): string[] => speechBeats(speechText({ text }));
+
+  it('treats an ellipsis as a breath, never as spoken dots', () => {
+    // Splitting on each dot used to emit beats whose whole text was '.', which
+    // the game read aloud as a click and the render tool recorded as a file.
+    expect(beats('…I gave them my word. This day is ash in my mouth.'))
+      .toEqual(['I gave them my word.', 'This day is ash in my mouth.']);
+    expect(beats('Aye… the way a boot settles on a neck.'))
+      .toEqual(['Aye', 'the way a boot settles on a neck.']);
+  });
+
+  it('never yields a beat with nothing to say', () => {
+    for (const text of ['…', '...', '. . .', '—', 'Aye…']) {
+      for (const beat of beats(text)) expect(beat).toMatch(/[\p{L}\p{N}]/u);
+    }
+  });
+
+  it('still breaks on dashes and sentence ends, and not inside a decimal', () => {
+    expect(beats('Settled. Aye — the way a boot settles on a neck.'))
+      .toEqual(['Settled.', 'Aye', 'the way a boot settles on a neck.']);
+    expect(beats('He paid 3.5 marks. Then left.')).toEqual(['He paid 3.5 marks.', 'Then left.']);
+  });
+});
+
 describe('parseVoiceManifest', () => {
   it('keeps entries that can actually be played', () => {
     const manifest = parseVoiceManifest({
