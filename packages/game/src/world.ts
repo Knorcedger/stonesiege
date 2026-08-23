@@ -106,10 +106,6 @@ export function wallCornerJoins(entities: Iterable<Entity>): Map<EntityId, WallC
  * [x0,y0,x1,y1,...] list for Graphics.poly. Radii are given per axis so a marker laid
  * on the ground can be squashed onto the isometric floor plane, and `rotation` (in
  * turns) aims the first point — 0 = straight down-screen, -0.25 = straight up.
- *
- * `minorRatio` below 1 shortens every second point, which turns an even-pointed star
- * into a compass rose (long cardinals, short diagonals) instead of a uniform blob —
- * at marker size, points of one length just fill in as a circle.
  */
 export function starPoly(
   points: number,
@@ -117,13 +113,11 @@ export function starPoly(
   outerY: number,
   innerRatio: number,
   rotation = 0,
-  minorRatio = 1,
 ): number[] {
   const out: number[] = [];
   for (let i = 0; i < points * 2; i++) {
     const t = (i / (points * 2) + rotation) * Math.PI * 2;
-    // Even indices are the points themselves; every second one may be a minor point.
-    const scale = i % 2 === 0 ? (i % 4 === 0 ? 1 : minorRatio) : innerRatio;
+    const scale = i % 2 === 0 ? 1 : innerRatio;
     out.push(Math.sin(t) * outerX * scale, Math.cos(t) * outerY * scale);
   }
   return out;
@@ -921,14 +915,15 @@ export class WorldLayer {
       const cav = (gameData.units[e.defId]?.speed ?? 0) > 1.1;
       const [rx, ry] = resourceRadius ?? (cav ? [14, 7] : [10, 5]);
       if (hero) {
-        // Eight-pointed compass rose on the ground, one step outside the selection
-        // ellipse so both stay readable at once. Squashed onto the floor plane and
-        // drawn in the hero's own colour over a dark rim.
+        // Eight-pointed star on the ground, one step outside the selection ellipse so
+        // both stay readable at once. Squashed onto the floor plane and drawn in the
+        // hero's own colour over a dark rim. The deep inner radius is what keeps eight
+        // points spiky at marker size instead of closing up into a disc.
         const mark = heroTintFor(e.defId) ?? HERO_MARK_FALLBACK;
-        const star = starPoly(8, rx + 7, ry + 6, 0.3, 0, 0.6);
+        const star = starPoly(8, rx + 7, ry + 6, 0.28);
         view.ring.poly(star).fill({ color: OUTLINE, alpha: 0.5 });
         view.ring.poly(star).stroke({ width: 1.5, color: mark });
-        view.ring.poly(starPoly(8, rx + 3.5, ry + 3, 0.3, 0, 0.6))
+        view.ring.poly(starPoly(8, rx + 3.5, ry + 3, 0.28))
           .stroke({ width: 1, color: HERO_MARK_CORE, alpha: 0.75 });
       }
       if (!selected && !highlighted) return;
