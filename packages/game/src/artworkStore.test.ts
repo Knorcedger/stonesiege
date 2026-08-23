@@ -137,14 +137,42 @@ describe('persistent artwork store', () => {
     ]);
   });
 
-  it('keeps a written-through manifest for offline boots until drop() erases it', async () => {
-    const store = new ArtworkStore(new FakeCache(), BASE);
+  it('keeps a written-through manifest for offline boots until clear() erases the set', async () => {
+    const cache = new FakeCache();
+    const store = new ArtworkStore(cache, BASE);
+    stubNetwork({ 'assets/hd/a.json': 'atlas a' });
+    await store.fetchVersioned('assets/hd/a.json', hashOf('atlas a'));
     await store.writeThrough('assets/hd/manifest.json', new Response('{"atlases":["a.json"]}'));
     const fallback = await store.readFallback('assets/hd/manifest.json');
     expect(await fallback!.text()).toBe('{"atlases":["a.json"]}');
 
-    await store.drop('assets/hd/manifest.json');
+    await store.clear();
+    expect(cache.entries.size).toBe(0); // atlases stranded by a gone manifest included
     expect(await store.readFallback('assets/hd/manifest.json')).toBeUndefined();
+  });
+
+  it('degrades a wedged cache to the network instead of hanging past the deadline', async () => {
+    // Cache Storage can wedge with promises that never settle; the loaders'
+    // deadlines are cooperative, so every cache await must lose a race
+    // against the abort signal rather than block the boot forever.
+    const wedged: ArtworkCacheLike = {
+      match: () => new Promise(() => {}),
+      put: () => new Promise(() => {}),
+      delete: () => new Promise(() => {}),
+      keys: () => new Promise(() => {}),
+    };
+    const store = new ArtworkStore(wedged, BASE);
+    const body = 'atlas bytes';
+    stubNetwork({ 'assets/hd/a.json': body });
+
+    const controller = new AbortController();
+    const request = store.fetchVersioned('assets/hd/a.json', hashOf(body), controller.signal);
+    controller.abort(new Error('deadline fired'));
+    expect(await (await request).text()).toBe(body);
+
+    const aborted = new AbortController();
+    aborted.abort(new Error('deadline fired'));
+    await expect(store.clear(aborted.signal)).resolves.toBeUndefined();
   });
 
   it('degrades to the plain network when every cache operation fails', async () => {

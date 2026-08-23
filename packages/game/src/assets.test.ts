@@ -160,13 +160,27 @@ describe('HD manifest revalidation against the persistent store', () => {
     expect(await loadHdManifest(null)).toEqual({ atlases: [] });
   });
 
-  it('erases the stored manifest when the deployment stops shipping HD art', async () => {
+  it('erases the whole stored set when the deployment stops shipping HD art', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('gone', { status: 404 })));
     const cache = new FakeCache();
     cache.entries.set(MANIFEST_KEY, manifestBody);
+    // With no manifest the completeness gate never lets prune() run, so the
+    // 404 path must clear stranded atlas bytes too, not just the manifest.
+    cache.entries.set(`${BASE}assets/hd/terrain-0.webp?v=99aabbccdd001122`, 'atlas bytes');
 
     expect(await loadHdManifest(new ArtworkStore(cache, BASE))).toEqual({ atlases: [] });
     expect(cache.entries.size).toBe(0);
+  });
+
+  it('treats a transient server error like a network failure, keeping the cached set', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('flaky edge', { status: 503 })));
+    const cache = new FakeCache();
+    cache.entries.set(MANIFEST_KEY, manifestBody);
+
+    const manifest = await loadHdManifest(new ArtworkStore(cache, BASE));
+
+    expect(manifest.atlases).toEqual(['terrain-0.json']); // boots from the cached set
+    expect(cache.entries.get(MANIFEST_KEY)).toBe(manifestBody); // offline anchor survives
   });
 });
 

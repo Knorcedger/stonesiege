@@ -46,6 +46,38 @@ async function attempt<T>(op: () => Promise<T>): Promise<T | undefined> {
   }
 }
 
+/**
+ * Cache Storage can wedge — promises that never settle rather than reject —
+ * and the asset loaders' deadlines are cooperative: an await that ignores its
+ * signal would hang the boot past every timeout. Racing the signal keeps a
+ * wedged cache no worse than a failed one (attempt() then falls through to
+ * the network).
+ */
+function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
+  if (!signal) return promise;
+  return new Promise<T>((resolve, reject) => {
+    const fail = (): void => {
+      reject(signal.reason instanceof Error ? signal.reason : new Error('Cache access was cancelled.'));
+    };
+    if (signal.aborted) {
+      fail();
+      return;
+    }
+    const onAbort = (): void => fail();
+    signal.addEventListener('abort', onAbort, { once: true });
+    promise.then(
+      (value) => {
+        signal.removeEventListener('abort', onAbort);
+        resolve(value);
+      },
+      (error: unknown) => {
+        signal.removeEventListener('abort', onAbort);
+        reject(error instanceof Error ? error : new Error(String(error)));
+      },
+    );
+  });
+}
+
 async function contentHashOf(bytes: ArrayBuffer): Promise<string | null> {
   const subtle = globalThis.crypto?.subtle;
   if (!subtle) return null;
@@ -87,7 +119,7 @@ export class ArtworkStore {
   async fetchVersioned(url: string, hash: string, signal?: AbortSignal): Promise<Response> {
     const versioned = this.absolute(`${url}?v=${hash}`);
     this.touched.add(versioned);
-    const hit = await attempt(() => this.cache.match(versioned));
+    const hit = await attempt(() => raceAbort(this.cache.match(versioned), signal));
     if (hit) return hit;
     const response = await fetch(versioned, { signal });
     if (!response.ok) return response;
@@ -99,7 +131,7 @@ export class ArtworkStore {
     });
     const digest = await contentHashOf(bytes);
     if (digest !== null && digest.startsWith(hash)) {
-      await attempt(() => this.cache.put(versioned, restored()));
+      await attempt(() => raceAbort(this.cache.put(versioned, restored()), signal));
     } else if (digest !== null) {
       console.warn(`[assets] ${url} does not match its manifest hash — using it uncached`);
     }
@@ -109,22 +141,29 @@ export class ArtworkStore {
   }
 
   /** Keep a fresh manifest response for boots whose next revalidation fails. */
-  async writeThrough(url: string, response: Response): Promise<void> {
+  async writeThrough(url: string, response: Response, signal?: AbortSignal): Promise<void> {
     const key = this.absolute(url);
     this.touched.add(key);
-    await attempt(() => this.cache.put(key, response));
+    await attempt(() => raceAbort(this.cache.put(key, response), signal));
   }
 
   /** Last stored copy of an unversioned entry (the manifest), if any. */
-  async readFallback(url: string): Promise<Response | undefined> {
+  async readFallback(url: string, signal?: AbortSignal): Promise<Response | undefined> {
     const key = this.absolute(url);
     this.touched.add(key);
-    return attempt(() => this.cache.match(key));
+    return attempt(() => raceAbort(this.cache.match(key), signal));
   }
 
-  /** A live "this deployment ships no HD art" answer must erase stale copies. */
-  async drop(url: string): Promise<void> {
-    await attempt(() => this.cache.delete(this.absolute(url)));
+  /**
+   * Erase everything. For a definitive "this deployment ships no HD art"
+   * answer: the store only ever holds HD files and their manifest, and with
+   * no manifest the completeness gate keeps prune() forever unreachable, so
+   * anything short of a full clear would strand ~41 MB on the device.
+   */
+  async clear(signal?: AbortSignal): Promise<void> {
+    const keys = await attempt(() => raceAbort(this.cache.keys(), signal));
+    if (!keys) return;
+    for (const key of keys) await attempt(() => raceAbort(this.cache.delete(key.url), signal));
   }
 
   /**

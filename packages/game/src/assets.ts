@@ -706,21 +706,24 @@ export async function loadHdManifest(store: ArtworkStore | null): Promise<HdMani
   return boundedAssetLoad(async (signal) => {
     try {
       const response = await fetch(HD_MANIFEST_URL, { signal, cache: 'no-cache' });
-      if (!response.ok) {
-        // A live "this deployment ships no HD art" answer beats any cached one.
-        await store?.drop(HD_MANIFEST_URL);
+      // Only a definitive "not here" may erase the cached set and report no
+      // HD art. Any other failed status (5xx, 429) is a host hiccup: treat it
+      // like a network failure so a complete cached set can still boot.
+      if (response.status === 404 || response.status === 410) {
+        await store?.clear(signal);
         return { atlases: [] };
       }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
       const copy = response.clone();
       const manifest = parseHdManifest(await response.json() as unknown);
       // Written through only once the body proved to be JSON, so a corrupt
       // transfer can never become the offline fallback.
-      await store?.writeThrough(HD_MANIFEST_URL, copy);
+      await store?.writeThrough(HD_MANIFEST_URL, copy, signal);
       return manifest;
     } catch (error) {
       // Revalidation failed (offline, flaky link): the last stored manifest
       // still names a complete cached set, so the match can boot from it.
-      const cached = await store?.readFallback(HD_MANIFEST_URL);
+      const cached = await store?.readFallback(HD_MANIFEST_URL, signal);
       if (!cached) throw error;
       return parseHdManifest(await cached.json() as unknown);
     }
