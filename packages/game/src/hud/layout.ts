@@ -58,6 +58,26 @@ export const TOP_BAR_GAP_PX = 6;
 export const HUD_RIGHT_CLUSTER_TOP_VAR = '--bf-right-cluster-top';
 
 /**
+ * CSS variables the objectives panel publishes onto the safe-area root: the
+ * first clear y below everything it occupies, and its own left edge.
+ *
+ * They live here, with the other cross-overlay edges, because the consumer is
+ * the scenario message banner. That banner is centred and the panel is
+ * right-anchored, so whether they collide is a question about two rectangles —
+ * see messageBannerTopPx.
+ */
+export const OBJECTIVES_MESSAGE_TOP_VAR = '--bf-objectives-message-top';
+export const OBJECTIVES_LEFT_VAR = '--bf-objectives-left';
+/** Breathing room (px) between the panel and a banner pushed clear of it. */
+export const OBJECTIVES_MESSAGE_GAP_PX = 14;
+
+/** A px length from a CSS variable, or `fallback` when it is unset or not a number. */
+export function cssVarPx(value: string, fallback: number): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
  * Stacking order of the overlays mounted on the HUD root, in one place because
  * they are declared across four CSS blocks and only make sense against one
  * another.
@@ -117,6 +137,65 @@ export function measuredRightClusterTopPx(cluster: EdgeRect, root: EdgeRect): nu
   if (!(cluster.height > 0)) return root.height;
   return Math.max(0, Math.min(root.height, Math.floor(cluster.top - root.top)));
 }
+
+/**
+ * How tall the bottom-right command cluster may be (px, in the SCALED HUD
+ * stage's own units — it lives inside the stage, while every edge here is
+ * measured on the unscaled root).
+ *
+ * The cluster is bottom-anchored with no bound of its own, so a card taller
+ * than the screen sent its excess off the TOP: on an 844x390 landscape phone a
+ * town centre card is 531px, putting its train and research buttons above the
+ * viewport where nothing could reach them.
+ *
+ * `firstClearY` is whichever is lower — the top bar, or the objectives panel's
+ * head where there is one. Deliberately the head and never the panel's full
+ * height: the panel's list already sizes itself against this cluster, so
+ * feeding the list back in here would be a layout loop.
+ */
+export function rightClusterMaxHeightPx(
+  clusterBottom: number,
+  firstClearY: number,
+  scale: number,
+): number {
+  return Math.max(0, Math.floor((clusterBottom - firstClearY) / Math.max(scale, 0.01)));
+}
+
+/**
+ * Sub-pixel slack: a card that exactly fits still reports a scroll height a
+ * fraction over its box, and a 1px "overflow" must not drop the queue reserve.
+ */
+export const CARD_OVERFLOW_SLACK_PX = 1;
+
+/**
+ * Whether the command card is taller than the room it has been given.
+ *
+ * `room` is the bound — what is left of the cluster's cap after the selection
+ * panel — never the card's own client height. Once the card fits, its client
+ * height IS its content, so comparing the two would read as "overflowing" for
+ * ever and the reserve would never come back.
+ *
+ * Judged against the card as it would be with its FULL queue reserve, never as
+ * it currently stands: dropping the reserve is a consequence of being capped,
+ * so measuring the shortened card would let a card that only just overflows
+ * un-cap itself, restore the reserve, overflow again, and flip every frame.
+ */
+export function cardOverflowsBound(
+  scrollHeight: number,
+  room: number,
+  reserveShortfall: number,
+): boolean {
+  return scrollHeight + reserveShortfall > room + CARD_OVERFLOW_SLACK_PX;
+}
+
+/**
+ * CSS variable the objectives panel publishes for the command cluster: the
+ * bottom edge of its head alone. See rightClusterMaxHeightPx for why the list
+ * is excluded.
+ */
+export const OBJECTIVES_HEAD_BOTTOM_VAR = '--bf-objectives-head-bottom';
+/** Breathing room (px) between the objectives head and the cluster below it. */
+export const OBJECTIVES_HEAD_GAP_PX = 6;
 
 /** Expand the HUD's logical stage before scaling so it still fills its safe parent. */
 export function hudStageExtentPercent(scale: number): number {

@@ -7,7 +7,7 @@ import {
   objectiveMarkerPlacement, objectiveProgressDue, objectiveMarkerPointerEvents,
   objectivePanelPointerEvents, objectiveProgressSummary, objectiveRows,
   objectiveSequencePosition, ObjectivesModel,
-  OBJECTIVE_LIST_GAP_PX, OBJECTIVE_LIST_MIN_PX, parseClusterTopPx,
+  OBJECTIVE_LIST_GAP_PX, OBJECTIVE_LIST_MIN_PX,
   RESOLVED_COLLAPSE_MIN, resolvedSummaryLabel, resolvedSummaryMark,
 } from './objectives';
 import { HUD_NARROW_MAX_PX } from './layout';
@@ -312,10 +312,5 @@ describe('objectiveListMaxHeightPx', () => {
     // Touching edges do not overlap; anything lower is a normal, tappable panel.
     expect(objectivePanelPointerEvents(100, 100)).toBe('auto');
     expect(objectivePanelPointerEvents(100, 510)).toBe('auto');
-  });
-
-  it('falls back to the full root before the HUD publishes an edge', () => {
-    expect(parseClusterTopPx('', 800)).toBe(800);
-    expect(parseClusterTopPx('520px', 800)).toBe(520);
   });
 });

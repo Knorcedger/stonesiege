@@ -1,11 +1,19 @@
 // Recorded voice-over playback: which beats play a file, which fall through to
 // the synthesizer, and what happens when playback is refused. The audio element
-// is faked, so these run under the repo's `node` environment.
+// is faked (and `fetch` stubbed for the manifest tests), so these run under the
+// repo's `node` environment.
 
-import { describe, expect, it } from 'vitest';
-import { createRecordedSpeech, type AudioClip } from './recordedSpeech';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createRecordedSpeech, createVoiceManifestFetch, loadVoiceManifest,
+  type AudioClip, type VoiceManifestAttempt,
+} from './recordedSpeech';
 import type { NarrationRequest, NarrationVoice, SpeechSeam } from './narration';
-import { voiceLineId, type VoiceManifest } from './voiceLines';
+import { EMPTY_VOICE_MANIFEST, voiceLineId, type VoiceManifest } from './voiceLines';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 class FakeClip implements AudioClip {
   src = '';
@@ -147,5 +155,103 @@ describe('createRecordedSpeech', () => {
     expect(() => seam.speak(request({ id: 'nothing-recorded' }))).not.toThrow();
     expect(() => seam.cancel()).not.toThrow();
     expect(clip.plays).toEqual([]);
+  });
+});
+
+describe('loadVoiceManifest', () => {
+  it('parses the manifest a normal fetch returns', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(manifestOf()) }));
+    const manifest = await loadVoiceManifest(undefined, AbortSignal.timeout(1000));
+    expect(Object.keys(manifest.lines)).toEqual([RECORDED]);
+  });
+
+  it('resolves empty within the bound when the fetch never settles', async () => {
+    // A connection that accepts and then stalls — a captive portal, a wedged
+    // CDN edge. The fake ignores its abort signal entirely, so this passes
+    // only if the loader bounds the wait itself rather than trusting fetch
+    // to reject on abort.
+    vi.stubGlobal('fetch', () => new Promise(() => undefined));
+    const manifest = await loadVoiceManifest(undefined, AbortSignal.timeout(5));
+    expect(manifest.lines).toEqual({});
+  });
+
+  it('resolves empty when the body stalls after the headers arrive', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve({ ok: true, json: () => new Promise(() => undefined) }));
+    const manifest = await loadVoiceManifest(undefined, AbortSignal.timeout(5));
+    expect(manifest.lines).toEqual({});
+  });
+});
+
+describe('createVoiceManifestFetch', () => {
+  it('fetches once per session when the manifest answers', async () => {
+    let calls = 0;
+    const fetchManifest = createVoiceManifestFetch({
+      load: async () => { calls++; return { manifest: manifestOf(), answered: true }; },
+    });
+    const first = await fetchManifest();
+    expect(await fetchManifest()).toBe(first);
+    expect(calls).toBe(1);
+  });
+
+  it('keeps the empty answer of a build with no recordings', async () => {
+    let calls = 0;
+    const fetchManifest = createVoiceManifestFetch({
+      load: async () => { calls++; return { manifest: EMPTY_VOICE_MANIFEST, answered: true }; },
+    });
+    await fetchManifest();
+    await fetchManifest();
+    expect(calls).toBe(1); // a 404 is the build's real answer, not a stall to retry
+  });
+
+  it('shares a stalled attempt between boots, then retries it next match', async () => {
+    let calls = 0;
+    // What the bounded loader reports under a stall: empty and unanswered,
+    // once the factory's own signal expires.
+    const fetchManifest = createVoiceManifestFetch({
+      timeoutMs: 5,
+      load: (signal) => new Promise((resolve) => {
+        calls++;
+        signal.addEventListener('abort',
+          () => resolve({ manifest: EMPTY_VOICE_MANIFEST, answered: false }), { once: true });
+      }),
+    });
+    const [a, b] = await Promise.all([fetchManifest(), fetchManifest()]);
+    expect(a.lines).toEqual({});
+    expect(b.lines).toEqual({});
+    expect(calls).toBe(1); // concurrent boots share the one in-flight attempt
+    await fetchManifest();
+    expect(calls).toBe(2); // the timed-out attempt did not poison the session cache
+  });
+
+  it('resolves empty for a load that throws, and does not keep the failure', async () => {
+    let calls = 0;
+    const fetchManifest = createVoiceManifestFetch({
+      // Throws synchronously — the worst case for the cache, whose clear must
+      // survive an attempt that settles before it is even stored.
+      load: (): Promise<VoiceManifestAttempt> => {
+        calls++;
+        if (calls === 1) throw new Error('offline');
+        return Promise.resolve({ manifest: manifestOf(), answered: true });
+      },
+    });
+    expect((await fetchManifest()).lines).toEqual({}); // boot got an answer, not an exception
+    expect(Object.keys((await fetchManifest()).lines)).toEqual([RECORDED]);
+    expect(calls).toBe(2);
+  });
+
+  it('retries next match when the real fetch fails outright, not only when it stalls', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', () => {
+      calls++;
+      return calls === 1
+        ? Promise.reject(new TypeError('network down'))
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(manifestOf()) });
+    });
+    const fetchManifest = createVoiceManifestFetch();
+    expect((await fetchManifest()).lines).toEqual({}); // the airplane-mode boot plays synthesised
+    expect(Object.keys((await fetchManifest()).lines)).toEqual([RECORDED]); // recordings return with the network
+    expect(calls).toBe(2);
   });
 });
