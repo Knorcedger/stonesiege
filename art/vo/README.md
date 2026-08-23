@@ -26,10 +26,17 @@ committed manifest still references wording that has changed.
 
 | | |
 | --- | --- |
-| Voice | `Martha`, English (UK) |
+| Voice | `Daniel`, English (UK) |
 | Source | Apple system voice, rendered locally with macOS `say` |
 | Renderer | `npm run vo:render` |
 | Licence for redistribution | **Open question — see below** |
+
+The recordings were made with `Daniel` rather than the `Martha` the live fallback prefers: Martha
+was not installed on the render machine, and `say -v '?'` offered no Martha variant there. The two
+paths are independent — the runtime ranking in `packages/game/src/audio/narration.ts` still prefers
+Martha for lines it has to synthesise, so a device with her installed reads unrecorded dialogue in
+her voice while the committed audio stays Daniel. `tools/voiceover.ts` defaults to Daniel so a
+re-render without `--voice` reproduces what is committed instead of silently revoicing it.
 
 Apple's system voices are licensed to speak on the device as part of the operating system. That
 grant does not clearly extend to redistributing rendered audio as game assets, which is what

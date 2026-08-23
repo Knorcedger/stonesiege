@@ -228,23 +228,23 @@ impacts carry further than hand weapons, so an off-screen siege is still audible
 has its own concurrency budget, so a wall crew, a field battle, and an archer volley never
 starve one another out of the mix.
 
-**Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as
-spoken story rather than silent text. Lines that have been recorded play as voice-over from
-`assets/vo/`; every other line goes to the device's own speech synthesizer, steered by voice
-choice and phrasing rather than by pitch. The two are interchangeable beat by beat, so dialogue
-written after the last render is still read aloud, and an edited line stops playing the audio of
-its old wording. The campaign is written for the English (UK) **Martha** voice and prefers her wherever
-the device has her, falling back to the best-quality English voice installed; a line is spoken
-as a sequence of beats split at sentence ends, dashes, colons and semicolons, with silence held
-between them, and every voice stays within a whole tone of its own register — dragging the pitch
-down instead is what makes a modern voice sound synthetic. The `Narrator` and `Chronicle` lines
-get the slowest read and the longest silences, and every other speaker keeps a slight pitch
-offset derived from its name, so Wallace and Cressingham stay apart by ear across chapters. The banner
-holds until the voice finishes (capped at 20s) so a line is never cut off mid-sentence, and a
-tap dismisses text and voice together. Narration stops with the match: pausing, backgrounding
-the app, or reaching the end screen silences it, and the closing lines are not read over the
-victory or defeat fanfare. **Narration** volume and a **Campaign narration** switch sit with
-the other audio settings; off sends nothing to the synthesizer at all.
+**Campaign narration.** Campaign dialogue banners are also read aloud, so chapters play as spoken
+story rather than silent text. Lines that have been recorded play as voice-over from `assets/vo/`,
+read by the English (UK) **Daniel** voice; every other line goes to the device's own speech
+synthesizer, steered by voice choice and phrasing rather than by pitch. The two are
+interchangeable beat by beat, so dialogue written after the last render is still read aloud, and
+an edited line stops playing the audio of its old wording. That synthesizer prefers the English
+(UK) **Martha** voice wherever the device has her, falling back to the best-quality English voice
+installed; a line is spoken as a sequence of beats split at sentence ends, dashes, colons and
+semicolons, with silence held between them, and every voice stays within a whole tone of its own
+register — dragging the pitch down instead is what makes a modern voice sound synthetic. The
+`Narrator` and `Chronicle` lines get the slowest read and the longest silences, and every other
+speaker keeps a slight pitch offset derived from its name, so Wallace and Cressingham stay apart
+by ear across chapters. The banner holds until the voice finishes (capped at 20s) so a line is
+never cut off mid-sentence, and a tap dismisses text and voice together. Narration stops with the
+match: pausing, backgrounding the app, or reaching the end screen silences it, and the closing
+lines are not read over the victory or defeat fanfare. **Narration** volume and a **Campaign
+narration** switch sit with the other audio settings; off sends nothing to the synthesizer at all.
 Devices without speech synthesis read only the lines that have recordings, and play exactly as
 before otherwise. Voice-over is rendered by `npm run vo:render` into one file per spoken beat,
 named by a hash of speaker and wording so a text edit can never leave stale audio playing; see

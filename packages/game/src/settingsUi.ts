@@ -179,10 +179,10 @@ export function buildSettingsControls(container: HTMLElement, opts: SettingsCont
   );
   const narrationHint = document.createElement('div');
   narrationHint.className = 'bf-set-hint';
-  narrationHint.textContent = 'Reads campaign dialogue aloud using the voices installed on your device. '
-    + 'The campaign is written for the English (UK) Martha voice — add it in your device\'s speech '
-    + 'or accessibility settings for the intended read. Without it, the best English voice '
-    + 'installed reads instead.';
+  narrationHint.textContent = 'Reads campaign dialogue aloud. Recorded lines play as voice-over. '
+    + 'Anything without a recording — dialogue written or reworded since the last render — is '
+    + 'read live by the best English voice installed on your device; add the English (UK) Martha '
+    + 'voice in your speech or accessibility settings for the closest match.';
   container.appendChild(narrationHint);
 
   booleanToggle(
