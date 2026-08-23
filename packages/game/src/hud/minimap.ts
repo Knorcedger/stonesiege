@@ -6,6 +6,7 @@ import { FP, GAIA, type Entity, type GameState, type PlayerId } from '@bf/sim/ty
 import type { GameAssets } from '../assets';
 import type { Camera } from '../camera';
 import { worldToTile } from '../camera';
+import { isHeroUnit } from '../frames';
 import { setGameTooltip } from '../tooltip';
 import { PlayerResourceMemory } from '../resourceMemory';
 
@@ -17,6 +18,9 @@ const TERRAIN_MINI_COLORS: Record<string, string> = {
 const RES_COLORS: Record<string, string> = {
   goldMine: '#E6C04A', stoneMine: '#C0C0C6', berryBush: '#A62E3E', tree: '#2E5426',
 };
+
+/** Gilded hero surround (ART_BIBLE §1 goldShine), matching the world hero ring. */
+const HERO_MARK = '#E6C04A';
 
 const PING_MS = 3000;
 const MOVE_MARKER_MS = 700;
@@ -168,8 +172,15 @@ export class Minimap {
           continue;
         }
         const color = state.players[e.player]?.setup.color ?? 6;
+        const hero = e.kind === 'unit' && isHeroUnit(e.defId);
+        const s = e.kind === 'building' ? 3 : hero ? 4 : 2;
+        if (hero) {
+          // Gilded surround: a campaign hero has to be findable on the minimap
+          // without hunting through identical army dots.
+          ctx.fillStyle = HERO_MARK;
+          ctx.fillRect(px - s / 2 - 1, py - s / 2 - 1, s + 2, s + 2);
+        }
         ctx.fillStyle = this.assets.getPlayerRampCss(color)[1];
-        const s = e.kind === 'building' ? 3 : 2;
         ctx.fillRect(px - s / 2, py - s / 2, s, s);
       }
     }

@@ -18,6 +18,11 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Added
 
+- Campaign heroes now stand out from the troops around them. William Wallace and every
+  other named hero wear their own colour, draw noticeably larger, and carry their own
+  star marker — one on the ground at their feet, one floating above them — plus a pip
+  on the minimap, so the one unit a chapter can be lost with is findable at a glance.
+  Player colours are unchanged, so a hero still shows whose side he is on.
 - **Campaign prologues and epilogues.** Every campaign now opens on an artwork page explaining
   the situation the chapters are about — for William Wallace, what Edward I had already done to
   Scotland by 1297 — shown the first time the campaign is opened and re-readable from the chapter

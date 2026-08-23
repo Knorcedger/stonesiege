@@ -26,7 +26,9 @@ import {
 } from '@bf/sim/types';
 import { gameData } from '@bf/data';
 import type { GameAssets } from './assets';
-import { ANIM_FPS, animFrameIndex, unitRig } from './frames';
+import {
+  ANIM_FPS, animFrameIndex, heroAccentFor, heroDrawScale, heroTintFor, unitRig,
+} from './frames';
 import { GAIA_NEUTRAL_COLOR } from './recolor';
 import { HALF_H, HALF_W, tileToWorld } from './camera';
 import { tileVisibility } from './fog';
@@ -499,13 +501,17 @@ export class FxLayer {
   private setCorpseFrame(c: Corpse, name: string): void {
     if (c.lastFrameKey === name) return;
     c.lastFrameKey = name;
-    const frame = this.assets.tryResolve(name, c.colorIdx);
+    // Heroes keep their accent colors and larger draw scale as they fall: the corpse
+    // must not pop back into rank-and-file art mid death animation.
+    const heroScale = c.isBuilding ? 1 : heroDrawScale(c.defId);
+    if (!c.isBuilding) c.sprite.tint = heroTintFor(c.defId) ?? 0xffffff;
+    const frame = this.assets.tryResolve(name, c.colorIdx, heroAccentFor(c.defId));
     if (!frame) return;
     c.sprite.texture = frame.texture;
     c.sprite.anchor.set(frame.anchorX, frame.anchorY);
     c.sprite.scale.set(
-      frame.mirrored ? -frame.renderScale : frame.renderScale,
-      frame.renderScale,
+      (frame.mirrored ? -frame.renderScale : frame.renderScale) * heroScale,
+      frame.renderScale * heroScale,
     );
   }
 

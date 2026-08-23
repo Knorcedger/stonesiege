@@ -81,3 +81,52 @@ export const FALLBACK_MASK_PALETTE: readonly [string, string, string] = ['#FF00F
  */
 export const GAIA_NEUTRAL_COLOR = -1;
 export const GAIA_NEUTRAL_RAMP: readonly [string, string, string] = ['#D8D2C6', '#9C9482', '#655F52'];
+
+/**
+ * The two ramps a humanoid rig's outfit is painted from (ART_BIBLE §1): cloth for
+ * tunics and kilts, metal for harness, helm and blade. Which one a rig actually uses
+ * depends on its tier — a militia is all cloth and a champion, knight or paladin is
+ * all metal — so a hero accent has to repaint both to be visible on every rig it may
+ * alias. Horse coats (wood/dirt tones) and the player-colour band are left alone.
+ */
+export const UNIT_CLOTH_RAMP: readonly [string, string, string] = ['#B89E73', '#957C56', '#6E5940'];
+export const UNIT_METAL_RAMP: readonly [string, string, string] = ['#A7B1BA', '#78828C', '#4A505A'];
+
+/** A second palette substitution layered on top of the player-colour swap. */
+export interface ColorAccent {
+  /** Stable identity for texture caching (the hero def id). */
+  id: string;
+  /** Source tones to replace, light→dark. */
+  from: readonly Rgb[];
+  /** Replacement tones, in the same order. */
+  to: readonly Rgb[];
+}
+
+/**
+ * Full per-entity palette pass: the owner's player ramp over the magenta mask, plus
+ * the optional accent over its own source ramp. Both substitutions are applied in ONE
+ * pass so each pixel is rewritten at most once — a second pass could re-swap a pixel
+ * the player ramp just wrote, silently repainting ownership as accent cloth. Returns
+ * true when anything changed, so callers can keep serving the plain atlas texture for
+ * frames that carry neither ramp.
+ */
+export function applyEntityPalette(
+  pixels: Uint8ClampedArray,
+  maskRamp: readonly Rgb[],
+  playerRamp: readonly Rgb[] | undefined,
+  accent?: ColorAccent,
+): boolean {
+  const from: Rgb[] = [];
+  const to: Rgb[] = [];
+  const add = (src: readonly Rgb[], dst: readonly Rgb[]): void => {
+    for (let i = 0; i < Math.min(src.length, dst.length); i++) {
+      from.push(src[i]);
+      to.push(dst[i]);
+    }
+  };
+  if (playerRamp) add(maskRamp, playerRamp);
+  if (accent) add(accent.from, accent.to);
+  if (from.length === 0 || !containsMask(pixels, from)) return false;
+  swapPalette(pixels, from, to);
+  return true;
+}

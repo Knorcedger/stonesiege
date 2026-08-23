@@ -7,7 +7,7 @@ import {
   advanceGateOpenProgress, artScaleForFrame, artZIndex, buildingArtKey, buildingHpBarWidth,
   defaultRallyTilePoint, entityPickDistance, isHiddenInHost, mirroredWallIds,
   ownedResearchProgress, resourceFrameName, wallCornerJoins, rallyFlagWorldPoint,
-  shouldFadeForUnit, villagerWorkTarget,
+  shouldFadeForUnit, villagerWorkTarget, starPoly, unitHpBarY, buildingHpBarY,
 } from './world';
 
 const HUMAN = 1 as PlayerId;
@@ -196,6 +196,68 @@ describe('advanceGateOpenProgress', () => {
     expect(advanceGateOpenProgress(0.5, true, 999)).toBe(1);
     expect(advanceGateOpenProgress(0.5, false, 999)).toBe(0);
     expect(advanceGateOpenProgress(0.5, false, -1)).toBe(0.5);
+  });
+});
+
+describe('artScaleForFrame — campaign heroes', () => {
+  it('draws heroes larger than the rig they alias', () => {
+    const hero = artScaleForFrame('heroWallace', 'unit/champion/idle/2/0');
+    expect(hero.x).toBeGreaterThan(1);
+    expect(hero.y).toBe(hero.x); // uniform: a stretched hero would leave his tile
+    expect(artScaleForFrame('champion', 'unit/champion/idle/2/0')).toEqual({ x: 1, y: 1 });
+    expect(artScaleForFrame('militia', 'unit/militia/idle/2/0')).toEqual({ x: 1, y: 1 });
+  });
+});
+
+describe('starPoly (hero marker geometry)', () => {
+  it('alternates outer and inner radii around a full turn', () => {
+    const star = starPoly(5, 10, 10, 0.4, -0.5);
+    expect(star).toHaveLength(20); // 5 points => 10 vertices => 20 coords
+    const radii = [];
+    for (let i = 0; i < star.length; i += 2) radii.push(Math.hypot(star[i], star[i + 1]));
+    for (let i = 0; i < radii.length; i++) {
+      expect(radii[i], `vertex ${i}`).toBeCloseTo(i % 2 === 0 ? 10 : 4, 5);
+    }
+  });
+
+  it('aims the first point where the rotation says', () => {
+    const up = starPoly(5, 8, 8, 0.4, -0.5);
+    expect(up[0]).toBeCloseTo(0, 5);
+    expect(up[1]).toBeCloseTo(-8, 5); // straight up-screen for the overhead star
+    const down = starPoly(4, 8, 8, 0.4);
+    expect(down[1]).toBeCloseTo(8, 5);
+  });
+
+  it('keeps every point of an eight-pointed star the same length', () => {
+    const star = starPoly(8, 20, 12, 0.28);
+    expect(star).toHaveLength(32);
+    for (let i = 0; i < star.length; i += 4) {
+      // Outer vertices all reach the full radius on the ellipse they lie on.
+      const [x, y] = [star[i] / 20, star[i + 1] / 12];
+      expect(Math.hypot(x, y), `point ${i / 4}`).toBeCloseTo(1, 5);
+    }
+  });
+
+  it('squashes onto the floor plane for the ground marker', () => {
+    const ground = starPoly(4, 16, 9, 0.34);
+    const xs = ground.filter((_, i) => i % 2 === 0).map(Math.abs);
+    const ys = ground.filter((_, i) => i % 2 === 1).map(Math.abs);
+    expect(Math.max(...xs)).toBeCloseTo(16, 5);
+    expect(Math.max(...ys)).toBeCloseTo(9, 5); // isometric: wider than it is tall
+  });
+});
+
+describe('unitHpBarY', () => {
+  it('lifts a hero bar clear of his taller art instead of crossing his chest', () => {
+    // A hero draws at HERO_DRAW_SCALE, so his trimmed top sits well above -34.
+    expect(unitHpBarY('heroWallace', -48)).toBe(-52);
+    expect(unitHpBarY('heroWallace', -20)).toBe(-34); // never lower than the rig default
+  });
+
+  it('leaves rank-and-file units on the fixed offset', () => {
+    expect(unitHpBarY('militia', -48)).toBe(-34);
+    expect(unitHpBarY('villager', -20)).toBe(-34);
+    expect(buildingHpBarY(-60)).toBe(-70); // buildings keep their own anchor
   });
 });
 

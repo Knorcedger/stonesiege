@@ -4,6 +4,41 @@
 
 import type { UnitDef } from './schema';
 
+/**
+ * Hero accent colour, ART_BIBLE §1 master palette only (light / mid / dark).
+ *
+ * Heroes alias a rank-and-file rig — in the HD art pack a hero and his militia are
+ * literally the same frames — so without this every hero is one more soldier in the
+ * line. The renderer uses this ramp twice: it repaints the pixel-art rig's cloth and
+ * metal tones with it, and tints the sprite with its light tone, which is what carries
+ * the accent on the pre-rendered HD art where no palette colour survives.
+ *
+ * Ramps must therefore be saturated (a near-white or grey ramp multiplies to nothing
+ * as a tint) and stay clear of the cloth and metal ramps they replace. Heroes who
+ * share a battlefield get different hues; reuse across campaigns is fine because
+ * those casts never meet.
+ */
+const HERO_CLOTH: Record<string, readonly [string, string, string]> = {
+  // ---- Wallace arc, Scots ----
+  heroWallace: ['#4884A4', '#2C6283', '#1D4763'], // water — the one blue on the field
+  heroMoray: ['#D4B562', '#B29245', '#8A6E33'], // thatch
+  heroGraham: ['#5B8A3B', '#3F6E2F', '#1F3B1E'], // leaf
+  heroFraser: ['#D4B562', '#B29245', '#8A6E33'], // thatch
+  // ---- Wallace arc, English ----
+  heroHeselrig: ['#5B8A3B', '#3F6E2F', '#1F3B1E'], // leaf
+  heroCressingham: ['#5B8A3B', '#3F6E2F', '#1F3B1E'], // leaf
+  heroWarenne: ['#E6C04A', '#C29422', '#8A6414'], // gold
+  heroEdward: ['#E6C04A', '#C29422', '#8A6414'], // gold — Longshanks outranks his earls
+  heroValence: ['#5B8A3B', '#3F6E2F', '#1F3B1E'], // leaf
+  // ---- Legendary campaign protagonists (one hero per campaign; ramps may repeat) ----
+  heroHenryV: ['#E6C04A', '#C29422', '#8A6414'], // gold
+  heroHardrada: ['#4884A4', '#2C6283', '#1D4763'], // water
+  heroJoan: ['#4884A4', '#2C6283', '#1D4763'], // water
+  heroGenghis: ['#5B8A3B', '#3F6E2F', '#1F3B1E'], // leaf
+  heroAlexios: ['#E6C04A', '#C29422', '#8A6414'], // Byzantine gold
+  heroSaladin: ['#5B8A3B', '#3F6E2F', '#1F3B1E'], // leaf
+};
+
 export const units: Record<string, UnitDef> = {
   // ---------------------------------------------------------------- economy
   villager: {
@@ -570,9 +605,10 @@ export const units: Record<string, UnitDef> = {
   // stats; never trainable (scenario-placed only) and immune to conversion. Stats
   // intentionally match the former @bf/scenarios placeholders so authored campaign
   // playthroughs do not drift. `sprite`/`icon` alias existing atlas rigs until
-  // bespoke hero art lands (heroWallace renders as a champion, etc.). Scenario hp
-  // overrides (Warenne 2000 / Edward 5000 / Valence 3000 as army-anchor bosses)
-  // stay in the scenario defs.
+  // bespoke hero art lands (heroWallace renders as a champion, etc.) — `hero` plus
+  // the HERO_CLOTH accent below is what keeps an aliased hero from looking exactly
+  // like the rank and file he leads. Scenario hp overrides (Warenne 2000 /
+  // Edward 5000 / Valence 3000 as army-anchor bosses) stay in the scenario defs.
   // ---- Scots ----
   heroWallace: heroDef('heroWallace', 'William Wallace', 200, 14, 'champion'),
   heroMoray: heroDef('heroMoray', 'Andrew Moray', 180, 12, 'knight'),
@@ -621,5 +657,7 @@ function heroDef(
     conversionResist: 100, // heroes cannot be converted
     icon: `icon/${sprite}`,
     sprite,
+    hero: true,
+    ...(HERO_CLOTH[id] ? { heroCloth: HERO_CLOTH[id] } : {}),
   };
 }

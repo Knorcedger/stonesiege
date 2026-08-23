@@ -78,6 +78,20 @@ export interface UnitDef {
    * (e.g. heroWallace -> champion) until bespoke hero art exists. Render-only.
    */
   sprite?: string;
+  /**
+   * Campaign hero: a named, scenario-placed protagonist or boss. Heroes share a
+   * rank-and-file rig through `sprite`, so the renderer keys its hero treatment
+   * (accent cloth, larger draw scale, permanent marker ring) off this flag.
+   */
+  hero?: boolean;
+  /**
+   * Hero accent ramp [light, mid, dark] as `#rrggbb`. The renderer repaints the
+   * shared rig's cloth and metal tones with it, and tints the sprite with its light
+   * tone so the accent also lands on pre-rendered HD art that carries no palette
+   * colour; the player-colour band keeps its own ramp, so ownership still reads.
+   * Master-palette colours only (ART_BIBLE §1). Render-only.
+   */
+  heroCloth?: readonly [string, string, string];
 }
 
 export interface BuildingDef {

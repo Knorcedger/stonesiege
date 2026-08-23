@@ -15,11 +15,11 @@ import { gameData, unitAggroRange } from '@bf/data';
 import type { GameAssets, ResolvedFrame } from './assets';
 import {
   animForActivity, animFrameIndex, attackSwingFrameIndex, buildingFrameCandidates,
-  facingFromDelta, unitRig, villagerWorkAnim, UNSEEN_FARM_FRAME,
-  type AnimName, type BuildingArtChoice,
+  facingFromDelta, heroAccentFor, heroTintFor, isHeroUnit, unitRig, villagerWorkAnim,
+  HERO_DRAW_SCALE, UNSEEN_FARM_FRAME, type AnimName, type BuildingArtChoice,
 } from './frames';
 import { hasActiveRally } from './hud/cardModel';
-import { GAIA_NEUTRAL_COLOR } from './recolor';
+import { GAIA_NEUTRAL_COLOR, type ColorAccent } from './recolor';
 import { HALF_H, HALF_W, tileToWorld, worldToTile } from './camera';
 import { getSettings } from './settings';
 import { tileVisibility } from './fog';
@@ -35,6 +35,14 @@ const HP_BG = 0x2c1f12;
 const RESEARCH_BLUE = 0x5b8fc9;
 const GHOST_TINT = 0x9aa4ad;
 const GHOST_ALPHA = 0.8;
+/**
+ * Hero marker. Deliberately NOT the amber ellipse used for worksite highlights, rally
+ * flags, garrison badges and impact flashes: heroes get their own shape (stars) in
+ * their own accent colour, with a pale core so a dark or green hero still separates
+ * from grass.
+ */
+const HERO_MARK_CORE = 0xf4eedd;
+const HERO_MARK_FALLBACK = 0xe6c04a;
 const AGGRO_COLOR = 0xe9d6a5;
 const AGGRO_LINE_ALPHA = 0.24;
 const AGGRO_FILL_ALPHA = 0.025;
@@ -43,6 +51,7 @@ const GATE_OPEN_RADIUS_FP = 2 * FP;
 const GATE_OPEN_TICKS = TICKS_PER_SECOND * 0.45;
 interface ArtScale { x: number; y: number }
 const NO_ART_SCALE: ArtScale = { x: 1, y: 1 };
+const HERO_ART_SCALE: ArtScale = { x: HERO_DRAW_SCALE, y: HERO_DRAW_SCALE };
 const FORTIFICATION_ART_SCALE: Readonly<Record<string, ArtScale>> = {
   // Wall endpoints stay close to one mechanical tile while the masonry grows
   // vertically to building scale. Uniform 2.25x scaling made every segment
@@ -101,6 +110,9 @@ export function artScaleForFrame(defId: string, frameName: string): ArtScale {
   const variant = AGE_VARIANT_FRAME.exec(frameName);
   const byAge = variant ? AGE_ART_SCALE[variant[1]]?.[variant[2] as AgeId] : undefined;
   if (byAge !== undefined) return { x: byAge, y: byAge };
+  // Campaign heroes draw larger than the rank-and-file rig they alias, so the
+  // protagonist reads as the protagonist in a press of his own bodyguard.
+  if (isHeroUnit(defId)) return HERO_ART_SCALE;
   return FORTIFICATION_ART_SCALE[defId] ?? NO_ART_SCALE;
 }
 
@@ -156,6 +168,28 @@ export function wallCornerJoins(entities: Iterable<Entity>): Map<EntityId, WallC
     corners.set(e.id, { xDir: xPos ? 1 : -1, yDir: yPos ? 1 : -1 });
   }
   return corners;
+}
+
+/**
+ * Vertices of a `points`-pointed star, alternating outer and inner radii, as a flat
+ * [x0,y0,x1,y1,...] list for Graphics.poly. Radii are given per axis so a marker laid
+ * on the ground can be squashed onto the isometric floor plane, and `rotation` (in
+ * turns) aims the first point — 0 = straight down-screen, -0.25 = straight up.
+ */
+export function starPoly(
+  points: number,
+  outerX: number,
+  outerY: number,
+  innerRatio: number,
+  rotation = 0,
+): number[] {
+  const out: number[] = [];
+  for (let i = 0; i < points * 2; i++) {
+    const t = (i / (points * 2) + rotation) * Math.PI * 2;
+    const scale = i % 2 === 0 ? 1 : innerRatio;
+    out.push(Math.sin(t) * outerX * scale, Math.cos(t) * outerY * scale);
+  }
+  return out;
 }
 
 /** Deterministic gate-leaf tween used for both opening and closing. */
@@ -248,9 +282,10 @@ export function buildingArtKey(
   colorIdx: number | undefined,
   mirrorWall: boolean,
   corner: WallCornerJoin | undefined,
+  accent?: ColorAccent,
 ): string {
   const joinKey = corner ? `corner:${corner.xDir},${corner.yDir}|` : mirrorWall ? 'wall-y|' : '';
-  return `${colorIdx ?? 'none'}|${joinKey}${candidates.join('|')}`;
+  return `${colorIdx ?? 'none'}|${accent?.id ?? ''}|${joinKey}${candidates.join('|')}`;
 }
 
 export interface EntityView extends WallJoinedArt {
@@ -277,6 +312,9 @@ export interface EntityView extends WallJoinedArt {
   badge: Container | null;
   badgeText: Text | null;
   lastBadgeKey: string;
+  /** Floating star over a campaign hero's head. */
+  heroStar: Graphics | null;
+  lastHeroStarKey: string;
 }
 
 export interface WorldRect {
@@ -828,6 +866,7 @@ export class WorldLayer {
       lastFrameKey: '', lastAnim: '', animStartTick: 0, lastHpKey: '', lastRingKey: '', spriteTopPx: 0,
       renderFacing: 0,
       carry: null, lastCarryKey: '', badge: null, badgeText: null, lastBadgeKey: '',
+      heroStar: null, lastHeroStarKey: '',
     };
   }
 
@@ -917,15 +956,15 @@ export class WorldLayer {
    * nothing. Returns the name that won, which is what the art scale keys on.
    */
   private resolveCandidates(
-    candidates: string[], colorIdx?: number,
+    candidates: string[], colorIdx?: number, accent?: ColorAccent,
   ): { frame: ResolvedFrame; resolvedName: string } {
     let resolvedName = candidates[candidates.length - 1];
     let frame: ResolvedFrame | null = null;
     for (let i = 0; i < candidates.length - 1 && !frame; i++) {
-      frame = this.assets.tryResolve(candidates[i], colorIdx);
+      frame = this.assets.tryResolve(candidates[i], colorIdx, accent);
       if (frame) resolvedName = candidates[i];
     }
-    return { frame: frame ?? this.assets.resolveFrame(resolvedName, colorIdx), resolvedName };
+    return { frame: frame ?? this.assets.resolveFrame(resolvedName, colorIdx, accent), resolvedName };
   }
 
   private updateView(state: GameState, e: Entity, view: EntityView, alpha: number, tickFloat: number): void {
@@ -950,6 +989,10 @@ export class WorldLayer {
     // Gaia entities use the neutral swap: some (sheep) carry a real mask band that
     // must never render raw magenta. Atlases without masks serve the plain frame.
     const colorIdx = e.player === GAIA ? GAIA_NEUTRAL_COLOR : state.players[e.player]?.setup.color;
+    // Campaign heroes share a rank-and-file rig: repaint its cloth with the hero's own
+    // ramp so William Wallace is not one more militia tunic (issue #110). The player
+    // color band is untouched, so a hero still shows whose side he is on.
+    const accent = e.kind === 'unit' ? heroAccentFor(e.defId) : undefined;
     const frameChoice = this.frameNameFor(state, e, tickFloat, view);
     const gateOperational = e.kind === 'building' && e.defId === 'gate' && e.hp > 0
       && (e.buildProgress ?? 1000) >= 1000;
@@ -962,9 +1005,9 @@ export class WorldLayer {
     // former owner's palette until its next animation/facing transition.
     const mirrorWall = this.mirroredWalls.has(e.id);
     const corner = e.defId === 'stoneWall' ? this.wallCorners.get(e.id) : undefined;
-    const key = buildingArtKey(candidates, colorIdx, mirrorWall, corner);
+    const key = buildingArtKey(candidates, colorIdx, mirrorWall, corner, accent);
     if (key !== view.lastFrameKey) {
-      const { frame, resolvedName } = this.resolveCandidates(candidates, colorIdx);
+      const { frame, resolvedName } = this.resolveCandidates(candidates, colorIdx, accent);
       const artScale = artScaleForFrame(e.defId, resolvedName);
       applyBuildingArt(view, frame, artScale, mirrorWall, corner);
 
@@ -1008,16 +1051,53 @@ export class WorldLayer {
     view.sprite.alpha = sprAlpha;
     view.cornerSprite.alpha = sprAlpha;
     view.gateDoor.alpha = sprAlpha;
-    // damage-taken red blink (attackImpact recorded in onSimEvents)
-    const tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat ? 0xff8070 : 0xffffff;
+    // damage-taken red blink (attackImpact recorded in onSimEvents), else the hero
+    // tint. The blink deliberately wins: a hero being hurt is the more urgent read,
+    // and the accent returns the moment the blink expires.
+    const tint = (this.damagedUntil.get(e.id) ?? 0) > tickFloat
+      ? 0xff8070
+      : (e.kind === 'unit' ? heroTintFor(e.defId) : undefined) ?? 0xffffff;
     view.sprite.tint = tint;
     view.cornerSprite.tint = tint;
     view.gateDoor.tint = tint;
 
     this.drawRing(e, view);
+    this.drawHeroStar(e, view);
     this.drawHpBar(e, view);
     this.updateCarryIcon(e, view);
     this.updateGarrisonBadge(e, view);
+  }
+
+  /**
+   * Floating star over a hero's head — the marker that survives a crowd, where the
+   * ground star is hidden behind whoever is standing in front of him. Own shape and
+   * own colour on purpose: every other overhead marker in the game is an amber flag
+   * or a resource icon.
+   */
+  private drawHeroStar(e: Entity, view: EntityView): void {
+    const hero = e.kind === 'unit' && e.activity !== 'dying' && isHeroUnit(e.defId);
+    const color = hero ? heroTintFor(e.defId) ?? HERO_MARK_FALLBACK : 0;
+    const key = hero ? `${color}` : '';
+    if (key !== view.lastHeroStarKey) {
+      view.lastHeroStarKey = key;
+      if (!key) {
+        if (view.heroStar) view.heroStar.visible = false;
+      } else {
+        const star = view.heroStar ?? new Graphics();
+        if (!view.heroStar) {
+          view.heroStar = star;
+          view.root.addChild(star);
+        }
+        star.clear();
+        const points = starPoly(5, 7, 7, 0.44, -0.5);
+        star.poly(points).fill({ color: OUTLINE, alpha: 0.55 });
+        star.poly(points).stroke({ width: 1.5, color });
+        star.poly(starPoly(5, 3.4, 3.4, 0.44, -0.5)).fill(HERO_MARK_CORE);
+        star.visible = true;
+      }
+    }
+    // Above the HP bar, which itself sits above the tallest hero rig.
+    if (view.heroStar?.visible) view.heroStar.position.set(0, Math.min(view.spriteTopPx, -34) - 11);
   }
 
   /** Small resource icon over a laden villager (entity.carrying). */
@@ -1138,11 +1218,17 @@ export class WorldLayer {
     // worksite highlight: amber ring on whatever the selected villagers work —
     // a resource being gathered, or a foundation being built or repaired
     const highlighted = !selected && this.workTargets.has(e.id);
-    const key = selected ? `1:${e.kind}:${e.defId}` : highlighted ? `h:${e.kind}:${e.defId}` : '';
+    // Campaign heroes keep a permanent star: the one cue that survives a crowded
+    // melee, where an accent tunic can be hidden behind other sprites.
+    const hero = e.kind === 'unit' && e.activity !== 'dying' && isHeroUnit(e.defId);
+    const ringState = selected ? '1' : highlighted ? 'h' : '0';
+    const key = selected || highlighted || hero
+      ? `${ringState}${hero ? 'H' : ''}:${e.kind}:${e.defId}`
+      : '';
     if (key === view.lastRingKey) return;
     view.lastRingKey = key;
     view.ring.clear();
-    if (!selected && !highlighted) return;
+    if (!selected && !highlighted && !hero) return;
     const color = selected ? HIGHLIGHT : AMBER_HIGHLIGHT;
     if (e.kind === 'building') {
       const size = gameData.buildings[e.defId]?.size ?? 1;
@@ -1163,6 +1249,19 @@ export class WorldLayer {
         : undefined;
       const cav = (gameData.units[e.defId]?.speed ?? 0) > 1.1;
       const [rx, ry] = resourceRadius ?? (cav ? [14, 7] : [10, 5]);
+      if (hero) {
+        // Eight-pointed star on the ground, one step outside the selection ellipse so
+        // both stay readable at once. Squashed onto the floor plane and drawn in the
+        // hero's own colour over a dark rim. The deep inner radius is what keeps eight
+        // points spiky at marker size instead of closing up into a disc.
+        const mark = heroTintFor(e.defId) ?? HERO_MARK_FALLBACK;
+        const star = starPoly(8, rx + 7, ry + 6, 0.28);
+        view.ring.poly(star).fill({ color: OUTLINE, alpha: 0.5 });
+        view.ring.poly(star).stroke({ width: 1.5, color: mark });
+        view.ring.poly(starPoly(8, rx + 3.5, ry + 3, 0.28))
+          .stroke({ width: 1, color: HERO_MARK_CORE, alpha: 0.75 });
+      }
+      if (!selected && !highlighted) return;
       view.ring.ellipse(0, 1, rx, ry + 1).stroke({ width: 1, color: OUTLINE });
       view.ring.ellipse(0, 0, rx, ry).stroke({ width: 1, color });
     }
@@ -1183,7 +1282,7 @@ export class WorldLayer {
     // tall frames carry transparent headroom. Integer px; part of the key so
     // the bar follows construct-stage frame changes.
     const isB = e.kind === 'building';
-    const yOff = isB ? buildingHpBarY(view.spriteTopPx) : -34;
+    const yOff = isB ? buildingHpBarY(view.spriteTopPx) : unitHpBarY(e.defId, view.spriteTopPx);
     const key = showHp
       ? `${frac.toFixed(2)}:${researchFrac?.toFixed(3) ?? ''}:${e.kind}:${e.defId}:${yOff}`
       : '';
@@ -1337,6 +1436,16 @@ const TILE_W_SAFE = HALF_W * 2;
  */
 export function buildingHpBarY(spriteTopPx: number): number {
   return Math.round(spriteTopPx) - 10;
+}
+
+/**
+ * Unit health-bar offset. The fixed -34 assumes a rank-and-file rig; a hero draws at
+ * HERO_DRAW_SCALE and is that much taller, so his bar would sit across his chest.
+ * Anchor his to the sprite's trimmed visible top instead, like a building's.
+ */
+export function unitHpBarY(defId: string, spriteTopPx: number): number {
+  const base = -34;
+  return isHeroUnit(defId) ? Math.min(base, Math.round(spriteTopPx) - 4) : base;
 }
 
 /** Compact building bars: exactly half the old near-full-footprint width. */
