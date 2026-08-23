@@ -13,6 +13,7 @@
 
 import { Rectangle, Texture, TextureSource } from 'pixi.js';
 import { gameData } from '@bf/data';
+import { openArtworkStore, type ArtworkStore } from './artworkStore';
 import { resolveFrameName, bakedColorName } from './frames';
 import {
   applyEntityPalette, containsMask, hexToRgb, FALLBACK_PLAYER_RAMPS, FALLBACK_MASK_PALETTE,
@@ -107,7 +108,12 @@ export interface ResolvedFrame {
   renderScale: number;
 }
 
-export interface HdManifest { atlases?: string[]; frameCount?: number }
+export interface HdManifest {
+  atlases?: string[];
+  frameCount?: number;
+  /** Per-file content hashes stamped by tools/hd-art — the persistent cache keys. */
+  assetHashes?: Record<string, string>;
+}
 
 export function parseHdManifest(value: unknown): HdManifest {
   if (!value || typeof value !== 'object') return { atlases: [] };
@@ -123,9 +129,22 @@ export function parseHdManifest(value: unknown): HdManifest {
     && manifest.frameCount >= 0
     ? manifest.frameCount
     : undefined;
+  const assetHashes: Record<string, string> = {};
+  if (manifest.assetHashes && typeof manifest.assetHashes === 'object') {
+    for (const [file, hash] of Object.entries(manifest.assetHashes)) {
+      if (
+        /^[a-z0-9][a-z0-9._-]*$/i.test(file)
+        && typeof hash === 'string'
+        && /^[0-9a-f]{8,64}$/i.test(hash)
+      ) {
+        assetHashes[file] = hash.toLowerCase();
+      }
+    }
+  }
   return {
     atlases,
     ...(frameCount !== undefined ? { frameCount } : {}),
+    ...(Object.keys(assetHashes).length > 0 ? { assetHashes } : {}),
   };
 }
 
@@ -205,9 +224,9 @@ export class GameAssets {
   async load(options: AssetLoadOptions = {}): Promise<void> {
     // Crisp nearest-neighbor everywhere (pixel art at integer zooms).
     TextureSource.defaultOptions.scaleMode = 'nearest';
-    const hdManifest = shouldLoadHdArtwork(options.artworkMode)
-      ? await loadHdManifest()
-      : { atlases: [] };
+    const wantHd = shouldLoadHdArtwork(options.artworkMode);
+    const store = wantHd ? await openArtworkStore() : null;
+    const hdManifest = wantHd ? await loadHdManifest(store) : { atlases: [] };
     const hdFiles = hdManifest.atlases ?? [];
     let progress: AssetLoadProgress = {
       completed: 0,
@@ -227,9 +246,13 @@ export class GameAssets {
       this.atlases.set(name, atlas);
       settled(atlas.missing);
     }));
-    const hdLoad = this.loadHdOverrides(hdFiles, options.optionalSignal, settled);
+    const hdLoad = this.loadHdOverrides(hdFiles, hdManifest.assetHashes, store, options.optionalSignal, settled);
     await Promise.all([baseLoad, hdLoad]);
     assertCompleteHdArtwork(options.artworkMode, hdManifest, this.hdFrames.size);
+    // Only a proven-complete boot may garbage-collect the store: after a
+    // partial or aborted load the untouched entries may be the very set the
+    // next boot needs. Not awaited — deletions can trail the match starting.
+    if (store) void store.prune();
     const missing = ATLAS_NAMES.filter((n) => this.atlases.get(n)!.missing);
     if (missing.length > 0) {
       console.warn(
@@ -510,6 +533,8 @@ export class GameAssets {
 
   private async loadHdOverrides(
     files: string[],
+    hashes: Record<string, string> | undefined,
+    store: ArtworkStore | null,
     signal: AbortSignal | undefined,
     onSettled: (usedFallback: boolean) => void,
   ): Promise<void> {
@@ -523,6 +548,7 @@ export class GameAssets {
         'assets/hd/',
         file.replace(/\.json$/i, ''),
         signal,
+        { store, hashes },
       );
       if (!signal?.aborted) onSettled(atlas.missing);
       return atlas;
@@ -676,12 +702,82 @@ function loadImage(url: string, signal: AbortSignal): Promise<HTMLImageElement> 
   });
 }
 
-async function loadHdManifest(): Promise<HdManifest> {
+const HD_MANIFEST_URL = 'assets/hd/manifest.json';
+
+/**
+ * The manifest is the version anchor of the whole cached HD set, so it must
+ * never itself be served stale: 'no-cache' forces a conditional revalidation
+ * even under permissive hosting headers. Exported for tests.
+ */
+export async function loadHdManifest(store: ArtworkStore | null): Promise<HdManifest> {
   return boundedAssetLoad(async (signal) => {
-    const response = await fetch('assets/hd/manifest.json', { signal });
-    if (!response.ok) return { atlases: [] };
-    return parseHdManifest(await response.json() as unknown);
+    try {
+      const response = await fetch(HD_MANIFEST_URL, { signal, cache: 'no-cache' });
+      // Only a definitive "not here" may erase the cached set and report no
+      // HD art. Any other failed status (5xx, 429) is a host hiccup: treat it
+      // like a network failure so a complete cached set can still boot.
+      if (response.status === 404 || response.status === 410) {
+        await store?.clear(signal);
+        return { atlases: [] };
+      }
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      const copy = response.clone();
+      const manifest = parseHdManifest(await response.json() as unknown);
+      // Written through only once the body proved to be JSON, so a corrupt
+      // transfer can never become the offline fallback.
+      await store?.writeThrough(HD_MANIFEST_URL, copy, signal);
+      return manifest;
+    } catch (error) {
+      // Revalidation failed (offline, flaky link): the last stored manifest
+      // still names a complete cached set, so the match can boot from it.
+      const cached = await store?.readFallback(HD_MANIFEST_URL, signal);
+      if (!cached) throw error;
+      return parseHdManifest(await cached.json() as unknown);
+    }
   }, { atlases: [] }, HD_MANIFEST_TIMEOUT_MS);
+}
+
+interface AtlasCacheSource {
+  store: ArtworkStore | null;
+  hashes?: Record<string, string>;
+}
+
+function pinnedHash(
+  file: string,
+  cached: AtlasCacheSource | undefined,
+): { store: ArtworkStore; hash: string } | null {
+  const hash = cached?.hashes?.[file];
+  return cached?.store && hash ? { store: cached.store, hash } : null;
+}
+
+async function fetchAtlasResource(
+  url: string,
+  file: string,
+  cached: AtlasCacheSource | undefined,
+  signal: AbortSignal,
+): Promise<Response> {
+  const pin = pinnedHash(file, cached);
+  return pin ? pin.store.fetchVersioned(url, pin.hash, signal) : fetch(url, { signal });
+}
+
+async function loadAtlasImage(
+  url: string,
+  file: string,
+  cached: AtlasCacheSource | undefined,
+  signal: AbortSignal,
+): Promise<HTMLImageElement> {
+  const pin = pinnedHash(file, cached);
+  if (!pin) return loadImage(url, signal);
+  const response = await pin.store.fetchVersioned(url, pin.hash, signal);
+  if (!response.ok) throw new Error(`Could not load ${url} (HTTP ${response.status})`);
+  // Decode through the same <img> path as the uncached route so texture
+  // memory behavior is identical; only the bytes' origin differs.
+  const objectUrl = URL.createObjectURL(await response.blob());
+  try {
+    return await loadImage(objectUrl, signal);
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 async function loadAtlasFile(
@@ -689,6 +785,7 @@ async function loadAtlasFile(
   imageBase: string,
   fallbackName = jsonUrl,
   parentSignal?: AbortSignal,
+  cached?: AtlasCacheSource,
 ): Promise<Atlas> {
   const atlas: Atlas = {
     name: fallbackName,
@@ -702,16 +799,15 @@ async function loadAtlasFile(
     playerRamps: null,
   };
   return boundedAssetLoad(async (signal) => {
-    const res = await fetch(jsonUrl, { signal });
+    const jsonFile = jsonUrl.slice(jsonUrl.lastIndexOf('/') + 1);
+    const res = await fetchAtlasResource(jsonUrl, jsonFile, cached, signal);
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const json = (await res.json()) as AtlasJson;
     if (!json || typeof json !== 'object' || !json.frames) throw new Error('bad atlas json');
     // A 0-frame atlas is an assetgen stub: treat as missing so mock frames kick in.
     if (Object.keys(json.frames).length === 0) throw new Error('empty atlas (stub)');
-    const image = await loadImage(
-      `${imageBase}${json.meta?.image ?? `${fallbackName}.png`}`,
-      signal,
-    );
+    const imageFile = json.meta?.image ?? `${fallbackName}.png`;
+    const image = await loadAtlasImage(`${imageBase}${imageFile}`, imageFile, cached, signal);
 
     const source = Texture.from(image).source;
     atlas.density = Math.max(1, json.meta?.scale ?? 1);

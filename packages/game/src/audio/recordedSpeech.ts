@@ -204,7 +204,14 @@ export function createRecordedSpeech(
       try {
         target.volume = 0;
         target.src = SILENCE;
-        void target.play();
+        const started = target.play();
+        // The pause below is what spends the gesture, and it rejects the play
+        // it interrupts. That rejection is the intended outcome, not a failure,
+        // so absorb it: left unhandled it reaches the console as an alarming
+        // AbortError on the first press of every match (issue #156).
+        if (started && typeof started.catch === 'function') {
+          started.catch(() => undefined);
+        }
         target.pause();
       } catch {
         /* non-fatal */

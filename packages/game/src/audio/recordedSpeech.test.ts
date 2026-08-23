@@ -144,6 +144,30 @@ describe('createRecordedSpeech', () => {
     expect(fallback.primes).toBe(1);
   });
 
+  it('absorbs the rejection its own pause provokes while priming', async () => {
+    // A real element rejects the interrupted play() with AbortError; unhandled,
+    // it reaches the console on the first press of every match.
+    const clip = new FakeClip();
+    clip.refuse = true;
+    const fallback = new FakeSeam();
+    const seam = seamWith(clip, fallback)!;
+    const unhandled: unknown[] = [];
+    const onUnhandled = (reason: unknown): void => void unhandled.push(reason);
+    process.on('unhandledRejection', onUnhandled);
+    try {
+      seam.prime?.();
+      await new Promise((resolve) => setImmediate(resolve));
+    } finally {
+      process.off('unhandledRejection', onUnhandled);
+    }
+
+    expect(unhandled).toEqual([]);
+    // and priming still did its job
+    expect(clip.plays).toHaveLength(1);
+    expect(clip.pauses).toBeGreaterThan(0);
+    expect(fallback.primes).toBe(1);
+  });
+
   it('keeps reporting the installed voices for the fallback to pick from', () => {
     const seam = seamWith(new FakeClip(), new FakeSeam())!;
     expect(seam.getVoices().map((v) => v.name)).toEqual(['Martha']);

@@ -4,8 +4,9 @@ import { describe, expect, it } from 'vitest';
 import {
   belowTopBarPx, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_SAFE_AREA_INSET_CSS,
   HUD_SAFE_AREA_ROOT_STYLE, HUD_LAYER, HUD_TOP_BAR_BOTTOM_VAR, hudStageExtentPercent,
-  cssVarPx, measuredRightClusterTopPx, measuredTopBarClearPx,
-  OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_TOP_VAR,
+  cardOverflowsBound, CARD_OVERFLOW_SLACK_PX, cssVarPx, measuredRightClusterTopPx, measuredTopBarClearPx,
+  OBJECTIVES_HEAD_BOTTOM_VAR, OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_TOP_VAR,
+  rightClusterMaxHeightPx,
   TOP_BAR_CLEAR_NARROW_PX, TOP_BAR_CLEAR_PX, TOP_BAR_GAP_PX,
 } from './layout';
 
@@ -84,9 +85,10 @@ describe('top bar layout contract', () => {
     expect(HUD_RIGHT_CLUSTER_TOP_VAR).toBe('--bf-right-cluster-top');
     expect(OBJECTIVES_MESSAGE_TOP_VAR).toBe('--bf-objectives-message-top');
     expect(OBJECTIVES_LEFT_VAR).toBe('--bf-objectives-left');
+    expect(OBJECTIVES_HEAD_BOTTOM_VAR).toBe('--bf-objectives-head-bottom');
     const names = [
       HUD_TOP_BAR_BOTTOM_VAR, HUD_RIGHT_CLUSTER_TOP_VAR,
-      OBJECTIVES_MESSAGE_TOP_VAR, OBJECTIVES_LEFT_VAR,
+      OBJECTIVES_MESSAGE_TOP_VAR, OBJECTIVES_LEFT_VAR, OBJECTIVES_HEAD_BOTTOM_VAR,
     ];
     for (const name of names) expect(name.startsWith('--')).toBe(true);
     expect(new Set(names).size).toBe(names.length);
@@ -164,5 +166,72 @@ describe('right cluster edge', () => {
     // Landscape phone, town centre selected: the card starts above the viewport.
     const phone = { top: 0, bottom: 390, height: 390 };
     expect(measuredRightClusterTopPx({ top: -120, bottom: 384, height: 504 }, phone)).toBe(0);
+  });
+});
+
+/**
+ * The cluster is bottom-anchored with no bound of its own, so a card taller
+ * than the screen sent its excess off the TOP: at 844x390 a town centre card is
+ * 531px, which put its train and research buttons above the viewport where
+ * nothing — no scroll, no gesture — could reach them.
+ */
+describe('right cluster bound', () => {
+  it('fills the column between the first clear y and its own bottom', () => {
+    expect(CARD_OVERFLOW_SLACK_PX).toBe(1);
+    // 844x390 landscape phone: bar clear 48, cluster bottom 384.
+    expect(rightClusterMaxHeightPx(384, 48, 1)).toBe(336);
+  });
+
+  it('converts into the scaled stage the cluster actually lives in', () => {
+    // Every edge is measured on the unscaled root, so a 125% HUD needs fewer
+    // stage units to fill the same screen space — and a 75% HUD more.
+    expect(rightClusterMaxHeightPx(384, 48, 1.25)).toBe(Math.floor(336 / 1.25));
+    expect(rightClusterMaxHeightPx(384, 48, 0.75)).toBe(Math.floor(336 / 0.75));
+  });
+
+  it('yields to a wrapped bar and to the objectives head below it', () => {
+    // The caller passes whichever is lower; a taller head means a shorter card.
+    expect(rightClusterMaxHeightPx(384, 106, 1)).toBe(278);
+    expect(rightClusterMaxHeightPx(384, 106, 1)).toBeLessThan(rightClusterMaxHeightPx(384, 48, 1));
+  });
+
+  it('never reports a negative bound', () => {
+    expect(rightClusterMaxHeightPx(100, 240, 1)).toBe(0);
+  });
+
+  /**
+   * Dropping the queue reserve is a consequence of being capped, so the test
+   * has to be made against the card as it would be WITH the full reserve —
+   * otherwise a card that only just overflows un-caps itself, restores the
+   * reserve, overflows again, and flips every frame.
+   */
+  it('judges overflow against the full queue reserve, not the shortened card', () => {
+    const shortfall = 140 - 44;
+    // Town centre at 844x390: 531px of content in a 278px bound.
+    expect(cardOverflowsBound(531, 278, 0)).toBe(true);
+    // Shortened to 435 by dropping the reserve — still capped, no flip-flop.
+    expect(cardOverflowsBound(435, 278, shortfall)).toBe(true);
+    // The borderline case the hysteresis exists for: 340 shortened to 244 would
+    // "fit" a 290 bound, but with its reserve back it would not.
+    expect(cardOverflowsBound(244, 290, shortfall)).toBe(true);
+    // Room enough for the full-reserve card: the reserve comes back.
+    expect(cardOverflowsBound(204, 310, shortfall)).toBe(false);
+  });
+
+  /**
+   * The bound, never the card's own client height: once the card fits, its
+   * client height IS its content, so that comparison reads as "overflowing"
+   * for ever and a desktop card never gets its queue reserve back.
+   */
+  it('compares against the room given, not the card it measures', () => {
+    // 1280x800 desktop: a 530px card with 688px of room is not capped...
+    expect(cardOverflowsBound(530, 688, 0)).toBe(false);
+    // ...and the shortened form of the same card must not latch it either.
+    expect(cardOverflowsBound(434, 688, 140 - 44)).toBe(false);
+    // A card measured against itself always looks 0-1px over: that is slack,
+    // not overflow.
+    expect(cardOverflowsBound(434, 433, 0)).toBe(false);
+    expect(cardOverflowsBound(434, 434, 0)).toBe(false);
+    expect(cardOverflowsBound(436, 434, 0)).toBe(true);
   });
 });

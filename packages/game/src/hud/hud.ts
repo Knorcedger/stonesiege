@@ -31,8 +31,10 @@ import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
 import {
-  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
+  cssVarPx, HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
   hudStageExtentPercent, measuredRightClusterTopPx, measuredTopBarClearPx,
+  cardOverflowsBound, OBJECTIVES_HEAD_BOTTOM_VAR, OBJECTIVES_HEAD_GAP_PX,
+  rightClusterMaxHeightPx, TOP_BAR_CLEAR_PX,
 } from './layout';
 import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
@@ -245,8 +247,11 @@ export function syncPausePresentation(
  * so a queue that grows a row would otherwise push the train buttons up ~44px
  * mid-tap and a spamming thumb would land on a single-tap-cancel queue chip.
  */
+/** Gap between the selection panel and the card inside the cluster. */
+const CLUSTER_GAP = 6;
 const QUEUE_ROWS = Math.ceil(TRAIN_QUEUE_CAP / CARD_COLS);
-const QUEUE_BLOCK_PX = `${QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP}px`;
+const QUEUE_BLOCK_H = QUEUE_ROWS * CARD_CELL + (QUEUE_ROWS - 1) * CARD_GAP;
+const QUEUE_BLOCK_PX = `${QUEUE_BLOCK_H}px`;
 
 const HUD_CSS = `
 .bf-hud { position:absolute; inset:0; pointer-events:none; font-family:"Alegreya Sans","Trebuchet MS",sans-serif; color:#F2E6CB; user-select:none; -webkit-user-select:none; text-shadow:0 1px 1px rgba(0,0,0,.65); }
@@ -279,8 +284,12 @@ const HUD_CSS = `
 .bf-idle canvas { width:22px; height:22px; image-rendering:auto; }
 .bf-idle:disabled { opacity:0.4; cursor:default; }
 .bf-idlecount { font-family:"Alegreya Sans","Trebuchet MS",sans-serif; font-variant-numeric:tabular-nums; font-size:15px; line-height:1; color:#E6C04A; min-width:11px; text-align:center; }
-.bf-rightcluster { position:absolute; right:6px; bottom:6px; width:264px; display:flex; flex-direction:column; align-items:stretch; gap:6px; pointer-events:none; }
-.bf-selpanel { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
+/* max-height is set inline from measurement (see rightClusterMaxHeightPx). The
+   cluster is bottom-anchored, so without a bound a card taller than the screen
+   sends its excess off the TOP — a town centre card is 531px on an 844x390
+   landscape phone, which put its train and research buttons out of reach. */
+.bf-rightcluster { position:absolute; right:6px; bottom:6px; width:264px; display:flex; flex-direction:column; align-items:stretch; justify-content:flex-end; gap:${CLUSTER_GAP}px; pointer-events:none; }
+.bf-selpanel { position:relative; flex:0 0 auto; width:246px; padding:8px; pointer-events:auto; display:none; }
 .bf-selpanel.show { display:block; }
 .bf-selrow { display:flex; gap:8px; align-items:center; padding-right:36px; }
 .bf-selrow canvas { width:40px; height:40px; image-rendering:auto; border:1px solid #8A6414; }
@@ -297,7 +306,16 @@ const HUD_CSS = `
 .bf-selstat:focus-visible { box-shadow:0 1px 0 #E6C04A; }
 .bf-selstat strong { color:#E6C04A; font-weight:normal; }
 .bf-x { position:absolute; top:0; right:0; box-sizing:border-box; width:44px; height:44px; padding:0; line-height:40px; font-size:20px; touch-action:manipulation; }
-.bf-card { position:relative; width:246px; padding:8px; pointer-events:auto; display:none; }
+/* Scrolls rather than overflowing: min-height:0 lets the flex child shrink past
+   its content, and pan-y re-enables touch scrolling inside a page that sets
+   touch-action:none for the battlefield.
+   The bar itself is hidden because a classic (non-overlay) one takes ~15px out
+   of a 246px box that holds a 236px grid of 44px buttons — it would clip the
+   fifth column and the touch floor is not negotiable. Touch platforms overlay
+   their bars anyway; a mouse still wheels and drags. */
+.bf-card { position:relative; flex:0 1 auto; min-height:0; overflow-y:auto; overscroll-behavior:contain;
+  touch-action:pan-y; scrollbar-width:none; width:246px; padding:8px; pointer-events:auto; display:none; }
+.bf-card::-webkit-scrollbar { width:0; height:0; }
 .bf-card.show { display:block; }
 .bf-cardtitle { font-size:13px; color:#C29422; margin:0 0 6px 2px; letter-spacing:1px; }
 .bf-cardtitle.with-icon { display:flex; align-items:center; gap:7px; min-height:34px; color:#E6C04A; }
@@ -545,6 +563,13 @@ export class Hud {
   private topBar!: HTMLDivElement;
   private topBarObserver: ResizeObserver | null = null;
   private rightClusterObserver: ResizeObserver | null = null;
+  private hudScale = 1;
+  /** Last first-clear-y the cluster was bounded against (see boundRightCluster). */
+  private lastClusterClear = '';
+  /** True while the card is taller than its bound, so its box can no longer move. */
+  private clusterCapped = false;
+  /** Whether the card on screen belongs to a building that can queue at all. */
+  private queueReserved = false;
   private viewportListener!: () => void;
 
   /** The minimap panel mounts here (bottom-left). */
@@ -620,6 +645,7 @@ export class Hud {
   private watchTopBarExtent(): void {
     this.viewportListener = () => {
       this.publishTopBarExtent();
+      this.boundRightCluster();
       this.publishRightClusterExtent();
     };
     window.addEventListener('resize', this.viewportListener);
@@ -636,6 +662,10 @@ export class Hud {
       this.root.getBoundingClientRect(),
     );
     this.root.style.setProperty(HUD_TOP_BAR_BOTTOM_VAR, `${clear}px`);
+    // The bar's edge is one of the two the cluster is bounded against. Writing
+    // to the cluster from the BAR's observer is safe; writing to it from its
+    // own would spin the observer.
+    if (this.rightCluster) this.boundRightCluster();
   }
 
   /**
@@ -666,7 +696,82 @@ export class Hud {
     this.root.style.setProperty(HUD_RIGHT_CLUSTER_TOP_VAR, `${top}px`);
   }
 
+  /**
+   * Bound the cluster to the column that actually exists, and let the card
+   * scroll inside it. The cluster lives in the scaled stage while every edge
+   * here is measured on the unscaled root, so the bound is converted into stage
+   * units before it is applied.
+   *
+   * Deliberately never called from the cluster's own ResizeObserver: writing a
+   * height to the element being observed, from inside its callback, is what
+   * produces "ResizeObserver loop completed with undelivered notifications".
+   * The inputs — the bar, the objectives head, the viewport, the HUD scale and
+   * the card's content — each notify separately.
+   *
+   * The first clear y is the lower of the top bar and the objectives head. The
+   * head only — the panel's list is measured against this cluster, so reading
+   * the panel's full height here would close a layout loop.
+   */
+  private boundRightCluster(): void {
+    const rootRect = this.root.getBoundingClientRect();
+    const barClear = cssVarPx(
+      this.root.style.getPropertyValue(HUD_TOP_BAR_BOTTOM_VAR),
+      TOP_BAR_CLEAR_PX,
+    );
+    const headBottom = cssVarPx(this.root.style.getPropertyValue(OBJECTIVES_HEAD_BOTTOM_VAR), 0);
+    const firstClear = Math.max(barClear, headBottom + OBJECTIVES_HEAD_GAP_PX);
+    this.lastClusterClear = `${firstClear}`;
+    const clusterBottom = this.rightCluster.getBoundingClientRect().bottom - rootRect.top;
+    const maxHeight = rightClusterMaxHeightPx(clusterBottom, firstClear, this.hudScale);
+    this.rightCluster.style.maxHeight = `${maxHeight}px`;
+    // A capped card scrolls, so its box no longer moves when the queue grows —
+    // and the full queue reserve exists only to stop that movement.
+    const shortfall = this.clusterCapped && this.queueReserved ? QUEUE_BLOCK_H - CARD_CELL : 0;
+    // offsetHeight/scrollHeight are layout px — the stage's own units, like
+    // maxHeight — so no scale conversion belongs here. A hidden panel is 0.
+    const selHeight = this.selPanel.offsetHeight;
+    const room = maxHeight - selHeight - (selHeight > 0 ? CLUSTER_GAP : 0);
+    const capped = cardOverflowsBound(this.card.scrollHeight, room, shortfall);
+    if (capped !== this.clusterCapped) {
+      this.clusterCapped = capped;
+      this.applyQueueReserve();
+    }
+  }
+
+  /**
+   * The objectives panel republishes its head edge as the objective text
+   * changes, and the cluster is bounded against it. Nothing observes a CSS
+   * variable, so this cheap string compare runs with the frame instead.
+   */
+  private watchObjectivesHead(): void {
+    const barClear = cssVarPx(
+      this.root.style.getPropertyValue(HUD_TOP_BAR_BOTTOM_VAR),
+      TOP_BAR_CLEAR_PX,
+    );
+    const headBottom = cssVarPx(this.root.style.getPropertyValue(OBJECTIVES_HEAD_BOTTOM_VAR), 0);
+    const firstClear = Math.max(barClear, headBottom + OBJECTIVES_HEAD_GAP_PX);
+    if (`${firstClear}` !== this.lastClusterClear) {
+      this.boundRightCluster();
+      this.publishRightClusterExtent();
+    }
+  }
+
+  /**
+   * The production queue reserves its full block up front so chips appearing
+   * never shove the bottom-anchored card's train buttons under the player's
+   * thumb. Once the card is capped and scrolling, nothing above the queue can
+   * move, and the reserve is 140px of a card that is already too tall.
+   */
+  private applyQueueReserve(): void {
+    // A villager or a wall reserves nothing; only a building that can queue.
+    // rebuildCard zeroes this row, so the reserve is tracked by a flag rather
+    // than read back off the style it also writes.
+    if (!this.queueReserved) return;
+    this.queueRow.style.minHeight = this.clusterCapped ? `${CARD_CELL}px` : QUEUE_BLOCK_PX;
+  }
+
   private applyHudScale(scale: number): void {
+    this.hudScale = scale;
     const extent = hudStageExtentPercent(scale);
     this.stage.style.width = `${extent}%`;
     this.stage.style.height = `${extent}%`;
@@ -676,12 +781,16 @@ export class Hud {
     // for the same reason, and it is bottom-anchored, so a scale change shifts
     // it even further than the bar.
     if (this.topBar) this.publishTopBarExtent();
-    if (this.rightCluster) this.publishRightClusterExtent();
+    if (this.rightCluster) {
+      this.boundRightCluster();
+      this.publishRightClusterExtent();
+    }
   }
 
   // ------------------------------------------------------------------ update
 
   update(): void {
+    this.watchObjectivesHead();
     const state = this.host.getState();
     const p = state.players[this.host.humanPlayer];
     if (p) {
@@ -1535,7 +1644,14 @@ export class Hud {
     ].join('#');
     if (key !== this.lastCardKey) {
       this.lastCardKey = key;
+      // The key covers the train queue and hp, so a capped (scrolling) card is
+      // rebuilt on every train tap and every hp tick under attack. Losing the
+      // scroll position there would yank the button out from under the thumb
+      // that just tapped it.
+      const scrollTop = this.card.scrollTop;
       this.rebuildCard(state, sel, !!placement);
+      this.boundRightCluster();
+      this.card.scrollTop = Math.min(scrollTop, this.card.scrollHeight - this.card.clientHeight);
     }
     // live queue progress (unit and research items alike — both tick at the front)
     for (const q of this.queueProgressEls) {
@@ -1555,6 +1671,7 @@ export class Hud {
     this.cardTitle.classList.remove('with-icon');
     this.queueRow.replaceChildren();
     this.queueRow.style.minHeight = '0px'; // production buildings re-reserve below
+    this.queueReserved = false;
     this.queueTitle.textContent = '';
     this.queueTitle.classList.remove('show', 'stalled');
     this.utilRow.replaceChildren();
@@ -1683,7 +1800,8 @@ export class Hud {
     // chips appearing (or completing) never displace the buttons above them
     const hasProduction = (def?.trains?.length ?? 0) > 0 || (def?.researches?.length ?? 0) > 0;
     if (hasProduction) {
-      this.queueRow.style.minHeight = QUEUE_BLOCK_PX;
+      this.queueReserved = true;
+      this.queueRow.style.minHeight = this.clusterCapped ? `${CARD_CELL}px` : QUEUE_BLOCK_PX;
       const count = b.trainQueue?.length ?? 0;
       this.queueTitle.textContent = housingBlocked
         ? '⚠ Production stopped — build a House'

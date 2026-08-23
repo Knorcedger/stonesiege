@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  assertCompleteHdArtwork, boundedAssetLoad, HD_LOAD_CONCURRENCY, mapWithConcurrency,
-  parseHdManifest, settleAssetPack, shouldLoadHdArtwork,
+  assertCompleteHdArtwork, boundedAssetLoad, HD_LOAD_CONCURRENCY, loadHdManifest,
+  mapWithConcurrency, parseHdManifest, settleAssetPack, shouldLoadHdArtwork,
 } from './assets';
+import { ArtworkStore, type ArtworkCacheLike } from './artworkStore';
 
 describe('bounded artwork-pack loading', () => {
   it('skips HD discovery only for the explicit developer comparison mode', () => {
@@ -74,6 +75,112 @@ describe('bounded artwork-pack loading', () => {
       frameCount: -1,
     })).toEqual({ atlases: ['terrain-0.json', 'units-0.json'] });
     expect(parseHdManifest(null)).toEqual({ atlases: [] });
+  });
+
+  it('keeps only plausible per-file content hashes', () => {
+    expect(parseHdManifest({
+      atlases: ['terrain-0.json'],
+      assetHashes: {
+        'terrain-0.json': 'AABBCCDD00112233',
+        'terrain-0.webp': 'not-hex!',
+        '../outside.json': 'aabbccdd00112233',
+        'units-0.webp': 12,
+      },
+    })).toEqual({
+      atlases: ['terrain-0.json'],
+      assetHashes: { 'terrain-0.json': 'aabbccdd00112233' },
+    });
+    expect(parseHdManifest({ atlases: [] })).toEqual({ atlases: [] });
+  });
+});
+
+describe('HD manifest revalidation against the persistent store', () => {
+  const BASE = 'https://play.example/';
+  const MANIFEST_KEY = `${BASE}assets/hd/manifest.json`;
+  const manifestBody = JSON.stringify({
+    atlases: ['terrain-0.json'],
+    frameCount: 3,
+    assetHashes: { 'terrain-0.json': 'aabbccdd00112233', 'terrain-0.webp': '99aabbccdd001122' },
+  });
+
+  class FakeCache implements ArtworkCacheLike {
+    entries = new Map<string, string>();
+    async match(url: string): Promise<Response | undefined> {
+      const body = this.entries.get(url);
+      return body === undefined ? undefined : new Response(body);
+    }
+
+    async put(url: string, response: Response): Promise<void> {
+      this.entries.set(url, await response.text());
+    }
+
+    async delete(url: string): Promise<boolean> {
+      return this.entries.delete(url);
+    }
+
+    async keys(): Promise<Array<{ url: string }>> {
+      return [...this.entries.keys()].map((url) => ({ url }));
+    }
+  }
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('revalidates on every boot and writes the fresh manifest through', async () => {
+    const fetchMock = vi.fn(async () => new Response(manifestBody));
+    vi.stubGlobal('fetch', fetchMock);
+    const cache = new FakeCache();
+
+    const manifest = await loadHdManifest(new ArtworkStore(cache, BASE));
+
+    expect(manifest.atlases).toEqual(['terrain-0.json']);
+    expect(manifest.assetHashes?.['terrain-0.webp']).toBe('99aabbccdd001122');
+    expect(fetchMock).toHaveBeenCalledWith(
+      'assets/hd/manifest.json',
+      expect.objectContaining({ cache: 'no-cache' }),
+    );
+    expect(cache.entries.get(MANIFEST_KEY)).toBe(manifestBody);
+  });
+
+  it('boots from the stored manifest when revalidation fails', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    const cache = new FakeCache();
+    cache.entries.set(MANIFEST_KEY, manifestBody);
+
+    const manifest = await loadHdManifest(new ArtworkStore(cache, BASE));
+
+    expect(manifest.atlases).toEqual(['terrain-0.json']);
+    expect(manifest.frameCount).toBe(3);
+  });
+
+  it('keeps the no-HD fallback when revalidation fails with nothing stored', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('offline'); }));
+    expect(await loadHdManifest(new ArtworkStore(new FakeCache(), BASE))).toEqual({ atlases: [] });
+    expect(await loadHdManifest(null)).toEqual({ atlases: [] });
+  });
+
+  it('erases the whole stored set when the deployment stops shipping HD art', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('gone', { status: 404 })));
+    const cache = new FakeCache();
+    cache.entries.set(MANIFEST_KEY, manifestBody);
+    // With no manifest the completeness gate never lets prune() run, so the
+    // 404 path must clear stranded atlas bytes too, not just the manifest.
+    cache.entries.set(`${BASE}assets/hd/terrain-0.webp?v=99aabbccdd001122`, 'atlas bytes');
+
+    expect(await loadHdManifest(new ArtworkStore(cache, BASE))).toEqual({ atlases: [] });
+    expect(cache.entries.size).toBe(0);
+  });
+
+  it('treats a transient server error like a network failure, keeping the cached set', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('flaky edge', { status: 503 })));
+    const cache = new FakeCache();
+    cache.entries.set(MANIFEST_KEY, manifestBody);
+
+    const manifest = await loadHdManifest(new ArtworkStore(cache, BASE));
+
+    expect(manifest.atlases).toEqual(['terrain-0.json']); // boots from the cached set
+    expect(cache.entries.get(MANIFEST_KEY)).toBe(manifestBody); // offline anchor survives
   });
 });
 
