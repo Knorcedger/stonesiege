@@ -5,10 +5,15 @@
 
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
-  createRecordedSpeech, createVoiceManifestFetch, loadVoiceManifest, type AudioClip,
+  createRecordedSpeech, createVoiceManifestFetch, loadVoiceManifest,
+  type AudioClip, type VoiceManifestAttempt,
 } from './recordedSpeech';
 import type { NarrationRequest, NarrationVoice, SpeechSeam } from './narration';
 import { EMPTY_VOICE_MANIFEST, voiceLineId, type VoiceManifest } from './voiceLines';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 class FakeClip implements AudioClip {
   src = '';
@@ -154,10 +159,6 @@ describe('createRecordedSpeech', () => {
 });
 
 describe('loadVoiceManifest', () => {
-  afterEach(() => {
-    vi.unstubAllGlobals();
-  });
-
   it('parses the manifest a normal fetch returns', async () => {
     vi.stubGlobal('fetch', () =>
       Promise.resolve({ ok: true, json: () => Promise.resolve(manifestOf()) }));
@@ -187,7 +188,7 @@ describe('createVoiceManifestFetch', () => {
   it('fetches once per session when the manifest answers', async () => {
     let calls = 0;
     const fetchManifest = createVoiceManifestFetch({
-      load: async () => { calls++; return manifestOf(); },
+      load: async () => { calls++; return { manifest: manifestOf(), answered: true }; },
     });
     const first = await fetchManifest();
     expect(await fetchManifest()).toBe(first);
@@ -197,7 +198,7 @@ describe('createVoiceManifestFetch', () => {
   it('keeps the empty answer of a build with no recordings', async () => {
     let calls = 0;
     const fetchManifest = createVoiceManifestFetch({
-      load: async () => { calls++; return EMPTY_VOICE_MANIFEST; },
+      load: async () => { calls++; return { manifest: EMPTY_VOICE_MANIFEST, answered: true }; },
     });
     await fetchManifest();
     await fetchManifest();
@@ -206,13 +207,14 @@ describe('createVoiceManifestFetch', () => {
 
   it('shares a stalled attempt between boots, then retries it next match', async () => {
     let calls = 0;
-    // What the bounded loader does under a stall: resolve empty when the
-    // signal expires, never sooner.
+    // What the bounded loader reports under a stall: empty and unanswered,
+    // once the factory's own signal expires.
     const fetchManifest = createVoiceManifestFetch({
       timeoutMs: 5,
       load: (signal) => new Promise((resolve) => {
         calls++;
-        signal?.addEventListener('abort', () => resolve(EMPTY_VOICE_MANIFEST), { once: true });
+        signal.addEventListener('abort',
+          () => resolve({ manifest: EMPTY_VOICE_MANIFEST, answered: false }), { once: true });
       }),
     });
     const [a, b] = await Promise.all([fetchManifest(), fetchManifest()]);
@@ -221,5 +223,35 @@ describe('createVoiceManifestFetch', () => {
     expect(calls).toBe(1); // concurrent boots share the one in-flight attempt
     await fetchManifest();
     expect(calls).toBe(2); // the timed-out attempt did not poison the session cache
+  });
+
+  it('resolves empty for a load that throws, and does not keep the failure', async () => {
+    let calls = 0;
+    const fetchManifest = createVoiceManifestFetch({
+      // Throws synchronously — the worst case for the cache, whose clear must
+      // survive an attempt that settles before it is even stored.
+      load: (): Promise<VoiceManifestAttempt> => {
+        calls++;
+        if (calls === 1) throw new Error('offline');
+        return Promise.resolve({ manifest: manifestOf(), answered: true });
+      },
+    });
+    expect((await fetchManifest()).lines).toEqual({}); // boot got an answer, not an exception
+    expect(Object.keys((await fetchManifest()).lines)).toEqual([RECORDED]);
+    expect(calls).toBe(2);
+  });
+
+  it('retries next match when the real fetch fails outright, not only when it stalls', async () => {
+    let calls = 0;
+    vi.stubGlobal('fetch', () => {
+      calls++;
+      return calls === 1
+        ? Promise.reject(new TypeError('network down'))
+        : Promise.resolve({ ok: true, json: () => Promise.resolve(manifestOf()) });
+    });
+    const fetchManifest = createVoiceManifestFetch();
+    expect((await fetchManifest()).lines).toEqual({}); // the airplane-mode boot plays synthesised
+    expect(Object.keys((await fetchManifest()).lines)).toEqual([RECORDED]); // recordings return with the network
+    expect(calls).toBe(2);
   });
 });

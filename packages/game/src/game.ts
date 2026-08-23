@@ -263,9 +263,10 @@ export async function runGame(
 /**
  * The voice-over manifest is optional and unchanging, so it is fetched once per
  * session and every later match reuses the result — including the empty one a
- * build with no recordings produces. The fetch is time-bounded (and a timed-out
- * attempt forgotten, so the next match retries), which lets bootGame await it
- * without ever hanging the black screen on a stalled connection.
+ * build with no recordings produces. The fetch is time-bounded (and an attempt
+ * the server never answered forgotten, so the next match retries), which lets
+ * bootGame await it without ever hanging the black screen on a stalled
+ * connection.
  */
 const voiceOverManifest = createVoiceManifestFetch();
 
@@ -287,6 +288,11 @@ async function bootGame(
   if (options.mode === 'resume' && plan.meta) {
     loading.setArtwork(campaignLoadingArtwork(plan.meta.id));
   }
+  // Kicked off before the artwork so its time bound overlaps asset loading
+  // instead of stacking on it. Awaited by name below: calling the fetch again
+  // after a timed-out attempt would start a fresh bound rather than reuse this
+  // one.
+  const voiceManifestReady = voiceOverManifest();
   loading.update({
     title: options.mode === 'resume' ? 'Restoring saved match' : 'Mustering the banners',
     status: 'Loading battlefield artwork…',
@@ -338,7 +344,7 @@ async function bootGame(
   // captured, the platform speech synthesizer everywhere else. iOS wants a
   // gesture before the first utterance and the first playback, so one is spent
   // silently on the first press rather than on the opening narrator line.
-  const speech = createRecordedSpeech(await voiceOverManifest(), {
+  const speech = createRecordedSpeech(await voiceManifestReady, {
     fallback: createBrowserSpeech(),
   });
   const narrator = new Narrator(speech);

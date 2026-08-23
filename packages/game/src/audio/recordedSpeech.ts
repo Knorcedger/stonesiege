@@ -62,6 +62,31 @@ function raceAbort<T>(promise: Promise<T>, signal?: AbortSignal): Promise<T> {
   });
 }
 
+/** What one manifest request produced, and whether the answer outlives this boot. */
+export interface VoiceManifestAttempt {
+  manifest: VoiceManifest;
+  /**
+   * True when the server answered — recordings, or the 404 that is a build's
+   * real "none". False when the request failed, stalled out or was cut short:
+   * that empty manifest belongs to the moment, not the build.
+   */
+  answered: boolean;
+}
+
+/** One manifest request, never rejecting; the manifest is empty unless `answered`. */
+async function attemptVoiceManifest(
+  url: string,
+  signal?: AbortSignal,
+): Promise<VoiceManifestAttempt> {
+  try {
+    const response = await raceAbort(fetch(url, { signal }), signal);
+    if (!response.ok) return { manifest: parseVoiceManifest(null), answered: true };
+    return { manifest: parseVoiceManifest(await raceAbort(response.json(), signal)), answered: true };
+  } catch {
+    return { manifest: parseVoiceManifest(null), answered: false };
+  }
+}
+
 /**
  * Fetch the voice-over manifest. Missing, unreachable, malformed or timed out
  * all mean the same thing — no recordings — because narration must never block
@@ -73,13 +98,7 @@ export async function loadVoiceManifest(
   url: string = MANIFEST_URL,
   signal?: AbortSignal,
 ): Promise<VoiceManifest> {
-  try {
-    const response = await raceAbort(fetch(url, { signal }), signal);
-    if (!response.ok) return parseVoiceManifest(null);
-    return parseVoiceManifest(await raceAbort(response.json(), signal));
-  } catch {
-    return parseVoiceManifest(null);
-  }
+  return (await attemptVoiceManifest(url, signal)).manifest;
 }
 
 /** How long match boot waits for the manifest before starting without recordings. */
@@ -88,34 +107,50 @@ export const VOICE_MANIFEST_TIMEOUT_MS = 2000;
 export interface VoiceManifestFetchOptions {
   /** Overridden in tests; defaults to {@link VOICE_MANIFEST_TIMEOUT_MS}. */
   timeoutMs?: number;
-  /** Injected in tests; defaults to {@link loadVoiceManifest} on its manifest URL. */
-  load?: (signal?: AbortSignal) => Promise<VoiceManifest>;
+  /** Injected in tests; defaults to one request for the manifest in {@link VOICE_OVER_DIR}. */
+  load?: (signal: AbortSignal) => Promise<VoiceManifestAttempt>;
 }
 
 /**
  * The manifest fetch match boot awaits: bounded, so START never hangs on an
  * optional asset, and cached per session because the manifest never changes —
- * including the empty answer a build with no recordings gives. A timed-out
- * attempt still resolves (empty, so the match plays with synthesised
- * narration) but is not kept: the stall was the network's moment, not the
- * build's answer, and the next match should get another chance at recordings.
+ * including the empty answer of a build with no recordings. An attempt the
+ * server never answered — timed out, offline, refused — still resolves, empty,
+ * so the boot that asked plays with synthesised narration; but it is not kept,
+ * because the failure was the moment's, not the build's, and the next match
+ * should get another chance at recordings. Never rejects, whatever the load
+ * does.
  */
 export function createVoiceManifestFetch(
   opts: VoiceManifestFetchOptions = {},
 ): () => Promise<VoiceManifest> {
   const timeoutMs = opts.timeoutMs ?? VOICE_MANIFEST_TIMEOUT_MS;
-  const load = opts.load ?? ((signal?: AbortSignal) => loadVoiceManifest(undefined, signal));
+  const load = opts.load ?? ((signal: AbortSignal) => attemptVoiceManifest(MANIFEST_URL, signal));
+  const attemptOnce = async (): Promise<VoiceManifestAttempt> => {
+    // A controller and timer rather than AbortSignal.timeout, which the older
+    // WebViews most likely to sit behind a captive portal do not have.
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(), timeoutMs);
+    try {
+      return await load(controller.signal);
+    } catch {
+      return { manifest: parseVoiceManifest(null), answered: false };
+    } finally {
+      clearTimeout(timer);
+    }
+  };
   let cached: Promise<VoiceManifest> | null = null;
-  return () => (cached ??= (async () => {
-    // WebViews that predate AbortSignal.timeout get the pre-existing unbounded
-    // wait — degraded, but never a crash over an optional asset.
-    const signal = typeof AbortSignal !== 'undefined' && typeof AbortSignal.timeout === 'function'
-      ? AbortSignal.timeout(timeoutMs)
-      : undefined;
-    const manifest = await load(signal);
-    if (signal?.aborted) cached = null;
-    return manifest;
-  })());
+  return () => {
+    if (cached) return cached;
+    const attempt = attemptOnce().then(({ manifest, answered }) => {
+      // Runs after the `cached = attempt` below even when the load settles
+      // synchronously, so this clear can never be overwritten by it.
+      if (!answered) cached = null;
+      return manifest;
+    });
+    cached = attempt;
+    return attempt;
+  };
 }
 
 /**
