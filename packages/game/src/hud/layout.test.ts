@@ -2,8 +2,9 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  belowTopBarPx, HUD_NARROW_MAX_PX, HUD_SAFE_AREA_INSET_CSS, HUD_SAFE_AREA_ROOT_STYLE,
-  HUD_LAYER, HUD_TOP_BAR_BOTTOM_VAR, hudStageExtentPercent, measuredTopBarClearPx,
+  belowTopBarPx, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_SAFE_AREA_INSET_CSS,
+  HUD_SAFE_AREA_ROOT_STYLE, HUD_LAYER, HUD_TOP_BAR_BOTTOM_VAR, hudStageExtentPercent,
+  measuredRightClusterTopPx, measuredTopBarClearPx,
   TOP_BAR_CLEAR_NARROW_PX, TOP_BAR_CLEAR_PX, TOP_BAR_GAP_PX,
 } from './layout';
 
@@ -77,9 +78,12 @@ describe('top bar layout contract', () => {
     expect(measuredTopBarClearPx({ top: 0, bottom: 4, height: 4 }, root)).toBe(TOP_BAR_CLEAR_PX);
   });
 
-  it('names the variable the CSS reads', () => {
+  it('names the variables the CSS reads', () => {
     expect(HUD_TOP_BAR_BOTTOM_VAR).toBe('--bf-top-bar-bottom');
-    expect(HUD_TOP_BAR_BOTTOM_VAR.startsWith('--')).toBe(true);
+    expect(HUD_RIGHT_CLUSTER_TOP_VAR).toBe('--bf-right-cluster-top');
+    for (const name of [HUD_TOP_BAR_BOTTOM_VAR, HUD_RIGHT_CLUSTER_TOP_VAR]) {
+      expect(name.startsWith('--')).toBe(true);
+    }
   });
 
   /**
@@ -109,5 +113,36 @@ describe('top bar layout contract', () => {
   it('keeps every overlay layer distinct so paint order is never DOM-dependent', () => {
     const layers = Object.values(HUD_LAYER);
     expect(new Set(layers).size).toBe(layers.length);
+  });
+});
+
+/**
+ * The command cluster is bottom-anchored in the scaled stage and shares the
+ * right edge with the objectives panel, so its top edge is the only honest
+ * bound on how tall that panel's list may grow. Nothing about it is constant:
+ * the card is ~120px with a villager selected and ~500px with a town centre.
+ */
+describe('right cluster edge', () => {
+  const root = { top: 0, bottom: 800, height: 800 };
+
+  it('reports the measured top edge, root-relative', () => {
+    expect(measuredRightClusterTopPx({ top: 520, bottom: 794, height: 274 }, root)).toBe(520);
+  });
+
+  it('frees the whole column when nothing is selected', () => {
+    // Both panels are display:none, so the flex cluster collapses to zero height
+    // and its top edge sits on its own bottom anchor — meaningless as a bound.
+    expect(measuredRightClusterTopPx({ top: 794, bottom: 794, height: 0 }, root)).toBe(root.height);
+  });
+
+  it('rebases onto the safe-area root, like the top bar', () => {
+    const inset = { top: 44, bottom: 800, height: 756 };
+    expect(measuredRightClusterTopPx({ top: 300, bottom: 794, height: 494 }, inset)).toBe(256);
+  });
+
+  it('clamps a cluster taller than the screen to zero free space', () => {
+    // Landscape phone, town centre selected: the card starts above the viewport.
+    const phone = { top: 0, bottom: 390, height: 390 };
+    expect(measuredRightClusterTopPx({ top: -120, bottom: 384, height: 504 }, phone)).toBe(0);
   });
 });
