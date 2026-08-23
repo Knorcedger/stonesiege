@@ -32,15 +32,23 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 - **Briefings that introduce the people in them.** Each chapter briefing now opens with what is
   at stake if it is lost, and lists who you are fighting with and against, so the names in the
   dialogue mean something the first time they are spoken.
-- Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud with a
-  slow, low delivery, with the narrator and each named character kept apart by ear. The banner
-  waits for the voice to finish the sentence before moving on, and a tap dismisses the line and
-  the voice together. Narration stops with the match — pausing, backgrounding the app, or
-  finishing a chapter silences it.
-- A **Narration** volume slider and a **Campaign narration** switch in Settings. Narration uses
-  the voices already installed on the device — no download, and nothing is spoken when the switch
-  is off, the volume is zero, the game is paused or in the background, or the device has no
-  speech support.
+- Spoken campaign narration: the dialogue banner in campaign chapters is now read aloud, in the
+  English (UK) **Martha** voice where the device has her and the best English voice installed
+  otherwise. Lines are read in phrases with silence held between them rather than at a forced low
+  pitch, which is what made earlier builds sound synthetic, and the narrator and each named
+  character stay apart by ear. The banner waits for the voice to finish the sentence before moving
+  on, and a tap dismisses the line and the voice together. Narration stops with the match —
+  pausing, backgrounding the app, or finishing a chapter silences it.
+- Recorded campaign voice-over. Spoken dialogue plays from audio committed under
+  `apps/web/public/assets/vo/`, so every device hears the same performance instead of whatever
+  voice it happens to have installed. Anything without a recording — dialogue written since the
+  last render, or a device that could not fetch the manifest — is still read by the device's
+  synthesizer, line by line, so nothing goes silent. `npm run vo:render` regenerates the audio on
+  macOS; `npm run vo:render -- --list` reviews the lines anywhere.
+- A **Narration** volume slider and a **Campaign narration** switch in Settings, with a hint
+  naming the Martha voice the campaign is written for. Narration uses the voices already installed
+  on the device — no download is required, and nothing is spoken when the switch is off, the volume
+  is zero, the game is paused or in the background, or the device has no speech support.
 
 ### Changed
 

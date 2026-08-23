@@ -1,8 +1,15 @@
 // Campaign narration: reads the scenario dialogue banner aloud through the
 // platform speech synthesizer so chapters play as spoken story instead of
-// silent text. There are no voice-over assets — the browser's installed voices
-// are steered into a slow, low, deliberate delivery, and each speaker keeps a
-// stable pitch of its own so characters stay apart by ear.
+// silent text. Lines the render tool has captured play as recorded audio (see
+// `recordedSpeech.ts`); everything else is synthesised here, and the two are
+// interchangeable beat by beat.
+//
+// The synthesised read is built out of the two things the platform can give:
+// the best voice installed — the English (UK) "Martha" the campaign is written
+// for, where the device has her — and phrasing. A line is spoken as a sequence
+// of beats with real silence between them, close to the voice's own register.
+// Dragging the pitch down instead, as this once did, is what makes a modern
+// voice sound synthetic.
 //
 // The browser API is reached only through the SpeechSeam below, so voice
 // choice, delivery and speaking-state logic are pure and unit-tested under the
@@ -10,11 +17,13 @@
 // failure must never reach gameplay.
 
 import { getSettings, onSettingsChanged, type GameSettings } from '../settings';
+import { speechBeats, speechText, voiceLineId, type NarrationLine } from './voiceLines';
 
-export interface NarrationLine {
-  text: string;
-  speaker?: string;
-}
+// The text helpers live in `voiceLines.ts` so the render tool can import them
+// without pulling in settings and the DOM; they are re-exported here because
+// narration is where callers expect to find them.
+export { speechBeats, speechText, voiceLineId };
+export type { NarrationLine };
 
 /** The subset of SpeechSynthesisVoice the picker ranks on. */
 export interface NarrationVoice {
@@ -34,32 +43,27 @@ export interface NarrationRequest {
   pitch: number;
   /** Final gain, 0..1. */
   volume: number;
+  /**
+   * Stable name for this beat, so a seam that has a recording of it can play
+   * that instead of synthesising. Undefined for the priming utterance.
+   */
+  id?: string;
   /** Fired when the utterance finishes, errors, or is cancelled. */
   onDone: () => void;
 }
 
-/** Platform seam. `createBrowserSpeech` is the only implementation shipped. */
+/**
+ * Platform seam. `createBrowserSpeech` synthesises; `createRecordedSpeech`
+ * wraps it so beats with a recording play the file instead.
+ */
 export interface SpeechSeam {
   getVoices(): NarrationVoice[];
   speak(req: NarrationRequest): void;
   cancel(): void;
   /** Subscribe to late voice-list population; returns an unsubscribe. */
   onVoicesChanged(cb: () => void): () => void;
-}
-
-// ------------------------------------------------------------- spoken text
-
-/**
- * Prepare banner text for the synthesizer: dashes and ellipses become the
- * punctuation engines actually pause on, and whitespace is collapsed so
- * wrapped scenario strings do not read with gaps.
- */
-export function speechText(line: NarrationLine): string {
-  return line.text
-    .replace(/\s*[—–]\s*/g, ', ')
-    .replace(/…/g, '...')
-    .replace(/\s+/g, ' ')
-    .trim();
+  /** Spend the first user gesture on whatever this seam needs unlocked. */
+  prime?(): void;
 }
 
 // --------------------------------------------------------------- delivery
@@ -67,15 +71,23 @@ export function speechText(line: NarrationLine): string {
 export interface NarrationDelivery {
   rate: number;
   pitch: number;
+  /** Silence held between spoken beats, in ms. */
+  beatMs: number;
 }
 
-/** The storyteller voices: the deepest, slowest read in the campaign. */
+/** The storyteller voices: the slowest read, and the longest silences. */
 const NARRATOR_SPEAKERS = new Set(['narrator', 'chronicle']);
 
-const NARRATOR_DELIVERY: NarrationDelivery = { rate: 0.78, pitch: 0.55 };
-const CHARACTER_RATE = 0.86;
+/**
+ * Pitch stays within a whole tone of the voice's own register. Below roughly
+ * 0.85 a neural voice stops sounding like a person and starts sounding like an
+ * effect, which is the whole reason this read was rebuilt around silence.
+ */
+const NARRATOR_DELIVERY: NarrationDelivery = { rate: 0.9, pitch: 0.94, beatMs: 300 };
+const CHARACTER_RATE = 0.96;
 /** Characters read above the narrator, so the storyteller stays the deepest voice. */
-const CHARACTER_PITCH = 0.78;
+const CHARACTER_PITCH = 1.02;
+const CHARACTER_BEAT_MS = 190;
 
 /** Stable non-cryptographic hash so a speaker sounds the same in every chapter. */
 function speakerHash(name: string): number {
@@ -95,35 +107,49 @@ function speakerHash(name: string): number {
 export function deliveryFor(speaker: string | undefined): NarrationDelivery {
   const key = speaker?.trim().toLowerCase() ?? '';
   if (key === '' || NARRATOR_SPEAKERS.has(key)) return { ...NARRATOR_DELIVERY };
-  // 8 stable steps across ±0.14 around the character pitch.
+  // 8 stable steps across ±0.07 around the character pitch: enough to tell two
+  // speakers apart, small enough that neither sounds processed.
   const step = speakerHash(key) % 8;
-  return { rate: CHARACTER_RATE, pitch: CHARACTER_PITCH + (step - 3.5) * 0.04 };
+  return {
+    rate: CHARACTER_RATE,
+    pitch: CHARACTER_PITCH + (step - 3.5) * 0.02,
+    beatMs: CHARACTER_BEAT_MS,
+  };
 }
 
 // ---------------------------------------------------------- voice picking
 
-/** Name fragments of voices that read as a low, formal storyteller. */
-const PREFERRED_NAMES = [
-  'daniel', 'arthur', 'oliver', 'george', 'brian', 'ryan', 'james', 'alex', 'fred',
-  'rishi', 'gordon', 'aaron',
-];
 /**
- * Platforms that label voices by sex ("Google UK English Male") rather than by
- * name. Matched as a whole word — a substring test also matches "female".
+ * The narrator the campaign is written for, chosen by ear against the
+ * alternatives: the English (UK) "Martha". Matched as a whole word so the
+ * downloadable "Martha (Enhanced)" and "Martha (Premium)" variants count, and
+ * so a voice merely containing the letters does not.
  */
-const MALE_LABEL = /\bmale\b/;
-/** Lower-bandwidth variants of otherwise good voices ("Daniel (Compact)"). */
-const COMPACT_LABEL = /\bcompact\b/;
+const CHOSEN_VOICE = /\bmartha\b/;
+/** Big enough that the chosen voice outranks anything else on any device. */
+const CHOSEN_BONUS = 200;
+
+/**
+ * Ranked fallbacks, best first, for devices with no Martha installed — she
+ * ships with Apple platforms and is an optional download even there.
+ */
+const FALLBACK_NAMES = [
+  'arthur', 'sonia', 'daniel', 'libby', 'oliver', 'ryan', 'thomas', 'kate',
+  'george', 'serena', 'stephanie', 'brian', 'james', 'alex',
+];
+
+/** Neural engines — the voices worth reading a campaign with. */
+const HIGH_FIDELITY = /\b(premium|enhanced|natural|neural|wavenet|studio)\b/;
+/**
+ * Bandwidth-reduced or formant engines ("Daniel (Compact)", eSpeak). No
+ * delivery rescues these, so they rank last among usable voices.
+ */
+const LOW_FIDELITY = /\b(compact|espeak|pico|eloquence)\b/;
 /** Voices whose delivery fights the intent (novelty, or clearly not a narrator). */
 const REJECTED_NAMES = [
   'whisper', 'bells', 'bubbles', 'organ', 'cellos', 'trinoids', 'zarvox', 'wobble',
   'bahh', 'boing', 'jester', 'superstar', 'bad news', 'good news', 'albert', 'eddy',
   'grandma', 'grandpa', 'rocko', 'sandy', 'shelley', 'junior', 'novelty',
-];
-const FEMALE_NAMES = [
-  'female', 'samantha', 'karen', 'moira', 'tessa', 'fiona', 'serena', 'kate', 'zira',
-  'susan', 'hazel', 'catherine', 'martha', 'amelie', 'victoria', 'ava', 'allison',
-  'nicky', 'joelle', 'noelle',
 ];
 
 const containsAny = (haystack: string, needles: string[]): boolean =>
@@ -148,9 +174,18 @@ export function voiceScore(voice: NarrationVoice): number | null {
   else if (lang.startsWith('en-za') || lang.startsWith('en-in')) score += 16;
   else score += 8;
 
-  if (containsAny(name, PREFERRED_NAMES) || MALE_LABEL.test(name)) score += 30;
-  if (containsAny(name, FEMALE_NAMES)) score -= 20;
-  if (COMPACT_LABEL.test(name)) score -= 4;
+  if (CHOSEN_VOICE.test(name)) {
+    score += CHOSEN_BONUS;
+  } else {
+    // Named fallbacks decay by rank, so a listed voice always beats an
+    // unlisted one of the same locale without any of them nearing the chosen.
+    const rank = FALLBACK_NAMES.findIndex((n) => name.includes(n));
+    if (rank >= 0) score += 40 - rank * 2;
+  }
+  // Engine quality, not the sex the voice reads as, is what separates a
+  // narrator from a robot.
+  if (HIGH_FIDELITY.test(name)) score += 20;
+  if (LOW_FIDELITY.test(name)) score -= 14;
   // Network voices sound better but stall offline; local wins the tiebreak.
   if (voice.localService) score += 6;
   if (voice.default) score += 2;
@@ -179,13 +214,25 @@ export function pickNarrationVoice(voices: readonly NarrationVoice[]): Narration
 // ------------------------------------------------------------ speaking time
 
 /**
- * How long a line should take to speak, used to hold the banner up and to time
- * out a seam that never reports completion. Roughly 14 characters per second
- * at rate 1, floored so very short lines still get a beat.
+ * How long one beat should take to speak. Roughly 14 characters per second at
+ * rate 1, floored so very short beats still get a moment.
  */
 export function estimateSpeechMs(text: string, rate: number): number {
   const safeRate = rate > 0 ? rate : 1;
   return Math.max(700, Math.round((text.length * 72) / safeRate));
+}
+
+/**
+ * How long a whole line should take: every beat plus the silences between
+ * them. Used to hold the banner up and to time out a seam that never reports
+ * completion.
+ */
+export function estimateLineMs(
+  beats: readonly string[],
+  delivery: NarrationDelivery,
+): number {
+  const spoken = beats.reduce((ms, beat) => ms + estimateSpeechMs(beat, delivery.rate), 0);
+  return spoken + Math.max(0, beats.length - 1) * delivery.beatMs;
 }
 
 /** Grace beyond the estimate before a silent seam is assumed finished. */
@@ -208,6 +255,10 @@ export class Narrator {
   private voice: NarrationVoice | null = null;
   private voicesResolved = false;
   private active: { startedAt: number; timeoutMs: number } | null = null;
+  /** Beats of the current line still waiting their turn. */
+  private queue: string[] = [];
+  /** The silence between the beat that just finished and the next one. */
+  private beatTimer: ReturnType<typeof setTimeout> | null = null;
   /**
    * Bumped on every speak/cancel. `cancel()` makes the outgoing utterance
    * report completion asynchronously, so a stale callback must not clear the
@@ -298,30 +349,63 @@ export class Narrator {
     const settings = this.readSettings();
     const volume = this.gain(settings);
     if (!settings.narrationEnabled || volume <= 0 || this.isHidden()) return;
-    const text = speechText(line);
-    if (text === '') return;
+    const beats = speechBeats(speechText(line));
+    if (beats.length === 0) return;
     const delivery = deliveryFor(line.speaker);
     try {
-      this.seam.cancel(); // barge-in: the newest line always wins
-      const generation = ++this.generation;
+      // Barge-in: the newest line always wins, and takes any queued beat of the
+      // outgoing line with it.
+      this.cancel();
       this.active = {
         startedAt: now,
-        timeoutMs: estimateSpeechMs(text, delivery.rate) * SPEECH_TIMEOUT_FACTOR,
+        timeoutMs: estimateLineMs(beats, delivery) * SPEECH_TIMEOUT_FACTOR,
       };
-      const request: NarrationRequest = {
-        text,
-        voice: this.resolveVoice(),
-        rate: delivery.rate,
-        pitch: delivery.pitch,
-        volume,
-        onDone: () => {
-          if (generation === this.generation) this.active = null;
-        },
-      };
-      this.seam.speak(request);
+      this.queue = beats.slice(1);
+      this.sayBeat(beats[0], line.speaker, delivery, volume, this.generation);
     } catch {
       this.active = null; // narration must never break the banner
+      this.queue = [];
     }
+  }
+
+  /**
+   * Speak one beat and arrange the next. `generation` is the line this beat
+   * belongs to: a barge-in bumps it, so a beat queued behind a cancelled line
+   * is dropped instead of talking over its replacement.
+   */
+  private sayBeat(
+    text: string,
+    speaker: string | undefined,
+    delivery: NarrationDelivery,
+    volume: number,
+    generation: number,
+  ): void {
+    this.seam?.speak({
+      text,
+      id: voiceLineId(speaker, text),
+      voice: this.resolveVoice(),
+      rate: delivery.rate,
+      pitch: delivery.pitch,
+      volume,
+      onDone: () => {
+        if (generation !== this.generation) return;
+        const next = this.queue.shift();
+        if (next === undefined) {
+          this.active = null; // the line is read out
+          return;
+        }
+        this.beatTimer = setTimeout(() => {
+          this.beatTimer = null;
+          if (generation !== this.generation) return;
+          try {
+            this.sayBeat(next, speaker, delivery, volume, generation);
+          } catch {
+            this.active = null;
+            this.queue = [];
+          }
+        }, delivery.beatMs);
+      },
+    });
   }
 
   /**
@@ -340,6 +424,11 @@ export class Narrator {
   /** Stop immediately (dismissed line, paused, narration switched off). */
   cancel(): void {
     this.active = null;
+    this.queue = [];
+    if (this.beatTimer !== null) {
+      clearTimeout(this.beatTimer);
+      this.beatTimer = null;
+    }
     this.generation++; // orphan the in-flight utterance's completion callback
     try {
       this.seam?.cancel();
@@ -406,9 +495,9 @@ export function createBrowserSpeech(): SpeechSeam | null {
 }
 
 /**
- * iOS refuses the first utterance unless it follows a user gesture. Speaking a
- * silent one on the first pointer/key press spends that gesture up front so the
- * opening narrator line is not the one that gets swallowed.
+ * iOS refuses the first utterance, and the first audio playback, unless it
+ * follows a user gesture. Spending the first pointer/key press on a silent one
+ * of each means the opening narrator line is not the one that gets swallowed.
  */
 export function primeSpeechOnGesture(seam: SpeechSeam | null): () => void {
   if (!seam || typeof document === 'undefined') return () => undefined;
@@ -417,6 +506,7 @@ export function primeSpeechOnGesture(seam: SpeechSeam | null): () => void {
     if (primed) return;
     primed = true;
     try {
+      seam.prime?.();
       seam.speak({ text: ' ', voice: null, rate: 1, pitch: 1, volume: 0, onDone: () => undefined });
     } catch {
       /* non-fatal */
