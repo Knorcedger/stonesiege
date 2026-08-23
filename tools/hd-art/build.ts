@@ -19,6 +19,7 @@ import { PALETTE } from '../assetgen/src/palette.ts';
 import { Raster } from '../assetgen/src/raster.ts';
 import { alphaBounds, type AlphaBounds } from './alpha-bounds.ts';
 import { shouldMirrorDirectionSheetCell } from './direction-sheet-layout.ts';
+import { assetContentHash } from './manifestHash.ts';
 import { HD_DENSITY, MaterialLibrary, materializeFrame } from './materialize.ts';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '../..');
@@ -1812,6 +1813,16 @@ if (converted !== expected - bespokeFrames.length) {
   throw new Error(`systemic conversion count ${converted} does not equal remaining ${expected - bespokeFrames.length}`);
 }
 
+// Stamp every emitted file's content hash so the renderer's persistent
+// artwork cache can let a revalidated manifest vouch for cached bytes (#149).
+const assetHashes: Record<string, string> = {};
+for (const jsonName of manifest) {
+  const atlasJson = JSON.parse(readFileSync(join(OUT, jsonName), 'utf8')) as { meta: { image: string } };
+  for (const name of [jsonName, atlasJson.meta.image]) {
+    assetHashes[name] = assetContentHash(readFileSync(join(OUT, name)));
+  }
+}
+
 writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify({
   version: 1,
   density: HD_DENSITY,
@@ -1820,5 +1831,6 @@ writeFileSync(join(OUT, 'manifest.json'), `${JSON.stringify({
   convertedFrames: converted,
   bespokeFrames: bespokeFrames.length,
   atlases: manifest,
+  assetHashes,
 }, null, 1)}\n`);
 console.log(`done: ${converted} systemic + ${bespokeFrames.length} redrawn = ${emittedNames.size} frames, ${manifest.length} atlases, ${hero.masked}px hero mask, ${((Date.now() - t0) / 1000).toFixed(1)}s`);

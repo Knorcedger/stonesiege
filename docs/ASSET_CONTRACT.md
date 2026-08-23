@@ -20,6 +20,27 @@ HD sheets are lossless WebP and use linear texture sampling; baseline pixel
 atlases are PNG and retain nearest sampling. Both use the same runtime
 player-color mask metadata. See `HD_ART_PIPELINE.md` for the active visual rules.
 
+## Persistent artwork cache
+
+`manifest.json` stamps `assetHashes`: for every listed atlas JSON and image, 16
+hex characters of its sha256 (`tools/hd-art/manifestHash.ts`; the build emits
+them, and a test fails if a committed stamp goes stale). On web origins the
+renderer keeps HD atlas responses in a Cache Storage cache
+(`packages/game/src/artworkStore.ts`) keyed by `<file>?v=<hash>`. The manifest
+itself is always revalidated (`cache: 'no-cache'`), so a warm visit resolves
+every HD file locally with zero transfers, an art drop re-fetches only files
+whose hash changed, and unreferenced entries are pruned after a complete load.
+Downloaded bytes are verified against their stamped hash before being cached:
+a half-updated host can still put mismatched bytes into that one session's
+render — exactly as it could without a store — but they are never stored, so
+the cache itself always agrees with the manifest. When revalidation fails but
+a manifest copy is stored, the match boots from the cached set; a manifest
+that is definitively gone (404/410) clears the store, while any other failed
+status is treated as a network failure. localhost origins
+(dev server, Capacitor shells) and environments without Cache Storage never use
+the cache and keep the plain network path; baseline pixel atlases always load
+over plain HTTP.
+
 The shipping HD manifest currently covers every baseline frame. Runtime team
 colors are resolved on demand and packed into shared 1,024px color pages; the
 renderer must never allocate a full recolored copy of each 2× source sheet.
