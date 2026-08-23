@@ -58,6 +58,26 @@ export const TOP_BAR_GAP_PX = 6;
 export const HUD_RIGHT_CLUSTER_TOP_VAR = '--bf-right-cluster-top';
 
 /**
+ * CSS variables the objectives panel publishes onto the safe-area root: the
+ * first clear y below everything it occupies, and its own left edge.
+ *
+ * They live here, with the other cross-overlay edges, because the consumer is
+ * the scenario message banner. That banner is centred and the panel is
+ * right-anchored, so whether they collide is a question about two rectangles —
+ * see messageBannerTopPx.
+ */
+export const OBJECTIVES_MESSAGE_TOP_VAR = '--bf-objectives-message-top';
+export const OBJECTIVES_LEFT_VAR = '--bf-objectives-left';
+/** Breathing room (px) between the panel and a banner pushed clear of it. */
+export const OBJECTIVES_MESSAGE_GAP_PX = 14;
+
+/** A px length from a CSS variable, or `fallback` when it is unset or not a number. */
+export function cssVarPx(value: string, fallback: number): number {
+  const parsed = Number.parseFloat(value);
+  return Number.isFinite(parsed) ? parsed : fallback;
+}
+
+/**
  * Stacking order of the overlays mounted on the HUD root, in one place because
  * they are declared across four CSS blocks and only make sense against one
  * another.

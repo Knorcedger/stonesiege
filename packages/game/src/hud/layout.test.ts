@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest';
 import {
   belowTopBarPx, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_SAFE_AREA_INSET_CSS,
   HUD_SAFE_AREA_ROOT_STYLE, HUD_LAYER, HUD_TOP_BAR_BOTTOM_VAR, hudStageExtentPercent,
-  measuredRightClusterTopPx, measuredTopBarClearPx,
+  cssVarPx, measuredRightClusterTopPx, measuredTopBarClearPx,
+  OBJECTIVES_LEFT_VAR, OBJECTIVES_MESSAGE_TOP_VAR,
   TOP_BAR_CLEAR_NARROW_PX, TOP_BAR_CLEAR_PX, TOP_BAR_GAP_PX,
 } from './layout';
 
@@ -81,9 +82,28 @@ describe('top bar layout contract', () => {
   it('names the variables the CSS reads', () => {
     expect(HUD_TOP_BAR_BOTTOM_VAR).toBe('--bf-top-bar-bottom');
     expect(HUD_RIGHT_CLUSTER_TOP_VAR).toBe('--bf-right-cluster-top');
-    for (const name of [HUD_TOP_BAR_BOTTOM_VAR, HUD_RIGHT_CLUSTER_TOP_VAR]) {
-      expect(name.startsWith('--')).toBe(true);
-    }
+    expect(OBJECTIVES_MESSAGE_TOP_VAR).toBe('--bf-objectives-message-top');
+    expect(OBJECTIVES_LEFT_VAR).toBe('--bf-objectives-left');
+    const names = [
+      HUD_TOP_BAR_BOTTOM_VAR, HUD_RIGHT_CLUSTER_TOP_VAR,
+      OBJECTIVES_MESSAGE_TOP_VAR, OBJECTIVES_LEFT_VAR,
+    ];
+    for (const name of names) expect(name.startsWith('--')).toBe(true);
+    expect(new Set(names).size).toBe(names.length);
+  });
+
+  /**
+   * Every published edge is read back through this, and an unpublished one has
+   * to degrade to "no obstacle" rather than to zero — a 0 would pin overlays to
+   * the top of the screen during the frames before the first measurement.
+   */
+  it('falls back when an edge has not been published yet', () => {
+    expect(cssVarPx('520px', 800)).toBe(520);
+    expect(cssVarPx('520', 800)).toBe(520);
+    expect(cssVarPx('', 800)).toBe(800);
+    expect(cssVarPx('   ', 800)).toBe(800);
+    expect(cssVarPx('auto', 800)).toBe(800);
+    expect(cssVarPx('', Number.POSITIVE_INFINITY)).toBe(Number.POSITIVE_INFINITY);
   });
 
   /**
