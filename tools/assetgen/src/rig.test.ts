@@ -10,7 +10,10 @@
 import { describe, expect, it } from 'vitest';
 import { genBuildings } from './gen-buildings.ts';
 import { HUMANS } from './gen-units.ts';
-import { drawCavalry, drawHuman, trimFrame, DIRS, CAV_GY, HUMAN_GY } from './rig.ts';
+import {
+  drawCavalry, drawHuman, trimFrame, walkFootDrop, walkSideLegs,
+  DIRS, CAV_GY, HUMAN_GY,
+} from './rig.ts';
 import type { CavSpec, Dir } from './rig.ts';
 import { PALETTE, isMaskColor } from './palette.ts';
 import type { Raster } from './raster.ts';
@@ -107,6 +110,65 @@ describe('humanoid walk cycle', () => {
               .toBeGreaterThanOrEqual(5);
           }
         }
+      }
+    }
+  });
+
+  it('sweeps the planted foot against the direction of travel', () => {
+    // The authored side views all face screen-left, so a foot with its weight
+    // on it has to travel screen-RIGHT: the ground holds it while the body
+    // walks over it. The rig had the series the other way round, which is a
+    // moonwalk — the legs drive the unit backwards while the sim advances it.
+    for (let frame = 0; frame < 6; frame++) {
+      const now = walkSideLegs(frame);
+      const next = walkSideLegs((frame + 1) % 6);
+      for (const leg of ['near', 'far'] as const) {
+        if (now[leg].lift > 0 || next[leg].lift > 0) continue; // swinging, not planted
+        expect(next[leg].dx - now[leg].dx, `${leg} leg planted at frame ${frame}`)
+          .toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('swings each lifted foot forward again, half a cycle from the other', () => {
+    for (let frame = 0; frame < 6; frame++) {
+      const legs = walkSideLegs(frame);
+      // Both feet planted at once is a stance, never both airborne mid-stride.
+      expect(legs.near.lift > 0 && legs.far.lift > 0, `frame ${frame} both airborne`)
+        .toBe(false);
+      expect(legs.far.dx, `frame ${frame} legs share a hip`).toBe(-legs.near.dx);
+    }
+    const lifted = Array.from({ length: 6 }, (_, f) => walkSideLegs(f))
+      .filter((legs) => legs.near.lift > 0);
+    expect(lifted.length, 'near leg swing frames').toBeGreaterThan(0);
+    for (let frame = 0; frame < 6; frame++) {
+      const now = walkSideLegs(frame);
+      const next = walkSideLegs((frame + 1) % 6);
+      if (now.near.lift === 0 || next.near.lift === 0) continue;
+      expect(next.near.dx - now.near.dx, `near leg swinging at frame ${frame}`)
+        .toBeLessThan(0);
+    }
+  });
+
+  it('reads foot height the opposite way walking away from the camera', () => {
+    // In iso the foot planted ahead of the body is the one further from the
+    // camera. Walking toward it that foot sits low and rises through its
+    // stance; walking away it starts high and descends. One shared table
+    // played the rear-facing walk backwards.
+    const front = Array.from({ length: 4 }, (_, f) => walkFootDrop(0, f)[0]);
+    const rear = Array.from({ length: 4 }, (_, f) => walkFootDrop(4, f)[0]);
+    for (let f = 0; f < 3; f++) {
+      expect(front[f + 1] - front[f], `front stance frame ${f}`).toBeGreaterThan(0);
+      expect(rear[f + 1] - rear[f], `rear stance frame ${f}`).toBeLessThan(0);
+    }
+    for (const dir of [0, 4] as const) {
+      const drops = Array.from({ length: 6 }, (_, f) => walkFootDrop(dir, f)[0]);
+      const pairs = Array.from({ length: 6 }, (_, f) => walkFootDrop(dir, f).join(','));
+      expect(new Set(pairs).size, `dir ${dir} distinct foot heights`).toBe(6);
+      // The right foot is the left foot half a cycle later.
+      for (let f = 0; f < 6; f++) {
+        expect(walkFootDrop(dir, f)[1], `dir ${dir} frame ${f} right foot`)
+          .toBe(drops[(f + 3) % 6]);
       }
     }
   });

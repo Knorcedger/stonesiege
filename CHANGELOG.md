@@ -4,6 +4,18 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ## Unreleased
 
+### Fixed
+
+- Militia, men-at-arms, longswordsmen, champions, and the campaign heroes drawn as champions now
+  walk instead of gliding backwards. Their authored movement sheet held one standing pose in every
+  cell, so once the sheet's sideways drift was corrected there was no gait left in it: the legs
+  were frozen and the little motion that remained ran the wrong way. The build now gives that
+  family a real cycle — the planted foot stays put on the ground while the body passes over it,
+  and the trailing foot lifts and swings through.
+- The procedural fallback rig, used when the HD art is unavailable, walked backwards in every
+  direction: its planted foot travelled with the unit instead of against it, and the rear-facing
+  cycle read its foot heights from the front-facing table.
+
 ### Added
 
 - **Campaign prologues and epilogues.** Every campaign now opens on an artwork page explaining

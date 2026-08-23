@@ -76,6 +76,25 @@ function frameMaskPixelCount(name: string): number {
   return count;
 }
 
+/**
+ * Opacity mask of the bottom quarter of a frame's canvas — the band the boots
+ * live in. Taken from the canvas rather than the subject so every pose in a
+ * cycle measures the same rows.
+ */
+function frameBootBand(name: string): boolean[] {
+  const match = hdAtlases().find(({ atlas }) => atlas.frames[name]);
+  if (!match) throw new Error(`missing HD frame ${name}`);
+  const frame = match.atlas.frames[name].frame;
+  const png = atlasImage(match.atlas.meta.image as string);
+  const band: boolean[] = [];
+  for (let y = Math.floor(frame.h * 0.75); y < frame.h; y++) {
+    for (let x = 0; x < frame.w; x++) {
+      band.push(png.data[((frame.y + y) * png.width + frame.x + x) * 4 + 3] > 40);
+    }
+  }
+  return band;
+}
+
 function frameVisibleBounds(name: string): {
   left: number; top: number; right: number; width: number; height: number; bottom: number;
 } {
@@ -234,6 +253,33 @@ describe('complete HD art override contract', () => {
       for (const [sprite, count] of [['unit/villager', 6], ['unit/scout', 8], ['obj/sheep', 4]] as const) {
         const hashes = Array.from({ length: count }, (_, frame) => framePixelsHash(`${sprite}/walk/${dir}/${frame}`));
         expect(new Set(hashes).size, `${sprite} direction ${dir}`).toBe(count);
+      }
+    }
+  });
+
+  it('moves the legs of every militia-line walk frame', () => {
+    // `champion-walk-grid-cutout-v1.png` is six copies of one standing pose
+    // translated across the strip. Once issue #60 stopped that translation
+    // leaking into the atlas there was no gait left in it at all, so the line
+    // slid across the ground on frozen legs; the build now synthesizes one.
+    // Measured over the boot band, consecutive poses used to differ by as
+    // little as 5.5% of it, against 26.5% now. The threshold below is a floor,
+    // not a target: authored families span 3.1% (pikeman, a genuine but shallow
+    // stride) to 51.0% (mamluk), so run tools/hd-art/qa-walk-grid.ts and read a
+    // family against its neighbours rather than against this number.
+    for (const id of ['militia', 'manAtArms', 'longswordsman', 'champion'] as const) {
+      for (let dir = 0; dir < 5; dir++) {
+        const bands = Array.from({ length: 6 }, (_, frame) =>
+          frameBootBand(`unit/${id}/walk/${dir}/${frame}`));
+        for (let frame = 0; frame < 6; frame++) {
+          const now = bands[frame];
+          const next = bands[(frame + 1) % 6];
+          let differing = 0;
+          for (let i = 0; i < now.length; i++) if (now[i] !== next[i]) differing++;
+          const covered = now.reduce((total, on) => total + (on ? 1 : 0), 0);
+          expect(differing / Math.max(1, covered), `${id} dir ${dir} frames ${frame}/${(frame + 1) % 6}`)
+            .toBeGreaterThan(0.1);
+        }
       }
     }
   });
