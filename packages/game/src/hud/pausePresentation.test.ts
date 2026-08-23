@@ -1,9 +1,25 @@
 import { describe, expect, it, vi } from 'vitest';
 import {
-  activatePauseControl, PAUSE_SAVE_HINT, pauseSaveStatus, pauseTabIndexAfterKey,
+  activatePauseControl, bindActivation, PAUSE_SAVE_HINT, pauseSaveStatus, pauseTabIndexAfterKey,
   resignControlAction, syncPausePresentation, unitStatRows,
   type PausePresentationTarget,
 } from './hud';
+
+/** A control that records its listeners so a press can be replayed event by event. */
+function control() {
+  const listeners = new Map<string, Array<(event: { detail?: number }) => void>>();
+  const target = {
+    addEventListener(type: string, listener: (event: { detail?: number }) => void) {
+      const forType = listeners.get(type) ?? [];
+      forType.push(listener);
+      listeners.set(type, forType);
+    },
+  };
+  const fire = (type: string, event: { detail?: number } = {}): void => {
+    for (const listener of listeners.get(type) ?? []) listener(event);
+  };
+  return { target, fire };
+}
 
 function target() {
   const buttonSetAttribute = vi.fn((_name: string, _value: string) => {});
@@ -121,5 +137,86 @@ describe('selected unit stat education', () => {
     expect(rows.find(({ label }) => label === 'Line of Sight')?.explanation).toContain('see through fog');
     expect(rows.find(({ label }) => label === 'Rate of Fire')?.explanation).toContain('Lower is faster');
     expect(rows.some(({ label }) => label === 'LOS' || label === 'ROF')).toBe(false);
+  });
+});
+
+describe('HUD control activation', () => {
+  it('activates on pointerup, because a click may never be synthesized', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('pointerdown');
+    fire('pointerup');
+
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('activates exactly once when the click does arrive after the pointer press', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('pointerdown');
+    fire('pointerup');
+    fire('click', { detail: 1 });   // the browser's synthesized click
+
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('still activates from the keyboard, which clicks with no pointer behind it', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('click', { detail: 0 });
+
+    expect(run).toHaveBeenCalledOnce();
+  });
+
+  it('ignores a pointerup that did not start on the control', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('pointerup');
+
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('keeps press-then-drag-away as a cancel', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('pointerdown');
+    fire('pointerleave');
+    fire('pointerup');
+
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('drops the press when the pointer is cancelled', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('pointerdown');
+    fire('pointercancel');
+    fire('pointerup');
+
+    expect(run).not.toHaveBeenCalled();
+  });
+
+  it('does not let one press arm a second activation', () => {
+    const { target, fire } = control();
+    const run = vi.fn();
+    bindActivation(target, run);
+
+    fire('pointerdown');
+    fire('pointerup');
+    fire('pointerup');
+
+    expect(run).toHaveBeenCalledOnce();
   });
 });

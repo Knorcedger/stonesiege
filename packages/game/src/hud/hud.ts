@@ -160,6 +160,44 @@ export interface PauseControlHost {
 }
 
 /** Pause button intent stays testable independently of the DOM event binding. */
+/** The subset of an element `bindActivation` needs, so it is testable without a DOM. */
+export interface ActivationTarget {
+  addEventListener(type: string, listener: (event: { detail?: number }) => void): void;
+}
+
+/**
+ * Activate a HUD control on pointerup instead of click.
+ *
+ * Pause is the one control a player reaches for under pressure, and in the
+ * field it can receive pointerdown, mousedown, pointerup and mouseup — none of
+ * them defaultPrevented, nothing covering the button — and still never see the
+ * `click` the browser is supposed to synthesize (issue #153). The press then
+ * vanishes with no feedback, and because pause is a toggle rather than
+ * idempotent navigation, a lost activation is indistinguishable from a dead
+ * button.
+ *
+ * pointerup is the last event we are actually guaranteed, so act on it. Arming
+ * on pointerdown keeps a stray pointerup (one that began somewhere else) from
+ * activating the control, and disarming on cancel/leave preserves the
+ * press-then-drag-away escape a button normally gives. Keyboard activation
+ * arrives as a click with no pointer behind it (`detail === 0`) and is kept;
+ * a pointer-driven click is ignored because pointerup already handled it.
+ */
+export function bindActivation(target: ActivationTarget, run: () => void): void {
+  let armed = false;
+  target.addEventListener('pointerdown', () => { armed = true; });
+  target.addEventListener('pointercancel', () => { armed = false; });
+  target.addEventListener('pointerleave', () => { armed = false; });
+  target.addEventListener('pointerup', () => {
+    if (!armed) return;
+    armed = false;
+    run();
+  });
+  target.addEventListener('click', (event) => {
+    if (event.detail === 0) run(); // keyboard only; pointer clicks already ran
+  });
+}
+
 export function activatePauseControl(host: PauseControlHost, matchFinished: boolean): void {
   if (matchFinished) host.returnToTitle();
   else host.togglePause();
@@ -742,7 +780,7 @@ export class Hud {
     this.pauseBtn.textContent = 'II';
     this.pauseBtn.setAttribute('aria-label', 'Pause game');
     this.pauseBtn.setAttribute('aria-pressed', 'false');
-    this.pauseBtn.addEventListener('click', () => {
+    bindActivation(this.pauseBtn, () => {
       activatePauseControl(this.host, this.matchFinished);
       if (!this.matchFinished) this.syncPauseUi();
     });
