@@ -127,7 +127,16 @@ export function objectiveSequencePosition(
 export type ObjectiveRow =
   /** `folded`: revealed history, indented under the summary row that owns it. */
   | { kind: 'objective'; objective: ObjectiveItem; display: ObjectiveDisplayState; folded: boolean }
-  | { kind: 'resolved'; completed: number; failed: number; expanded: boolean };
+  /**
+   * `runId` identifies THIS run (its first objective) so each summary expands on
+   * its own — a mission with two history blocks must not open both at one tap.
+   * `ids` are the objectives it stands for: a completion inside a folded run has
+   * no row of its own to flash, so the summary flashes for it.
+   */
+  | {
+    kind: 'resolved'; runId: string; ids: readonly string[];
+    completed: number; failed: number; expanded: boolean;
+  };
 
 /**
  * Runs shorter than this stay expanded: folding a single completed objective
@@ -145,7 +154,7 @@ export const RESOLVED_COLLAPSE_MIN = 2;
 export function objectiveRows(
   items: readonly ObjectiveItem[],
   currentId: string | undefined,
-  showResolved: boolean,
+  expandedRuns: ReadonlySet<string>,
 ): ObjectiveRow[] {
   const rows: ObjectiveRow[] = [];
   const push = (objective: ObjectiveItem, folded: boolean): void => {
@@ -160,15 +169,18 @@ export function objectiveRows(
   const flush = (): void => {
     if (run.length === 0) return;
     if (run.length >= RESOLVED_COLLAPSE_MIN) {
+      const expanded = expandedRuns.has(run[0].id);
       rows.push({
         kind: 'resolved',
+        runId: run[0].id,
+        ids: run.map((objective) => objective.id),
         completed: run.filter((objective) => objective.state === 'complete').length,
         failed: run.filter((objective) => objective.state === 'failed').length,
-        expanded: showResolved,
+        expanded,
       });
       // The summary row is also the control that folds them back up, so it
       // stays in place above the rows it reveals.
-      if (showResolved) for (const objective of run) push(objective, true);
+      if (expanded) for (const objective of run) push(objective, true);
     } else {
       for (const objective of run) push(objective, false);
     }
@@ -231,6 +243,25 @@ export function objectiveListMaxHeightPx(
  */
 export function objectiveListFits(maxHeightPx: number): boolean {
   return maxHeightPx >= OBJECTIVE_LIST_MIN_PX;
+}
+
+/**
+ * Hit testing for the panel itself, on the same rule as the battlefield beacon
+ * (see objectiveMarkerPointerEvents): an overlay that cannot get out of the
+ * way must not take the taps meant for the control underneath it.
+ *
+ * The head is anchored under the top bar and cannot move, so a cluster whose
+ * top rises past the head's bottom — a town centre card on a landscape phone —
+ * is a column with no free space at all. The head keeps painting there (it
+ * carries the current goal and its progress, the one thing worth the pixels),
+ * but its taps belong to the card: the list it would toggle is hidden in that
+ * state anyway, so nothing is lost by letting them through.
+ */
+export function objectivePanelPointerEvents(
+  headBottom: number,
+  clusterTop: number,
+): 'auto' | 'none' {
+  return headBottom > clusterTop ? 'none' : 'auto';
 }
 
 /** Root height (px) fallback for a cluster edge the HUD has not published yet. */
@@ -344,6 +375,7 @@ const OBJ_CSS = `
 .bf-obj-chip.done { color:#9BCB70; border-color:#527033; }
 .bf-obj-item.complete .bf-obj-chip { color:#8f8268; border-color:#46331F; }
 .bf-obj-fold { padding:0; list-style:none; }
+.bf-obj-fold.flash { animation:bfObjFlash 0.9s ease-out; }
 .bf-obj-fold + .bf-obj-item, .bf-obj-item + .bf-obj-fold { border-top:1px solid rgba(100,73,43,0.45); }
 /* 44px like every other tappable in the HUD: this is a thumb target, not a label. */
 .bf-obj-resolved { box-sizing:border-box; display:grid; grid-template-columns:15px minmax(0,1fr) 14px;
@@ -397,8 +429,14 @@ export class ObjectivesPanel {
   private listEl: HTMLUListElement;
   private markerEl: HTMLButtonElement;
   private open: boolean;
-  /** Player intent for the folded history rows; independent of `open`. */
-  private showResolved = false;
+  /** Runs of history the player has unfolded, keyed by first objective id. */
+  private expandedRuns = new Set<string>();
+  /**
+   * Re-render on the next update() even though nothing the key covers changed.
+   * A boolean, NOT a sentinel key: '' is the real key of an empty objective
+   * list, so a sentinel would be swallowed exactly when the panel is empty.
+   */
+  private forceRender = false;
   private wideViewport: boolean;
   private viewportKey: string;
   private lastKey = '';
@@ -441,7 +479,7 @@ export class ObjectivesPanel {
       this.open = !this.open;
       this.el.classList.toggle('open', this.open);
       this.summaryEl.setAttribute('aria-expanded', String(this.open));
-      this.lastKey = ''; // re-measure: aria and the cramped state follow `open`
+      this.forceRender = true; // re-measure: aria and the cramped state follow `open`
     });
     this.headFocusEl = document.createElement('button');
     this.headFocusEl.type = 'button';
@@ -557,11 +595,23 @@ export class ObjectivesPanel {
     // though not one objective changed.
     const clusterTop = this.root.style.getPropertyValue(HUD_RIGHT_CLUSTER_TOP_VAR);
     const clusterMoved = clusterTop !== this.lastClusterTop;
-    if (key === this.lastKey && this.flashIds.size === 0
-      && !viewportChanged && !barMoved && !clusterMoved) return;
+    // Geometry and content are separated deliberately. The cluster is
+    // bottom-anchored, so its edge moves on every selection, every queued unit
+    // and every garrison change — rebuilding the rows for that would reset the
+    // list's scroll position, drop focus to <body>, and swallow a tap that
+    // straddled the rebuild, several times a minute. Moving edges re-measure;
+    // only real objective changes rebuild rows.
+    const rowsChanged = key !== this.lastKey || this.flashIds.size > 0
+      || this.forceRender || viewportChanged;
+    if (!rowsChanged && !barMoved && !clusterMoved) return;
     this.lastKey = key;
     this.lastBarClear = barClear;
     this.lastClusterTop = clusterTop;
+    this.forceRender = false;
+    if (!rowsChanged) {
+      this.applyClearance();
+      return;
+    }
 
     const current = this.model.current;
     if (current) {
@@ -578,18 +628,23 @@ export class ObjectivesPanel {
     this.headFocusEl.classList.toggle('show', this.currentTarget !== undefined);
 
     this.listEl.replaceChildren();
-    for (const row of objectiveRows(items, current?.id, this.showResolved)) {
+    for (const row of objectiveRows(items, current?.id, this.expandedRuns)) {
       this.listEl.appendChild(row.kind === 'resolved'
-        ? this.buildResolvedRow(row.completed, row.failed, row.expanded)
+        ? this.buildResolvedRow(row)
         : this.buildObjectiveRow(row.objective, row.display, row.folded));
     }
     this.flashIds.clear();
     this.applyClearance();
   }
 
-  private buildResolvedRow(completed: number, failed: number, expanded: boolean): HTMLLIElement {
+  private buildResolvedRow(row: Extract<ObjectiveRow, { kind: 'resolved' }>): HTMLLIElement {
+    const { completed, failed, expanded } = row;
     const li = document.createElement('li');
-    li.className = 'bf-obj-fold';
+    // A goal that completes inside a folded run has no row of its own to flash;
+    // without this the 2nd completion onward lands with no feedback at all,
+    // since notify() also skips the head flash while the panel is open.
+    const flash = !expanded && row.ids.some((id) => this.flashIds.has(id));
+    li.className = flash ? 'bf-obj-fold flash' : 'bf-obj-fold';
     const button = document.createElement('button');
     button.type = 'button';
     button.className = 'bf-obj-resolved';
@@ -604,10 +659,10 @@ export class ObjectivesPanel {
     chevron.textContent = expanded ? '▲' : '▼';
     button.append(mark, label, chevron);
     button.addEventListener('click', () => {
-      this.showResolved = !this.showResolved;
+      if (!this.expandedRuns.delete(row.runId)) this.expandedRuns.add(row.runId);
       // The row set changes without any objective changing, so the key-based
       // early return in update() would otherwise swallow the tap.
-      this.lastKey = '';
+      this.forceRender = true;
     });
     li.appendChild(button);
     return li;
@@ -668,6 +723,7 @@ export class ObjectivesPanel {
     const fits = objectiveListFits(maxHeight);
     this.listEl.style.maxHeight = `${maxHeight}px`;
     this.el.classList.toggle('cramped', !fits);
+    this.el.style.pointerEvents = objectivePanelPointerEvents(headBottom, clusterTop);
     // aria-expanded must describe what is actually revealed, not what the
     // player asked for, or a screen reader announces a list that is not there.
     this.summaryEl.setAttribute('aria-expanded', String(this.open && fits));

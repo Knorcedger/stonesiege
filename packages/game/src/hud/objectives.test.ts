@@ -5,7 +5,8 @@ import { describe, expect, it } from 'vitest';
 import {
   autoOpenObjectives, objectiveDisplayState, objectiveListFits, objectiveListMaxHeightPx,
   objectiveMarkerPlacement, objectiveProgressDue, objectiveMarkerPointerEvents,
-  objectiveProgressSummary, objectiveRows, objectiveSequencePosition, ObjectivesModel,
+  objectivePanelPointerEvents, objectiveProgressSummary, objectiveRows,
+  objectiveSequencePosition, ObjectivesModel,
   OBJECTIVE_LIST_GAP_PX, OBJECTIVE_LIST_MIN_PX, parseClusterTopPx,
   RESOLVED_COLLAPSE_MIN, resolvedSummaryLabel, resolvedSummaryMark,
 } from './objectives';
@@ -169,6 +170,7 @@ describe('objective progress throttle', () => {
  * objective and painted over the bottom-right command card.
  */
 describe('objectiveRows', () => {
+  const NONE: ReadonlySet<string> = new Set();
   const model = (states: readonly ('complete' | 'failed' | 'open')[]): ObjectivesModel => {
     const m = new ObjectivesModel();
     states.forEach((state, index) => {
@@ -181,22 +183,22 @@ describe('objectiveRows', () => {
 
   it('folds a run of resolved objectives into one summary row', () => {
     const m = model(['complete', 'complete', 'complete', 'open']);
-    const rows = objectiveRows(m.items(), m.current?.id, false);
+    const rows = objectiveRows(m.items(), m.current?.id, NONE);
     expect(rows).toEqual([
-      { kind: 'resolved', completed: 3, failed: 0, expanded: false },
+      { kind: 'resolved', runId: 'o0', ids: ['o0', 'o1', 'o2'], completed: 3, failed: 0, expanded: false },
       expect.objectContaining({ kind: 'objective', display: 'current', folded: false }),
     ]);
   });
 
   it('counts completed and failed separately in the same run', () => {
     const m = model(['complete', 'failed', 'complete', 'open']);
-    expect(objectiveRows(m.items(), m.current?.id, false)[0])
-      .toEqual({ kind: 'resolved', completed: 2, failed: 1, expanded: false });
+    expect(objectiveRows(m.items(), m.current?.id, NONE)[0])
+      .toMatchObject({ kind: 'resolved', completed: 2, failed: 1, expanded: false });
   });
 
   it('reveals the folded rows under the summary that owns them', () => {
     const m = model(['complete', 'complete', 'open']);
-    const rows = objectiveRows(m.items(), m.current?.id, true);
+    const rows = objectiveRows(m.items(), m.current?.id, new Set(['o0']));
     expect(rows.map((row) => row.kind)).toEqual(['resolved', 'objective', 'objective', 'objective']);
     // The summary stays put: it is also the control that folds them back up.
     expect(rows[0]).toMatchObject({ expanded: true });
@@ -207,16 +209,42 @@ describe('objectiveRows', () => {
   it('leaves a lone resolved objective expanded — folding it saves nothing', () => {
     const m = model(['complete', 'open']);
     expect(RESOLVED_COLLAPSE_MIN).toBe(2);
-    expect(objectiveRows(m.items(), m.current?.id, false)).toEqual([
+    expect(objectiveRows(m.items(), m.current?.id, NONE)).toEqual([
       expect.objectContaining({ kind: 'objective', display: 'complete', folded: false }),
       expect.objectContaining({ kind: 'objective', display: 'current' }),
     ]);
   });
 
+  /**
+   * One panel-wide "show history" flag opened every block at once: tapping the
+   * opening block's summary also spilled the mid-mission one, in the exact
+   * shape the consecutive-run test below builds.
+   */
+  it('expands each run on its own', () => {
+    const m = model(['complete', 'complete', 'open', 'failed', 'failed', 'open']);
+    const runIds = objectiveRows(m.items(), m.current?.id, NONE)
+      .filter((row) => row.kind === 'resolved')
+      .map((row) => row.kind === 'resolved' ? row.runId : '');
+    expect(runIds).toEqual(['o0', 'o3']);
+
+    const rows = objectiveRows(m.items(), m.current?.id, new Set(['o3']));
+    expect(rows.map((row) => row.kind)).toEqual([
+      'resolved', 'objective', 'resolved', 'objective', 'objective', 'objective',
+    ]);
+    expect(rows[0]).toMatchObject({ runId: 'o0', expanded: false });
+    expect(rows[2]).toMatchObject({ runId: 'o3', expanded: true });
+  });
+
+  it('names the objectives a summary stands for, so a folded completion can flash', () => {
+    const m = model(['complete', 'complete', 'complete', 'open']);
+    expect(objectiveRows(m.items(), m.current?.id, NONE)[0])
+      .toMatchObject({ ids: ['o0', 'o1', 'o2'] });
+  });
+
   it('folds by consecutive run, so the authored sequence never reorders', () => {
     // A mid-list failure must not teleport up into the opening history block.
     const m = model(['complete', 'complete', 'open', 'failed', 'failed', 'open']);
-    const rows = objectiveRows(m.items(), m.current?.id, false);
+    const rows = objectiveRows(m.items(), m.current?.id, NONE);
     expect(rows.map((row) => row.kind)).toEqual(['resolved', 'objective', 'resolved', 'objective']);
     expect(rows[0]).toMatchObject({ completed: 2, failed: 0 });
     expect(rows[2]).toMatchObject({ completed: 0, failed: 2 });
@@ -225,7 +253,7 @@ describe('objectiveRows', () => {
 
   it('never folds live goals', () => {
     const m = model(['open', 'open', 'open']);
-    const rows = objectiveRows(m.items(), m.current?.id, false);
+    const rows = objectiveRows(m.items(), m.current?.id, NONE);
     expect(rows.every((row) => row.kind === 'objective')).toBe(true);
     expect(rows.map((row) => row.kind === 'objective' && row.display))
       .toEqual(['current', 'upcoming', 'upcoming']);
@@ -269,6 +297,21 @@ describe('objectiveListMaxHeightPx', () => {
     expect(objectiveListFits(OBJECTIVE_LIST_MIN_PX - 1)).toBe(false);
     // Villager card (~150px) on a landscape phone still leaves a usable list.
     expect(objectiveListFits(objectiveListMaxHeightPx(104, 236, 390))).toBe(true);
+  });
+
+  /**
+   * The head is anchored under the top bar and cannot move, so when the cluster
+   * fills the column it stays on top of the card's own controls. It keeps
+   * painting (the current goal is worth those pixels) but stops taking taps —
+   * the same rule the battlefield beacon follows.
+   */
+  it('lets taps through when the head cannot clear the cluster', () => {
+    // Landscape phone, town centre selected: the card starts above the head.
+    expect(objectivePanelPointerEvents(100, 0)).toBe('none');
+    expect(objectivePanelPointerEvents(100, 84)).toBe('none');
+    // Touching edges do not overlap; anything lower is a normal, tappable panel.
+    expect(objectivePanelPointerEvents(100, 100)).toBe('auto');
+    expect(objectivePanelPointerEvents(100, 510)).toBe('auto');
   });
 
   it('falls back to the full root before the HUD publishes an edge', () => {
