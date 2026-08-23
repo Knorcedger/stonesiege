@@ -31,8 +31,8 @@ import { PENDING_COMMAND_KINDS } from '@bf/sim/commands';
 import { TRAIN_QUEUE_CAP } from '@bf/sim/production';
 import { formatRatio } from './format';
 import {
-  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_TOP_BAR_BOTTOM_VAR, hudStageExtentPercent,
-  measuredTopBarClearPx,
+  HUD_LAYER, HUD_NARROW_MAX_PX, HUD_RIGHT_CLUSTER_TOP_VAR, HUD_TOP_BAR_BOTTOM_VAR,
+  hudStageExtentPercent, measuredRightClusterTopPx, measuredTopBarClearPx,
 } from './layout';
 import { buildSettingsControls } from '../settingsUi';
 import { hideGameTooltip, setGameTooltip, showGameTooltip } from '../tooltip';
@@ -506,6 +506,7 @@ export class Hud {
   private rightCluster!: HTMLDivElement;
   private topBar!: HTMLDivElement;
   private topBarObserver: ResizeObserver | null = null;
+  private rightClusterObserver: ResizeObserver | null = null;
   private viewportListener!: () => void;
 
   /** The minimap panel mounts here (bottom-left). */
@@ -543,6 +544,7 @@ export class Hud {
     this.bindCommandHotkeys();
 
     this.watchTopBarExtent();
+    this.watchRightClusterExtent();
 
     this.minimapSlot = document.createElement('div');
     this.minimapSlot.className = 'bf-mini';
@@ -559,7 +561,10 @@ export class Hud {
     window.removeEventListener('resize', this.viewportListener);
     this.topBarObserver?.disconnect();
     this.topBarObserver = null;
+    this.rightClusterObserver?.disconnect();
+    this.rightClusterObserver = null;
     this.root.style.removeProperty(HUD_TOP_BAR_BOTTOM_VAR);
+    this.root.style.removeProperty(HUD_RIGHT_CLUSTER_TOP_VAR);
     this.el.remove();
   }
 
@@ -575,7 +580,10 @@ export class Hud {
    * setting, which moves the on-screen edge without changing layout size.
    */
   private watchTopBarExtent(): void {
-    this.viewportListener = () => this.publishTopBarExtent();
+    this.viewportListener = () => {
+      this.publishTopBarExtent();
+      this.publishRightClusterExtent();
+    };
     window.addEventListener('resize', this.viewportListener);
     if (typeof ResizeObserver !== 'undefined') {
       this.topBarObserver = new ResizeObserver(() => this.publishTopBarExtent());
@@ -592,14 +600,45 @@ export class Hud {
     this.root.style.setProperty(HUD_TOP_BAR_BOTTOM_VAR, `${clear}px`);
   }
 
+  /**
+   * Publish the command cluster's real top edge, the mirror image of the top
+   * bar's. The objectives panel is anchored to the same right edge, so without
+   * this it sized its list against the viewport and painted over the selection
+   * panel and the command card — both unreadable, on exactly the phone widths
+   * where the card is tallest relative to the screen.
+   *
+   * The cluster is bottom-anchored, so ANY height change (a selection, a
+   * production queue growing a row, a card swapped for a taller one) moves the
+   * edge the panel measures against; a ResizeObserver on the cluster catches
+   * all of them without a per-frame layout read.
+   */
+  private watchRightClusterExtent(): void {
+    if (typeof ResizeObserver !== 'undefined') {
+      this.rightClusterObserver = new ResizeObserver(() => this.publishRightClusterExtent());
+      this.rightClusterObserver.observe(this.rightCluster);
+    }
+    this.publishRightClusterExtent();
+  }
+
+  private publishRightClusterExtent(): void {
+    const top = measuredRightClusterTopPx(
+      this.rightCluster.getBoundingClientRect(),
+      this.root.getBoundingClientRect(),
+    );
+    this.root.style.setProperty(HUD_RIGHT_CLUSTER_TOP_VAR, `${top}px`);
+  }
+
   private applyHudScale(scale: number): void {
     const extent = hudStageExtentPercent(scale);
     this.stage.style.width = `${extent}%`;
     this.stage.style.height = `${extent}%`;
     this.stage.style.transform = `scale(${scale})`;
     // Scaling moves the bar's on-screen bottom edge without resizing its box,
-    // so the observer stays silent — republish by hand.
+    // so the observer stays silent — republish by hand. The cluster's edge moves
+    // for the same reason, and it is bottom-anchored, so a scale change shifts
+    // it even further than the bar.
     if (this.topBar) this.publishTopBarExtent();
+    if (this.rightCluster) this.publishRightClusterExtent();
   }
 
   // ------------------------------------------------------------------ update

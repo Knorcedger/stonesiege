@@ -44,6 +44,20 @@ export const HUD_TOP_BAR_BOTTOM_VAR = '--bf-top-bar-bottom';
 export const TOP_BAR_GAP_PX = 6;
 
 /**
+ * CSS variable the HUD publishes onto the safe-area root: the top edge (px,
+ * root-relative) of the bottom-right command cluster — the selection panel and
+ * the command card.
+ *
+ * The cluster shares its screen column with the objectives panel (both are
+ * anchored to the right edge), and it is bottom-anchored inside the scaled HUD
+ * stage, so its top edge moves with the selection (a town centre card is ~500px
+ * tall, a lone villager's a third of that), with the production queue, and with
+ * the HUD scale setting. Anything anchored above it measures this variable
+ * instead of guessing; unset means nothing is selected and the column is free.
+ */
+export const HUD_RIGHT_CLUSTER_TOP_VAR = '--bf-right-cluster-top';
+
+/**
  * Stacking order of the overlays mounted on the HUD root, in one place because
  * they are declared across four CSS blocks and only make sense against one
  * another.
@@ -88,6 +102,20 @@ export interface EdgeRect {
 export function measuredTopBarClearPx(bar: EdgeRect, root: EdgeRect): number {
   if (!(bar.height > 0)) return TOP_BAR_CLEAR_PX;
   return Math.max(TOP_BAR_CLEAR_PX, Math.ceil(bar.bottom - root.top) + TOP_BAR_GAP_PX);
+}
+
+/**
+ * Top edge (px, relative to `root`) of the bottom-right command cluster. An
+ * empty cluster (nothing selected, so both panels are display:none) reports the
+ * root's full height: the column above it is free all the way down.
+ *
+ * A cluster taller than the root — a town centre card on a landscape phone —
+ * clamps to 0 rather than reporting a negative edge, so callers read "no free
+ * space" instead of inverted geometry.
+ */
+export function measuredRightClusterTopPx(cluster: EdgeRect, root: EdgeRect): number {
+  if (!(cluster.height > 0)) return root.height;
+  return Math.max(0, Math.min(root.height, Math.floor(cluster.top - root.top)));
 }
 
 /** Expand the HUD's logical stage before scaling so it still fills its safe parent. */

@@ -3,8 +3,12 @@
 
 import { describe, expect, it } from 'vitest';
 import {
-  autoOpenObjectives, objectiveDisplayState, objectiveMarkerPlacement, objectiveProgressDue,
-  objectiveMarkerPointerEvents, objectiveProgressSummary, objectiveSequencePosition, ObjectivesModel,
+  autoOpenObjectives, objectiveDisplayState, objectiveListFits, objectiveListMaxHeightPx,
+  objectiveMarkerPlacement, objectiveProgressDue, objectiveMarkerPointerEvents,
+  objectivePanelPointerEvents, objectiveProgressSummary, objectiveRows,
+  objectiveSequencePosition, ObjectivesModel,
+  OBJECTIVE_LIST_GAP_PX, OBJECTIVE_LIST_MIN_PX, parseClusterTopPx,
+  RESOLVED_COLLAPSE_MIN, resolvedSummaryLabel, resolvedSummaryMark,
 } from './objectives';
 import { HUD_NARROW_MAX_PX } from './layout';
 
@@ -157,5 +161,161 @@ describe('objective progress throttle', () => {
       reads++;
     }
     expect(reads).toBe(4);
+  });
+});
+
+/**
+ * Resolved objectives are history, but each one used to keep a full row — text,
+ * progress chips and all — so a campaign list outgrew the screen by its fourth
+ * objective and painted over the bottom-right command card.
+ */
+describe('objectiveRows', () => {
+  const NONE: ReadonlySet<string> = new Set();
+  const model = (states: readonly ('complete' | 'failed' | 'open')[]): ObjectivesModel => {
+    const m = new ObjectivesModel();
+    states.forEach((state, index) => {
+      m.add(`o${index}`, `objective ${index}`);
+      if (state === 'complete') m.complete(`o${index}`);
+      if (state === 'failed') m.fail(`o${index}`);
+    });
+    return m;
+  };
+
+  it('folds a run of resolved objectives into one summary row', () => {
+    const m = model(['complete', 'complete', 'complete', 'open']);
+    const rows = objectiveRows(m.items(), m.current?.id, NONE);
+    expect(rows).toEqual([
+      { kind: 'resolved', runId: 'o0', ids: ['o0', 'o1', 'o2'], completed: 3, failed: 0, expanded: false },
+      expect.objectContaining({ kind: 'objective', display: 'current', folded: false }),
+    ]);
+  });
+
+  it('counts completed and failed separately in the same run', () => {
+    const m = model(['complete', 'failed', 'complete', 'open']);
+    expect(objectiveRows(m.items(), m.current?.id, NONE)[0])
+      .toMatchObject({ kind: 'resolved', completed: 2, failed: 1, expanded: false });
+  });
+
+  it('reveals the folded rows under the summary that owns them', () => {
+    const m = model(['complete', 'complete', 'open']);
+    const rows = objectiveRows(m.items(), m.current?.id, new Set(['o0']));
+    expect(rows.map((row) => row.kind)).toEqual(['resolved', 'objective', 'objective', 'objective']);
+    // The summary stays put: it is also the control that folds them back up.
+    expect(rows[0]).toMatchObject({ expanded: true });
+    expect(rows.slice(1, 3).every((row) => row.kind === 'objective' && row.folded)).toBe(true);
+    expect(rows[3]).toMatchObject({ folded: false, display: 'current' });
+  });
+
+  it('leaves a lone resolved objective expanded — folding it saves nothing', () => {
+    const m = model(['complete', 'open']);
+    expect(RESOLVED_COLLAPSE_MIN).toBe(2);
+    expect(objectiveRows(m.items(), m.current?.id, NONE)).toEqual([
+      expect.objectContaining({ kind: 'objective', display: 'complete', folded: false }),
+      expect.objectContaining({ kind: 'objective', display: 'current' }),
+    ]);
+  });
+
+  /**
+   * One panel-wide "show history" flag opened every block at once: tapping the
+   * opening block's summary also spilled the mid-mission one, in the exact
+   * shape the consecutive-run test below builds.
+   */
+  it('expands each run on its own', () => {
+    const m = model(['complete', 'complete', 'open', 'failed', 'failed', 'open']);
+    const runIds = objectiveRows(m.items(), m.current?.id, NONE)
+      .filter((row) => row.kind === 'resolved')
+      .map((row) => row.kind === 'resolved' ? row.runId : '');
+    expect(runIds).toEqual(['o0', 'o3']);
+
+    const rows = objectiveRows(m.items(), m.current?.id, new Set(['o3']));
+    expect(rows.map((row) => row.kind)).toEqual([
+      'resolved', 'objective', 'resolved', 'objective', 'objective', 'objective',
+    ]);
+    expect(rows[0]).toMatchObject({ runId: 'o0', expanded: false });
+    expect(rows[2]).toMatchObject({ runId: 'o3', expanded: true });
+  });
+
+  it('names the objectives a summary stands for, so a folded completion can flash', () => {
+    const m = model(['complete', 'complete', 'complete', 'open']);
+    expect(objectiveRows(m.items(), m.current?.id, NONE)[0])
+      .toMatchObject({ ids: ['o0', 'o1', 'o2'] });
+  });
+
+  it('folds by consecutive run, so the authored sequence never reorders', () => {
+    // A mid-list failure must not teleport up into the opening history block.
+    const m = model(['complete', 'complete', 'open', 'failed', 'failed', 'open']);
+    const rows = objectiveRows(m.items(), m.current?.id, NONE);
+    expect(rows.map((row) => row.kind)).toEqual(['resolved', 'objective', 'resolved', 'objective']);
+    expect(rows[0]).toMatchObject({ completed: 2, failed: 0 });
+    expect(rows[2]).toMatchObject({ completed: 0, failed: 2 });
+    expect(rows[3]).toMatchObject({ display: 'upcoming' });
+  });
+
+  it('never folds live goals', () => {
+    const m = model(['open', 'open', 'open']);
+    const rows = objectiveRows(m.items(), m.current?.id, NONE);
+    expect(rows.every((row) => row.kind === 'objective')).toBe(true);
+    expect(rows.map((row) => row.kind === 'objective' && row.display))
+      .toEqual(['current', 'upcoming', 'upcoming']);
+  });
+
+  it('labels the summary by what actually happened', () => {
+    expect(resolvedSummaryLabel(3, 0)).toBe('3 completed');
+    expect(resolvedSummaryLabel(0, 2)).toBe('2 failed');
+    expect(resolvedSummaryLabel(2, 1)).toBe('2 completed · 1 failed');
+    expect(resolvedSummaryMark(3, 0)).toBe('✔');
+    expect(resolvedSummaryMark(2, 1)).toBe('✔');
+    expect(resolvedSummaryMark(0, 2)).toBe('✖');
+  });
+});
+
+/**
+ * The panel and the bottom-right command cluster share the right edge of the
+ * screen, so a list capped at a share of the VIEWPORT overlapped the command
+ * card by construction — unreadable on exactly the phone widths where the card
+ * is tallest relative to the screen. The cap is the free space, measured.
+ */
+describe('objectiveListMaxHeightPx', () => {
+  it('stops the list above the command cluster', () => {
+    // Landscape phone, villager selected: head ends at 110, card top at 250.
+    expect(objectiveListMaxHeightPx(110, 250, 390)).toBe(250 - 110 - OBJECTIVE_LIST_GAP_PX);
+  });
+
+  it('caps a free column so the battlefield stays visible', () => {
+    // Nothing selected: the cluster reports the root height, and 44% wins.
+    expect(objectiveListMaxHeightPx(110, 800, 800)).toBe(Math.floor(800 * 0.44));
+  });
+
+  it('reports no room rather than negative geometry', () => {
+    // Town centre selected on a landscape phone: the card starts above the head.
+    expect(objectiveListMaxHeightPx(110, 0, 390)).toBe(0);
+    expect(objectiveListFits(objectiveListMaxHeightPx(110, 0, 390))).toBe(false);
+  });
+
+  it('keeps the head-only fallback for spaces too small to read', () => {
+    expect(objectiveListFits(OBJECTIVE_LIST_MIN_PX)).toBe(true);
+    expect(objectiveListFits(OBJECTIVE_LIST_MIN_PX - 1)).toBe(false);
+    // Villager card (~150px) on a landscape phone still leaves a usable list.
+    expect(objectiveListFits(objectiveListMaxHeightPx(104, 236, 390))).toBe(true);
+  });
+
+  /**
+   * The head is anchored under the top bar and cannot move, so when the cluster
+   * fills the column it stays on top of the card's own controls. It keeps
+   * painting (the current goal is worth those pixels) but stops taking taps —
+   * the same rule the battlefield beacon follows.
+   */
+  it('lets taps through when the head cannot clear the cluster', () => {
+    // Landscape phone, town centre selected: the card starts above the head.
+    expect(objectivePanelPointerEvents(100, 0)).toBe('none');
+    expect(objectivePanelPointerEvents(100, 84)).toBe('none');
+    // Touching edges do not overlap; anything lower is a normal, tappable panel.
+    expect(objectivePanelPointerEvents(100, 100)).toBe('auto');
+    expect(objectivePanelPointerEvents(100, 510)).toBe('auto');
+  });
+
+  it('falls back to the full root before the HUD publishes an edge', () => {
+    expect(parseClusterTopPx('', 800)).toBe(800);
+    expect(parseClusterTopPx('520px', 800)).toBe(520);
   });
 });
