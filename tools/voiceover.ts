@@ -230,17 +230,32 @@ export function runVoiceOverCli(argv: readonly string[]): number {
   let rendered = 0;
   let reused = 0;
 
+  // Which voice actually made the audio, per speaker. A reused beat keeps the
+  // voice recorded for it last time; only a beat this run really rendered can
+  // claim the voice this run asked for. Otherwise `--voice X` over a complete
+  // set would rewrite the provenance table without a byte of audio changing.
+  const voicesUsed = new Map<string, Set<string>>();
+  const noteVoice = (speaker: string, used: string | undefined): void => {
+    if (used === undefined) return;
+    manifest.voices![speaker] = used;
+    const seen = voicesUsed.get(speaker) ?? new Set<string>();
+    seen.add(used);
+    voicesUsed.set(speaker, seen);
+  };
+
   for (const beat of beats) {
     const voice = voiceFor(beat, opts);
-    manifest.voices![beat.speaker ?? 'Narrator'] = voice;
+    const speaker = beat.speaker ?? 'Narrator';
     const existing = previous.lines[beat.id];
     if (!opts.force && existing && existsSync(join(OUT_DIR, existing.file))) {
       manifest.lines[beat.id] = existing;
+      noteVoice(speaker, previous.voices?.[speaker]);
       reused++;
       continue;
     }
     try {
       manifest.lines[beat.id] = renderBeat(beat, opts);
+      noteVoice(speaker, voice);
       rendered++;
       process.stdout.write(`  rendered ${beat.id}  ${beat.text}\n`);
     } catch (error) {
@@ -257,6 +272,14 @@ export function runVoiceOverCli(argv: readonly string[]): number {
     if (name === 'manifest.json' || keep.has(name)) continue;
     rmSync(join(OUT_DIR, name), { force: true });
     pruned++;
+  }
+
+  // A speaker whose beats were not all made by one voice cannot be described by
+  // a single entry, so say so rather than letting the table pick a winner.
+  for (const [speaker, used] of voicesUsed) {
+    if (used.size > 1) {
+      process.stderr.write(`  WARNING  ${speaker} mixes voices: ${[...used].sort().join(', ')}\n`);
+    }
   }
 
   writeManifest(manifest);
