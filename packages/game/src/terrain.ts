@@ -4,10 +4,11 @@
 // are LRU-evicted to bound GPU memory.
 //
 // Two presentation-only rules run on top of the sim terrain (the sim map, the
-// minimap and pathing never see them): road borders weather into dirt so a track
-// does not draw a ruler-straight line across the field, and a shallows band that
-// spans a channel draws as `ford` — the road bed under the water — so a player
-// following a road to a river can see where it is crossable.
+// minimap and pathing never see them): a road is drawn as a ribbon lying on the
+// ground around it, picked per run direction and joint so the track threads and
+// meanders from tile to tile, and a shallows band carrying a route across a
+// channel draws as `ford` — a stony bed under the water — so a player following a
+// road to a river can see where it is crossable.
 
 import { Container, RenderTexture, Sprite, type Renderer } from 'pixi.js';
 import type { GameMap } from '@bf/sim/types';
@@ -20,15 +21,21 @@ const MAX_BAKED_CHUNKS = 30;
 /**
  * Terrain priority (high bleeds over low) — ART_BIBLE §3.2 order, extended with
  * the sim-only terrains exactly as the generated terrain.json transition pairs
- * imply: cliff > road > farmland > (forest) > snow > grass > dirt > sand > shallows > water.
+ * imply: cliff > farmland > (forest) > snow > grass > dirt > sand > shallows > water.
+ * `road` is absent on purpose: it lies on its ground and blends as that ground.
  */
 const TERRAIN_PRIORITY: Record<string, number> = {
-  cliff: 9, road: 8, farmland: 7, forest: 6, snow: 5,
+  cliff: 9, farmland: 7, forest: 6, snow: 5,
   grass: 4, dirt: 3, sand: 2, shallows: 1, water: 0,
 };
 
-/** Wet terrain: the material a crossing has to span. */
-const WET_TERRAIN = new Set(['water', 'shallows']);
+/** Distinct salts per edge: 'ne'/'se' and 'sw'/'nw' share both of their letters. */
+const EDGE_SALT: Record<string, number> = { ne: 11, se: 23, sw: 37, nw: 53 };
+
+/** The four edges of a tile, as [dx, dy, edge] toward the neighbour across each. */
+const TILE_EDGES: ReadonlyArray<readonly [number, number, string]> = [
+  [0, -1, 'ne'], [1, 0, 'se'], [0, 1, 'sw'], [-1, 0, 'nw'],
+];
 
 /** What a road ribbon may be drawn over — the ground the track was worn into. */
 const ROAD_GROUND = ['grass', 'dirt', 'sand', 'snow', 'farmland'];
@@ -59,13 +66,20 @@ function tileHash(x: number, y: number, salt: number): number {
   return (h ^ (h >>> 15)) >>> 0;
 }
 
+/** How far a ford may reach through shallows before it stops being a crossing. */
+const FORD_REACH = 32;
+
 /**
- * Tiles of every `shallows` region that spans a water channel — a ford.
+ * Tiles of every `shallows` band that carries a route across a water channel — a
+ * ford — as a Set of tile indices.
  *
- * A crossing is a shallows region with dry land reachable on both sides of one
- * axis and water on both sides of the other: exactly the shape of a shallow bar
- * carrying a route from bank to bank. A shallows fringe along a shore touches
- * land on one side only and is left as ordinary shallow water.
+ * Decided per tile, and both halves of the test matter. ACROSS the crossing, the
+ * first thing that is not shallows must be water on BOTH sides: that is what makes
+ * it a channel rather than a shore, and it is what rejects the rim of a lake or an
+ * island, which has land on its outer side all the way round. ALONG the crossing,
+ * one side must reach dry land through shallows: that is the bank you are wading
+ * to. A shallows lane running down the middle of a channel reaches neither bank
+ * and stays ordinary shallow water.
  *
  * Pure function of the map, exported for tests; the renderer computes it once.
  */
@@ -75,37 +89,28 @@ export function fordTiles(map: GameMap): Set<number> {
       ? null
       : map.terrainIds[map.terrain[y * map.width + x]] ?? null
   );
+  /** First terrain that is not shallows in one direction, within reach. */
+  const beyond = (x: number, y: number, dx: number, dy: number): string | null => {
+    for (let step = 1; step <= FORD_REACH; step++) {
+      const terrain = idOf(x + dx * step, y + dy * step);
+      if (terrain !== 'shallows') return terrain;
+    }
+    return null;
+  };
+  const isLand = (terrain: string | null): boolean => terrain !== null && terrain !== 'water';
+
   const fords = new Set<number>();
-  const seen = new Uint8Array(map.width * map.height);
-  for (let y0 = 0; y0 < map.height; y0++) {
-    for (let x0 = 0; x0 < map.width; x0++) {
-      const start = y0 * map.width + x0;
-      if (seen[start] || idOf(x0, y0) !== 'shallows') continue;
-      const region: number[] = [];
-      const queue = [start];
-      seen[start] = 1;
-      const land = { west: false, east: false, north: false, south: false };
-      const water = { west: false, east: false, north: false, south: false };
-      for (let i = 0; i < queue.length; i++) {
-        const tile = queue[i];
-        region.push(tile);
-        const x = tile % map.width;
-        const y = (tile / map.width) | 0;
-        for (const [dx, dy, side] of [
-          [-1, 0, 'west'], [1, 0, 'east'], [0, -1, 'north'], [0, 1, 'south'],
-        ] as Array<[number, number, 'west' | 'east' | 'north' | 'south']>) {
-          const neighbor = idOf(x + dx, y + dy);
-          if (neighbor === null) continue;
-          if (neighbor === 'shallows') {
-            const next = (y + dy) * map.width + (x + dx);
-            if (!seen[next]) { seen[next] = 1; queue.push(next); }
-          } else if (neighbor === 'water') water[side] = true;
-          else land[side] = true;
-        }
+  for (let y = 0; y < map.height; y++) {
+    for (let x = 0; x < map.width; x++) {
+      if (idOf(x, y) !== 'shallows') continue;
+      for (const [ax, ay] of [[1, 0], [0, 1]] as const) {
+        const acrossOne = beyond(x, y, ay, ax);
+        const acrossTwo = beyond(x, y, -ay, -ax);
+        if (acrossOne !== 'water' || acrossTwo !== 'water') continue;
+        if (!isLand(beyond(x, y, ax, ay)) && !isLand(beyond(x, y, -ax, -ay))) continue;
+        fords.add(y * map.width + x);
+        break;
       }
-      const spansX = land.west && land.east && water.north && water.south;
-      const spansY = land.north && land.south && water.west && water.east;
-      if (spansX || spansY) for (const tile of region) fords.add(tile);
     }
   }
   return fords;
@@ -123,7 +128,7 @@ function terrainIdAt(map: GameMap, x: number, y: number): string | null {
  * Two presentation-only rules, both pure functions of the map so every client
  * draws the same field:
  *
- * - a ford replaces the shallows it crosses (see `fordTiles`);
+ * - a ford replaces the shallows carrying a crossing (see `fordTiles`);
  * - a road draws with the family for the axis it runs along, so its crown, cart
  *   ruts and verges are continuous from tile to tile. The oriented art is laid
  *   out on the line joining the two edge midpoints the road passes through, and
@@ -220,6 +225,20 @@ export function roadFrameName(
 }
 
 /**
+ * The edges a road tile's own track crosses — where the road comes in and goes
+ * out. Everything else is the road's WIDTH: that is where a fill wedge belongs.
+ */
+export function roadGateEdges(map: GameMap, x: number, y: number, family: string): readonly string[] {
+  if (family === 'road-x') return ['nw', 'se'];
+  if (family === 'road-y') return ['ne', 'sw'];
+  if (family === 'road-bend') {
+    const road = (dx: number, dy: number): boolean => terrainIdAt(map, x + dx, y + dy) === 'road';
+    return [road(-1, 0) ? 'nw' : 'se', road(0, -1) ? 'ne' : 'sw'];
+  }
+  return []; // a crossroads has no single run: every road neighbour widens it
+}
+
+/**
  * The ground a road tile's ribbon is drawn over: the nearest ordinary land
  * terrain around it, so a track worn across a meadow lies on grass and one across
  * a snowfield lies on snow. Roads are ribbons on the ground, not tile-shaped
@@ -230,10 +249,12 @@ export function roadFrameName(
  * solid deck instead of a ribbon lying on ground that is not there.
  */
 export function roadGroundId(map: GameMap, x: number, y: number): string | null {
-  for (let radius = 1; radius <= ROAD_GROUND_REACH; radius++) {
-    for (let dy = -radius; dy <= radius; dy++) {
-      for (let dx = -radius; dx <= radius; dx++) {
-        if (Math.max(Math.abs(dx), Math.abs(dy)) !== radius) continue;
+  // Nearest first, and an edge neighbour before a corner one: a tile bedded on
+  // the meadow it runs through must not pick up the marsh off its shoulder.
+  for (let reach = 1; reach <= ROAD_GROUND_REACH * 2; reach++) {
+    for (let dy = -ROAD_GROUND_REACH; dy <= ROAD_GROUND_REACH; dy++) {
+      for (let dx = -ROAD_GROUND_REACH; dx <= ROAD_GROUND_REACH; dx++) {
+        if (Math.abs(dx) + Math.abs(dy) !== reach) continue;
         const terrain = terrainIdAt(map, x + dx, y + dy);
         if (terrain !== null && ROAD_GROUND.includes(terrain)) return terrain;
       }
@@ -401,7 +422,7 @@ export class TerrainLayer {
   /** One half-tile of bare road earth, toward `edge`. */
   private fillFrame(x: number, y: number, edge: string) {
     return this.assets.tryResolve(
-      `terr/road-fill/${edge}/${tileHash(x, y, edge.charCodeAt(1)) % ROAD_FILL_VARIANTS}`,
+      `terr/road-fill/${edge}/${tileHash(x, y, EDGE_SALT[edge] ?? 0) % ROAD_FILL_VARIANTS}`,
     );
   }
 
@@ -449,7 +470,7 @@ export class TerrainLayer {
       this.variantCounts.set(prefix, count);
     }
     if (count === 0) return this.assets.tryResolve(prefix);
-    return this.assets.tryResolve(`${prefix}/${tileHash(tileX, tileY, edge.charCodeAt(0)) % count}`);
+    return this.assets.tryResolve(`${prefix}/${tileHash(tileX, tileY, EDGE_SALT[edge] ?? 0) % count}`);
   }
 
   private variantCount(terrainId: string): number {
@@ -494,13 +515,15 @@ export class TerrainLayer {
             gspr.position.set(lx, ly);
             temp.addChild(gspr);
           }
-          // Fill the half of the tile facing each road neighbour, so a road wider
-          // than one tile is one band. Out over open water there is no ground to
-          // lie on: fill every half instead, and the bridge gets a solid deck.
-          for (const [nx, ny, edge] of [
-            [0, -1, 'ne'], [1, 0, 'se'], [0, 1, 'sw'], [-1, 0, 'nw'],
-          ] as Array<[number, number, string]>) {
-            if (ground !== null && this.terrainAt(tx + nx, ty + ny) !== 'road') continue;
+          // Fill the half of the tile facing each road neighbour ACROSS the road,
+          // so a road wider than one tile is one band. Never along the run: those
+          // two halves are the whole diamond, and filling them would put every
+          // straight tile back to a tile-shaped patch. Out over open water there
+          // is no ground to lie on, so fill every half and deck the bridge.
+          const gates = roadGateEdges(this.map, tx, ty, terr);
+          for (const [nx, ny, edge] of TILE_EDGES) {
+            if (ground !== null
+              && (gates.includes(edge) || this.terrainAt(tx + nx, ty + ny) !== 'road')) continue;
             const fill = this.fillFrame(tx, ty, edge);
             if (!fill) continue;
             const fspr = new Sprite(fill.texture);
@@ -521,14 +544,8 @@ export class TerrainLayer {
         // Edge transitions: higher-priority neighbors bleed a fringe into this tile.
         const myTerr = this.transitionTerrainAt(tx, ty) ?? terr;
         const myPrio = TERRAIN_PRIORITY[myTerr] ?? 1;
-        const neighbors: Array<[number, number, string]> = [
-          [tx, ty - 1, 'ne'],
-          [tx + 1, ty, 'se'],
-          [tx, ty + 1, 'sw'],
-          [tx - 1, ty, 'nw'],
-        ];
-        for (const [nx, ny, edge] of neighbors) {
-          const nTerr = this.transitionTerrainAt(nx, ny);
+        for (const [dx, dy, edge] of TILE_EDGES) {
+          const nTerr = this.transitionTerrainAt(tx + dx, ty + dy);
           if (!nTerr || nTerr === myTerr) continue;
           if ((TERRAIN_PRIORITY[nTerr] ?? 1) <= myPrio) continue;
           const trans = this.transitionFrame(nTerr, myTerr, edge, tx, ty);

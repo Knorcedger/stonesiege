@@ -223,9 +223,12 @@ These families have no sim `TerrainId`. The renderer resolves them from the map 
 them in place of the terrain they stand for (`packages/game/src/terrain.ts`), so the sim,
 pathing, the minimap and replays never see them.
 
-**`ford`** (`terr/ford/<variant>`, 4 variants) replaces a `shallows` tile that belongs to a
-crossing — a shallows region with land on both sides of one axis and water on both sides of
-the other, i.e. a shallow bar carrying a route from bank to bank.
+**`ford`** (`terr/ford/<variant>`, 4 variants) replaces a `shallows` tile carrying a route
+across a water channel. Decided per tile: across the crossing the first thing that is not
+shallows must be water on BOTH sides (a channel, not a shore — which is what rejects the rim
+of a lake or an island), and along it one side must reach dry land through shallows (the bank
+being waded to). A shallow lane running down the middle of a channel reaches neither bank and
+stays ordinary shallow water.
 
 Recipe: `waterLight` base; gravel bars laid on smooth value noise in the road's own earth
 tones (`dirtLight`/`dirtPale`, ~45% of the diamond) so the track reads as continuing under

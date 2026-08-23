@@ -408,7 +408,9 @@ function roadBand(
         + valueNoise(seed ^ 0x2c9, (a - b) / 2.4) * 0.9;
       const edge = Math.abs(d) - halfWidth;
       if (edge > 0) continue;
-      if (edge > -2.6 && grain > 0.82 + edge * 0.3) continue; // frayed, dithered rim
+      // Frayed rim: solid a couple of pixels in, thinning to a scatter at the
+      // very edge. (Inverted, this drew a detached speckled outline instead.)
+      if (edge > -2.6 && grain > 0.15 - edge * 0.33) continue;
       const crown = Math.abs(d) < 5.5;
       r.set(x, y, crown && grain > (overgrown ? 0.62 : 0.26) ? PALETTE.dirtPale
         : Math.abs(d) > 9.5 && grain > 0.45 ? PALETTE.dirtBase : PALETTE.dirtLight);
@@ -465,12 +467,20 @@ function orientedRoadTile(
   const enter = ROAD_OFFSETS[inOffset];
   const leave = ROAD_OFFSETS[outOffset];
 
+  /**
+   * How far along the road a tile pixel is: -16 at the entry gate, +16 at the
+   * exit one. A y-run enters across the NE edge, at x = 48, so its along-axis
+   * runs the other way — reading both the same way applied the entry offset to
+   * the exit gate and every tile boundary on a north-south road stepped sideways.
+   */
+  const alongAt = (x: number): number => (axis === 'x' ? x - 32 : 32 - x);
+
   /** Centre of the track at a point `along` the tile (-16 entry .. +16 exit). */
   const centre = (along: number): number => {
     const t = Math.max(0, Math.min(1, (along + 16) / 32));
     return enter + (leave - enter) * t * t * (3 - 2 * t);
   };
-  const distance = (x: number, y: number): number => acrossRoad(x, y, axis) - centre(x - 32);
+  const distance = (x: number, y: number): number => acrossRoad(x, y, axis) - centre(alongAt(x));
 
   roadBand(r, seed, distance, variant);
   packedEarth(r, rng, variant);
@@ -484,7 +494,7 @@ function orientedRoadTile(
       const taper = Math.max(0, 1 - Math.abs(along) / 17);
       const wander = valueNoise(seed ^ (lane < 0 ? 0x11 : 0x77), along / 4.5) * 2.6 * taper;
       const d = centre(along) + lane + wander;
-      const x = 32 + along;
+      const x = axis === 'x' ? 32 + along : 32 - along;
       const y = axis === 'x' ? x / 2 + d : 32 - x / 2 + d;
       if (r.alphaAt(x, y) === 0) continue;
       const grain = pixelHash(seed ^ 0x2f, step, Math.round(d * 4));

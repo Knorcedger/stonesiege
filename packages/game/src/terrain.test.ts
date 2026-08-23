@@ -39,8 +39,9 @@ const display = (map: GameMap, x: number, y: number, fords = fordTiles(map)): st
   displayTerrainId(map, x, y, fords);
 
 describe('fordTiles', () => {
-  it('marks a shallows band that spans a river, bank to bank', () => {
-    // Vertical river (x 3-5) with a shallows crossing on rows 2-3.
+  it('marks the shallows carrying a crossing over a river channel', () => {
+    // Vertical river (water x 3-5, sand banks x 2 and 6) with a shallows
+    // crossing on rows 2-3.
     const map = mapOf([
       '..awwwa..',
       '..awwwa..',
@@ -50,13 +51,40 @@ describe('fordTiles', () => {
       '..awwwa..',
     ]);
     const fords = fordTiles(map);
-    expect(fords.size).toBe(10);
+    expect(fords.size).toBe(6);
     for (let y = 2; y <= 3; y++) {
-      for (let x = 2; x <= 6; x++) {
-        expect(display(map, x, y, fords)).toBe('ford');
-      }
+      // In the channel: the crossing proper.
+      for (let x = 3; x <= 5; x++) expect(display(map, x, y, fords)).toBe('ford');
+      // Over the banks: shallow water at the water's edge, not a crossing.
+      for (const x of [2, 6]) expect(display(map, x, y, fords)).toBe('shallows');
     }
     expect(display(map, 4, 1, fords)).toBe('water');
+  });
+
+  it('leaves the rim of a lake alone — every side of it reaches land', () => {
+    const map = mapOf([
+      '.........',
+      '.sssssss.',
+      '.swwwwws.',
+      '.swwwwws.',
+      '.swwwwws.',
+      '.sssssss.',
+      '.........',
+    ]);
+    expect(fordTiles(map).size).toBe(0);
+  });
+
+  it('leaves a shallow lane running down a channel as plain shallow water', () => {
+    // The lane reaches no bank along its length, so it is water to wade in, not
+    // a crossing to wade across.
+    const map = mapOf([
+      '..www..',
+      'wwwswww',
+      'wwwswww',
+      'wwwswww',
+      '..www..',
+    ]);
+    expect(fordTiles(map).size).toBe(0);
   });
 
   it('leaves a shore fringe alone — it touches land on one side only', () => {
