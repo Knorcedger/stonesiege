@@ -1,11 +1,14 @@
 // Recorded voice-over playback: which beats play a file, which fall through to
 // the synthesizer, and what happens when playback is refused. The audio element
-// is faked, so these run under the repo's `node` environment.
+// is faked (and `fetch` stubbed for the manifest tests), so these run under the
+// repo's `node` environment.
 
-import { describe, expect, it } from 'vitest';
-import { createRecordedSpeech, type AudioClip } from './recordedSpeech';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  createRecordedSpeech, createVoiceManifestFetch, loadVoiceManifest, type AudioClip,
+} from './recordedSpeech';
 import type { NarrationRequest, NarrationVoice, SpeechSeam } from './narration';
-import { voiceLineId, type VoiceManifest } from './voiceLines';
+import { EMPTY_VOICE_MANIFEST, voiceLineId, type VoiceManifest } from './voiceLines';
 
 class FakeClip implements AudioClip {
   src = '';
@@ -147,5 +150,76 @@ describe('createRecordedSpeech', () => {
     expect(() => seam.speak(request({ id: 'nothing-recorded' }))).not.toThrow();
     expect(() => seam.cancel()).not.toThrow();
     expect(clip.plays).toEqual([]);
+  });
+});
+
+describe('loadVoiceManifest', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('parses the manifest a normal fetch returns', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve({ ok: true, json: () => Promise.resolve(manifestOf()) }));
+    const manifest = await loadVoiceManifest(undefined, AbortSignal.timeout(1000));
+    expect(Object.keys(manifest.lines)).toEqual([RECORDED]);
+  });
+
+  it('resolves empty within the bound when the fetch never settles', async () => {
+    // A connection that accepts and then stalls — a captive portal, a wedged
+    // CDN edge. The fake ignores its abort signal entirely, so this passes
+    // only if the loader bounds the wait itself rather than trusting fetch
+    // to reject on abort.
+    vi.stubGlobal('fetch', () => new Promise(() => undefined));
+    const manifest = await loadVoiceManifest(undefined, AbortSignal.timeout(5));
+    expect(manifest.lines).toEqual({});
+  });
+
+  it('resolves empty when the body stalls after the headers arrive', async () => {
+    vi.stubGlobal('fetch', () =>
+      Promise.resolve({ ok: true, json: () => new Promise(() => undefined) }));
+    const manifest = await loadVoiceManifest(undefined, AbortSignal.timeout(5));
+    expect(manifest.lines).toEqual({});
+  });
+});
+
+describe('createVoiceManifestFetch', () => {
+  it('fetches once per session when the manifest answers', async () => {
+    let calls = 0;
+    const fetchManifest = createVoiceManifestFetch({
+      load: async () => { calls++; return manifestOf(); },
+    });
+    const first = await fetchManifest();
+    expect(await fetchManifest()).toBe(first);
+    expect(calls).toBe(1);
+  });
+
+  it('keeps the empty answer of a build with no recordings', async () => {
+    let calls = 0;
+    const fetchManifest = createVoiceManifestFetch({
+      load: async () => { calls++; return EMPTY_VOICE_MANIFEST; },
+    });
+    await fetchManifest();
+    await fetchManifest();
+    expect(calls).toBe(1); // a 404 is the build's real answer, not a stall to retry
+  });
+
+  it('shares a stalled attempt between boots, then retries it next match', async () => {
+    let calls = 0;
+    // What the bounded loader does under a stall: resolve empty when the
+    // signal expires, never sooner.
+    const fetchManifest = createVoiceManifestFetch({
+      timeoutMs: 5,
+      load: (signal) => new Promise((resolve) => {
+        calls++;
+        signal?.addEventListener('abort', () => resolve(EMPTY_VOICE_MANIFEST), { once: true });
+      }),
+    });
+    const [a, b] = await Promise.all([fetchManifest(), fetchManifest()]);
+    expect(a.lines).toEqual({});
+    expect(b.lines).toEqual({});
+    expect(calls).toBe(1); // concurrent boots share the one in-flight attempt
+    await fetchManifest();
+    expect(calls).toBe(2); // the timed-out attempt did not poison the session cache
   });
 });
