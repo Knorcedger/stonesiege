@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { scenariosById } from '@bf/scenarios';
 import { campaignLoadingArtwork } from './loadingContext';
 
 describe('campaign loading artwork', () => {
@@ -8,7 +9,16 @@ describe('campaign loading artwork', () => {
       campaign: 'William Wallace — The Rising of Scotland',
       chapter: 'Chapter 2 · The Sheriff of Lanark',
       setting: 'Lanark · May 1297',
+      stakes: scenariosById['wallace-02-lanark']!.story!.stakes,
     });
+  });
+
+  it('carries the chapter stakes onto the loading screen', () => {
+    // The load is the last quiet moment before the map, so it says what this
+    // chapter is for rather than only where and when it happens.
+    expect(campaignLoadingArtwork('wallace-02-lanark')?.stakes)
+      .toContain('the rising dies with the man who started it');
+    expect(campaignLoadingArtwork('henry-01-harfleur')?.stakes).toBeTruthy();
   });
 
   it('uses the campaign cover for chapters that share a campaign illustration', () => {

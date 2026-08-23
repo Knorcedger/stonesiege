@@ -4,20 +4,20 @@ The live campaign turns the original six long scenarios into twelve shorter save
 boundaries. Economy and preparation chapters end before their paired battle, while
 the decisive battles begin with an appropriate force already in the field.
 
-| Act | Chapter | Historical beat | Target length |
-| --- | --- | --- | --- |
-| I — The Outlaw | 1. A Name in the Ledger | Scotland after the 1296 conquest; the hidden Lanarkshire camp | 8–12 min |
-| | 2. The Sheriff of Lanark | Killing of William Heselrig, May 1297 | 5–8 min |
-| | 3. The Camp on the Tay | The raid becomes a sustainable rising | 8–12 min |
-| | 4. The Justiciar Flees | Wallace and Douglas drive William de Ormesby from Scone | 8–12 min |
-| II — The Great Victory | 5. Two Risings, One Army | Wallace joins Andrew Moray and prepares the foot army | 6–10 min |
-| | 6. Stirling Bridge | The battle of 11 September 1297 | 10–15 min |
-| III — Guardian of Scotland | 7. A Guardian’s Winter | The 1297 invasion of northern England | 10–15 min |
-| | 8. Fire on the Tyne | Corbridge, Hexham, and protection of the priory | 10–15 min |
-| IV — The Broken Field | 9. The Schiltrons | Preparation before Falkirk | 6–10 min |
-| | 10. The Broken Field | Battle, noble withdrawal, and escape to the Torwood | 10–15 min |
-| V — The Unbroken | 11. The Forest | Return from France, Happrew, and the outlaw war | 12–18 min |
-| | 12. The Unbroken | Earnside, capture, trial, execution, and legacy | 8–12 min |
+| Act | Chapter | Historical beat | Target length | Difficulty |
+| --- | --- | --- | --- | --- |
+| I — The Outlaw | 1. A Name in the Ledger | Scotland after the 1296 conquest; the hidden Lanarkshire camp | 8–12 min | Recruit (1/5) |
+| | 2. The Sheriff of Lanark | Killing of William Heselrig, May 1297 | 5–8 min | Soldier (2/5) |
+| | 3. The Camp on the Tay | The raid becomes a sustainable rising | 8–12 min | Soldier (2/5) |
+| | 4. The Justiciar Flees | Wallace and Douglas drive William de Ormesby from Scone | 8–12 min | Veteran (3/5) |
+| II — The Great Victory | 5. Two Risings, One Army | Wallace joins Andrew Moray and prepares the foot army | 6–10 min | Soldier (2/5) |
+| | 6. Stirling Bridge | The battle of 11 September 1297 | 10–15 min | Captain (4/5) |
+| III — Guardian of Scotland | 7. A Guardian’s Winter | The 1297 invasion of northern England | 10–15 min | Veteran (3/5) |
+| | 8. Fire on the Tyne | Corbridge, Hexham, and protection of the priory | 10–15 min | Veteran (3/5) |
+| IV — The Broken Field | 9. The Schiltrons | Preparation before Falkirk | 6–10 min | Veteran (3/5) |
+| | 10. The Broken Field | Battle, noble withdrawal, and escape to the Torwood | 10–15 min | Legend (5/5) |
+| V — The Unbroken | 11. The Forest | Return from France, Happrew, and the outlaw war | 12–18 min | Captain (4/5) |
+| | 12. The Unbroken | Earnside, capture, trial, execution, and legacy | 8–12 min | Captain (4/5) |
 
 ## Historical framing
 

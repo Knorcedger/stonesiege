@@ -28,6 +28,8 @@ export function screenPath(screen: MenuScreen): string {
     case 'practiceSetup': return '/practice';
     case 'campaigns': return '/campaigns';
     case 'scenarioList': return `/campaigns/${screen.campaignId}`;
+    case 'prologue': return `/campaigns/${screen.campaignId}/prologue`;
+    case 'epilogue': return `/campaigns/${screen.campaignId}/epilogue`;
     case 'briefing': return `/campaigns/${screen.campaignId}/${screen.scenarioId}`;
     case 'settings': return '/settings';
   }
@@ -57,6 +59,12 @@ function stackFor(screen: MenuScreen): MenuScreen[] {
     case 'campaigns': return [{ id: 'title' }, { id: 'play' }, screen];
     case 'scenarioList':
       return [{ id: 'title' }, { id: 'play' }, { id: 'campaigns' }, screen];
+    case 'prologue':
+    case 'epilogue':
+      return [
+        { id: 'title' }, { id: 'play' }, { id: 'campaigns' },
+        { id: 'scenarioList', campaignId: screen.campaignId }, screen,
+      ];
     case 'briefing':
       return [
         { id: 'title' }, { id: 'play' }, { id: 'campaigns' },
@@ -86,6 +94,10 @@ export function screenFromHash(hash: string): MenuScreen | null {
       const campaign = campaigns[campaignId];
       if (!campaign) return null;
       if (scenarioId === undefined) return { id: 'scenarioList', campaignId };
+      // The two story pages every campaign has. Chapter ids are prefixed with
+      // their campaign ('wallace-01-ledger'), so neither word can collide.
+      if (scenarioId === 'prologue') return { id: 'prologue', campaignId };
+      if (scenarioId === 'epilogue') return { id: 'epilogue', campaignId };
       // A briefing route must name a chapter this campaign actually contains,
       // or Back from it would return to an unrelated list.
       if (!campaign.scenarioIds.includes(scenarioId) || !scenariosById[scenarioId]) return null;

@@ -11,7 +11,15 @@ import { PNG } from 'pngjs';
 
 const root = join(import.meta.dirname, '../..');
 const unitDir = join(root, 'art/hd/frames/units');
-const SHEETS = ['housecarl', 'chevalier', 'mangudai', 'cataphract', 'mamluk'] as const;
+// Cutout basenames under art/hd/frames/units, without the .png. Any regenerated
+// 6x5 sheet can be added here; the pass is not specific to civilization units.
+const SHEETS = [
+  'housecarl-walk-grid-cutout-v1',
+  'chevalier-walk-grid-cutout-v1',
+  'mangudai-walk-grid-cutout-v1',
+  'cataphract-walk-grid-cutout-v1',
+  'mamluk-walk-grid-cutout-v1',
+] as const;
 const COLUMNS = 6;
 const ROWS = 5;
 const CELL = 272;
@@ -141,11 +149,11 @@ function normalize(source: PNG, sourceName: string): PNG {
   return out;
 }
 
-for (const unit of SHEETS) {
-  const file = `${unit}-walk-grid-cutout-v1.png`;
+for (const sheet of SHEETS) {
+  const file = `${sheet}.png`;
   const path = join(unitDir, file);
   const source = PNG.sync.read(readFileSync(path));
   const out = normalize(source, file);
   writeFileSync(path, PNG.sync.write(out));
-  console.log(`normalized 30 isolated ${unit} poses into a ${COLUMNS}x${ROWS} grid`);
+  console.log(`normalized 30 isolated ${sheet} poses into a ${COLUMNS}x${ROWS} grid`);
 }
