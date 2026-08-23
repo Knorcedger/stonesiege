@@ -4,6 +4,7 @@ import { join } from 'node:path';
 import sharp from 'sharp';
 import { beforeAll, describe, expect, it } from 'vitest';
 import { buildings } from '../../packages/data/src/buildings.ts';
+import { assetContentHash } from './manifestHash.ts';
 
 const ROOT = join(import.meta.dirname, '../..');
 const HD = join(ROOT, 'apps/web/public/assets/hd');
@@ -141,6 +142,22 @@ describe('complete HD art override contract', () => {
     }
 
     expect([...hdNames].sort()).toEqual([...baseNames].sort());
+  });
+
+  it('stamps a truthful content hash for every shipped HD file', () => {
+    // The renderer's persistent artwork cache trusts these hashes to decide
+    // which stored bytes are current (#149); a stale stamp would pin players
+    // to outdated art, so the committed manifest must always match the files.
+    const stamped = (manifest.assetHashes ?? {}) as Record<string, string>;
+    const shipped = new Set<string>();
+    for (const { file, atlas } of hdAtlases()) {
+      shipped.add(file);
+      shipped.add(atlas.meta.image as string);
+    }
+    expect(Object.keys(stamped).sort()).toEqual([...shipped].sort());
+    for (const file of shipped) {
+      expect(stamped[file], file).toBe(assetContentHash(readFileSync(join(HD, file))));
+    }
   });
 
   it('ships dedicated directional rigs and icons for every civilization unique unit', () => {
