@@ -86,6 +86,21 @@ describe('persistent artwork store', () => {
     expect(warn).toHaveBeenCalledTimes(2); // each rejected transfer says so
   });
 
+  it('never stores bytes it could not verify, even matching ones', async () => {
+    vi.stubGlobal('crypto', {}); // an origin without WebCrypto
+    const cache = new FakeCache();
+    const store = new ArtworkStore(cache, BASE);
+    const body = 'atlas bytes';
+    const requests = stubNetwork({ 'assets/hd/objects-0.webp': body });
+
+    const served = await store.fetchVersioned('assets/hd/objects-0.webp', hashOf(body));
+    expect(await served.text()).toBe(body); // render proceeds from the network
+    expect(cache.puts).toBe(0); // but nothing gets pinned under the hash key
+
+    await store.fetchVersioned('assets/hd/objects-0.webp', hashOf(body));
+    expect(requests).toHaveLength(2);
+  });
+
   it('treats a changed hash as a new entry and prunes the superseded one', async () => {
     const cache = new FakeCache();
     stubNetwork({ 'assets/hd/units-0.webp': 'first art drop' });

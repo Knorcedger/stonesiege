@@ -98,11 +98,13 @@ export class ArtworkStore {
       headers: response.headers,
     });
     const digest = await contentHashOf(bytes);
-    if (digest === null || digest.startsWith(hash)) {
+    if (digest !== null && digest.startsWith(hash)) {
       await attempt(() => this.cache.put(versioned, restored()));
-    } else {
+    } else if (digest !== null) {
       console.warn(`[assets] ${url} does not match its manifest hash — using it uncached`);
     }
+    // digest === null (no WebCrypto: an insecure origin) stays uncached too —
+    // unverifiable bytes must never become the pinned copy of a hash key.
     return restored();
   }
 
