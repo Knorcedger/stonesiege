@@ -11,10 +11,12 @@ or Google Play's Designed for Families program.
 - App access: unrestricted; reviewers need no account or instructions beyond `reviewNotes`.
 - Ads, tracking, accounts, purchases, loot boxes, gambling, user-generated content, social
   features, location, camera, microphone, contacts, health, and financial features: none.
-- Analytics: anonymous, cookieless gameplay statistics only (Google Analytics 4), optional through
-  the in-game **Share anonymous gameplay stats** setting. No cookies, no advertising identifier, no
-  persistent identifier, and no cross-app or cross-site tracking, so no App Tracking Transparency
-  prompt applies. Google acts as a processor; nothing is shared for a third party's own purposes.
+- Analytics: anonymous gameplay statistics sent only to the first-party StoneSiege service,
+  optional through the in-game **Share anonymous gameplay stats** setting. No cookies, advertising
+  identifier, persistent person/device identifier, or cross-app/cross-site tracking is used, so no
+  App Tracking Transparency prompt applies. Railway and MongoDB Atlas act as infrastructure
+  processors; nothing is shared for a third party's own purposes. Raw events are retained for up
+  to two years and do not contain an IP address.
 - Privacy/Data Safety: **App activity / App interactions** is collected for analytics, not shared,
   not linked to identity, and optional. Apple's equivalent answer is **Usage Data / Product
   Interaction**, used for Analytics, not linked to identity, not used for tracking. Everything else

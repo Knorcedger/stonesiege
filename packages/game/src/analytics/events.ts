@@ -2,19 +2,18 @@
 // (the same shape as flow.ts / summary.ts / progress.ts — all the logic worth
 // testing lives here, and the sink that ships them is trivially mockable).
 //
-// Nothing here knows about gtag, Capacitor, or the network. An event is a name
+// Nothing here knows about a provider, Capacitor, or the network. An event is a name
 // plus flat scalar params; the transport is somebody else's problem.
 //
-// Params are OMITTED when they do not apply rather than sent as null: GA4
-// registers one custom dimension per parameter name and nulls would pollute
-// every practice-only dimension with campaign rows and vice versa.
+// Params are OMITTED when they do not apply rather than sent as null, keeping
+// the first-party event contract compact and unambiguous.
 
 import type { MenuScreen } from '../screens/flow';
 
 export type AnalyticsParams = Record<string, string | number>;
 
 export interface AnalyticsEvent {
-  /** GA4 event name (snake_case, <= 40 chars, never a GA4-reserved name). */
+  /** Allowlisted first-party event name. */
   name: string;
   params: AnalyticsParams;
 }
@@ -28,11 +27,12 @@ export type MatchOutcome = 'victory' | 'defeat';
  * enforce that — callers build one from the live MatchPlan and the builders
  * simply skip whatever is absent.
  *
- * `storyCampaignId` is deliberately NOT emitted as `campaign_id`: GA4 reserves
- * that parameter for traffic-source attribution, so a Wallace/Saladin id sent
- * under it would be read as an ad campaign and never become a usable dimension.
+ * `storyCampaignId` is deliberately distinct from generic marketing-campaign
+ * language: it identifies authored StoneSiege story content.
  */
 export interface MatchContext {
+  /** Random id for joining this match's lifecycle; never identifies a player. */
+  matchId: string;
   mode: MatchMode;
   /** practice */
   civ?: string;
@@ -65,7 +65,7 @@ const put = (
 
 /** Full match identity: mode plus whichever of the practice/campaign fields apply. */
 export function matchContextParams(context: MatchContext): AnalyticsParams {
-  const params: AnalyticsParams = { mode: context.mode };
+  const params: AnalyticsParams = { matchId: context.matchId, mode: context.mode };
   put(params, 'civ', context.civ);
   put(params, 'map_size', context.mapSize);
   put(params, 'opponent_count', context.opponentCount);
@@ -87,7 +87,7 @@ export function matchStartEvent(context: MatchContext): AnalyticsEvent {
  * `match_start` owns.
  */
 export function matchResumeEvent(context: MatchContext): AnalyticsEvent {
-  const params: AnalyticsParams = { mode: context.mode };
+  const params: AnalyticsParams = { matchId: context.matchId, mode: context.mode };
   put(params, 'scenario_id', context.scenarioId);
   put(params, 'story_campaign_id', context.storyCampaignId);
   return { name: 'match_resume', params };
@@ -123,7 +123,7 @@ export function campaignChapterCompleteEvent(
 
 /**
  * A menu screen became the top of the navigation stack — the drop-off funnel
- * before anyone starts a match. NOT named `screen_view`, which GA4 reserves.
+ * before anyone starts a match. `menu_screen` is part of the ingest allowlist.
  */
 export function menuScreenEvent(screen: MenuScreen['id']): AnalyticsEvent {
   return { name: 'menu_screen', params: { screen } };

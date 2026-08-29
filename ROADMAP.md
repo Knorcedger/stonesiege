@@ -28,6 +28,7 @@ and scenario-tool foundations below come first.
 - One autosaved resumable match per campaign plus one for practice, with the pause overlay
   reporting the last autosave time and deterministic restoration
 - Touch-first controls, native mobile wrappers, HD runtime art, and automated quality gates
+- Optional first-party gameplay analytics with no account or persistent person/device identifier
 
 ## Gap audit
 

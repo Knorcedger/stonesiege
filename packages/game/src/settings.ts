@@ -24,8 +24,8 @@ export interface GameSettings {
   /** Rich upgrade effects and unit counter advice in the custom HUD tooltips. */
   extendedTooltips: boolean;
   /**
-   * Share anonymous gameplay statistics. Off means the gtag script is never
-   * loaded at all, not merely that events are suppressed.
+   * Share anonymous gameplay statistics. Off means no analytics request is
+   * made and no analytics session identifier is created.
    */
   analyticsEnabled: boolean;
 }

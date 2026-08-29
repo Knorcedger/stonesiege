@@ -1,5 +1,5 @@
 // Analytics payload building (pure). The shape of these params is a public
-// contract with the GA4 property: renaming one silently empties a dimension.
+// contract with the first-party ingest service: renaming one drops data.
 
 import { describe, expect, it } from 'vitest';
 import {
@@ -9,6 +9,7 @@ import {
 } from './events';
 
 const practice: MatchContext = {
+  matchId: 'match-practice-123',
   mode: 'practice',
   civ: 'scots',
   mapSize: 'medium',
@@ -17,6 +18,7 @@ const practice: MatchContext = {
 };
 
 const campaign: MatchContext = {
+  matchId: 'match-campaign-123',
   mode: 'scenario',
   scenarioId: 'wallace-04-lanark',
   storyCampaignId: 'wallace',
@@ -26,19 +28,19 @@ const campaign: MatchContext = {
 describe('matchContextParams', () => {
   it('sends only the practice fields for a practice match', () => {
     expect(matchContextParams(practice)).toEqual({
-      mode: 'practice', civ: 'scots', map_size: 'medium', opponent_count: 2, difficulty: 'hard',
+      matchId: 'match-practice-123', mode: 'practice', civ: 'scots', map_size: 'medium', opponent_count: 2, difficulty: 'hard',
     });
   });
 
   it('sends only the campaign fields for a scenario match', () => {
     expect(matchContextParams(campaign)).toEqual({
-      mode: 'scenario', scenario_id: 'wallace-04-lanark', story_campaign_id: 'wallace', chapter_index: 3,
+      matchId: 'match-campaign-123', mode: 'scenario', scenario_id: 'wallace-04-lanark', story_campaign_id: 'wallace', chapter_index: 3,
     });
   });
 
   it('omits inapplicable params instead of sending nulls', () => {
-    const params = matchContextParams({ mode: 'practice' });
-    expect(params).toEqual({ mode: 'practice' });
+    const params = matchContextParams({ matchId: 'match-minimum-123', mode: 'practice' });
+    expect(params).toEqual({ matchId: 'match-minimum-123', mode: 'practice' });
     expect(Object.values(params).every((v) => v !== null && v !== undefined)).toBe(true);
   });
 
@@ -46,7 +48,7 @@ describe('matchContextParams', () => {
     expect(matchContextParams({ ...campaign, chapterIndex: 0 }).chapter_index).toBe(0);
   });
 
-  it('never emits GA4-reserved traffic-source parameter names', () => {
+  it('never emits marketing traffic-source parameter names', () => {
     const reserved = ['campaign_id', 'campaign', 'source', 'medium', 'term', 'content'];
     for (const key of Object.keys(matchContextParams(campaign))) {
       expect(reserved).not.toContain(key);
@@ -58,16 +60,16 @@ describe('match lifecycle events', () => {
   it('names the start event and carries the full setup', () => {
     expect(matchStartEvent(practice)).toEqual({
       name: 'match_start',
-      params: { mode: 'practice', civ: 'scots', map_size: 'medium', opponent_count: 2, difficulty: 'hard' },
+      params: { matchId: 'match-practice-123', mode: 'practice', civ: 'scots', map_size: 'medium', opponent_count: 2, difficulty: 'hard' },
     });
   });
 
   it('reports a resume as mode plus ids only, never as a new match', () => {
     expect(matchResumeEvent(campaign)).toEqual({
       name: 'match_resume',
-      params: { mode: 'scenario', scenario_id: 'wallace-04-lanark', story_campaign_id: 'wallace' },
+      params: { matchId: 'match-campaign-123', mode: 'scenario', scenario_id: 'wallace-04-lanark', story_campaign_id: 'wallace' },
     });
-    expect(matchResumeEvent(practice)).toEqual({ name: 'match_resume', params: { mode: 'practice' } });
+    expect(matchResumeEvent(practice)).toEqual({ name: 'match_resume', params: { matchId: 'match-practice-123', mode: 'practice' } });
   });
 
   it('repeats the match context on end events so they stand alone', () => {
@@ -82,6 +84,7 @@ describe('match lifecycle events', () => {
     expect(end).toEqual({
       name: 'match_end',
       params: {
+        matchId: 'match-campaign-123',
         mode: 'scenario',
         scenario_id: 'wallace-04-lanark',
         story_campaign_id: 'wallace',
@@ -124,7 +127,7 @@ describe('match lifecycle events', () => {
 });
 
 describe('shell events', () => {
-  it('reports menu screens under a name GA4 does not reserve', () => {
+  it('reports menu screens under the first-party allowlisted name', () => {
     expect(menuScreenEvent('briefing')).toEqual({ name: 'menu_screen', params: { screen: 'briefing' } });
     expect(menuScreenEvent('title').name).not.toBe('screen_view');
   });

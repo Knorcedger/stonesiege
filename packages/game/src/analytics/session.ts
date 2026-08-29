@@ -9,12 +9,11 @@
 // what the cookieless design refuses to create. sessionStorage sits precisely
 // between the two — it survives reloads and dies with the tab or app process.
 //
-// Both ids are needed. Cookieless GA4 (Consent Mode `analytics_storage:
-// 'denied'`) keeps no cookie of its own, so it can persist neither the client
-// id nor the session id; supplying only the client id would leave every reload
-// starting a fresh session.
+// The first-party service uses this only to group events from one sitting. It
+// is not copied to localStorage and cannot follow a player across sessions.
 
-export const SESSION_KEY = 'bf.analytics.session.v1';
+export const SESSION_KEY = 'bf.analytics.session.v2';
+const SESSION_ID_PATTERN = /^[A-Za-z0-9_-]{1,64}$/;
 
 /** Minimal slice of the Web Storage API this needs (sessionStorage satisfies it). */
 export interface SessionStore {
@@ -23,9 +22,7 @@ export interface SessionStore {
 }
 
 export interface AnalyticsSession {
-  /** GA4 `client_id`. */
-  clientId: string;
-  /** GA4 `session_id`. Digits only — GA4 treats it as a number. */
+  /** Random id for one tab/app session only. */
   sessionId: string;
   /**
    * True only when this call minted the identity, i.e. the app was genuinely
@@ -36,14 +33,13 @@ export interface AnalyticsSession {
 }
 
 /** Defensive decode, like every other stored record in this package. */
-function decode(raw: string | null): { clientId: string; sessionId: string } | null {
+function decode(raw: string | null): { sessionId: string } | null {
   if (!raw) return null;
   try {
-    const parsed = JSON.parse(raw) as Partial<Record<'clientId' | 'sessionId', unknown>>;
-    const { clientId, sessionId } = parsed;
-    if (typeof clientId !== 'string' || clientId.length === 0) return null;
-    if (typeof sessionId !== 'string' || sessionId.length === 0) return null;
-    return { clientId, sessionId };
+    const parsed = JSON.parse(raw) as Partial<Record<'sessionId', unknown>>;
+    const { sessionId } = parsed;
+    if (typeof sessionId !== 'string' || !SESSION_ID_PATTERN.test(sessionId)) return null;
+    return { sessionId };
   } catch {
     return null;
   }
@@ -57,16 +53,15 @@ function decode(raw: string | null): { clientId: string; sessionId: string } | n
  */
 export function resolveAnalyticsSession(
   store: SessionStore | null | undefined,
-  makeClientId: () => string,
   makeSessionId: () => string,
 ): AnalyticsSession {
   try {
     const existing = decode(store?.getItem(SESSION_KEY) ?? null);
     if (existing) return { ...existing, isNewSession: false };
   } catch {
-    return { clientId: makeClientId(), sessionId: makeSessionId(), isNewSession: true };
+    return { sessionId: makeSessionId(), isNewSession: true };
   }
-  const minted = { clientId: makeClientId(), sessionId: makeSessionId() };
+  const minted = { sessionId: makeSessionId() };
   try {
     store?.setItem(SESSION_KEY, JSON.stringify(minted));
   } catch {

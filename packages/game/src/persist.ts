@@ -48,6 +48,8 @@ export interface PracticeSnapshot {
   tallies?: MatchTallies;
   /** Player-facing last-seen resource state; never reconstructed from hidden live truth. */
   resourceMemory?: ResourceMemorySnapshot;
+  /** Random analytics join key for this saved match only; not a player/device id. */
+  analyticsMatchId?: string;
 }
 
 export interface ScenarioSnapshot {
@@ -70,6 +72,8 @@ export interface ScenarioSnapshot {
   tallies?: MatchTallies;
   /** Player-facing last-seen resource state; never reconstructed from hidden live truth. */
   resourceMemory?: ResourceMemorySnapshot;
+  /** Random analytics join key for this saved match only; not a player/device id. */
+  analyticsMatchId?: string;
 }
 
 export type MatchSnapshot = PracticeSnapshot | ScenarioSnapshot;
@@ -118,6 +122,7 @@ const LEGACY_DIFFICULTIES: readonly string[] = ['easy', 'standard', 'hard'];
 const MAP_SIZES = ['small', 'medium', 'large'];
 
 const isInt = (n: unknown): n is number => typeof n === 'number' && Number.isInteger(n);
+const ANALYTICS_ID_PATTERN = /^[A-Za-z0-9_-]{8,64}$/;
 
 /** Parse + validate; null for anything that cannot be resumed safely. */
 export function decodeSnapshot(raw: string | null): MatchSnapshot | null {
@@ -127,6 +132,9 @@ export function decodeSnapshot(raw: string | null): MatchSnapshot | null {
     if (s.version !== SNAPSHOT_VERSION && s.version !== 2) return null;
     if (!isInt(s.tick) || s.tick < 0) return null;
     if (!Array.isArray(s.log)) return null;
+    if (s.analyticsMatchId !== undefined
+      && (typeof s.analyticsMatchId !== 'string'
+        || !ANALYTICS_ID_PATTERN.test(s.analyticsMatchId))) return null;
     if (s.tallies !== undefined && !isMatchTallies(s.tallies)) return null;
     const resourceMemory = s.resourceMemory === undefined
       ? undefined : canonicalResourceMemorySnapshot(s.resourceMemory);

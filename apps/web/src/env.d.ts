@@ -5,9 +5,8 @@ declare const __APP_VERSION__: string;
 
 interface ImportMetaEnv {
   /**
-   * Google Analytics 4 measurement id. Absent in local checkouts and in every
-   * dev build; set as a Vercel project variable for the deployed game. An empty
-   * or missing value disables measurement entirely.
+   * Full first-party event-ingest URL. Absent in local checkouts and every dev
+   * build; set only for production. Empty or missing disables measurement.
    */
-  readonly VITE_GA_ID?: string;
+  readonly VITE_ANALYTICS_ENDPOINT?: string;
 }

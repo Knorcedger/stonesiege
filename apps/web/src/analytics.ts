@@ -1,160 +1,219 @@
-// The platform half of anonymous gameplay analytics: cookieless Google
-// Analytics 4, loaded through a dynamically injected async <script> (the same
-// shape as the dynamic import() of @capacitor/app in native.ts) so the measured
-// game keeps its zero-dependency bundle. @bf/game only ever sees the
-// AnalyticsSink interface from here.
-//
-// Cookieless by construction, verified against a real gtag.js payload:
-//  - Consent Mode `analytics_storage: 'denied'` — the only thing that actually
-//    stops GA4 writing _ga and _ga_<id>. The `client_storage` / `storage`
-//    config fields are Universal Analytics leftovers: GA4 does not recognise
-//    them, forwards them to every event as custom parameters, and writes the
-//    cookies anyway.
-//  - client_id, session_id — random ids held in sessionStorage, which die with
-//    the tab or app process. With storage denied GA4 can persist neither, so
-//    both must be supplied or every match-exit reload starts a new session.
-//  - send_page_view: false — the game sends its own gameplay events.
-//  - Google Signals and ad personalisation explicitly denied.
-//
-// Offline-first by construction: dataLayer.push() is a synchronous array write
-// that works whether or not the script ever arrives, nothing here is awaited on
-// the boot path, and every entry point is wrapped so a blocked request, an ad
-// blocker, or a storage-denied WebView is invisible to the player.
+// First-party gameplay analytics. @bf/game only sees AnalyticsSink; this file
+// owns the network envelope, batching, session identity, retry, and lifecycle
+// flushing. Every path is fire-and-forget so analytics can never block play.
 
 import { createAnalyticsSink, noopAnalytics, type AnalyticsSink } from '@bf/game/analytics/sink';
+import { randomAnalyticsId } from '@bf/game/analytics/id';
 import { resolveAnalyticsSession, type AnalyticsSession } from '@bf/game/analytics/session';
+import type { AnalyticsParams } from '@bf/game/analytics/events';
 import { getSettings } from '@bf/game/settings';
 
-const GTAG_SRC = 'https://www.googletagmanager.com/gtag/js?id=';
+const MAX_BATCH_SIZE = 50;
+const FLUSH_DELAY_MS = 250;
+const RETRY_DELAY_MS = 1_000;
 
-interface DataLayerWindow extends Window {
-  dataLayer?: unknown[];
+export interface GameplayAnalyticsEnvelope {
+  eventId: string;
+  eventName: string;
+  sessionId: string;
+  occurredAt: number;
+  platform: string;
+  appVersion: string;
+  props: AnalyticsParams;
 }
 
-/** RFC 4122-ish random id. crypto.randomUUID needs a secure context; degrade rather than throw. */
-function randomClientId(): string {
-  try {
-    if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
-      return crypto.randomUUID();
-    }
-    if (typeof crypto !== 'undefined' && typeof crypto.getRandomValues === 'function') {
-      const bytes = crypto.getRandomValues(new Uint8Array(16));
-      return Array.from(bytes, (b) => b.toString(16).padStart(2, '0')).join('');
-    }
-  } catch {
-    // fall through to the arithmetic fallback
-  }
-  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 12)}`;
+type FetchLike = (
+  input: string,
+  init: {
+    method: 'POST';
+    headers: { 'Content-Type': 'text/plain' };
+    body: string;
+    keepalive: true;
+    credentials: 'omit';
+    mode: 'cors';
+  },
+) => Promise<{ ok: boolean; status: number }>;
+
+type TimerHandle = ReturnType<typeof setTimeout>;
+
+interface QueuedEvent {
+  envelope: GameplayAnalyticsEnvelope;
+  attempts: number;
 }
 
-/** GA4 reads session_id as a number; epoch seconds is what GA itself uses. */
-function newSessionId(): string {
-  return String(Math.floor(Date.now() / 1000));
+export interface FirstPartyTransport {
+  track(name: string, params: AnalyticsParams): void;
+  flush(): Promise<void>;
+}
+
+export interface FirstPartyTransportOptions {
+  endpoint: string;
+  platform: string;
+  appVersion: string;
+  enabled: () => boolean;
+  getSessionId: () => string;
+  fetch: FetchLike;
+  makeId?: () => string;
+  now?: () => number;
+  schedule?: (callback: () => void, delayMs: number) => TimerHandle;
+  cancel?: (handle: TimerHandle) => void;
+}
+
+/**
+ * Pure, dependency-injected batching transport. Exported so the exact wire
+ * behavior can be tested in Node without a DOM or a live analytics service.
+ */
+export function createFirstPartyTransport(options: FirstPartyTransportOptions): FirstPartyTransport {
+  const {
+    endpoint,
+    platform,
+    appVersion,
+    enabled,
+    getSessionId,
+    fetch,
+    makeId = randomAnalyticsId,
+    now = Date.now,
+    schedule = (callback, delayMs) => setTimeout(callback, delayMs),
+    cancel = clearTimeout,
+  } = options;
+  const queue: QueuedEvent[] = [];
+  let timer: TimerHandle | null = null;
+  let inFlight: Promise<void> | null = null;
+
+  const scheduleFlush = (delayMs: number): void => {
+    if (timer !== null) return;
+    timer = schedule(() => {
+      timer = null;
+      void flush();
+    }, delayMs);
+  };
+
+  const flush = async (): Promise<void> => {
+    if (!enabled()) {
+      queue.length = 0;
+      if (timer !== null) cancel(timer);
+      timer = null;
+      return;
+    }
+    if (inFlight) {
+      await inFlight;
+      return queue.length > 0 ? flush() : undefined;
+    }
+    if (queue.length === 0) return;
+
+    if (timer !== null) cancel(timer);
+    timer = null;
+    const batch = queue.splice(0, MAX_BATCH_SIZE);
+
+    inFlight = (async () => {
+      let retry = false;
+      try {
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'text/plain' },
+          body: JSON.stringify(batch.map(({ envelope }) => envelope)),
+          keepalive: true,
+          credentials: 'omit',
+          mode: 'cors',
+        });
+        retry = response.status === 429 || response.status >= 500;
+      } catch {
+        retry = true;
+      }
+
+      if (retry) {
+        const retryable = batch
+          .filter(({ attempts }) => attempts === 0)
+          .map(({ envelope }) => ({ envelope, attempts: 1 }));
+        queue.unshift(...retryable);
+      }
+    })().finally(() => {
+      inFlight = null;
+      if (!enabled()) queue.length = 0;
+      if (queue.length > 0) {
+        const hasRetry = queue.some(({ attempts }) => attempts > 0);
+        scheduleFlush(hasRetry ? RETRY_DELAY_MS : FLUSH_DELAY_MS);
+      }
+    });
+
+    return inFlight;
+  };
+
+  return {
+    track(name, params) {
+      if (!enabled()) {
+        queue.length = 0;
+        return;
+      }
+      queue.push({
+        attempts: 0,
+        envelope: {
+          eventId: makeId(),
+          eventName: name,
+          sessionId: getSessionId(),
+          occurredAt: now(),
+          platform,
+          appVersion,
+          props: params,
+        },
+      });
+      scheduleFlush(FLUSH_DELAY_MS);
+      if (queue.length >= MAX_BATCH_SIZE) void flush();
+    },
+    flush,
+  };
 }
 
 function sessionStore(): Storage | null {
   try {
     return typeof sessionStorage === 'undefined' ? null : sessionStorage;
   } catch {
-    return null; // privacy mode / storage-denied WebView
+    return null;
   }
 }
 
 export interface WebAnalytics {
   analytics: AnalyticsSink;
-  /**
-   * True only on a genuine launch. Every match exit reloads the page, so this
-   * is what keeps `app_open` meaning "opened the game" rather than "left a match".
-   */
+  /** True only for the first boot of a tab/app session, not match-exit reloads. */
   isNewSession: boolean;
 }
 
 const disabled: WebAnalytics = { analytics: noopAnalytics, isNewSession: false };
 
-/**
- * Build the reporting sink for this boot. Returns a sink that measures nothing
- * unless a measurement id was configured for a production build; the player's
- * opt-out is re-read on every event, and while it is off no gtag script is
- * requested and no session id is stored.
- */
 export function createWebAnalytics(options: {
-  measurementId: string | undefined;
+  endpoint: string | undefined;
   appVersion: string;
   platform: string;
 }): WebAnalytics {
-  const { measurementId, appVersion, platform } = options;
-  if (typeof measurementId !== 'string' || measurementId.length === 0) return disabled;
+  const { endpoint, appVersion, platform } = options;
+  if (typeof endpoint !== 'string' || endpoint.length === 0) return disabled;
   if (typeof window === 'undefined') return disabled;
 
-  const win = window as DataLayerWindow;
   let session: AnalyticsSession | null = null;
-  let started = false;
-
   const ensureSession = (): AnalyticsSession =>
-    (session ??= resolveAnalyticsSession(sessionStore(), randomClientId, newSessionId));
+    (session ??= resolveAnalyticsSession(sessionStore(), randomAnalyticsId));
 
-  /**
-   * Google's own snippet, verbatim in behaviour: gtag pushes the `arguments`
-   * object, and the tag's queue reader distinguishes that from a plain array
-   * (which it would treat as a dataLayer variable update instead of a command).
-   */
-  const gtag: (...args: unknown[]) => void = function gtagCommand(): void {
-    // eslint-disable-next-line prefer-rest-params
-    win.dataLayer?.push(arguments);
+  const transport = createFirstPartyTransport({
+    endpoint,
+    platform,
+    appVersion,
+    enabled: () => getSettings().analyticsEnabled,
+    getSessionId: () => ensureSession().sessionId,
+    fetch: (input, init) => window.fetch(input, init),
+  });
+
+  const flushWhenHidden = (): void => {
+    if (document.visibilityState === 'hidden') void transport.flush();
   };
-
-  /**
-   * Bootstrap gtag on the first event that is actually allowed to be sent, so
-   * an opted-out player never causes a request to googletagmanager.com. Queued
-   * dataLayer commands are flushed by the script whenever — or if ever — it lands.
-   */
-  const ensureStarted = (): void => {
-    if (started) return;
-    started = true;
-    win.dataLayer ??= [];
-    // Consent Mode is what actually makes this cookieless. It must be pushed
-    // before the config command. analytics_storage: 'denied' is the only
-    // supported way to stop GA4 writing _ga / _ga_<id>; the `client_storage`
-    // and `storage` config fields are Universal Analytics leftovers that GA4
-    // does not recognise and silently forwards to every event as a custom
-    // parameter while still setting the cookie. Nothing here is advertising, so
-    // the ad signals are denied too.
-    gtag('consent', 'default', {
-      analytics_storage: 'denied',
-      ad_storage: 'denied',
-      ad_user_data: 'denied',
-      ad_personalization: 'denied',
-    });
-    gtag('js', new Date());
-    const { clientId, sessionId } = ensureSession();
-    gtag('config', measurementId, {
-      client_id: clientId,
-      session_id: sessionId,
-      send_page_view: false,
-      allow_google_signals: false,
-      allow_ad_personalization_signals: false,
-    });
-
-    const script = document.createElement('script');
-    script.async = true;
-    script.src = `${GTAG_SRC}${encodeURIComponent(measurementId)}`;
-    // A blocked or offline request is expected, not exceptional: the queued
-    // commands simply stay in the array and the game never notices.
-    script.addEventListener('error', () => undefined);
-    document.head.appendChild(script);
-  };
+  document.addEventListener('visibilitychange', flushWhenHidden);
+  window.addEventListener('pagehide', () => void transport.flush());
 
   return {
     analytics: createAnalyticsSink({
-      common: { platform, app_version: appVersion },
       enabled: () => getSettings().analyticsEnabled,
-      transport: (name, params) => {
-        ensureStarted();
-        gtag('event', name, params);
-      },
+      transport: (name, params) => transport.track(name, params),
     }),
-    // Resolving this eagerly costs one sessionStorage read; doing it only when
-    // reporting is on means an opted-out player writes nothing at all.
+    // Do not create even a session-scoped id for a player who has opted out.
     isNewSession: getSettings().analyticsEnabled ? ensureSession().isNewSession : false,
   };
 }
