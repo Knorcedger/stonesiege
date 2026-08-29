@@ -98,17 +98,18 @@ belong in the shared 1Password vault, never in Git.
 
 ## Privacy and release checklist
 
-The current build has no accounts, ads, tracking, push notifications, purchases, or third-party
-network services beyond analytics. Settings, campaign progress, and resumable-match snapshots
-remain in the app's local WebView storage.
+The current build has no accounts, ads, tracking, push notifications, or purchases. Settings,
+campaign progress, and resumable-match snapshots remain in the app's local WebView storage.
 
-Anonymous gameplay statistics are reported through Google Analytics 4 when the build is configured
-with `VITE_GA_ID`: app launches, menu screens visited, and match start/resume/end with outcome,
-duration, and setup. The configuration is cookieless through Consent Mode
-(`analytics_storage: 'denied'`), the client identifier is a random value held in session storage
-and discarded when the app closes, and Google Signals and ad personalization are disabled. Players
-can turn collection off entirely under
-**Settings → Share anonymous gameplay stats**, which prevents the gtag script from loading at all.
+When the production build is configured with `VITE_ANALYTICS_ENDPOINT`, anonymous gameplay
+statistics go only to the first-party StoneSiege service: app launches, menu screens, match
+start/resume/end and campaign completion, with outcome, duration, setup, match statistics,
+platform, and app version. There are no cookies, advertising identifiers, or persistent person or
+device identifiers. A random ID held in session storage is discarded when the app closes; a
+separate random match ID joins one saved match's lifecycle. Raw events are encrypted in transit,
+stored for up to two years on Railway/MongoDB Atlas infrastructure, and contain no stored IP
+address. Players can turn collection off entirely under
+**Settings → Share anonymous gameplay stats**, after which no gameplay analytics request is sent.
 The store privacy questionnaires therefore declare app-activity collection for analytics, not
 shared and not linked to identity, with no cross-app or cross-site tracking and no ATT prompt.
 Reassess every disclosure before release if any further online service or SDK is added.

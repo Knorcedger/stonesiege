@@ -146,6 +146,8 @@ describe('decodeSnapshot (defensive intake)', () => {
   it('accepts valid practice and scenario snapshot round-trips', () => {
     expect(decodeSnapshot(encodeSnapshot(valid()))).toEqual(valid());
     expect(decodeSnapshot(encodeSnapshot(validScenario()))).toEqual(validScenario());
+    const withMatchId = { ...valid(), analyticsMatchId: 'match-saved-1234' };
+    expect(decodeSnapshot(encodeSnapshot(withMatchId))).toEqual(withMatchId);
     const withTallies = { ...valid(), tallies: { ...emptyTallies(4), foodGathered: 120 } };
     expect(decodeSnapshot(encodeSnapshot(withTallies))).toEqual(withTallies);
   });
@@ -181,6 +183,7 @@ describe('decodeSnapshot (defensive intake)', () => {
     expect(decodeSnapshot(JSON.stringify(scenarioMap))).toBeNull();
     expect(decodeSnapshot(JSON.stringify({ ...validScenario(), scenarioId: '' }))).toBeNull();
     expect(decodeSnapshot(JSON.stringify({ ...validScenario(), seed: 'x' }))).toBeNull();
+    expect(decodeSnapshot(JSON.stringify({ ...valid(), analyticsMatchId: 'bad id' }))).toBeNull();
     expect(decodeSnapshot(JSON.stringify({
       ...valid(), tallies: { ...emptyTallies(), buildingsBuilt: -1 },
     }))).toBeNull();

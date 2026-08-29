@@ -15,12 +15,12 @@ app.innerHTML = '<div style="color:#c9b98a;font:16px monospace;padding:2rem">Sto
 
 /**
  * The only place that reads the analytics configuration. Measurement is on
- * only for a production build with a measurement id configured — a dev server
- * must never pollute the property with playtesting.
+ * only for a production build with a first-party endpoint configured — a dev
+ * server must never pollute the service with playtesting.
  */
 function bootAnalytics(): WebAnalytics {
   return createWebAnalytics({
-    measurementId: import.meta.env.DEV ? undefined : import.meta.env.VITE_GA_ID,
+    endpoint: import.meta.env.DEV ? undefined : import.meta.env.VITE_ANALYTICS_ENDPOINT,
     appVersion: __APP_VERSION__,
     platform: nativePlatform(),
   });

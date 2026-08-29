@@ -1,6 +1,6 @@
 // The analytics seam. @bf/game codes strictly against this interface and ships
-// a no-op default, so the renderer never learns that gtag, Capacitor, or a
-// network exist; apps/web injects the real implementation through startApp the
+// a no-op default, so the renderer never learns which service or network
+// implementation is used; apps/web injects it through startApp the
 // same way ScenarioUiHooks are injected into game.ts.
 //
 // Two hard rules, both enforced here rather than at every call site:
@@ -19,7 +19,7 @@ export interface AnalyticsSink {
 export const noopAnalytics: AnalyticsSink = { track: () => undefined };
 
 export interface AnalyticsSinkOptions {
-  /** Hands the finished event to the provider. May throw; the sink absorbs it. */
+  /** Hands the finished event to the transport. May throw; the sink absorbs it. */
   transport: (name: string, params: AnalyticsParams) => void;
   /** Stamped onto every event (platform, app_version). */
   common?: AnalyticsParams;
@@ -36,8 +36,8 @@ export function createAnalyticsSink(options: AnalyticsSinkOptions): AnalyticsSin
         const stamped = withCommonParams(event, common);
         transport(stamped.name, stamped.params);
       } catch {
-        // Measurement is never worth a broken game: a blocked script, a
-        // storage-denied WebView, or an ad blocker must all be invisible.
+        // Measurement is never worth a broken game: unavailable storage or a
+        // blocked/offline request must be invisible to the player.
       }
     },
   };

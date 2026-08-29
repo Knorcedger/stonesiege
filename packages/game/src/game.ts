@@ -57,6 +57,7 @@ import {
   campaignChapterCompleteEvent, matchEndEvent, matchResumeEvent, matchStartEvent,
   type MatchContext,
 } from './analytics/events';
+import { randomAnalyticsId } from './analytics/id';
 import { noopAnalytics, type AnalyticsSink } from './analytics/sink';
 import {
   campaignEpilogueDue, completeScenario, loadProgress, saveProgress,
@@ -168,9 +169,10 @@ function resolvePlan(options: RunGameOptions): MatchPlan | null {
 }
 
 /** What this match is, for anonymous reporting. Practice and campaign fields are disjoint. */
-function analyticsContext(plan: MatchPlan): MatchContext {
+function analyticsContext(plan: MatchPlan, matchId: string): MatchContext {
   if (plan.mode === 'scenario') {
     return {
+      matchId,
       mode: 'scenario',
       ...(plan.meta ? {
         scenarioId: plan.meta.id,
@@ -180,6 +182,7 @@ function analyticsContext(plan: MatchPlan): MatchContext {
     };
   }
   return {
+    matchId,
     mode: 'practice',
     ...(plan.setup ? {
       civ: plan.setup.civ,
@@ -334,7 +337,8 @@ async function bootGame(
 
   // A resumed snapshot is the player returning to a match already counted at
   // its start, so it reports match_resume instead of inflating match_start.
-  const matchContext = analyticsContext(plan);
+  const matchId = snapshot?.analyticsMatchId ?? randomAnalyticsId();
+  const matchContext = analyticsContext(plan, matchId);
   analytics.track(snapshot === null ? matchStartEvent(matchContext) : matchResumeEvent(matchContext));
 
   // ------------------------------------------------------------------ audio
@@ -701,8 +705,8 @@ async function bootGame(
     const summary = deriveMatchSummary(getState(), humanPlayer, tallies);
     // One fire per match: the endShown guard above already guarantees it, and a
     // resignation arrives here through the sim's playerDefeated -> showEnd(false).
-    // Killing the app mid-match never reaches this, so match_start minus
-    // match_end IS the abandonment rate.
+    // Killing the app mid-match never reaches this. The per-match id lets the
+    // aggregate report distinguish an open match from one resumed and ended later.
     analytics.track(matchEndEvent(matchContext, {
       outcome: victory ? 'victory' : 'defeat',
       durationSeconds: summary.durationSeconds,
@@ -882,12 +886,14 @@ async function bootGame(
         // def + game data ('' can never match, degrading to "no resume")
         fingerprint: scenarioFingerprint(meta.id) ?? '',
         seed: config.seed, tick: st.tick, log: commandLog,
+        analyticsMatchId: matchId,
         tallies: copyTallies(tallies), resourceMemory: resourceMemory.snapshot(), ...withBlob,
       });
     } else if (plan.setup) {
       stored = saveSnapshot({
         version: SNAPSHOT_VERSION, mode: 'practice', config, setup: plan.setup,
         tick: st.tick, log: commandLog, tallies: copyTallies(tallies),
+        analyticsMatchId: matchId,
         resourceMemory: resourceMemory.snapshot(), ...withBlob,
       });
     }

@@ -57,6 +57,12 @@ Notable player-facing and contributor-facing changes are recorded here. StoneSie
 
 ### Changed
 
+- Gameplay statistics now go to StoneSiege's own aggregate reporting service instead of Google
+  Analytics. Events use one session-scoped random ID and a separate per-match join ID, with no
+  cookie, account, advertising identifier, or persistent person/device identifier. Turning off
+  **Share anonymous gameplay stats** stops all gameplay analytics requests.
+- Updated the public privacy and store disclosures for the first-party service, its two-year raw
+  event retention, and its Railway/MongoDB Atlas infrastructure. The service stores no IP address.
 - Roads look their age, and behave like roads. A road is now a ribbon of worn earth laid
   over the ground rather than a row of tile-shaped patches: it has a crown polished pale by
   traffic, two cart ruts that wander and break, damp shoulders, weeds, and a frayed edge that

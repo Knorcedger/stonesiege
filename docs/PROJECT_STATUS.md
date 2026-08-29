@@ -1,6 +1,6 @@
 # StoneSiege project status
 
-_Last updated: 2026-08-20_
+_Last updated: 2026-08-29_
 
 StoneSiege is a playable single-player RTS in **alpha**. The public browser build and internal Android and iOS builds share one offline game bundle and the same deterministic simulation.
 
@@ -15,7 +15,7 @@ StoneSiege is a playable single-player RTS in **alpha**. The public browser buil
 | Repository | Public at [github.com/Knorcedger/stonesiege](https://github.com/Knorcedger/stonesiege) |
 | Accounts, ads, purchases | None in the current build |
 
-The current store builds collect no user data through accounts, advertising, tracking, purchases, push notifications, or project-operated network services. They do report anonymous gameplay statistics through cookieless Google Analytics 4 — app launches, menu screens visited, and match start/resume/end with outcome, duration, and setup — with no cookie, no advertising identifier, and no persistent identifier; the client id is a random value held in session storage and discarded when the app closes. Players can turn it off under **Settings → Share anonymous gameplay stats**, which stops the analytics script from loading. Campaign progress, settings, and resumable matches remain on-device. This must be reassessed before any further online feature or SDK is added.
+The current store builds have no accounts, advertising, cross-app tracking, purchases, or push notifications. They can report anonymous gameplay statistics to the first-party StoneSiege service — app launches, menu screens, and match start/resume/end with outcome, duration, setup, match statistics, platform, and app version. No cookie, advertising identifier, persistent person/device identifier, or IP address is stored. A random session ID is discarded when the app closes; a separate match ID joins only one match lifecycle. Raw events are retained for up to two years on Railway/MongoDB Atlas infrastructure. Players can turn reporting off under **Settings → Share anonymous gameplay stats**, after which no gameplay analytics request is sent. Campaign progress, settings, and resumable matches remain on-device. This must be reassessed before any further online feature or SDK is added.
 
 ## What is playable
 
